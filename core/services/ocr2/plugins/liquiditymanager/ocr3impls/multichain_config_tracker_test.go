@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/no_op_ocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest/heavyweight"
@@ -25,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/graph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/ocr3impls"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
 
 func setupLogPoller[RI ocr3impls.MultichainMeta](t *testing.T, db *sqlx.DB, bs *keyringsAndSigners[RI]) (logpoller.LogPoller, testUniverse[RI]) {
@@ -42,7 +44,11 @@ func setupLogPoller[RI ocr3impls.MultichainMeta](t *testing.T, db *sqlx.DB, bs *
 		RpcBatchSize:             100,
 		KeepFinalizedBlocksDepth: 200,
 	}
-	lp := logpoller.NewLogPoller(o, uni.simClient, lggr, lpOpts)
+	headTracker := headtracker.NewSimulatedHeadTracker(uni.simClient, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+	if lpOpts.PollPeriod == 0 {
+		lpOpts.PollPeriod = 1 * time.Hour
+	}
+	lp := logpoller.NewLogPoller(o, uni.simClient, lggr, headTracker, lpOpts)
 	return lp, uni
 }
 
@@ -56,7 +62,7 @@ func TestMultichainConfigTracker_New(t *testing.T) {
 		_, uni := setupLogPoller[multichainMeta](t, db, nil)
 
 		masterChain := commontypes.RelayID{
-			Network: commontypes.NetworkEVM,
+			Network: relay.NetworkEVM,
 			ChainID: testutils.SimulatedChainID.String(),
 		}
 		mockDiscovererFactory := discoverermocks.NewFactory(t)
@@ -78,7 +84,7 @@ func TestMultichainConfigTracker_New(t *testing.T) {
 		lp, uni := setupLogPoller[multichainMeta](t, db, nil)
 
 		masterChain := commontypes.RelayID{
-			Network: commontypes.NetworkEVM,
+			Network: relay.NetworkEVM,
 			ChainID: testutils.SimulatedChainID.String(),
 		}
 		mockDiscovererFactory := discoverermocks.NewFactory(t)
@@ -100,7 +106,7 @@ func TestMultichainConfigTracker_New(t *testing.T) {
 		lp, uni := setupLogPoller[multichainMeta](t, db, nil)
 
 		masterChain := commontypes.RelayID{
-			Network: commontypes.NetworkEVM,
+			Network: relay.NetworkEVM,
 			ChainID: testutils.SimulatedChainID.String(),
 		}
 		_, err := ocr3impls.NewMultichainConfigTracker(
@@ -124,7 +130,7 @@ func TestMultichainConfigTracker_SingleChain(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, lp.Close()) })
 
 	masterChain := commontypes.RelayID{
-		Network: commontypes.NetworkEVM,
+		Network: relay.NetworkEVM,
 		ChainID: testutils.SimulatedChainID.String(),
 	}
 
@@ -164,7 +170,7 @@ func TestMultichainConfigTracker_SingleChain(t *testing.T) {
 	// fetch config digest from the tracker
 	changedInBlock, configDigest, err := tracker.LatestConfigDetails(testutils.Context(t))
 	require.NoError(t, err, "failed to get latest config details")
-	c, err := uni.wrapper.LatestConfigDigestAndEpoch(nil)
+	c, err := uni.wrapper.LatestConfigDetails(nil)
 	require.NoError(t, err, "failed to get latest config digest and epoch")
 	require.Equal(t, hex.EncodeToString(c.ConfigDigest[:]), configDigest.Hex(), "expected latest config digest to match")
 
@@ -223,11 +229,11 @@ func TestMultichainConfigTracker_Multichain(t *testing.T) {
 	// the chain id's we're using in the mappings are different from the
 	// simulated chain id but that should be fine for this test.
 	masterChain := commontypes.RelayID{
-		Network: commontypes.NetworkEVM,
+		Network: relay.NetworkEVM,
 		ChainID: strconv.FormatUint(chainsel.TEST_90000001.EvmChainID, 10),
 	}
 	secondChain := commontypes.RelayID{
-		Network: commontypes.NetworkEVM,
+		Network: relay.NetworkEVM,
 		ChainID: strconv.FormatUint(chainsel.TEST_90000002.EvmChainID, 10),
 	}
 
@@ -277,7 +283,7 @@ func TestMultichainConfigTracker_Multichain(t *testing.T) {
 	// fetch config digest from the tracker
 	changedInBlock, configDigest, err := tracker.LatestConfigDetails(testutils.Context(t))
 	require.NoError(t, err, "failed to get latest config details")
-	c, err := uni1.wrapper.LatestConfigDigestAndEpoch(nil)
+	c, err := uni1.wrapper.LatestConfigDetails(nil)
 	require.NoError(t, err, "failed to get latest config digest and epoch")
 	require.Equal(t, hex.EncodeToString(c.ConfigDigest[:]), configDigest.Hex(), "expected latest config digest to match")
 

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/montanaflynn/stats"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/vrf_v2plus_load_test_with_metrics"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -287,6 +289,13 @@ func WrapperConfigure(
 	helpers.ConfirmTXMined(context.Background(), e.Ec, tx, e.ChainID)
 }
 
+func PrintWrapperConfig(wrapper *vrfv2plus_wrapper.VRFV2PlusWrapper) {
+	cfg, err := wrapper.GetConfig(nil)
+	helpers.PanicErr(err)
+	fmt.Printf("Wrapper config: %+v\n", cfg)
+	fmt.Printf("Wrapper Keyhash: %s\n", fmt.Sprintf("0x%x", cfg.KeyHash))
+}
+
 func WrapperConsumerDeploy(
 	e helpers.Environment,
 	link, wrapper common.Address,
@@ -308,4 +317,41 @@ func EoaV2PlusLoadTestConsumerWithMetricsDeploy(e helpers.Environment, consumerC
 	)
 	helpers.PanicErr(err)
 	return helpers.ConfirmContractDeployed(context.Background(), e.Ec, tx, e.ChainID)
+}
+
+func CalculateFulfillmentResponseTimePercentiles(e helpers.Environment, consumer *vrf_v2plus_load_test_with_metrics.VRFV2PlusLoadTestWithMetrics) (float64, float64, error) {
+	var responseTimesInBlocks []uint32
+	for {
+		currentResponseTimesInBlocks, err := consumer.GetRequestBlockTimes(&bind.CallOpts{
+			From:    e.Owner.From,
+			Context: context.Background(),
+		}, big.NewInt(int64(len(responseTimesInBlocks))), big.NewInt(1000))
+		if err != nil {
+			return 0, 0, err
+		}
+		if len(currentResponseTimesInBlocks) == 0 {
+			break
+		}
+		responseTimesInBlocks = append(responseTimesInBlocks, currentResponseTimesInBlocks...)
+	}
+	var p90FulfillmentBlockTime, p95FulfillmentBlockTime float64
+	var err error
+	if len(responseTimesInBlocks) == 0 {
+		p90FulfillmentBlockTime = 0
+		p95FulfillmentBlockTime = 0
+	} else {
+		responseTimesInBlocksFloat64 := make([]float64, len(responseTimesInBlocks))
+		for i, value := range responseTimesInBlocks {
+			responseTimesInBlocksFloat64[i] = float64(value)
+		}
+		p90FulfillmentBlockTime, err = stats.Percentile(responseTimesInBlocksFloat64, 90)
+		if err != nil {
+			return 0, 0, err
+		}
+		p95FulfillmentBlockTime, err = stats.Percentile(responseTimesInBlocksFloat64, 95)
+		if err != nil {
+			return 0, 0, err
+		}
+	}
+	return p90FulfillmentBlockTime, p95FulfillmentBlockTime, nil
 }

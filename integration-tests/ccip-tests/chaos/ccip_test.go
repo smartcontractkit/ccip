@@ -107,7 +107,7 @@ func TestChaosCCIP(t *testing.T) {
 			var numOfRequests = 3
 
 			setUpArgs := testsetups.CCIPDefaultTestSetUp(
-				t, l, "chaos-ccip", nil, testCfg)
+				t, &l, "chaos-ccip", nil, testCfg)
 
 			if len(setUpArgs.Lanes) == 0 {
 				return
@@ -124,7 +124,7 @@ func TestChaosCCIP(t *testing.T) {
 
 			lane.RecordStateBeforeTransfer()
 			// Send the ccip-request and verify ocr2 is running
-			err := lane.SendRequests(1, big.NewInt(600_000))
+			err := lane.SendRequests(1, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.NoError(t, err)
 			lane.ValidateRequests(nil)
 
@@ -139,7 +139,7 @@ func TestChaosCCIP(t *testing.T) {
 			})
 			lane.RecordStateBeforeTransfer()
 			// Now send the ccip-request while the chaos is at play
-			err = lane.SendRequests(numOfRequests, big.NewInt(600_000))
+			err = lane.SendRequests(numOfRequests, big.NewInt(actions.DefaultDestinationGasLimit))
 			require.NoError(t, err)
 			if in.waitForChaosRecovery {
 				// wait for chaos to be recovered before further validation

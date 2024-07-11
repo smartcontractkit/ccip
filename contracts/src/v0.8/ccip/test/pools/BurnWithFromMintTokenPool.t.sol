@@ -2,10 +2,13 @@
 pragma solidity 0.8.24;
 
 import {Pool} from "../../libraries/Pool.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {BurnWithFromMintTokenPool} from "../../pools/BurnWithFromMintTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 import {BurnMintSetup} from "./BurnMintSetup.t.sol";
+
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract BurnWithFromMintTokenPoolSetup is BurnMintSetup {
   BurnWithFromMintTokenPool internal s_pool;
@@ -39,13 +42,13 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
     vm.startPrank(s_burnMintOnRamp);
 
     vm.expectEmit();
-    emit TokensConsumed(burnAmount);
+    emit RateLimiter.TokensConsumed(burnAmount);
 
     vm.expectEmit();
-    emit Transfer(address(s_pool), address(0), burnAmount);
+    emit IERC20.Transfer(address(s_pool), address(0), burnAmount);
 
     vm.expectEmit();
-    emit Burned(address(s_burnMintOnRamp), burnAmount);
+    emit TokenPool.Burned(address(s_burnMintOnRamp), burnAmount);
 
     bytes4 expectedSignature = bytes4(keccak256("burn(address,uint256)"));
     vm.expectCall(address(s_burnMintERC677), abi.encodeWithSelector(expectedSignature, address(s_pool), burnAmount));
@@ -55,7 +58,8 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
         originalSender: OWNER,
         receiver: bytes(""),
         amount: burnAmount,
-        remoteChainSelector: DEST_CHAIN_SELECTOR
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_burnMintERC677)
       })
     );
 
@@ -64,7 +68,7 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
 
   // Should not burn tokens if cursed.
   function test_PoolBurnRevertNotHealthy_Revert() public {
-    s_mockRMN.voteToCurse(bytes32(0));
+    s_mockRMN.setGlobalCursed(true);
     uint256 before = s_burnMintERC677.balanceOf(address(s_pool));
     vm.startPrank(s_burnMintOnRamp);
 
@@ -74,7 +78,8 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
         originalSender: OWNER,
         receiver: bytes(""),
         amount: 1e5,
-        remoteChainSelector: DEST_CHAIN_SELECTOR
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_burnMintERC677)
       })
     );
 
@@ -89,6 +94,7 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
         originalSender: bytes(""),
         receiver: OWNER,
         amount: 1,
+        localToken: address(s_burnMintERC677),
         remoteChainSelector: wrongChainSelector,
         sourcePoolAddress: generateSourceTokenData().sourcePoolAddress,
         sourcePoolData: generateSourceTokenData().extraData,

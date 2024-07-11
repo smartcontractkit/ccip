@@ -46,13 +46,13 @@ jobs:
           cosign-private-key: ${{ secrets.COSIGN_PRIVATE_KEY }}
           cosign-public-key: ${{ secrets.COSIGN_PUBLIC_KEY }}
           cosign-password: ${{ secrets.COSIGN_PASSWORD }}
-          dockerhub_username: ${{ secrets.DOCKERHUB_READONLY_USERNAME }}
-          dockerhub_password: ${{ secrets.DOCKERHUB_READONLY_PASSWORD }}
+          dockerhub_username: ${{ secrets.DOCKER_READONLY_USERNAME }}
+          dockerhub_password: ${{ secrets.DOCKER_READONLY_PASSWORD }}
           verify-signature: true
       - name: Collect Metrics
         if: always()
         id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
+        uses: smartcontractkit/push-gha-metrics-action@d9da21a2747016b3e13de58c7d4115a3d5c97935 # v3.0.1
         with:
           id: build-chainlink-publish
           org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}

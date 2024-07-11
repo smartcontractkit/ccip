@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 )
@@ -17,7 +18,7 @@ func TestLmBasic(t *testing.T) {
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
 	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	//gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
-	lmTestSetup := testsetups.LMDefaultTestSetup(t, log, "smoke-lm", TestCfg)
+	lmTestSetup := testsetups.LMDefaultTestSetup(t, &log, "smoke-lm", TestCfg)
 
 	l1ChainId := lmTestSetup.Cfg.SelectedNetworks[0].ChainID
 	l2ChainId := lmTestSetup.Cfg.SelectedNetworks[1].ChainID
@@ -28,7 +29,7 @@ func TestLmBasic(t *testing.T) {
 	require.NoError(t, err, "Failed to get liquidity from L2")
 	log.Info().Str("L1 Liquidity", l1liquidityStart.String()).Str("L2 Liquidity", l2liquidityStart.String()).Msg("Liquidity at start")
 
-	//TODO: Improve this wait
+	// TODO: Improve this wait
 	log.Info().Msg("Waiting 3 minutes for liquidity to change")
 	time.Sleep(3 * time.Minute)
 

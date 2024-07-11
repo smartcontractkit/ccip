@@ -103,6 +103,7 @@ func WaitForSuccessfulTxMined(evmClient blockchain.EVMClient, tx *types.Transact
 		return err
 	}
 	if receipt.Status != types.ReceiptStatusSuccessful {
+		// TODO: Add error reason from receipt/tx
 		return fmt.Errorf("tx failed %s", tx.Hash().Hex())
 	}
 	log.Info().Str("tx", tx.Hash().Hex()).Str("Network", evmClient.GetNetworkName()).Msg("tx mined successfully")
@@ -202,8 +203,7 @@ func MultiCallCCIP(
 				}
 			}
 
-			data := Call{Target: tokenAndAmount.Token, AllowFailure: false, CallData: inputs}
-			callData = append(callData, data)
+			callData = append(callData, Call{Target: tokenAndAmount.Token, AllowFailure: false, CallData: inputs})
 		}
 		// approve fee token if not already approved
 		if msg.Fee != nil && msg.Fee.Cmp(big.NewInt(0)) > 0 && !isFeeTokenAndBridgeTokenSame {
@@ -211,16 +211,14 @@ func MultiCallCCIP(
 			if err != nil {
 				return nil, err
 			}
-			data := Call{Target: msg.Msg.FeeToken, AllowFailure: false, CallData: inputs}
-			callData = append(callData, data)
+			callData = append(callData, Call{Target: msg.Msg.FeeToken, AllowFailure: false, CallData: inputs})
 		}
 
 		inputs, err := CCIPSendCallData(msg)
 		if err != nil {
 			return nil, err
 		}
-		data := Call{Target: msg.RouterAddr, AllowFailure: false, CallData: inputs}
-		callData = append(callData, data)
+		callData = append(callData, Call{Target: msg.RouterAddr, AllowFailure: false, CallData: inputs})
 	}
 	opts, err := evmClient.TransactionOpts(evmClient.GetDefaultWallet())
 	if err != nil {

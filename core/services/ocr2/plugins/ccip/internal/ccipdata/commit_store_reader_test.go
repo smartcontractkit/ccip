@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	gasmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
 	rollupMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/rollups/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -149,7 +150,11 @@ func TestCommitStoreReaders(t *testing.T) {
 		RpcBatchSize:             2,
 		KeepFinalizedBlocksDepth: 1000,
 	}
-	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), lggr), ec, lggr, lpOpts)
+	headTracker := headtracker.NewSimulatedHeadTracker(ec, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+	if lpOpts.PollPeriod == 0 {
+		lpOpts.PollPeriod = 1 * time.Hour
+	}
+	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), lggr), ec, lggr, headTracker, lpOpts)
 
 	// Deploy 2 commit store versions
 	onramp1 := utils.RandomAddress()
@@ -189,10 +194,18 @@ func TestCommitStoreReaders(t *testing.T) {
 	ge.On("L1Oracle").Return(lm)
 
 	maxGasPrice := big.NewInt(1e8)
-	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp, ge, maxGasPrice)
+	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp) // ge, maxGasPrice
+	require.NoError(t, err)
+	err = c10r.SetGasEstimator(ctx, ge)
+	require.NoError(t, err)
+	err = c10r.SetSourceMaxGasPrice(ctx, maxGasPrice)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&v1_0_0.CommitStore{}).String())
-	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr2), ec, lp, ge, maxGasPrice)
+	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr2), ec, lp)
+	require.NoError(t, err)
+	err = c12r.SetGasEstimator(ctx, ge)
+	require.NoError(t, err)
+	err = c12r.SetSourceMaxGasPrice(ctx, maxGasPrice)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&v1_2_0.CommitStore{}).String())
 
@@ -277,7 +290,6 @@ func TestCommitStoreReaders(t *testing.T) {
 	for v, cr := range crs {
 		cr := cr
 		t.Run("CommitStoreReader "+v, func(t *testing.T) {
-
 			// Static config.
 			cfg, err := cr.GetCommitStoreStaticConfig(context.Background())
 			require.NoError(t, err)
@@ -400,7 +412,7 @@ func TestNewCommitStoreReader(t *testing.T) {
 			if tc.expectedErr == "" {
 				lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil)
 			}
-			_, err = factory.NewCommitStoreReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp, nil, nil)
+			_, err = factory.NewCommitStoreReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {

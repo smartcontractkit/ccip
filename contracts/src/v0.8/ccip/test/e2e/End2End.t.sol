@@ -62,6 +62,8 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     s_commitStore.report(commitReport, ++s_latestEpochAndRound);
     vm.pauseGasMetering();
 
+    s_mockRMN.setTaggedRootBlessed(IRMN.TaggedRoot({commitStore: address(s_commitStore), root: merkleRoots[0]}), true);
+
     bytes32[] memory proofs = new bytes32[](0);
     uint256 timestamp = s_commitStore.verify(merkleRoots, proofs, 2 ** 2 - 1);
     assertEq(BLOCK_TIME, timestamp);
@@ -72,17 +74,17 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     vm.warp(BLOCK_TIME + 2000);
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[1].sequenceNumber, messages[1].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
     vm.expectEmit();
-    emit ExecutionStateChanged(
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
       messages[2].sequenceNumber, messages[2].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
@@ -103,7 +105,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
       _messageToEvent(message, expectedSeqNum, expectedSeqNum, expectedFee, OWNER);
 
     vm.expectEmit();
-    emit CCIPSendRequested(msgEvent);
+    emit EVM2EVMOnRamp.CCIPSendRequested(msgEvent);
 
     vm.resumeGasMetering();
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);

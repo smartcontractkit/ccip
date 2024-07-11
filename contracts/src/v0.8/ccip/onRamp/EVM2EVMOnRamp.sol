@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
-import {IPool} from "../interfaces/IPool.sol";
+import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
@@ -47,7 +47,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
   error InvalidConfig();
-  error InvalidAddress(bytes encodedAddress);
   error CursedByRMN();
   error LinkBalanceNotSettled();
   error InvalidNopAddress(address nop);
@@ -56,6 +55,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error SourceTokenDataTooLarge(address token);
   error InvalidChainSelector(uint64 chainSelector);
   error GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
+  error InvalidDestBytesOverhead(address token, uint32 destBytesOverhead);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
@@ -68,6 +68,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @dev Struct that contains the static configuration
   /// RMN depends on this struct, if changing, please notify the RMN maintainers.
+  //solhint-disable gas-struct-packing
   struct StaticConfig {
     address linkToken; // ────────╮ Link token address
     uint64 chainSelector; // ─────╯ Source chainSelector
@@ -76,6 +77,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint96 maxNopFeesJuels; // ───╯ Max nop fee balance onramp can have
     address prevOnRamp; //          Address of previous-version OnRamp
     address rmnProxy; //            Address of RMN proxy
+    address tokenAdminRegistry; //  Address of the token admin registry
   }
 
   /// @dev Struct to contains the dynamic configuration
@@ -90,12 +92,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     address priceRegistry; //                    │ Price registry address
     uint32 maxDataBytes; //                      │ Maximum payload data size in bytes
     uint32 maxPerMsgGasLimit; // ────────────────╯ Maximum gas limit for messages targeting EVMs
-    address tokenAdminRegistry; // ──────────────╮ Token admin registry address
     //                                           │
     // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
-    uint16 defaultTokenFeeUSDCents; //           │ Default token fee charged per token transfer
+    uint16 defaultTokenFeeUSDCents; // ──────────╮ Default token fee charged per token transfer
     uint32 defaultTokenDestGasOverhead; //       │ Default gas charged to execute the token transfer on the destination chain
-    uint32 defaultTokenDestBytesOverhead; //     | Default extra data availability bytes charged per token transfer
+    //                                           │ Default data availability bytes that are returned from the source pool and sent
+    uint32 defaultTokenDestBytesOverhead; //     | to the destination pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
     bool enforceOutOfOrder; // ──────────────────╯ Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
   }
 
@@ -123,7 +125,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint32 maxFeeUSDCents; //           │ Maximum fee to charge per token transfer, multiples of 0.01 USD
     uint16 deciBps; //                  │ Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
     uint32 destGasOverhead; //          │ Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; //        │ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
+    //                                  │ Extra data availability bytes that are returned from the source pool and sent
+    uint32 destBytesOverhead; //        │ to the destination pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
     bool aggregateRateLimitEnabled; //  │ Whether this transfer token is to be included in Aggregate Rate Limiting
     bool isEnabled; // ─────────────────╯ Whether this token has custom transfer fees
   }
@@ -136,7 +139,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint32 maxFeeUSDCents; //           │ Maximum fee to charge per token transfer, multiples of 0.01 USD
     uint16 deciBps; // ─────────────────╯ Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
     uint32 destGasOverhead; // ─────────╮ Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; //        │ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
+    //                                  │ Extra data availability bytes that are returned from the source pool and sent
+    uint32 destBytesOverhead; //        │ to the destination pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
     bool aggregateRateLimitEnabled; // ─╯ Whether this transfer token is to be included in Aggregate Rate Limiting
   }
 
@@ -169,6 +173,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   address internal immutable i_prevOnRamp;
   /// @dev The address of the RMN proxy
   address internal immutable i_rmnProxy;
+  /// @dev The address of the token admin registry
+  address internal immutable i_tokenAdminRegistry;
   /// @dev the maximum number of nops that can be configured at the same time.
   /// Used to bound gas for loops over nops.
   uint256 private constant MAX_NUMBER_OF_NOPS = 64;
@@ -209,6 +215,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     if (
       staticConfig.linkToken == address(0) || staticConfig.chainSelector == 0 || staticConfig.destChainSelector == 0
         || staticConfig.defaultTxGasLimit == 0 || staticConfig.rmnProxy == address(0)
+        || staticConfig.tokenAdminRegistry == address(0)
     ) revert InvalidConfig();
 
     i_metadataHash = keccak256(
@@ -223,6 +230,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     i_maxNopFeesJuels = staticConfig.maxNopFeesJuels;
     i_prevOnRamp = staticConfig.prevOnRamp;
     i_rmnProxy = staticConfig.rmnProxy;
+    i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
 
     _setDynamicConfig(dynamicConfig);
     _setFeeTokenConfig(feeTokenConfigs);
@@ -257,7 +265,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 feeTokenAmount,
     address originalSender
   ) external returns (bytes32) {
-    if (IRMN(i_rmnProxy).isCursed(bytes32(uint256(destChainSelector)))) revert CursedByRMN();
+    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN();
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause.
@@ -325,7 +333,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // There should be no state changes after external call to TokenPools.
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
-      IPool sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
+      IPoolV1 sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
       // We don't have to check if it supports the pool version in a non-reverting way here because
       // if we revert here, there is no effect on CCIP. Therefore we directly call the supportsInterface
       // function and not through the ERC165Checker.
@@ -335,27 +343,30 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
       Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
         Pool.LockOrBurnInV1({
-          originalSender: originalSender,
           receiver: message.receiver,
+          remoteChainSelector: i_destChainSelector,
+          originalSender: originalSender,
           amount: tokenAndAmount.amount,
-          remoteChainSelector: i_destChainSelector
+          localToken: tokenAndAmount.token
         })
       );
 
-      // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the extraData.
-      // This prevents gas bomb attacks on the NOPs. We use destBytesOverhead as a proxy to cap the number of bytes we accept.
-      // As destBytesOverhead accounts for extraData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
-      // It therefore fully mitigates gas bombs for most tokens, as most tokens don't use offchainData.
-      if (poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead) {
+      // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the
+      // extraData. This prevents gas bomb attacks on the NOPs. As destBytesOverhead accounts for both
+      // extraData and offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
+      if (
+        poolReturnData.destPoolData.length > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
+          && poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead
+      ) {
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
       }
-      // We validate the pool address to ensure it is a valid EVM address
-      Internal._validateEVMAddress(poolReturnData.destPoolAddress);
+      // We validate the token address to ensure it is a valid EVM address
+      Internal._validateEVMAddress(poolReturnData.destTokenAddress);
 
       newMessage.sourceTokenData[i] = abi.encode(
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(sourcePool),
-          destPoolAddress: poolReturnData.destPoolAddress,
+          destTokenAddress: poolReturnData.destTokenAddress,
           extraData: poolReturnData.destPoolData
         })
       );
@@ -365,8 +376,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     newMessage.messageId = Internal._hash(newMessage, i_metadataHash);
 
     // Emit message request
-    // Note this must happen after pools, some tokens (eg USDC) emit events that we
-    // expect to directly precede this event.
+    // This must happen after any pool events as some tokens (e.g. USDC) emit events that we expect to precede this
+    // event in the offchain code.
     emit CCIPSendRequested(newMessage);
     return newMessage.messageId;
   }
@@ -425,7 +436,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       defaultTxGasLimit: i_defaultTxGasLimit,
       maxNopFeesJuels: i_maxNopFeesJuels,
       prevOnRamp: i_prevOnRamp,
-      rmnProxy: i_rmnProxy
+      rmnProxy: i_rmnProxy,
+      tokenAdminRegistry: i_tokenAdminRegistry
     });
   }
 
@@ -445,6 +457,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
     // We permit router to be set to zero as a way to pause the contract.
     if (dynamicConfig.priceRegistry == address(0)) revert InvalidConfig();
+    if (dynamicConfig.defaultTokenDestBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
+      revert InvalidDestBytesOverhead(address(0), dynamicConfig.defaultTokenDestBytesOverhead);
+    }
 
     s_dynamicConfig = dynamicConfig;
 
@@ -456,7 +471,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         defaultTxGasLimit: i_defaultTxGasLimit,
         maxNopFeesJuels: i_maxNopFeesJuels,
         prevOnRamp: i_prevOnRamp,
-        rmnProxy: i_rmnProxy
+        rmnProxy: i_rmnProxy,
+        tokenAdminRegistry: i_tokenAdminRegistry
       }),
       dynamicConfig
     );
@@ -467,8 +483,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   // ================================================================
 
   /// @inheritdoc IEVM2AnyOnRampClient
-  function getPoolBySourceToken(uint64, /*destChainSelector*/ IERC20 sourceToken) public view returns (IPool) {
-    return IPool(ITokenAdminRegistry(s_dynamicConfig.tokenAdminRegistry).getPool(address(sourceToken)));
+  function getPoolBySourceToken(uint64, /*destChainSelector*/ IERC20 sourceToken) public view returns (IPoolV1) {
+    return IPoolV1(ITokenAdminRegistry(i_tokenAdminRegistry).getPool(address(sourceToken)));
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
@@ -711,6 +727,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   ) internal {
     for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
       TokenTransferFeeConfigArgs memory configArg = tokenTransferFeeConfigArgs[i];
+
+      if (configArg.destBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
+        revert InvalidDestBytesOverhead(configArg.token, configArg.destBytesOverhead);
+      }
 
       s_tokenTransferFeeConfig[configArg.token] = TokenTransferFeeConfig({
         minFeeUSDCents: configArg.minFeeUSDCents,

@@ -9,19 +9,15 @@ contract EVM2EVMMultiOnRampHelper is EVM2EVMMultiOnRamp, IgnoreContractSize {
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
     DestChainConfigArgs[] memory destChainConfigs,
-    RateLimiter.Config memory rateLimiterConfig,
-    FeeTokenConfigArgs[] memory feeTokenConfigs,
-    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
-    NopAndWeight[] memory nopsAndWeights
+    PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
+    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs
   )
     EVM2EVMMultiOnRamp(
       staticConfig,
       dynamicConfig,
       destChainConfigs,
-      rateLimiterConfig,
-      feeTokenConfigs,
-      tokenTransferFeeConfigArgs,
-      nopsAndWeights
+      premiumMultiplierWeiPerEthArgs,
+      tokenTransferFeeConfigArgs
     )
   {}
 
@@ -44,5 +40,23 @@ contract EVM2EVMMultiOnRampHelper is EVM2EVMMultiOnRamp, IgnoreContractSize {
     Client.EVMTokenAmount[] calldata tokenAmounts
   ) external view returns (uint256, uint32, uint32) {
     return _getTokenTransferCost(destChainSelector, feeToken, feeTokenPrice, tokenAmounts);
+  }
+
+  function parseEVMExtraArgsFromBytes(
+    bytes calldata extraArgs,
+    uint64 destChainSelector
+  ) external view returns (Client.EVMExtraArgsV2 memory) {
+    return _parseEVMExtraArgsFromBytes(extraArgs, s_destChainConfig[destChainSelector].dynamicConfig);
+  }
+
+  function validateDestFamilyAddress(bytes4 chainFamilySelector, bytes memory destAddress) external pure {
+    _validateDestFamilyAddress(chainFamilySelector, destAddress);
+  }
+
+  function convertParsedExtraArgs(
+    bytes calldata extraArgs,
+    DestChainDynamicConfig memory destChainDynamicConfig
+  ) external pure returns (bytes memory encodedExtraArgs) {
+    return _convertParsedExtraArgs(extraArgs, destChainDynamicConfig);
   }
 }

@@ -12,7 +12,10 @@ import (
 	pkgerrors "github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
@@ -42,22 +45,25 @@ type ORM interface {
 
 	SelectLogs(ctx context.Context, start, end int64, address common.Address, eventSig common.Hash) ([]Log, error)
 	SelectLogsWithSigs(ctx context.Context, start, end int64, address common.Address, eventSigs []common.Hash) ([]Log, error)
-	SelectLogsCreatedAfter(ctx context.Context, address common.Address, eventSig common.Hash, after time.Time, confs Confirmations) ([]Log, error)
-	SelectLatestLogByEventSigWithConfs(ctx context.Context, eventSig common.Hash, address common.Address, confs Confirmations) (*Log, error)
-	SelectLatestLogEventSigsAddrsWithConfs(ctx context.Context, fromBlock int64, addresses []common.Address, eventSigs []common.Hash, confs Confirmations) ([]Log, error)
-	SelectLatestBlockByEventSigsAddrsWithConfs(ctx context.Context, fromBlock int64, eventSigs []common.Hash, addresses []common.Address, confs Confirmations) (int64, error)
+	SelectLogsCreatedAfter(ctx context.Context, address common.Address, eventSig common.Hash, after time.Time, confs evmtypes.Confirmations) ([]Log, error)
+	SelectLatestLogByEventSigWithConfs(ctx context.Context, eventSig common.Hash, address common.Address, confs evmtypes.Confirmations) (*Log, error)
+	SelectLatestLogEventSigsAddrsWithConfs(ctx context.Context, fromBlock int64, addresses []common.Address, eventSigs []common.Hash, confs evmtypes.Confirmations) ([]Log, error)
+	SelectLatestBlockByEventSigsAddrsWithConfs(ctx context.Context, fromBlock int64, eventSigs []common.Hash, addresses []common.Address, confs evmtypes.Confirmations) (int64, error)
 	SelectLogsByBlockRange(ctx context.Context, start, end int64) ([]Log, error)
 
-	SelectIndexedLogs(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValues []common.Hash, confs Confirmations) ([]Log, error)
+	SelectIndexedLogs(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValues []common.Hash, confs evmtypes.Confirmations) ([]Log, error)
 	SelectIndexedLogsByBlockRange(ctx context.Context, start, end int64, address common.Address, eventSig common.Hash, topicIndex int, topicValues []common.Hash) ([]Log, error)
-	SelectIndexedLogsCreatedAfter(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValues []common.Hash, after time.Time, confs Confirmations) ([]Log, error)
-	SelectIndexedLogsTopicGreaterThan(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValueMin common.Hash, confs Confirmations) ([]Log, error)
-	SelectIndexedLogsTopicRange(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValueMin, topicValueMax common.Hash, confs Confirmations) ([]Log, error)
-	SelectIndexedLogsWithSigsExcluding(ctx context.Context, sigA, sigB common.Hash, topicIndex int, address common.Address, startBlock, endBlock int64, confs Confirmations) ([]Log, error)
+	SelectIndexedLogsCreatedAfter(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValues []common.Hash, after time.Time, confs evmtypes.Confirmations) ([]Log, error)
+	SelectIndexedLogsTopicGreaterThan(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValueMin common.Hash, confs evmtypes.Confirmations) ([]Log, error)
+	SelectIndexedLogsTopicRange(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValueMin, topicValueMax common.Hash, confs evmtypes.Confirmations) ([]Log, error)
+	SelectIndexedLogsWithSigsExcluding(ctx context.Context, sigA, sigB common.Hash, topicIndex int, address common.Address, startBlock, endBlock int64, confs evmtypes.Confirmations) ([]Log, error)
 	SelectIndexedLogsByTxHash(ctx context.Context, address common.Address, eventSig common.Hash, txHash common.Hash) ([]Log, error)
-	SelectLogsDataWordRange(ctx context.Context, address common.Address, eventSig common.Hash, wordIndex int, wordValueMin, wordValueMax common.Hash, confs Confirmations) ([]Log, error)
-	SelectLogsDataWordGreaterThan(ctx context.Context, address common.Address, eventSig common.Hash, wordIndex int, wordValueMin common.Hash, confs Confirmations) ([]Log, error)
-	SelectLogsDataWordBetween(ctx context.Context, address common.Address, eventSig common.Hash, wordIndexMin int, wordIndexMax int, wordValue common.Hash, confs Confirmations) ([]Log, error)
+	SelectLogsDataWordRange(ctx context.Context, address common.Address, eventSig common.Hash, wordIndex int, wordValueMin, wordValueMax common.Hash, confs evmtypes.Confirmations) ([]Log, error)
+	SelectLogsDataWordGreaterThan(ctx context.Context, address common.Address, eventSig common.Hash, wordIndex int, wordValueMin common.Hash, confs evmtypes.Confirmations) ([]Log, error)
+	SelectLogsDataWordBetween(ctx context.Context, address common.Address, eventSig common.Hash, wordIndexMin int, wordIndexMax int, wordValue common.Hash, confs evmtypes.Confirmations) ([]Log, error)
+
+	// FilteredLogs accepts chainlink-common filtering DSL.
+	FilteredLogs(ctx context.Context, filter query.KeyFilter, limitAndSort query.LimitAndSort, queryName string) ([]Log, error)
 }
 
 type DSORM struct {
@@ -87,17 +93,17 @@ func (o *DSORM) new(ds sqlutil.DataSource) *DSORM { return NewORM(o.chainID, ds,
 // InsertBlock is idempotent to support replays.
 func (o *DSORM) InsertBlock(ctx context.Context, blockHash common.Hash, blockNumber int64, blockTimestamp time.Time, finalizedBlock int64) error {
 	args, err := newQueryArgs(o.chainID).
-		withCustomHashArg("block_hash", blockHash).
-		withCustomArg("block_number", blockNumber).
-		withCustomArg("block_timestamp", blockTimestamp).
-		withCustomArg("finalized_block_number", finalizedBlock).
+		withField("block_hash", blockHash).
+		withField("block_number", blockNumber).
+		withField("block_timestamp", blockTimestamp).
+		withField("finalized_block_number", finalizedBlock).
 		toArgs()
 	if err != nil {
 		return err
 	}
-	query := `INSERT INTO evm.log_poller_blocks 
-				(evm_chain_id, block_hash, block_number, block_timestamp, finalized_block_number, created_at) 
-      		VALUES (:evm_chain_id, :block_hash, :block_number, :block_timestamp, :finalized_block_number, NOW()) 
+	query := `INSERT INTO evm.log_poller_blocks
+				(evm_chain_id, block_hash, block_number, block_timestamp, finalized_block_number, created_at)
+      		VALUES (:evm_chain_id, :block_hash, :block_number, :block_timestamp, :finalized_block_number, NOW())
 			ON CONFLICT DO NOTHING`
 	_, err = o.ds.NamedExecContext(ctx, query, args)
 	return err
@@ -110,7 +116,7 @@ func (o *DSORM) InsertBlock(ctx context.Context, blockHash common.Hash, blockNum
 func (o *DSORM) InsertFilter(ctx context.Context, filter Filter) (err error) {
 	topicArrays := []types.HashArray{filter.Topic2, filter.Topic3, filter.Topic4}
 	args, err := newQueryArgs(o.chainID).
-		withCustomArg("name", filter.Name).
+		withField("name", filter.Name).
 		withRetention(filter.Retention).
 		withMaxLogsKept(filter.MaxLogsKept).
 		withLogsPerBlock(filter.LogsPerBlock).
@@ -154,13 +160,12 @@ func (o *DSORM) DeleteFilter(ctx context.Context, name string) error {
 		`DELETE FROM evm.log_poller_filters WHERE name = $1 AND evm_chain_id = $2`,
 		name, ubig.New(o.chainID))
 	return err
-
 }
 
 // LoadFilters returns all filters for this chain
 func (o *DSORM) LoadFilters(ctx context.Context) (map[string]Filter, error) {
 	query := `SELECT name,
-			ARRAY_AGG(DISTINCT address)::BYTEA[] AS addresses, 
+			ARRAY_AGG(DISTINCT address)::BYTEA[] AS addresses,
 			ARRAY_AGG(DISTINCT event)::BYTEA[] AS event_sigs,
 			ARRAY_AGG(DISTINCT topic2 ORDER BY topic2) FILTER(WHERE topic2 IS NOT NULL) AS topic2,
 			ARRAY_AGG(DISTINCT topic3 ORDER BY topic3) FILTER(WHERE topic3 IS NOT NULL) AS topic3,
@@ -211,7 +216,7 @@ func (o *DSORM) SelectOldestBlock(ctx context.Context, minAllowedBlockNumber int
 	return &b, nil
 }
 
-func (o *DSORM) SelectLatestLogByEventSigWithConfs(ctx context.Context, eventSig common.Hash, address common.Address, confs Confirmations) (*Log, error) {
+func (o *DSORM) SelectLatestLogByEventSigWithConfs(ctx context.Context, eventSig common.Hash, address common.Address, confs evmtypes.Confirmations) (*Log, error) {
 	args, err := newQueryArgsForEvent(o.chainID, address, eventSig).
 		withConfs(confs).
 		toArgs()
@@ -224,7 +229,7 @@ func (o *DSORM) SelectLatestLogByEventSigWithConfs(ctx context.Context, eventSig
 			AND event_sig = :event_sig
 			AND address = :address
 			AND block_number <= %s
-			ORDER BY block_number desc, log_index DESC 
+			ORDER BY block_number desc, log_index DESC
 			LIMIT 1
 		`, nestedBlockNumberQuery(confs))
 	var l Log
@@ -247,7 +252,7 @@ func (o *DSORM) DeleteBlocksBefore(ctx context.Context, end int64, limit int64) 
 			`DELETE FROM evm.log_poller_blocks
         				WHERE block_number IN (
             				SELECT block_number FROM evm.log_poller_blocks
-            				WHERE block_number <= $1 
+            				WHERE block_number <= $1
             				AND evm_chain_id = $2
 							LIMIT $3
 						)
@@ -258,7 +263,7 @@ func (o *DSORM) DeleteBlocksBefore(ctx context.Context, end int64, limit int64) 
 		}
 		return result.RowsAffected()
 	}
-	result, err := o.ds.ExecContext(ctx, `DELETE FROM evm.log_poller_blocks 
+	result, err := o.ds.ExecContext(ctx, `DELETE FROM evm.log_poller_blocks
        WHERE block_number <= $1 AND evm_chain_id = $2`, end, ubig.New(o.chainID))
 	if err != nil {
 		return 0, err
@@ -275,11 +280,11 @@ func (o *DSORM) DeleteLogsAndBlocksAfter(ctx context.Context, start int64) error
 		// If not applied, these queries can become very slow. After some critical number
 		// of logs, Postgres will try to scan all the logs in the index by block_number.
 		// Latency without upper bound filter can be orders of magnitude higher for large number of logs.
-		_, err := o.ds.ExecContext(ctx, `DELETE FROM evm.log_poller_blocks 
+		_, err := o.ds.ExecContext(ctx, `DELETE FROM evm.log_poller_blocks
        						WHERE evm_chain_id = $1
        						AND block_number >= $2
-       						AND block_number <= (SELECT MAX(block_number) 
-						 		FROM evm.log_poller_blocks 
+       						AND block_number <= (SELECT MAX(block_number)
+						 		FROM evm.log_poller_blocks
 						 		WHERE evm_chain_id = $1)`,
 			ubig.New(o.chainID), start)
 		if err != nil {
@@ -287,8 +292,8 @@ func (o *DSORM) DeleteLogsAndBlocksAfter(ctx context.Context, start int64) error
 			return err
 		}
 
-		_, err = o.ds.ExecContext(ctx, `DELETE FROM evm.logs 
-       						WHERE evm_chain_id = $1 
+		_, err = o.ds.ExecContext(ctx, `DELETE FROM evm.logs
+       						WHERE evm_chain_id = $1
        						AND block_number >= $2
        						AND block_number <= (SELECT MAX(block_number) FROM evm.logs WHERE evm_chain_id = $1)`,
 			ubig.New(o.chainID), start)
@@ -330,7 +335,7 @@ func (o *DSORM) DeleteExpiredLogs(ctx context.Context, limit int64) (int64, erro
 	} else {
 		result, err = o.ds.ExecContext(ctx, `WITH r AS
 		( SELECT address, event, MAX(retention) AS retention
-			FROM evm.log_poller_filters WHERE evm_chain_id=$1 
+			FROM evm.log_poller_filters WHERE evm_chain_id=$1
 			GROUP BY evm_chain_id,address, event HAVING NOT 0 = ANY(ARRAY_AGG(retention))
 		) DELETE FROM evm.logs l USING r
 			WHERE l.evm_chain_id = $1 AND l.address=r.address AND l.event_sig=r.event
@@ -382,16 +387,13 @@ func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []Log, tx sqlutil.D
 			end = len(logs)
 		}
 
-		query := `INSERT INTO evm.logs 
-					(evm_chain_id, log_index, block_hash, block_number, block_timestamp, address, event_sig, topics, tx_hash, data, created_at) 
-				VALUES 
-					(:evm_chain_id, :log_index, :block_hash, :block_number, :block_timestamp, :address, :event_sig, :topics, :tx_hash, :data, NOW()) 
+		query := `INSERT INTO evm.logs
+					(evm_chain_id, log_index, block_hash, block_number, block_timestamp, address, event_sig, topics, tx_hash, data, created_at)
+				VALUES
+					(:evm_chain_id, :log_index, :block_hash, :block_number, :block_timestamp, :address, :event_sig, :topics, :tx_hash, :data, NOW())
 				ON CONFLICT DO NOTHING`
 
 		_, err := o.ds.NamedExecContext(ctx, query, logs[start:end])
-		if err != nil {
-			return err
-		}
 		if err != nil {
 			if pkgerrors.Is(err, context.DeadlineExceeded) && batchInsertSize > 500 {
 				// In case of DB timeouts, try to insert again with a smaller batch upto a limit
@@ -423,10 +425,10 @@ func (o *DSORM) SelectLogsByBlockRange(ctx context.Context, start, end int64) ([
 		return nil, err
 	}
 
-	query := `SELECT * FROM evm.logs 
+	query := `SELECT * FROM evm.logs
         	WHERE evm_chain_id = :evm_chain_id
-        	AND block_number >= :start_block 
-        	AND block_number <= :end_block 
+        	AND block_number >= :start_block
+        	AND block_number <= :end_block
         	ORDER BY block_number, log_index`
 
 	var logs []Log
@@ -452,11 +454,11 @@ func (o *DSORM) SelectLogs(ctx context.Context, start, end int64, address common
 		return nil, err
 	}
 
-	query := `SELECT * FROM evm.logs 
-			WHERE evm_chain_id = :evm_chain_id 
+	query := `SELECT * FROM evm.logs
+			WHERE evm_chain_id = :evm_chain_id
 			AND address = :address
-			AND event_sig = :event_sig  
-			AND block_number >= :start_block 
+			AND event_sig = :event_sig
+			AND block_number >= :start_block
 			AND block_number <= :end_block
 			ORDER BY block_number, log_index`
 
@@ -474,7 +476,7 @@ func (o *DSORM) SelectLogs(ctx context.Context, start, end int64, address common
 }
 
 // SelectLogsCreatedAfter finds logs created after some timestamp.
-func (o *DSORM) SelectLogsCreatedAfter(ctx context.Context, address common.Address, eventSig common.Hash, after time.Time, confs Confirmations) ([]Log, error) {
+func (o *DSORM) SelectLogsCreatedAfter(ctx context.Context, address common.Address, eventSig common.Hash, after time.Time, confs evmtypes.Confirmations) ([]Log, error) {
 	args, err := newQueryArgsForEvent(o.chainID, address, eventSig).
 		withBlockTimestampAfter(after).
 		withConfs(confs).
@@ -484,7 +486,7 @@ func (o *DSORM) SelectLogsCreatedAfter(ctx context.Context, address common.Addre
 	}
 
 	query := fmt.Sprintf(`
-		SELECT * FROM evm.logs 
+		SELECT * FROM evm.logs
 				WHERE evm_chain_id = :evm_chain_id
 				AND address = :address
 				AND event_sig = :event_sig
@@ -545,8 +547,8 @@ func (o *DSORM) GetBlocksRange(ctx context.Context, start int64, end int64) ([]L
 		return nil, err
 	}
 
-	query := `SELECT * FROM evm.log_poller_blocks 
-			WHERE block_number >= :start_block 
+	query := `SELECT * FROM evm.log_poller_blocks
+			WHERE block_number >= :start_block
 			AND block_number <= :end_block
 			AND evm_chain_id = :evm_chain_id
 			ORDER BY block_number ASC`
@@ -565,7 +567,7 @@ func (o *DSORM) GetBlocksRange(ctx context.Context, start int64, end int64) ([]L
 }
 
 // SelectLatestLogEventSigsAddrsWithConfs finds the latest log by (address, event) combination that matches a list of Addresses and list of events
-func (o *DSORM) SelectLatestLogEventSigsAddrsWithConfs(ctx context.Context, fromBlock int64, addresses []common.Address, eventSigs []common.Hash, confs Confirmations) ([]Log, error) {
+func (o *DSORM) SelectLatestLogEventSigsAddrsWithConfs(ctx context.Context, fromBlock int64, addresses []common.Address, eventSigs []common.Hash, confs evmtypes.Confirmations) ([]Log, error) {
 	args, err := newQueryArgs(o.chainID).
 		withAddressArray(addresses).
 		withEventSigArray(eventSigs).
@@ -578,11 +580,11 @@ func (o *DSORM) SelectLatestLogEventSigsAddrsWithConfs(ctx context.Context, from
 
 	query := fmt.Sprintf(`
 		SELECT * FROM evm.logs WHERE (block_number, address, event_sig) IN (
-			SELECT MAX(block_number), address, event_sig FROM evm.logs 
-				WHERE evm_chain_id = :evm_chain_id 
-				AND event_sig = ANY(:event_sig_array) 
-				AND address = ANY(:address_array) 
-				AND block_number > :start_block 
+			SELECT MAX(block_number), address, event_sig FROM evm.logs
+				WHERE evm_chain_id = :evm_chain_id
+				AND event_sig = ANY(:event_sig_array)
+				AND address = ANY(:address_array)
+				AND block_number > :start_block
 				AND block_number <= %s
 			GROUP BY event_sig, address
 		)
@@ -601,7 +603,7 @@ func (o *DSORM) SelectLatestLogEventSigsAddrsWithConfs(ctx context.Context, from
 }
 
 // SelectLatestBlockByEventSigsAddrsWithConfs finds the latest block number that matches a list of Addresses and list of events. It returns 0 if there is no matching block
-func (o *DSORM) SelectLatestBlockByEventSigsAddrsWithConfs(ctx context.Context, fromBlock int64, eventSigs []common.Hash, addresses []common.Address, confs Confirmations) (int64, error) {
+func (o *DSORM) SelectLatestBlockByEventSigsAddrsWithConfs(ctx context.Context, fromBlock int64, eventSigs []common.Hash, addresses []common.Address, confs evmtypes.Confirmations) (int64, error) {
 	args, err := newQueryArgs(o.chainID).
 		withEventSigArray(eventSigs).
 		withAddressArray(addresses).
@@ -613,10 +615,10 @@ func (o *DSORM) SelectLatestBlockByEventSigsAddrsWithConfs(ctx context.Context, 
 	}
 	query := fmt.Sprintf(`
 		SELECT COALESCE(MAX(block_number), 0) FROM evm.logs
-			WHERE evm_chain_id = :evm_chain_id 
-			AND event_sig = ANY(:event_sig_array) 
-			AND address = ANY(:address_array) 
-			AND block_number > :start_block 
+			WHERE evm_chain_id = :evm_chain_id
+			AND event_sig = ANY(:event_sig_array)
+			AND address = ANY(:address_array)
+			AND block_number > :start_block
 			AND block_number <= %s`, nestedBlockNumberQuery(confs))
 
 	var blockNumber int64
@@ -631,7 +633,7 @@ func (o *DSORM) SelectLatestBlockByEventSigsAddrsWithConfs(ctx context.Context, 
 	return blockNumber, nil
 }
 
-func (o *DSORM) SelectLogsDataWordRange(ctx context.Context, address common.Address, eventSig common.Hash, wordIndex int, wordValueMin, wordValueMax common.Hash, confs Confirmations) ([]Log, error) {
+func (o *DSORM) SelectLogsDataWordRange(ctx context.Context, address common.Address, eventSig common.Hash, wordIndex int, wordValueMin, wordValueMax common.Hash, confs evmtypes.Confirmations) ([]Log, error) {
 	args, err := newQueryArgsForEvent(o.chainID, address, eventSig).
 		withWordIndex(wordIndex).
 		withWordValueMin(wordValueMin).
@@ -642,9 +644,9 @@ func (o *DSORM) SelectLogsDataWordRange(ctx context.Context, address common.Addr
 		return nil, err
 	}
 
-	query := fmt.Sprintf(`SELECT * FROM evm.logs 
+	query := fmt.Sprintf(`SELECT * FROM evm.logs
 			WHERE evm_chain_id = :evm_chain_id
-			AND address = :address 
+			AND address = :address
 			AND event_sig = :event_sig
 			AND substring(data from 32*:word_index+1 for 32) >= :word_value_min
 			AND substring(data from 32*:word_index+1 for 32) <= :word_value_max
@@ -663,7 +665,7 @@ func (o *DSORM) SelectLogsDataWordRange(ctx context.Context, address common.Addr
 	return logs, nil
 }
 
-func (o *DSORM) SelectLogsDataWordGreaterThan(ctx context.Context, address common.Address, eventSig common.Hash, wordIndex int, wordValueMin common.Hash, confs Confirmations) ([]Log, error) {
+func (o *DSORM) SelectLogsDataWordGreaterThan(ctx context.Context, address common.Address, eventSig common.Hash, wordIndex int, wordValueMin common.Hash, confs evmtypes.Confirmations) ([]Log, error) {
 	args, err := newQueryArgsForEvent(o.chainID, address, eventSig).
 		withWordIndex(wordIndex).
 		withWordValueMin(wordValueMin).
@@ -674,7 +676,7 @@ func (o *DSORM) SelectLogsDataWordGreaterThan(ctx context.Context, address commo
 	}
 
 	query := fmt.Sprintf(`
-		SELECT * FROM evm.logs 
+		SELECT * FROM evm.logs
 			WHERE evm_chain_id = :evm_chain_id
 			AND address = :address
 			AND event_sig = :event_sig
@@ -694,7 +696,7 @@ func (o *DSORM) SelectLogsDataWordGreaterThan(ctx context.Context, address commo
 	return logs, nil
 }
 
-func (o *DSORM) SelectLogsDataWordBetween(ctx context.Context, address common.Address, eventSig common.Hash, wordIndexMin int, wordIndexMax int, wordValue common.Hash, confs Confirmations) ([]Log, error) {
+func (o *DSORM) SelectLogsDataWordBetween(ctx context.Context, address common.Address, eventSig common.Hash, wordIndexMin int, wordIndexMax int, wordValue common.Hash, confs evmtypes.Confirmations) ([]Log, error) {
 	args, err := newQueryArgsForEvent(o.chainID, address, eventSig).
 		withWordIndexMin(wordIndexMin).
 		withWordIndexMax(wordIndexMax).
@@ -705,7 +707,7 @@ func (o *DSORM) SelectLogsDataWordBetween(ctx context.Context, address common.Ad
 		return nil, err
 	}
 	query := fmt.Sprintf(`
-		SELECT * FROM evm.logs 
+		SELECT * FROM evm.logs
 			WHERE evm_chain_id = :evm_chain_id
 			AND address = :address
 			AND event_sig = :event_sig
@@ -726,7 +728,7 @@ func (o *DSORM) SelectLogsDataWordBetween(ctx context.Context, address common.Ad
 	return logs, nil
 }
 
-func (o *DSORM) SelectIndexedLogsTopicGreaterThan(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValueMin common.Hash, confs Confirmations) ([]Log, error) {
+func (o *DSORM) SelectIndexedLogsTopicGreaterThan(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValueMin common.Hash, confs evmtypes.Confirmations) ([]Log, error) {
 	args, err := newQueryArgsForEvent(o.chainID, address, eventSig).
 		withTopicIndex(topicIndex).
 		withTopicValueMin(topicValueMin).
@@ -739,7 +741,7 @@ func (o *DSORM) SelectIndexedLogsTopicGreaterThan(ctx context.Context, address c
 	query := fmt.Sprintf(`
 		SELECT * FROM evm.logs
 			WHERE evm_chain_id = :evm_chain_id
-			AND address = :address 
+			AND address = :address
 			AND event_sig = :event_sig
 			AND topics[:topic_index] >= :topic_value_min
 			AND block_number <= %s
@@ -757,7 +759,7 @@ func (o *DSORM) SelectIndexedLogsTopicGreaterThan(ctx context.Context, address c
 	return logs, nil
 }
 
-func (o *DSORM) SelectIndexedLogsTopicRange(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValueMin, topicValueMax common.Hash, confs Confirmations) ([]Log, error) {
+func (o *DSORM) SelectIndexedLogsTopicRange(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValueMin, topicValueMax common.Hash, confs evmtypes.Confirmations) ([]Log, error) {
 	args, err := newQueryArgsForEvent(o.chainID, address, eventSig).
 		withTopicIndex(topicIndex).
 		withTopicValueMin(topicValueMin).
@@ -769,7 +771,7 @@ func (o *DSORM) SelectIndexedLogsTopicRange(ctx context.Context, address common.
 	}
 
 	query := fmt.Sprintf(`
-			SELECT * FROM evm.logs 
+			SELECT * FROM evm.logs
 				WHERE evm_chain_id = :evm_chain_id
 				AND address = :address
 				AND event_sig = :event_sig
@@ -790,7 +792,7 @@ func (o *DSORM) SelectIndexedLogsTopicRange(ctx context.Context, address common.
 	return logs, nil
 }
 
-func (o *DSORM) SelectIndexedLogs(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValues []common.Hash, confs Confirmations) ([]Log, error) {
+func (o *DSORM) SelectIndexedLogs(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValues []common.Hash, confs evmtypes.Confirmations) ([]Log, error) {
 	args, err := newQueryArgsForEvent(o.chainID, address, eventSig).
 		withTopicIndex(topicIndex).
 		withTopicValues(topicValues).
@@ -801,7 +803,7 @@ func (o *DSORM) SelectIndexedLogs(ctx context.Context, address common.Address, e
 	}
 
 	query := fmt.Sprintf(`
-		SELECT * FROM evm.logs 
+		SELECT * FROM evm.logs
 			WHERE evm_chain_id = :evm_chain_id
 			AND address = :address
 			AND event_sig = :event_sig
@@ -833,8 +835,8 @@ func (o *DSORM) SelectIndexedLogsByBlockRange(ctx context.Context, start, end in
 		return nil, err
 	}
 
-	query := `SELECT * FROM evm.logs 
-				WHERE evm_chain_id = :evm_chain_id 
+	query := `SELECT * FROM evm.logs
+				WHERE evm_chain_id = :evm_chain_id
 				AND address = :address
 				AND event_sig = :event_sig
 				AND topics[:topic_index] = ANY(:topic_values)
@@ -855,7 +857,7 @@ func (o *DSORM) SelectIndexedLogsByBlockRange(ctx context.Context, start, end in
 	return logs, nil
 }
 
-func (o *DSORM) SelectIndexedLogsCreatedAfter(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValues []common.Hash, after time.Time, confs Confirmations) ([]Log, error) {
+func (o *DSORM) SelectIndexedLogsCreatedAfter(ctx context.Context, address common.Address, eventSig common.Hash, topicIndex int, topicValues []common.Hash, after time.Time, confs evmtypes.Confirmations) ([]Log, error) {
 	args, err := newQueryArgsForEvent(o.chainID, address, eventSig).
 		withBlockTimestampAfter(after).
 		withConfs(confs).
@@ -867,7 +869,7 @@ func (o *DSORM) SelectIndexedLogsCreatedAfter(ctx context.Context, address commo
 	}
 
 	query := fmt.Sprintf(`
-		SELECT * FROM evm.logs 
+		SELECT * FROM evm.logs
 			WHERE evm_chain_id = :evm_chain_id
 			AND address = :address
 			AND event_sig = :event_sig
@@ -899,7 +901,7 @@ func (o *DSORM) SelectIndexedLogsByTxHash(ctx context.Context, address common.Ad
 		return nil, err
 	}
 
-	query := `SELECT * FROM evm.logs 
+	query := `SELECT * FROM evm.logs
 			WHERE evm_chain_id = :evm_chain_id
 			AND address = :address
 			AND event_sig = :event_sig
@@ -919,15 +921,15 @@ func (o *DSORM) SelectIndexedLogsByTxHash(ctx context.Context, address common.Ad
 	return logs, nil
 }
 
-// SelectIndexedLogsWithSigsExcluding query's for logs that have signature A and exclude logs that have a corresponding signature B, matching is done based on the topic index both logs should be inside the block range and have the minimum number of confirmations
-func (o *DSORM) SelectIndexedLogsWithSigsExcluding(ctx context.Context, sigA, sigB common.Hash, topicIndex int, address common.Address, startBlock, endBlock int64, confs Confirmations) ([]Log, error) {
+// SelectIndexedLogsWithSigsExcluding query's for logs that have signature A and exclude logs that have a corresponding signature B, matching is done based on the topic index both logs should be inside the block range and have the minimum number of evmtypes.Confirmations
+func (o *DSORM) SelectIndexedLogsWithSigsExcluding(ctx context.Context, sigA, sigB common.Hash, topicIndex int, address common.Address, startBlock, endBlock int64, confs evmtypes.Confirmations) ([]Log, error) {
 	args, err := newQueryArgs(o.chainID).
 		withAddress(address).
 		withTopicIndex(topicIndex).
 		withStartBlock(startBlock).
 		withEndBlock(endBlock).
-		withCustomHashArg("sigA", sigA).
-		withCustomHashArg("sigB", sigB).
+		withField("sigA", sigA).
+		withField("sigB", sigB).
 		withConfs(confs).
 		toArgs()
 	if err != nil {
@@ -941,7 +943,7 @@ func (o *DSORM) SelectIndexedLogsWithSigsExcluding(ctx context.Context, sigA, si
 		AND     address = :address
 		AND     event_sig = :sigA
 		AND 	block_number BETWEEN :start_block AND :end_block
-		AND 	block_number <= %s		
+		AND 	block_number <= %s
 		EXCEPT
 		SELECT     a.* FROM       evm.logs AS a
 		INNER JOIN evm.logs B
@@ -966,19 +968,44 @@ func (o *DSORM) SelectIndexedLogsWithSigsExcluding(ctx context.Context, sigA, si
 	return logs, nil
 }
 
-func nestedBlockNumberQuery(confs Confirmations) string {
-	if confs == Finalized {
+// TODO flaky BCF-3258
+func (o *DSORM) FilteredLogs(ctx context.Context, filter query.KeyFilter, limitAndSort query.LimitAndSort, _ string) ([]Log, error) {
+	qs, args, err := (&pgDSLParser{}).buildQuery(o.chainID, filter.Expressions, limitAndSort)
+	if err != nil {
+		return nil, err
+	}
+
+	values, err := args.toArgs()
+	if err != nil {
+		return nil, err
+	}
+
+	query, sqlArgs, err := o.ds.BindNamed(qs, values)
+	if err != nil {
+		return nil, err
+	}
+
+	var logs []Log
+	if err = o.ds.SelectContext(ctx, &logs, query, sqlArgs...); err != nil {
+		return nil, err
+	}
+
+	return logs, nil
+}
+
+func nestedBlockNumberQuery(confs evmtypes.Confirmations) string {
+	if confs == evmtypes.Finalized {
 		return `
-				(SELECT finalized_block_number 
-				FROM evm.log_poller_blocks 
-				WHERE evm_chain_id = :evm_chain_id 
+				(SELECT finalized_block_number
+				FROM evm.log_poller_blocks
+				WHERE evm_chain_id = :evm_chain_id
 				ORDER BY block_number DESC LIMIT 1) `
 	}
 	// Intentionally wrap with greatest() function and don't return negative block numbers when :confs > :block_number
 	// It doesn't impact logic of the outer query, because block numbers are never less or equal to 0 (guarded by log_poller_blocks_block_number_check)
 	return `
-			(SELECT greatest(block_number - :confs, 0) 
-			FROM evm.log_poller_blocks 	
-			WHERE evm_chain_id = :evm_chain_id 
+			(SELECT greatest(block_number - :confs, 0)
+			FROM evm.log_poller_blocks
+			WHERE evm_chain_id = :evm_chain_id
 			ORDER BY block_number DESC LIMIT 1) `
 }

@@ -4,17 +4,17 @@ pragma solidity 0.8.24;
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
 
+import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {CommitStore} from "../../CommitStore.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {RMN} from "../../RMN.sol";
 import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
+import {OCR2Abstract} from "../../ocr/OCR2Abstract.sol";
 import {CommitStoreHelper} from "../helpers/CommitStoreHelper.sol";
 import {OCR2BaseSetup} from "../ocr/OCR2Base.t.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 
 contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
-  event ConfigSet(CommitStore.StaticConfig, CommitStore.DynamicConfig);
-
   CommitStoreHelper internal s_commitStore;
 
   function setUp() public virtual override(PriceRegistrySetup, OCR2BaseSetup) {
@@ -37,7 +37,9 @@ contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
 
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = address(s_commitStore);
-    s_priceRegistry.applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
+    s_priceRegistry.applyAuthorizedCallerUpdates(
+      AuthorizedCallers.AuthorizedCallerArgs({addedCallers: priceUpdaters, removedCallers: new address[](0)})
+    );
   }
 }
 
@@ -53,13 +55,8 @@ contract CommitStoreRealRMNSetup is PriceRegistrySetup, OCR2BaseSetup {
     OCR2BaseSetup.setUp();
 
     RMN.Voter[] memory voters = new RMN.Voter[](1);
-    voters[0] = RMN.Voter({
-      blessVoteAddr: BLESS_VOTE_ADDR,
-      curseVoteAddr: address(9999),
-      curseUnvoteAddr: address(19999),
-      blessWeight: 1,
-      curseWeight: 1
-    });
+    voters[0] =
+      RMN.Voter({blessVoteAddr: BLESS_VOTE_ADDR, curseVoteAddr: address(9999), blessWeight: 1, curseWeight: 1});
     // Overwrite base mock rmn with real.
     s_rmn = new RMN(RMN.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
     s_commitStore = new CommitStoreHelper(
@@ -78,10 +75,7 @@ contract CommitStoreRealRMNSetup is PriceRegistrySetup, OCR2BaseSetup {
   }
 }
 
-/// @notice #constructor
 contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
-  event ConfigSet(CommitStore.StaticConfig, CommitStore.DynamicConfig);
-
   function setUp() public virtual override(PriceRegistrySetup, OCR2BaseSetup) {
     PriceRegistrySetup.setUp();
     OCR2BaseSetup.setUp();
@@ -98,7 +92,7 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
       CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)});
 
     vm.expectEmit();
-    emit ConfigSet(staticConfig, dynamicConfig);
+    emit CommitStore.ConfigSet(staticConfig, dynamicConfig);
 
     CommitStore commitStore = new CommitStore(staticConfig);
     commitStore.setOCR2Config(
@@ -125,9 +119,11 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
   }
 }
 
-/// @notice #setMinSeqNr
 contract CommitStore_setMinSeqNr is CommitStoreSetup {
   function test_Fuzz_SetMinSeqNr_Success(uint64 minSeqNr) public {
+    vm.expectEmit();
+    emit CommitStore.SequenceNumberSet(s_commitStore.getExpectedNextSequenceNumber(), minSeqNr);
+
     s_commitStore.setMinSeqNr(minSeqNr);
 
     assertEq(s_commitStore.getExpectedNextSequenceNumber(), minSeqNr);
@@ -141,7 +137,6 @@ contract CommitStore_setMinSeqNr is CommitStoreSetup {
   }
 }
 
-/// @notice #setDynamicConfig
 contract CommitStore_setDynamicConfig is CommitStoreSetup {
   function test_Fuzz_SetDynamicConfig_Success(address priceRegistry) public {
     vm.assume(priceRegistry != address(0));
@@ -150,12 +145,12 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
     bytes memory onchainConfig = abi.encode(dynamicConfig);
 
     vm.expectEmit();
-    emit ConfigSet(staticConfig, dynamicConfig);
+    emit CommitStore.ConfigSet(staticConfig, dynamicConfig);
 
     uint32 configCount = 1;
 
     vm.expectEmit();
-    emit ConfigSet(
+    emit OCR2Abstract.ConfigSet(
       uint32(block.number),
       getBasicConfigDigest(address(s_commitStore), s_f, configCount, onchainConfig),
       configCount + 1,
@@ -211,10 +206,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
   }
 }
 
-/// @notice #resetUnblessedRoots
 contract CommitStore_resetUnblessedRoots is CommitStoreRealRMNSetup {
-  event RootRemoved(bytes32 root);
-
   function test_ResetUnblessedRoots_Success() public {
     bytes32[] memory rootsToReset = new bytes32[](3);
     rootsToReset[0] = "1";
@@ -252,10 +244,10 @@ contract CommitStore_resetUnblessedRoots is CommitStoreRealRMNSetup {
     s_rmn.voteToBless(blessedTaggedRoots);
 
     vm.expectEmit(false, false, false, true);
-    emit RootRemoved(rootsToReset[0]);
+    emit CommitStore.RootRemoved(rootsToReset[0]);
 
     vm.expectEmit(false, false, false, true);
-    emit RootRemoved(rootsToReset[2]);
+    emit CommitStore.RootRemoved(rootsToReset[2]);
 
     vm.startPrank(OWNER);
     s_commitStore.resetUnblessedRoots(rootsToReset);
@@ -275,11 +267,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreRealRMNSetup {
   }
 }
 
-/// @notice #report
 contract CommitStore_report is CommitStoreSetup {
-  event ReportAccepted(CommitStore.CommitReport report);
-  event UsdPerTokenUpdated(address indexed feeToken, uint256 value, uint256 timestamp);
-
   function test_ReportOnlyRootSuccess_gas() public {
     vm.pauseGasMetering();
     uint64 max1 = 931;
@@ -291,7 +279,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectEmit();
-    emit ReportAccepted(report);
+    emit CommitStore.ReportAccepted(report);
 
     bytes memory encodedReport = abi.encode(report);
 
@@ -314,7 +302,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectEmit();
-    emit ReportAccepted(report);
+    emit CommitStore.ReportAccepted(report);
 
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
 
@@ -334,7 +322,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectEmit();
-    emit ReportAccepted(report);
+    emit CommitStore.ReportAccepted(report);
 
     s_commitStore.report(abi.encode(report), s_latestEpochAndRound);
     assertEq(maxSeq + 1, s_commitStore.getExpectedNextSequenceNumber());
@@ -347,7 +335,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectEmit();
-    emit ReportAccepted(report);
+    emit CommitStore.ReportAccepted(report);
 
     s_commitStore.report(abi.encode(report), s_latestEpochAndRound);
     assertEq(maxSeq * 2 + 1, s_commitStore.getExpectedNextSequenceNumber());
@@ -366,7 +354,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectEmit();
-    emit UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
 
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
     assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
@@ -380,7 +368,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectEmit();
-    emit UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
 
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
     assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
@@ -398,7 +386,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectEmit();
-    emit UsdPerTokenUpdated(s_sourceFeeToken, tokenPrice1, block.timestamp);
+    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, tokenPrice1, block.timestamp);
 
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
     assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
@@ -410,7 +398,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectEmit();
-    emit ReportAccepted(report);
+    emit CommitStore.ReportAccepted(report);
 
     s_commitStore.report(abi.encode(report), s_latestEpochAndRound);
 
@@ -431,7 +419,7 @@ contract CommitStore_report is CommitStoreSetup {
   }
 
   function test_Unhealthy_Revert() public {
-    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    s_mockRMN.setGlobalCursed(true);
     vm.expectRevert(CommitStore.CursedByRMN.selector);
     bytes memory report;
     s_commitStore.report(report, ++s_latestEpochAndRound);
@@ -488,7 +476,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectEmit();
-    emit UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
 
     vm.expectRevert(CommitStore.StaleReport.selector);
@@ -515,7 +503,6 @@ contract CommitStore_report is CommitStoreSetup {
   }
 }
 
-/// @notice #verify
 contract CommitStore_verify is CommitStoreRealRMNSetup {
   function test_NotBlessed_Success() public {
     bytes32[] memory leaves = new bytes32[](1);
@@ -595,26 +582,31 @@ contract CommitStore_isUnpausedAndRMNHealthy is CommitStoreSetup {
     assertTrue(s_commitStore.isUnpausedAndNotCursed());
 
     // Test rmn
-    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    s_mockRMN.setGlobalCursed(true);
     assertFalse(s_commitStore.isUnpausedAndNotCursed());
-    RMN.UnvoteToCurseRecord[] memory records = new RMN.UnvoteToCurseRecord[](1);
-    records[0] = RMN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
-    s_mockRMN.ownerUnvoteToCurse(records);
+    s_mockRMN.setGlobalCursed(false);
+    // TODO: also test with s_mockRMN.setChainCursed(sourceChainSelector),
+    // also for other similar tests (e.g., OffRamp, OnRamp)
     assertTrue(s_commitStore.isUnpausedAndNotCursed());
 
-    s_mockRMN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    s_mockRMN.setGlobalCursed(true);
     s_commitStore.pause();
     assertFalse(s_commitStore.isUnpausedAndNotCursed());
   }
 }
 
-/// @notice #setLatestPriceEpochAndRound
 contract CommitStore_setLatestPriceEpochAndRound is CommitStoreSetup {
   function test_SetLatestPriceEpochAndRound_Success() public {
     uint40 latestRoundAndEpoch = 1782155;
+
+    vm.expectEmit();
+    emit CommitStore.LatestPriceEpochAndRoundSet(
+      uint40(s_commitStore.getLatestPriceEpochAndRound()), latestRoundAndEpoch
+    );
+
     s_commitStore.setLatestPriceEpochAndRound(latestRoundAndEpoch);
 
-    assertEq(s_commitStore.getLatestPriceEpochAndRound(), latestRoundAndEpoch);
+    assertEq(uint40(s_commitStore.getLatestPriceEpochAndRound()), latestRoundAndEpoch);
   }
 
   // Reverts

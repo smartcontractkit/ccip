@@ -3,16 +3,16 @@ package ocr
 import (
 	"testing"
 
+	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/utils/seth"
+
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/seth"
 	"github.com/smartcontractkit/wasp"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/k8s"
 	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
-	"github.com/smartcontractkit/chainlink/integration-tests/utils"
 )
 
 var (
@@ -25,19 +25,13 @@ var (
 func TestOCRLoad(t *testing.T) {
 	l := logging.GetTestLogger(t)
 
-	config, err := tc.GetConfig("Load", tc.OCR)
+	config, err := tc.GetConfig([]string{"Load"}, tc.OCR)
 	require.NoError(t, err)
 
 	evmNetwork, msClient, bootstrapNode, workerNodes, err := k8s.ConnectRemote()
 	require.NoError(t, err)
 
-	readSethCfg := config.GetSethConfig()
-	require.NotNil(t, readSethCfg, "Seth config shouldn't be nil")
-
-	sethCfg, err := utils.MergeSethAndEvmNetworkConfigs(*evmNetwork, *readSethCfg)
-	require.NoError(t, err, "Error merging seth and evm network configs")
-
-	seth, err := seth.NewClientWithConfig(&sethCfg)
+	seth, err := seth_utils.GetChainClient(config, *evmNetwork)
 	require.NoError(t, err, "Error creating seth client")
 
 	lta, err := SetupCluster(l, seth, workerNodes)
@@ -67,19 +61,13 @@ func TestOCRLoad(t *testing.T) {
 
 func TestOCRVolume(t *testing.T) {
 	l := logging.GetTestLogger(t)
-	config, err := tc.GetConfig("Volume", tc.OCR)
+	config, err := tc.GetConfig([]string{"Volume"}, tc.OCR)
 	require.NoError(t, err)
 
 	evmNetwork, msClient, bootstrapNode, workerNodes, err := k8s.ConnectRemote()
 	require.NoError(t, err)
 
-	readSethCfg := config.GetSethConfig()
-	require.NotNil(t, readSethCfg, "Seth config shouldn't be nil")
-
-	sethCfg, err := utils.MergeSethAndEvmNetworkConfigs(*evmNetwork, *readSethCfg)
-	require.NoError(t, err, "Error merging seth and evm network configs")
-
-	seth, err := seth.NewClientWithConfig(&sethCfg)
+	seth, err := seth_utils.GetChainClient(config, *evmNetwork)
 	require.NoError(t, err, "Error creating seth client")
 
 	lta, err := SetupCluster(l, seth, workerNodes)

@@ -18,12 +18,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 )
 
-func Test_prover_getFPAC(t *testing.T) {
+func Test_prover_GetFPAC(t *testing.T) {
 	type fields struct {
 		optimismPortal *mock_optimism_portal.OptimismPortalInterface
 	}
 	type args struct {
-		ctx context.Context
+		ctx context.Context //nolint:containedctx
 	}
 	tests := []struct {
 		name    string
@@ -93,7 +93,7 @@ func Test_prover_getFPAC(t *testing.T) {
 			}
 			tt.expect(t, tt.fields, tt.args)
 			defer tt.assert(t, tt.fields)
-			got, err := p.getFPAC(tt.args.ctx)
+			got, err := p.GetFPAC(tt.args.ctx)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -109,7 +109,7 @@ func Test_prover_makeStateTrieProof(t *testing.T) {
 		l2Client *evmclientmocks.Client
 	}
 	type args struct {
-		ctx           context.Context
+		ctx           context.Context //nolint:containedctx
 		l2BlockNumber *big.Int
 		address       common.Address
 		slot          [32]byte
@@ -218,7 +218,7 @@ func Test_prover_getMessageBedrockOutput(t *testing.T) {
 		l2OutputOracle *mock_optimism_l2_output_oracle.OptimismL2OutputOracleInterface
 	}
 	type args struct {
-		ctx           context.Context
+		ctx           context.Context //nolint:containedctx
 		l2BlockNumber *big.Int
 	}
 	tests := []struct {

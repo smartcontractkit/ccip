@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -124,7 +125,6 @@ func TestExecOnchainConfig120(t *testing.T) {
 }
 
 func TestOffRampReaderInit(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		version string
@@ -167,10 +167,15 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 		RpcBatchSize:             2,
 		KeepFinalizedBlocksDepth: 1000,
 	}
+	headTracker := headtracker.NewSimulatedHeadTracker(bc, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+	if lpOpts.PollPeriod == 0 {
+		lpOpts.PollPeriod = 1 * time.Hour
+	}
 	lp := logpoller.NewLogPoller(
 		orm,
 		bc,
 		log,
+		headTracker,
 		lpOpts)
 	assert.NoError(t, orm.InsertBlock(ctx, common.Hash{}, 1, time.Now(), 1))
 	// Setup offRamp.
@@ -239,7 +244,6 @@ func setupOffRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 }
 
 func setupOffRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
-
 	onRampAddr := utils.RandomAddress()
 	armAddr := deployMockArm(t, user, bc)
 	csAddr := deployCommitStore(t, user, bc, onRampAddr, armAddr)
@@ -277,6 +281,7 @@ func setupOffRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 
 func setupOffRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
 	onRampAddr := utils.RandomAddress()
+	tokenAdminRegAddr := utils.RandomAddress()
 	rmnAddr := deployMockArm(t, user, bc)
 	csAddr := deployCommitStore(t, user, bc, onRampAddr, rmnAddr)
 
@@ -288,6 +293,7 @@ func setupOffRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 		OnRamp:              onRampAddr,
 		PrevOffRamp:         common.Address{},
 		RmnProxy:            rmnAddr,
+		TokenAdminRegistry:  tokenAdminRegAddr,
 	}
 	rateLimiterConfig := evm_2_evm_offramp.RateLimiterConfig{
 		IsEnabled: false,
@@ -366,7 +372,6 @@ func testOffRampReader(t *testing.T, th offRampReaderTH) {
 	require.Empty(t, sourceToDestTokens)
 
 	require.NoError(t, err)
-	require.Empty(t, tokens.DestinationPool)
 }
 
 func TestNewOffRampReader(t *testing.T) {

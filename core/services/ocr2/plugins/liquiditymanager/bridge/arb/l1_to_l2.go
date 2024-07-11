@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/abstract_arbitrum_token_gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_gateway_router"
@@ -31,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/abiutils"
+	bridgecommon "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 )
 
@@ -54,6 +56,7 @@ type l1ToL2Bridge struct {
 }
 
 func NewL1ToL2Bridge(
+	ctx context.Context,
 	lggr logger.Logger,
 	localSelector,
 	remoteSelector models.NetworkSelector,
@@ -85,17 +88,21 @@ func NewL1ToL2Bridge(
 		return nil, fmt.Errorf("instantiate L1 inbox at %s: %w", l1InboxAddress, err)
 	}
 
-	l1FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L1-LiquidityManager:%s-Local:%s-Remote:%s",
-		l1LiquidityManagerAddress.String(), localChain.Name, remoteChain.Name)
-	// FIXME Makram please pass the valid context
-	ctx := context.Background()
+	l1FilterName := bridgecommon.GetBridgeFilterName(
+		"ArbitrumL1ToL2Bridge",
+		"L1",
+		l1LiquidityManagerAddress,
+		localChain.Name,
+		remoteChain.Name,
+		"",
+	)
 	err = l1LogPoller.RegisterFilter(ctx, logpoller.Filter{
 		Addresses: []common.Address{l1LiquidityManagerAddress},
 		Name:      l1FilterName,
 		EventSigs: []common.Hash{
-			LiquidityTransferredTopic,
+			bridgecommon.LiquidityTransferredTopic,
 		},
-		Retention: DurationMonth,
+		Retention: bridgecommon.DurationMonth,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("register L1 log filter: %w", err)
@@ -139,8 +146,14 @@ func NewL1ToL2Bridge(
 		return nil, fmt.Errorf("get counterpart gateway for gateway %s: %w", l1TokenGateway, err)
 	}
 
-	l2FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L2-L2Gateway:%s-LiquidityManager:%s-Local:%s-Remote:%s",
-		l2Gateway.Hex(), l2LiquidityManagerAddress.Hex(), localChain.Name, remoteChain.Name)
+	l2FilterName := bridgecommon.GetBridgeFilterName(
+		"ArbitrumL1ToL2Bridge",
+		"L2",
+		l2LiquidityManagerAddress,
+		localChain.Name,
+		remoteChain.Name,
+		fmt.Sprintf("L2Gateway:%s", l2Gateway.Hex()),
+	)
 	err = l2LogPoller.RegisterFilter(ctx, logpoller.Filter{
 		Addresses: []common.Address{
 			l2Gateway,                 // emits DepositFinalized
@@ -148,10 +161,10 @@ func NewL1ToL2Bridge(
 		},
 		Name: l2FilterName,
 		EventSigs: []common.Hash{
-			DepositFinalizedTopic,     // emitted by the gateways
-			LiquidityTransferredTopic, // emitted by the liquidityManagers
+			DepositFinalizedTopic,                  // emitted by the gateways
+			bridgecommon.LiquidityTransferredTopic, // emitted by the liquidityManagers
 		},
-		Retention: DurationMonth,
+		Retention: bridgecommon.DurationMonth,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("register L2 log filter: %w", err)
@@ -228,23 +241,13 @@ func (l *l1ToL2Bridge) GetTransfers(
 		return nil, err
 	}
 
-	slices.SortFunc(sendLogs, func(a, b logpoller.Log) int {
-		return a.BlockTimestamp.Compare(b.BlockTimestamp)
-	})
-	slices.SortFunc(depositFinalizedLogs, func(a, b logpoller.Log) int {
-		return a.BlockTimestamp.Compare(b.BlockTimestamp)
-	})
-	slices.SortFunc(receiveLogs, func(a, b logpoller.Log) int {
-		return a.BlockTimestamp.Compare(b.BlockTimestamp)
-	})
-
 	lggr.Infow("got logs",
 		"sendLogs", len(sendLogs),
 		"depositFinalizedLogs", len(depositFinalizedLogs),
 		"receiveLogs", len(receiveLogs),
 	)
 
-	parsedSent, parsedToLP, err := parseLiquidityTransferred(l.l1LiquidityManager.ParseLiquidityTransferred, sendLogs)
+	parsedSent, parsedToLP, err := bridgecommon.ParseLiquidityTransferred(l.l1LiquidityManager.ParseLiquidityTransferred, sendLogs)
 	if err != nil {
 		return nil, fmt.Errorf("parse L1 -> L2 transfers: %w", err)
 	}
@@ -254,7 +257,8 @@ func (l *l1ToL2Bridge) GetTransfers(
 		return nil, fmt.Errorf("parse DepositFinalized logs: %w", err)
 	}
 
-	parsedReceived, _, err := parseLiquidityTransferred(l.l1LiquidityManager.ParseLiquidityTransferred, receiveLogs)
+	// Technically an L2 event, but the l1LiquidityManager ABI parsing should be the same
+	parsedReceived, _, err := bridgecommon.ParseLiquidityTransferred(l.l1LiquidityManager.ParseLiquidityTransferred, receiveLogs)
 	if err != nil {
 		return nil, fmt.Errorf("parse LiquidityTransferred logs: %w", err)
 	}
@@ -270,11 +274,7 @@ func (l *l1ToL2Bridge) GetTransfers(
 	// event, such as the l1 to l2 tx id. This is only available as part of the calldata for when the L2 calls
 	// submitRetryable on the ArbRetryableTx precompile.
 	// e.g https://sepolia.arbiscan.io/tx/0xce0d0d7e74f184fa8cb264b6d9aab5ced159faf3d0d9ae54b67fd40ba9d965a7
-	// therefore we're kind of relegated here to doing a simple count check - filter out all of the
-	// LiquidityTransferred logs destined for the liquidityManager on L2 and all the DepositFinalized logs that
-	// pay out to the liquidityManager on L2.
-	// We can _probably_ assume that the earlier LiquidityTransferred logs on L1
-	// are more likely to be finalizedNotExecuted than later ones.
+	// therefore we're kind of relegated here to simply checking on the `amount` transferred.
 	notReady, ready, readyData, err := partitionTransfers(
 		localToken,
 		l.l1BridgeAdapter.Address(),
@@ -292,11 +292,11 @@ func (l *l1ToL2Bridge) GetTransfers(
 func (l *l1ToL2Bridge) getLogs(ctx context.Context, fromTs time.Time) (sendLogs []logpoller.Log, depositFinalizedLogs []logpoller.Log, receiveLogs []logpoller.Log, err error) {
 	sendLogs, err = l.l1LogPoller.IndexedLogsCreatedAfter(
 		ctx,
-		LiquidityTransferredTopic,
+		bridgecommon.LiquidityTransferredTopic,
 		l.l1LiquidityManager.Address(),
-		LiquidityTransferredToChainSelectorTopicIndex,
+		bridgecommon.LiquidityTransferredToChainSelectorTopicIndex,
 		[]common.Hash{
-			toHash(l.remoteSelector),
+			bridgecommon.NetworkSelectorToHash(l.remoteSelector),
 		},
 		fromTs,
 		1,
@@ -314,7 +314,7 @@ func (l *l1ToL2Bridge) getLogs(ctx context.Context, fromTs time.Time) (sendLogs 
 			common.HexToHash(l.l2LiquidityManagerAddress.Hex()),
 		},
 		fromTs,
-		logpoller.Finalized,
+		evmtypes.Finalized,
 	)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, nil, fmt.Errorf("get DepositFinalized events from L2 gateway: %w", err)
@@ -322,11 +322,11 @@ func (l *l1ToL2Bridge) getLogs(ctx context.Context, fromTs time.Time) (sendLogs 
 
 	receiveLogs, err = l.l2LogPoller.IndexedLogsCreatedAfter(
 		ctx,
-		LiquidityTransferredTopic,
+		bridgecommon.LiquidityTransferredTopic,
 		l.l2LiquidityManagerAddress,
-		LiquidityTransferredFromChainSelectorTopicIndex,
+		bridgecommon.LiquidityTransferredFromChainSelectorTopicIndex,
 		[]common.Hash{
-			toHash(l.localSelector),
+			bridgecommon.NetworkSelectorToHash(l.localSelector),
 		},
 		fromTs,
 		1,
@@ -343,7 +343,7 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 	notReady,
 	ready []*liquiditymanager.LiquidityManagerLiquidityTransferred,
 	readyData [][]byte,
-	parsedToLP map[logKey]logpoller.Log,
+	parsedToLP map[bridgecommon.LogKey]logpoller.Log,
 ) ([]models.PendingTransfer, error) {
 	if len(ready) != len(readyData) {
 		return nil, fmt.Errorf("length of ready and readyData should be the same: len(ready) = %d, len(readyData) = %d",
@@ -360,12 +360,13 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 				LocalTokenAddress:  localToken,
 				RemoteTokenAddress: remoteToken,
 				Amount:             ubig.New(transfer.Amount),
-				Date: parsedToLP[logKey{
-					txHash:   transfer.Raw.TxHash,
-					logIndex: int64(transfer.Raw.Index),
+				Date: parsedToLP[bridgecommon.LogKey{
+					TxHash:   transfer.Raw.TxHash,
+					LogIndex: int64(transfer.Raw.Index),
 				}].BlockTimestamp,
-				BridgeData: []byte{}, // no finalization data, not ready
-				Stage:      StageRebalanceConfirmed,
+				BridgeData:      []byte{}, // no finalization data, not ready
+				Stage:           bridgecommon.StageRebalanceConfirmed,
+				NativeBridgeFee: ubig.NewI(0),
 			},
 			Status: models.TransferStatusNotReady,
 			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
@@ -381,12 +382,13 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 				LocalTokenAddress:  localToken,
 				RemoteTokenAddress: remoteToken,
 				Amount:             ubig.New(transfer.Amount),
-				Date: parsedToLP[logKey{
-					txHash:   transfer.Raw.TxHash,
-					logIndex: int64(transfer.Raw.Index),
+				Date: parsedToLP[bridgecommon.LogKey{
+					TxHash:   transfer.Raw.TxHash,
+					LogIndex: int64(transfer.Raw.Index),
 				}].BlockTimestamp,
-				BridgeData: readyData[i], // finalization data since its ready
-				Stage:      StageFinalizeReady,
+				BridgeData:      readyData[i], // finalization data since its ready
+				Stage:           bridgecommon.StageFinalizeReady,
+				NativeBridgeFee: ubig.NewI(0),
 			},
 			Status: models.TransferStatusReady, // ready == finalized for L1 -> L2 transfers due to auto-finalization by the native bridge
 			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
@@ -397,7 +399,6 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 	return transfers, nil
 }
 
-// precondition: the input logs are already sorted in time-ascending order
 func partitionTransfers(
 	localToken models.Address,
 	l1BridgeAdapterAddress common.Address,
@@ -412,22 +413,23 @@ func partitionTransfers(
 	err error,
 ) {
 	effectiveDepositFinalized := getEffectiveEvents(localToken, l1BridgeAdapterAddress, l2LiquidityManagerAddress, depositFinalizedLogs)
-	// determine ready and not ready first
-	if len(sentLogs) > len(effectiveDepositFinalized) {
-		// more sent than have been finalized
-		for i := len(sentLogs) - len(effectiveDepositFinalized) + 1; i < len(sentLogs); i++ {
-			notReady = append(notReady, sentLogs[i])
+
+	// Loop through sentLogs and find an effectiveDepositFinalized log with a matching 'amount' and 'to' address.
+	// If found, it is ready to be received by L2 LM. If not found, it still needs to be finalized.
+	for _, sentLog := range sentLogs {
+		var found bool
+		for _, depFinalized := range effectiveDepositFinalized {
+			if sentLog.Amount.Cmp(depFinalized.Amount) == 0 && sentLog.To == depFinalized.To {
+				ready = append(ready, sentLog)
+				found = true
+				break
+			}
 		}
-		for i := 0; i < (len(sentLogs) - len(effectiveDepositFinalized)); i++ {
-			ready = append(ready, sentLogs[i])
+		if !found {
+			notReady = append(notReady, sentLog)
 		}
-	} else if len(sentLogs) < len(effectiveDepositFinalized) {
-		// more finalized than have been sent - should be impossible
-		return nil, nil, nil, fmt.Errorf("got more finalized logs than sent - should be impossible: len(sent) = %d, len(finalized) = %d",
-			len(sentLogs), len(effectiveDepositFinalized))
-	} else {
-		ready = sentLogs
 	}
+
 	// figure out if any of the ready have been executed
 	ready, err = filterExecuted(ready, receivedLogs)
 	if err != nil {
@@ -479,6 +481,10 @@ func matchingExecutionExists(
 				err, hexutil.Encode(recvLog.BridgeSpecificData))
 		}
 		if sendL1ToL2TxId.Cmp(recvL1ToL2TxId) == 0 {
+			if readyCandidate.Amount.Cmp(recvLog.Amount) != 0 {
+				return false, fmt.Errorf("bridge data matched but amount mismatched: send amount %s, receive amount %s",
+					readyCandidate.Amount, recvLog.Amount)
+			}
 			return true, nil
 		}
 	}

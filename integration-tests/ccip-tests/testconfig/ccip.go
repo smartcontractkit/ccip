@@ -2,29 +2,31 @@ package testconfig
 
 import (
 	"fmt"
+	"math/big"
+	"os"
+
 	"github.com/AlekSi/pointer"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
+
 	ctfK8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
-	"math/big"
-	"os"
 
 	testutils "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/utils"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
+	ctfK8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 
 	ccipcontracts "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
+	testutils "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/utils"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 )
 
 const (
-	CONTRACTS_OVERRIDE_CONFIG        = "BASE64_CCIP_CONFIG_OVERRIDE_CONTRACTS"
+	CONTRACTS_OVERRIDE_CONFIG string = "BASE64_CCIP_CONFIG_OVERRIDE_CONTRACTS"
 	TokenOnlyTransfer         string = "Token"
-
-	DataOnlyTransfer string = "Data"
-
-	DataAndTokenTransfer string = "DataWithToken"
+	DataOnlyTransfer          string = "Data"
+	DataAndTokenTransfer      string = "DataWithToken"
 )
 
 type OffRampConfig struct {
@@ -94,12 +96,16 @@ func (m *MsgDetails) Validate() error {
 	return nil
 }
 
+// TokenConfig defines the configuration for tokens in a CCIP test group
 type TokenConfig struct {
 	NoOfTokensPerChain         *int             `toml:",omitempty"`
 	WithPipeline               *bool            `toml:",omitempty"`
 	TimeoutForPriceUpdate      *config.Duration `toml:",omitempty"`
 	NoOfTokensWithDynamicPrice *int             `toml:",omitempty"`
 	DynamicPriceUpdateInterval *config.Duration `toml:",omitempty"`
+	// CCIPOwnerTokens dictates if tokens are deployed and controlled by the default CCIP owner account
+	// By default, all tokens are deployed and owned by a separate address
+	CCIPOwnerTokens *bool `toml:",omitempty"`
 }
 
 func (tc *TokenConfig) IsDynamicPriceUpdate() bool {
@@ -202,18 +208,26 @@ func (m *MsgProfile) Validate() error {
 	return nil
 }
 
+type LoadFrequency struct {
+	RequestPerUnitTime []int64            `toml:",omitempty"`
+	TimeUnit           *config.Duration   `toml:",omitempty"`
+	StepDuration       []*config.Duration `toml:",omitempty"`
+}
+
 type LoadProfile struct {
-	MsgProfile                                 *MsgProfile        `toml:",omitempty"`
-	RequestPerUnitTime                         []int64            `toml:",omitempty"`
-	TimeUnit                                   *config.Duration   `toml:",omitempty"`
-	StepDuration                               []*config.Duration `toml:",omitempty"`
-	TestDuration                               *config.Duration   `toml:",omitempty"`
-	WaitBetweenChaosDuringLoad                 *config.Duration   `toml:",omitempty"`
-	SkipRequestIfAnotherRequestTriggeredWithin *config.Duration   `toml:",omitempty"`
-	OptimizeSpace                              *bool              `toml:",omitempty"`
-	FailOnFirstErrorInLoad                     *bool              `toml:",omitempty"`
-	SendMaxDataInEveryMsgCount                 *int64             `toml:",omitempty"`
-	TestRunName                                string             `toml:",omitempty"`
+	MsgProfile                                 *MsgProfile               `toml:",omitempty"`
+	FrequencyByDestination                     map[string]*LoadFrequency `toml:",omitempty"`
+	RequestPerUnitTime                         []int64                   `toml:",omitempty"`
+	TimeUnit                                   *config.Duration          `toml:",omitempty"`
+	StepDuration                               []*config.Duration        `toml:",omitempty"`
+	TestDuration                               *config.Duration          `toml:",omitempty"`
+	NetworkChaosDelay                          *config.Duration          `toml:",omitempty"`
+	WaitBetweenChaosDuringLoad                 *config.Duration          `toml:",omitempty"`
+	SkipRequestIfAnotherRequestTriggeredWithin *config.Duration          `toml:",omitempty"`
+	OptimizeSpace                              *bool                     `toml:",omitempty"`
+	FailOnFirstErrorInLoad                     *bool                     `toml:",omitempty"`
+	SendMaxDataInEveryMsgCount                 *int64                    `toml:",omitempty"`
+	TestRunName                                string                    `toml:",omitempty"`
 }
 
 func (l *LoadProfile) Validate() error {
@@ -241,33 +255,6 @@ func (l *LoadProfile) SetTestRunName(name string) {
 	}
 }
 
-type ChaosGasLimitProfile struct {
-	TargetChain             string  `toml:",omitempty"`
-	BlockGasLimitPercentage float64 `toml:",omitempty"`
-}
-
-func (gp *ChaosGasLimitProfile) Validate() error {
-	if gp.TargetChain != "src" && gp.TargetChain != "dst" {
-		return fmt.Errorf("target chain for gas chaos should be 'src' or 'dst'")
-	}
-	return nil
-}
-
-type ChaosGasProfile struct {
-	TargetChain        string           `toml:",omitempty"`
-	StartGasPrice      int64            `toml:",omitempty"`
-	GasRaisePercentage float64          `toml:",omitempty"`
-	Spike              bool             `toml:",omitempty"`
-	Duration           *config.Duration `toml:",omitempty"`
-}
-
-func (gp *ChaosGasProfile) Validate() error {
-	if gp.TargetChain != "src" && gp.TargetChain != "dst" {
-		return fmt.Errorf("target chain for gas chaos should be 'src' or 'dst'")
-	}
-	return nil
-}
-
 type ChaosReorgProfile struct {
 	FinalityDelta int              `toml:",omitempty"`
 	Duration      *config.Duration `toml:",omitempty"`
@@ -278,39 +265,39 @@ func (gp *ChaosReorgProfile) Validate() error {
 	return nil
 }
 
-type CCIPTestConfig struct {
-	Type                      string                                `toml:",omitempty"`
-	KeepEnvAlive              *bool                                 `toml:",omitempty"`
-	BiDirectionalLane         *bool                                 `toml:",omitempty"`
-	CommitAndExecuteOnSameDON *bool                                 `toml:",omitempty"`
-	NoOfCommitNodes           int                                   `toml:",omitempty"`
-	MsgDetails                *MsgDetails                           `toml:",omitempty"`
-	TokenConfig               *TokenConfig                          `toml:",omitempty"`
-	MulticallInOneTx          *bool                                 `toml:",omitempty"`
-	NoOfSendsInMulticall      int                                   `toml:",omitempty"`
-	PhaseTimeout              *config.Duration                      `toml:",omitempty"`
-	LocalCluster              *bool                                 `toml:",omitempty"`
-	ExistingDeployment        *bool                                 `toml:",omitempty"`
-	ReuseContracts            *bool                                 `toml:",omitempty"`
-	NodeFunding               float64                               `toml:",omitempty"`
-	NetworkPairs              []string                              `toml:",omitempty"`
-	NoOfNetworks              int                                   `toml:",omitempty"`
-	NoOfRoutersPerPair        int                                   `toml:",omitempty"`
-	MaxNoOfLanes              int                                   `toml:",omitempty"`
-	ChaosDuration             *config.Duration                      `toml:",omitempty"`
-	USDCMockDeployment        *bool                                 `toml:",omitempty"`
-	CommitOCRParams           *contracts.OffChainAggregatorV2Config `toml:",omitempty"`
-	ExecOCRParams             *contracts.OffChainAggregatorV2Config `toml:",omitempty"`
-	OffRampConfig             *OffRampConfig                        `toml:",omitempty"`
-	CommitInflightExpiry      *config.Duration                      `toml:",omitempty"`
-	StoreLaneConfig           *bool                                 `toml:",omitempty"`
-	LoadProfile               *LoadProfile                          `toml:",omitempty"`
-	ChaosGasProfile           *ChaosGasProfile                      `toml:",omitempty"`
-	ChaosGasLimitProfile      *ChaosGasLimitProfile                 `toml:",omitempty"`
+// CCIPTestGroupConfig defines configuration input to change how a particular CCIP test group should run
+type CCIPTestGroupConfig struct {
+	Type                            string                                `toml:",omitempty"`
+	KeepEnvAlive                    *bool                                 `toml:",omitempty"`
+	BiDirectionalLane               *bool                                 `toml:",omitempty"`
+	CommitAndExecuteOnSameDON       *bool                                 `toml:",omitempty"`
+	NoOfCommitNodes                 int                                   `toml:",omitempty"`
+	MsgDetails                      *MsgDetails                           `toml:",omitempty"`
+	TokenConfig                     *TokenConfig                          `toml:",omitempty"`
+	MulticallInOneTx                *bool                                 `toml:",omitempty"`
+	NoOfSendsInMulticall            int                                   `toml:",omitempty"`
+	PhaseTimeout                    *config.Duration                      `toml:",omitempty"`
+	LocalCluster                    *bool                                 `toml:",omitempty"`
+	ExistingDeployment              *bool                                 `toml:",omitempty"`
+	ReuseContracts                  *bool                                 `toml:",omitempty"`
+	NodeFunding                     float64                               `toml:",omitempty"`
+	NetworkPairs                    []string                              `toml:",omitempty"`
+	DenselyConnectedNetworkChainIds []string                              `toml:",omitempty"`
+	NoOfNetworks                    int                                   `toml:",omitempty"`
+	NoOfRoutersPerPair              int                                   `toml:",omitempty"`
+	MaxNoOfLanes                    int                                   `toml:",omitempty"`
+	ChaosDuration                   *config.Duration                      `toml:",omitempty"`
+	USDCMockDeployment              *bool                                 `toml:",omitempty"`
+	CommitOCRParams                 *contracts.OffChainAggregatorV2Config `toml:",omitempty"`
+	ExecOCRParams                   *contracts.OffChainAggregatorV2Config `toml:",omitempty"`
+	OffRampConfig                   *OffRampConfig                        `toml:",omitempty"`
+	CommitInflightExpiry            *config.Duration                      `toml:",omitempty"`
+	StoreLaneConfig                 *bool                                 `toml:",omitempty"`
+	LoadProfile                     *LoadProfile                          `toml:",omitempty"`
 	ChaosReorgProfile         *ChaosReorgProfile                    `toml:",omitempty"`
 }
 
-func (c *CCIPTestConfig) Validate() error {
+func (c *CCIPTestGroupConfig) Validate() error {
 	if c.Type == Load {
 		if err := c.LoadProfile.Validate(); err != nil {
 			return err
@@ -322,11 +309,6 @@ func (c *CCIPTestConfig) Validate() error {
 		if c.ExistingDeployment != nil && *c.ExistingDeployment {
 			if c.LoadProfile.TestRunName == "" && os.Getenv(ctfK8config.EnvVarJobImage) != "" {
 				return fmt.Errorf("test run name should be set if existing deployment is true and test is running in k8s")
-			}
-		}
-		if c.ChaosGasProfile != nil {
-			if err := c.ChaosGasProfile.Validate(); err != nil {
-				return err
 			}
 		}
 		if c.ChaosReorgProfile != nil {
@@ -419,10 +401,10 @@ func (c *CCIPContractConfig) ContractsData() ([]byte, error) {
 }
 
 type CCIP struct {
-	Env              *Common                                   `toml:",omitempty"`
-	ContractVersions map[string]*ccipcontracts.ContractVersion `toml:",omitempty"`
-	Deployments      *CCIPContractConfig                       `toml:",omitempty"`
-	Groups           map[string]*CCIPTestConfig                `toml:",omitempty"`
+	Env              *Common                                      `toml:",omitempty"`
+	ContractVersions map[ccipcontracts.Name]ccipcontracts.Version `toml:",omitempty"`
+	Deployments      *CCIPContractConfig                          `toml:",omitempty"`
+	Groups           map[string]*CCIPTestGroupConfig              `toml:",omitempty"`
 }
 
 func (c *CCIP) Validate() error {
@@ -450,6 +432,5 @@ func (c *CCIP) ApplyOverrides(fromCfg *CCIP) error {
 	if err != nil {
 		return err
 	}
-	lggr := zerolog.Logger{}
-	return ctfconfig.BytesToAnyTomlStruct(lggr, "", "", c, logBytes)
+	return ctfconfig.BytesToAnyTomlStruct(zerolog.Logger{}, "", "", c, logBytes)
 }

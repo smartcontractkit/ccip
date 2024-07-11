@@ -250,6 +250,11 @@ DeltaDial = '15s'
 DeltaReconcile = '1m0s'
 ListenAddresses = []
 
+[Capabilities.ExternalRegistry]
+Address = ''
+NetworkID = 'evm'
+ChainID = '1'
+
 [[EVM]]
 ChainID = '1'
 AutoCreateKey = true
@@ -270,6 +275,7 @@ NoNewHeadsThreshold = '3m0s'
 OperatorFactoryAddress = '0x3E64Cd889482443324F91bFA9c84fE72A511f48A'
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
+FinalizedBlockOffset = 0
 
 [EVM.Transactions]
 ForwardersEnabled = false
@@ -278,6 +284,9 @@ MaxQueued = 250
 ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
+
+[EVM.Transactions.AutoPurge]
+Enabled = false
 
 [EVM.BalanceMonitor]
 Enabled = true
@@ -310,6 +319,8 @@ TransactionPercentile = 50
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [EVM.NodePool]
 PollFailureThreshold = 5
@@ -319,6 +330,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
+EnforceRepeatableRead = false
+DeathDeclarationDelay = '10s'
 
 [EVM.OCR]
 ContractConfirmations = 4
@@ -361,6 +374,7 @@ NoNewHeadsThreshold = '3m0s'
 OperatorFactoryAddress = '0x8007e24251b1D2Fc518Eb843A701d9cD21fe0aA3'
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
+FinalizedBlockOffset = 0
 
 [EVM.Transactions]
 ForwardersEnabled = false
@@ -369,6 +383,9 @@ MaxQueued = 250
 ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
+
+[EVM.Transactions.AutoPurge]
+Enabled = false
 
 [EVM.BalanceMonitor]
 Enabled = true
@@ -401,6 +418,8 @@ TransactionPercentile = 50
 HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [EVM.NodePool]
 PollFailureThreshold = 5
@@ -410,6 +429,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
+EnforceRepeatableRead = false
+DeathDeclarationDelay = '10s'
 
 [EVM.OCR]
 ContractConfirmations = 4
@@ -446,6 +467,7 @@ NonceAutoSync = true
 NoNewHeadsThreshold = '30s'
 RPCDefaultBatchSize = 100
 RPCBlockQueryDelay = 10
+FinalizedBlockOffset = 0
 
 [EVM.Transactions]
 ForwardersEnabled = false
@@ -454,6 +476,9 @@ MaxQueued = 5000
 ReaperInterval = '1h0m0s'
 ReaperThreshold = '168h0m0s'
 ResendAfterThreshold = '1m0s'
+
+[EVM.Transactions.AutoPurge]
+Enabled = false
 
 [EVM.BalanceMonitor]
 Enabled = true
@@ -486,6 +511,8 @@ TransactionPercentile = 60
 HistoryDepth = 2000
 MaxBufferSize = 3
 SamplingInterval = '1s'
+MaxAllowedFinalityDepth = 10000
+FinalityTagBypass = true
 
 [EVM.NodePool]
 PollFailureThreshold = 5
@@ -495,6 +522,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
+EnforceRepeatableRead = false
+DeathDeclarationDelay = '10s'
 
 [EVM.OCR]
 ContractConfirmations = 4
@@ -565,6 +594,7 @@ ComputeUnitPriceMax = 1000
 ComputeUnitPriceMin = 0
 ComputeUnitPriceDefault = 0
 FeeBumpPeriod = '3s'
+BlockHistoryPollPeriod = '5s'
 
 [[Solana.Nodes]]
 Name = 'primary'
@@ -587,6 +617,7 @@ ComputeUnitPriceMax = 1000
 ComputeUnitPriceMin = 0
 ComputeUnitPriceDefault = 0
 FeeBumpPeriod = '3s'
+BlockHistoryPollPeriod = '5s'
 
 [[Solana.Nodes]]
 Name = 'secondary'

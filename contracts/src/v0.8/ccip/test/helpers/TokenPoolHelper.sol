@@ -7,10 +7,6 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract TokenPoolHelper is TokenPool {
-  event LockOrBurn(uint256 amount);
-  event ReleaseOrMint(address indexed recipient, uint256 amount);
-  event AssertionPassed();
-
   constructor(
     IERC20 token,
     address[] memory allowlist,
@@ -20,20 +16,20 @@ contract TokenPoolHelper is TokenPool {
 
   function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
     external
+    view
     override
     returns (Pool.LockOrBurnOutV1 memory)
   {
-    emit LockOrBurn(lockOrBurnIn.amount);
-    return Pool.LockOrBurnOutV1({destPoolAddress: getRemotePool(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+    return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
     external
+    pure
     override
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
-    emit ReleaseOrMint(releaseOrMintIn.receiver, releaseOrMintIn.amount);
-    return Pool.ReleaseOrMintOutV1({localToken: address(i_token), destinationAmount: releaseOrMintIn.amount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 
   function onlyOnRampModifier(uint64 remoteChainSelector) external view {

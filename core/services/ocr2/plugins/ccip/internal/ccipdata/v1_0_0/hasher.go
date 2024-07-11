@@ -7,9 +7,10 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_0_0"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/pkg/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
 const (
@@ -20,16 +21,16 @@ var LeafDomainSeparator = [1]byte{0x00}
 
 type LeafHasher struct {
 	metaDataHash [32]byte
-	ctx          hashlib.Ctx[[32]byte]
+	ctx          hashutil.Hasher[[32]byte]
 	onRamp       *evm_2_evm_onramp_1_0_0.EVM2EVMOnRamp
 }
 
-func GetMetaDataHash[H hashlib.Hash](ctx hashlib.Ctx[H], prefix [32]byte, sourceChainSelector uint64, onRampId common.Address, destChainSelector uint64) H {
+func GetMetaDataHash[H hashutil.Hash](ctx hashutil.Hasher[H], prefix [32]byte, sourceChainSelector uint64, onRampId common.Address, destChainSelector uint64) H {
 	paddedOnRamp := common.BytesToHash(onRampId[:])
 	return ctx.Hash(utils.ConcatBytes(prefix[:], math.U256Bytes(big.NewInt(0).SetUint64(sourceChainSelector)), math.U256Bytes(big.NewInt(0).SetUint64(destChainSelector)), paddedOnRamp[:]))
 }
 
-func NewLeafHasher(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte], onRamp *evm_2_evm_onramp_1_0_0.EVM2EVMOnRamp) *LeafHasher {
+func NewLeafHasher(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashutil.Hasher[[32]byte], onRamp *evm_2_evm_onramp_1_0_0.EVM2EVMOnRamp) *LeafHasher {
 	return &LeafHasher{
 		metaDataHash: GetMetaDataHash(ctx, ctx.Hash([]byte(MetaDataHashPrefix)), sourceChainSelector, onRampId, destChainSelector),
 		ctx:          ctx,
@@ -42,14 +43,14 @@ func (t *LeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 	if err != nil {
 		return [32]byte{}, err
 	}
-	encodedTokens, err := utils.ABIEncode(
+	encodedTokens, err := abihelpers.ABIEncode(
 		`[
 {"components": [{"name":"token","type":"address"},{"name":"amount","type":"uint256"}], "type":"tuple[]"}]`, message.Message.TokenAmounts)
 	if err != nil {
 		return [32]byte{}, err
 	}
 
-	packedValues, err := utils.ABIEncode(
+	packedValues, err := abihelpers.ABIEncode(
 		`[
 {"name": "leafDomainSeparator","type":"bytes1"},
 {"name": "metadataHash", "type":"bytes32"},

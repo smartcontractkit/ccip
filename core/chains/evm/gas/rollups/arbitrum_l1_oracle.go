@@ -20,9 +20,9 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink/v2/common/client"
-	"github.com/smartcontractkit/chainlink/v2/common/config"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/chaintype"
 )
 
 type ArbL1GasOracle interface {
@@ -36,7 +36,7 @@ type arbitrumL1Oracle struct {
 	client     l1OracleClient
 	pollPeriod time.Duration
 	logger     logger.SugaredLogger
-	chainType  config.ChainType
+	chainType  chaintype.ChainType
 
 	l1GasPriceAddress   string
 	gasPriceMethod      string
@@ -71,7 +71,7 @@ const (
 	ArbGasInfo_getPricesInArbGas = "02199f34"
 )
 
-func NewArbitrumL1GasOracle(lggr logger.Logger, ethClient l1OracleClient) *arbitrumL1Oracle {
+func NewArbitrumL1GasOracle(lggr logger.Logger, ethClient l1OracleClient) (*arbitrumL1Oracle, error) {
 	var l1GasPriceAddress, gasPriceMethod, l1GasCostAddress, gasCostMethod string
 	var l1GasPriceMethodAbi, l1GasCostMethodAbi abi.ABI
 	var gasPriceErr, gasCostErr error
@@ -84,17 +84,17 @@ func NewArbitrumL1GasOracle(lggr logger.Logger, ethClient l1OracleClient) *arbit
 	l1GasCostMethodAbi, gasCostErr = abi.JSON(strings.NewReader(GasEstimateL1ComponentAbiString))
 
 	if gasPriceErr != nil {
-		panic("Failed to parse L1 gas price method ABI for chain: arbitrum")
+		return nil, fmt.Errorf("failed to parse L1 gas price method ABI for chain: arbitrum: %w", gasPriceErr)
 	}
 	if gasCostErr != nil {
-		panic("Failed to parse L1 gas cost method ABI for chain: arbitrum")
+		return nil, fmt.Errorf("failed to parse L1 gas cost method ABI for chain: arbitrum: %w", gasCostErr)
 	}
 
 	return &arbitrumL1Oracle{
 		client:     ethClient,
 		pollPeriod: PollPeriod,
 		logger:     logger.Sugared(logger.Named(lggr, "L1GasOracle(arbitrum)")),
-		chainType:  config.ChainArbitrum,
+		chainType:  chaintype.ChainArbitrum,
 
 		l1GasPriceAddress:   l1GasPriceAddress,
 		gasPriceMethod:      gasPriceMethod,
@@ -106,7 +106,7 @@ func NewArbitrumL1GasOracle(lggr logger.Logger, ethClient l1OracleClient) *arbit
 		chInitialised: make(chan struct{}),
 		chStop:        make(chan struct{}),
 		chDone:        make(chan struct{}),
-	}
+	}, nil
 }
 
 func (o *arbitrumL1Oracle) Name() string {

@@ -1,137 +1,205 @@
 package evm
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
+	"fmt"
 	"math/big"
+	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/google/uuid"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 
-	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-
-	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
+
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 )
 
-// CCIPCommitProvider provides all components needed for a CCIP Relay OCR2 plugin.
-type CCIPCommitProvider interface {
-	commontypes.Plugin
+var _ cciptypes.CommitStoreReader = (*IncompleteSourceCommitStoreReader)(nil)
+var _ cciptypes.CommitStoreReader = (*IncompleteDestCommitStoreReader)(nil)
+
+// IncompleteSourceCommitStoreReader is an implementation of CommitStoreReader with the only valid methods being
+// GasPriceEstimator, ChangeConfig, and OffchainConfig
+type IncompleteSourceCommitStoreReader struct {
+	estimator         gas.EvmFeeEstimator
+	gasPriceEstimator *prices.DAGasPriceEstimator
+	sourceMaxGasPrice *big.Int
+	offchainConfig    cciptypes.CommitOffchainConfig
 }
 
-// CCIPExecutionProvider provides all components needed for a CCIP Execution OCR2 plugin.
-type CCIPExecutionProvider interface {
-	commontypes.Plugin
+func NewIncompleteSourceCommitStoreReader(estimator gas.EvmFeeEstimator, sourceMaxGasPrice *big.Int) *IncompleteSourceCommitStoreReader {
+	return &IncompleteSourceCommitStoreReader{
+		estimator:         estimator,
+		sourceMaxGasPrice: sourceMaxGasPrice,
+	}
 }
 
-type ccipCommitProvider struct {
-	*configWatcher
-	contractTransmitter *contractTransmitter
+func (i *IncompleteSourceCommitStoreReader) ChangeConfig(ctx context.Context, onchainConfig []byte, offchainConfig []byte) (cciptypes.Address, error) {
+	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ccip.CommitOnchainConfig](onchainConfig)
+	if err != nil {
+		return "", err
+	}
+
+	offchainConfigParsed, err := ccipconfig.DecodeOffchainConfig[ccip.JSONCommitOffchainConfigV1_2_0](offchainConfig)
+	if err != nil {
+		return "", err
+	}
+
+	i.gasPriceEstimator = prices.NewDAGasPriceEstimator(
+		i.estimator,
+		i.sourceMaxGasPrice,
+		int64(offchainConfigParsed.ExecGasPriceDeviationPPB),
+		int64(offchainConfigParsed.DAGasPriceDeviationPPB),
+	)
+	i.offchainConfig = ccip.NewCommitOffchainConfig(
+		offchainConfigParsed.ExecGasPriceDeviationPPB,
+		offchainConfigParsed.GasPriceHeartBeat.Duration(),
+		offchainConfigParsed.TokenPriceDeviationPPB,
+		offchainConfigParsed.TokenPriceHeartBeat.Duration(),
+		offchainConfigParsed.InflightCacheExpiry.Duration(),
+		offchainConfigParsed.PriceReportingDisabled,
+	)
+
+	return cciptypes.Address(onchainConfigParsed.PriceRegistry.String()), nil
 }
 
-func chainToUUID(chainID *big.Int) uuid.UUID {
-	// See https://www.rfc-editor.org/rfc/rfc4122.html#section-4.1.3 for the list of supported versions.
-	const VersionSHA1 = 5
-	var buf bytes.Buffer
-	buf.WriteString("CCIP:")
-	buf.Write(chainID.Bytes())
-	// We use SHA-256 instead of SHA-1 because the former has better collision resistance.
-	// The UUID will contain only the first 16 bytes of the hash.
-	// You can't say which algorithms was used just by looking at the UUID bytes.
-	return uuid.NewHash(sha256.New(), uuid.NameSpaceOID, buf.Bytes(), VersionSHA1)
+func (i *IncompleteSourceCommitStoreReader) DecodeCommitReport(ctx context.Context, report []byte) (cciptypes.CommitStoreReport, error) {
+	return cciptypes.CommitStoreReport{}, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
-func NewCCIPCommitProvider(ctx context.Context, lggr logger.Logger, chainSet legacyevm.Chain, rargs commontypes.RelayArgs, transmitterID string, ks keystore.Eth) (CCIPCommitProvider, error) {
-	relayOpts := types.NewRelayOpts(rargs)
-	configWatcher, err := newStandardConfigProvider(ctx, lggr, chainSet, relayOpts)
+func (i *IncompleteSourceCommitStoreReader) EncodeCommitReport(ctx context.Context, report cciptypes.CommitStoreReport) ([]byte, error) {
+	return []byte{}, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
+}
+
+// GasPriceEstimator returns an ExecGasPriceEstimator to satisfy the GasPriceEstimatorCommit interface,
+// with deviationPPB values hardcoded to 0 when this implementation is first constructed.
+// When ChangeConfig is called, another call to this method must be made to fetch a GasPriceEstimator with updated values
+func (i *IncompleteSourceCommitStoreReader) GasPriceEstimator(ctx context.Context) (cciptypes.GasPriceEstimatorCommit, error) {
+	return i.gasPriceEstimator, nil
+}
+
+func (i *IncompleteSourceCommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+	return nil, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
+}
+
+func (i *IncompleteSourceCommitStoreReader) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+	return nil, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
+}
+
+func (i *IncompleteSourceCommitStoreReader) GetCommitStoreStaticConfig(ctx context.Context) (cciptypes.CommitStoreStaticConfig, error) {
+	return cciptypes.CommitStoreStaticConfig{}, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
+}
+
+func (i *IncompleteSourceCommitStoreReader) GetExpectedNextSequenceNumber(ctx context.Context) (uint64, error) {
+	return 0, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
+}
+
+func (i *IncompleteSourceCommitStoreReader) GetLatestPriceEpochAndRound(ctx context.Context) (uint64, error) {
+	return 0, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
+}
+
+func (i *IncompleteSourceCommitStoreReader) IsBlessed(ctx context.Context, root [32]byte) (bool, error) {
+	return false, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
+}
+
+func (i *IncompleteSourceCommitStoreReader) IsDestChainHealthy(ctx context.Context) (bool, error) {
+	return false, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
+}
+
+func (i *IncompleteSourceCommitStoreReader) IsDown(ctx context.Context) (bool, error) {
+	return false, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
+}
+
+func (i *IncompleteSourceCommitStoreReader) OffchainConfig(ctx context.Context) (cciptypes.CommitOffchainConfig, error) {
+	return i.offchainConfig, nil
+}
+
+func (i *IncompleteSourceCommitStoreReader) VerifyExecutionReport(ctx context.Context, report cciptypes.ExecReport) (bool, error) {
+	return false, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
+}
+
+func (i *IncompleteSourceCommitStoreReader) Close() error {
+	return fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
+}
+
+// IncompleteDestCommitStoreReader is an implementation of CommitStoreReader with all valid methods except
+// GasPriceEstimator, ChangeConfig, and OffchainConfig.
+type IncompleteDestCommitStoreReader struct {
+	cs cciptypes.CommitStoreReader
+}
+
+func NewIncompleteDestCommitStoreReader(lggr logger.Logger, versionFinder ccip.VersionFinder, address cciptypes.Address, ec client.Client, lp logpoller.LogPoller) (*IncompleteDestCommitStoreReader, error) {
+	cs, err := ccip.NewCommitStoreReader(lggr, versionFinder, address, ec, lp)
 	if err != nil {
 		return nil, err
 	}
-	address := common.HexToAddress(relayOpts.ContractID)
-	typ, ver, err := ccipconfig.TypeAndVersion(address, chainSet.Client())
-	if err != nil {
-		return nil, err
-	}
-	fn, err := ccipcommit.CommitReportToEthTxMeta(typ, ver)
-	if err != nil {
-		return nil, err
-	}
-	subjectID := chainToUUID(configWatcher.chain.ID())
-	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
-		subjectID: &subjectID,
-	}, OCR2AggregatorTransmissionContractABI, fn, 0)
-	if err != nil {
-		return nil, err
-	}
-	return &ccipCommitProvider{
-		configWatcher:       configWatcher,
-		contractTransmitter: contractTransmitter,
+
+	return &IncompleteDestCommitStoreReader{
+		cs: cs,
 	}, nil
 }
 
-func (c *ccipCommitProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
-	return c.contractTransmitter
+func (i *IncompleteDestCommitStoreReader) ChangeConfig(ctx context.Context, onchainConfig []byte, offchainConfig []byte) (cciptypes.Address, error) {
+	return "", fmt.Errorf("invalid usage of IncompleteDestCommitStoreReader")
 }
 
-func (c *ccipCommitProvider) ChainReader() commontypes.ChainReader {
-	return nil
+func (i *IncompleteDestCommitStoreReader) DecodeCommitReport(ctx context.Context, report []byte) (cciptypes.CommitStoreReport, error) {
+	return i.cs.DecodeCommitReport(ctx, report)
 }
 
-func (c *ccipCommitProvider) Codec() commontypes.Codec {
-	return nil
+func (i *IncompleteDestCommitStoreReader) EncodeCommitReport(ctx context.Context, report cciptypes.CommitStoreReport) ([]byte, error) {
+	return i.cs.EncodeCommitReport(ctx, report)
 }
 
-type ccipExecutionProvider struct {
-	*configWatcher
-	contractTransmitter *contractTransmitter
+func (i *IncompleteDestCommitStoreReader) GasPriceEstimator(ctx context.Context) (cciptypes.GasPriceEstimatorCommit, error) {
+	return nil, fmt.Errorf("invalid usage of IncompleteDestCommitStoreReader")
 }
 
-var _ commontypes.Plugin = (*ccipExecutionProvider)(nil)
-
-func NewCCIPExecutionProvider(ctx context.Context, lggr logger.Logger, chainSet legacyevm.Chain, rargs commontypes.RelayArgs, transmitterID string, ks keystore.Eth) (CCIPExecutionProvider, error) {
-	relayOpts := types.NewRelayOpts(rargs)
-
-	configWatcher, err := newStandardConfigProvider(ctx, lggr, chainSet, relayOpts)
-	if err != nil {
-		return nil, err
-	}
-	address := common.HexToAddress(relayOpts.ContractID)
-	typ, ver, err := ccipconfig.TypeAndVersion(address, chainSet.Client())
-	if err != nil {
-		return nil, err
-	}
-	fn, err := ccipexec.ExecReportToEthTxMeta(ctx, typ, ver)
-	if err != nil {
-		return nil, err
-	}
-	subjectID := chainToUUID(configWatcher.chain.ID())
-	contractTransmitter, err := newOnChainContractTransmitter(ctx, lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
-		subjectID: &subjectID,
-	}, OCR2AggregatorTransmissionContractABI, fn, 0)
-	if err != nil {
-		return nil, err
-	}
-	return &ccipExecutionProvider{
-		configWatcher:       configWatcher,
-		contractTransmitter: contractTransmitter,
-	}, nil
+func (i *IncompleteDestCommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+	return i.cs.GetAcceptedCommitReportsGteTimestamp(ctx, ts, confirmations)
 }
 
-func (c *ccipExecutionProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
-	return c.contractTransmitter
+func (i *IncompleteDestCommitStoreReader) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+	return i.cs.GetCommitReportMatchingSeqNum(ctx, seqNum, confirmations)
 }
 
-func (c *ccipExecutionProvider) ChainReader() commontypes.ChainReader {
-	return nil
+func (i *IncompleteDestCommitStoreReader) GetCommitStoreStaticConfig(ctx context.Context) (cciptypes.CommitStoreStaticConfig, error) {
+	return i.cs.GetCommitStoreStaticConfig(ctx)
 }
 
-func (c *ccipExecutionProvider) Codec() commontypes.Codec {
-	return nil
+func (i *IncompleteDestCommitStoreReader) GetExpectedNextSequenceNumber(ctx context.Context) (uint64, error) {
+	return i.cs.GetExpectedNextSequenceNumber(ctx)
+}
+
+func (i *IncompleteDestCommitStoreReader) GetLatestPriceEpochAndRound(ctx context.Context) (uint64, error) {
+	return i.cs.GetLatestPriceEpochAndRound(ctx)
+}
+
+func (i *IncompleteDestCommitStoreReader) IsBlessed(ctx context.Context, root [32]byte) (bool, error) {
+	return i.cs.IsBlessed(ctx, root)
+}
+
+func (i *IncompleteDestCommitStoreReader) IsDestChainHealthy(ctx context.Context) (bool, error) {
+	return i.cs.IsDestChainHealthy(ctx)
+}
+
+func (i *IncompleteDestCommitStoreReader) IsDown(ctx context.Context) (bool, error) {
+	return i.cs.IsDown(ctx)
+}
+
+func (i *IncompleteDestCommitStoreReader) OffchainConfig(ctx context.Context) (cciptypes.CommitOffchainConfig, error) {
+	return cciptypes.CommitOffchainConfig{}, fmt.Errorf("invalid usage of IncompleteDestCommitStoreReader")
+}
+
+func (i *IncompleteDestCommitStoreReader) VerifyExecutionReport(ctx context.Context, report cciptypes.ExecReport) (bool, error) {
+	return i.cs.VerifyExecutionReport(ctx, report)
+}
+
+func (i *IncompleteDestCommitStoreReader) Close() error {
+	return i.cs.Close()
 }

@@ -33,9 +33,15 @@ type Head[BLOCK_HASH Hashable] interface {
 	// If not in chain, returns the zero hash
 	HashAtHeight(blockNum int64) BLOCK_HASH
 
+	// HeadAtHeight returns head at specified height or an error, if one does not exist in provided chain.
+	HeadAtHeight(blockNum int64) (Head[BLOCK_HASH], error)
+
 	// Returns the total difficulty of the block. For chains who do not have a concept of block
 	// difficulty, return 0.
 	BlockDifficulty() *big.Int
 	// IsValid returns true if the head is valid.
 	IsValid() bool
+
+	// Returns the latest finalized based on finality tag or depth
+	LatestFinalizedHead() Head[BLOCK_HASH]
 }

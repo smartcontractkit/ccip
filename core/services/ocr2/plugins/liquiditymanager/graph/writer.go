@@ -18,19 +18,6 @@ func (g *liquidityGraph) Add(from, to Data) error {
 		return fmt.Errorf("add connection %d -> %d: %w", from.NetworkSelector, to.NetworkSelector, err)
 	}
 	return nil
-
-}
-
-func (g *liquidityGraph) AddEdges(edges []models.Edge) error {
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
-	for _, edge := range edges {
-		if err := g.addConnection(edge.Source, edge.Dest); err != nil {
-			return fmt.Errorf("add connection %d -> %d: %w", edge.Source, edge.Dest, err)
-		}
-	}
-	return nil
 }
 
 func (g *liquidityGraph) SetLiquidity(n models.NetworkSelector, liquidity *big.Int) bool {
@@ -49,6 +36,28 @@ func (g *liquidityGraph) SetLiquidity(n models.NetworkSelector, liquidity *big.I
 		ConfigDigest:            prev.ConfigDigest,
 		NetworkSelector:         prev.NetworkSelector,
 		MinimumLiquidity:        prev.MinimumLiquidity,
+		TargetLiquidity:         prev.TargetLiquidity,
+	}
+	return true
+}
+
+func (g *liquidityGraph) SetTargetLiquidity(n models.NetworkSelector, target *big.Int) bool {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	if !g.hasNetwork(n) {
+		return false
+	}
+
+	prev := g.data[n]
+	g.data[n] = Data{
+		Liquidity:               prev.Liquidity,
+		TokenAddress:            prev.TokenAddress,
+		LiquidityManagerAddress: prev.LiquidityManagerAddress,
+		ConfigDigest:            prev.ConfigDigest,
+		NetworkSelector:         prev.NetworkSelector,
+		MinimumLiquidity:        prev.MinimumLiquidity,
+		TargetLiquidity:         target,
 	}
 	return true
 }

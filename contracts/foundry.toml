@@ -7,7 +7,7 @@ src = 'src/v0.8'
 test = 'test/v0.8'
 out = 'foundry-artifacts'
 cache_path  = 'foundry-cache'
-libs = ['node_modules', 'foundry-lib']
+libs = ['node_modules']
 bytecode_hash = "none"
 ffi = false
 
@@ -26,7 +26,7 @@ single_line_statement_blocks = "preserve"
 solc_version = '0.8.24'
 src = 'src/v0.8/ccip'
 test = 'src/v0.8/ccip/test'
-optimizer_runs = 4_300
+optimizer_runs = 3_600
 evm_version = 'paris'
 
 [profile.functions]
@@ -73,10 +73,11 @@ solc_version = '0.8.24'
 evm_version = 'paris'
 
 [profile.keystone]
-solc_version = '0.8.19'
+optimizer_runs = 1_000_000
+solc_version = '0.8.24'
 src = 'src/v0.8/keystone'
 test = 'src/v0.8/keystone/test'
-optimizer_runs = 10_000
+evm_version = 'paris'
 
 [profile.operatorforwarder]
 optimizer_runs = 1_000_000

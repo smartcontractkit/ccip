@@ -14,16 +14,20 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	bridgetestutils "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/testutils"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/l2_arbitrum_gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/mocks/mock_arbitrum_inbox"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	bridgecommon "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
 )
 
@@ -107,7 +111,7 @@ func Test_l1ToL2Bridge_Close(t *testing.T) {
 		l2FilterName string
 	}
 	type args struct {
-		ctx context.Context
+		ctx context.Context //nolint:containedctx
 	}
 	tests := []struct {
 		name       string
@@ -209,7 +213,7 @@ func Test_l1ToL2Bridge_estimateMaxFeePerGasOnL2(t *testing.T) {
 		l2Client *evmclientmocks.Client
 	}
 	type args struct {
-		ctx context.Context
+		ctx context.Context //nolint:containedctx
 	}
 	tests := []struct {
 		name       string
@@ -281,7 +285,7 @@ func Test_l1ToL2Bridge_estimateRetryableGasLimit(t *testing.T) {
 		l2Client *evmclientmocks.Client
 	}
 	type args struct {
-		ctx context.Context
+		ctx context.Context //nolint:containedctx
 		rd  RetryableData
 	}
 	tests := []struct {
@@ -374,7 +378,7 @@ func Test_l1ToL2Bridge_estimateMaxSubmissionFee(t *testing.T) {
 		l1Inbox *mock_arbitrum_inbox.ArbitrumInboxInterface
 	}
 	type args struct {
-		ctx        context.Context
+		ctx        context.Context //nolint:containedctx
 		l1BaseFee  *big.Int
 		dataLength int
 	}
@@ -751,6 +755,11 @@ func Test_filterExecuted(t *testing.T) {
 }
 
 func Test_partitionTransfers(t *testing.T) {
+	var (
+		localToken                = testutils.NewAddress()
+		l1BridgeAdapterAddress    = testutils.NewAddress()
+		l2LiquidityManagerAddress = testutils.NewAddress()
+	)
 	type args struct {
 		localToken                models.Address
 		l1BridgeAdapterAddress    common.Address
@@ -766,7 +775,288 @@ func Test_partitionTransfers(t *testing.T) {
 		wantReady     []*liquiditymanager.LiquidityManagerLiquidityTransferred
 		wantReadyData [][]byte
 		wantErr       bool
-	}{}
+	}{
+		{
+			name: "happy path - one ready, one not ready, one already received",
+			args: args{
+				localToken:                models.Address(localToken),
+				l1BridgeAdapterAddress:    l1BridgeAdapterAddress,
+				l2LiquidityManagerAddress: l2LiquidityManagerAddress,
+				sentLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+					// Amount = 100, ready
+					{
+						To:               l2LiquidityManagerAddress,
+						Amount:           big.NewInt(100),
+						BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001"),
+					},
+					// Amount = 200, not ready
+					{
+						To:               l2LiquidityManagerAddress,
+						Amount:           big.NewInt(200),
+						BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000002"),
+					},
+					// Amount = 300, already received
+					{
+						To:               l2LiquidityManagerAddress,
+						Amount:           big.NewInt(300),
+						BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000003"),
+					},
+				},
+				depositFinalizedLogs: []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{
+					// Amount = 100, ready
+					{
+						L1Token: localToken,
+						From:    l1BridgeAdapterAddress,
+						To:      l2LiquidityManagerAddress,
+						Amount:  big.NewInt(100),
+					},
+					// Amount = 300, already received
+					{
+						L1Token: localToken,
+						From:    l1BridgeAdapterAddress,
+						To:      l2LiquidityManagerAddress,
+						Amount:  big.NewInt(300),
+					},
+				},
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+					// Amount = 300, already received
+					{
+						To:                 l2LiquidityManagerAddress,
+						Amount:             big.NewInt(300),
+						BridgeSpecificData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000003"),
+					},
+				},
+			},
+			wantNotReady: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+				// Amount = 200, not ready
+				{
+					To:               l2LiquidityManagerAddress,
+					Amount:           big.NewInt(200),
+					BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000002"),
+				},
+			},
+			wantReady: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+				// Amount = 100, ready
+				{
+					To:               l2LiquidityManagerAddress,
+					Amount:           big.NewInt(100),
+					BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001"),
+				}},
+			wantReadyData: [][]byte{bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001")},
+			wantErr:       false,
+		},
+		{
+			name: "mismatched token address",
+			args: args{
+				localToken:                models.Address(localToken),
+				l1BridgeAdapterAddress:    l1BridgeAdapterAddress,
+				l2LiquidityManagerAddress: l2LiquidityManagerAddress,
+				sentLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+					{
+						To:               l2LiquidityManagerAddress,
+						Amount:           big.NewInt(100),
+						BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001"),
+					},
+				},
+				depositFinalizedLogs: []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{
+					{
+						L1Token: testutils.NewAddress(), // Mismatched address
+						From:    l1BridgeAdapterAddress,
+						To:      l2LiquidityManagerAddress,
+						Amount:  big.NewInt(100),
+					},
+				},
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
+			},
+			wantNotReady: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+				{
+					To:               l2LiquidityManagerAddress,
+					Amount:           big.NewInt(100),
+					BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001"),
+				},
+			},
+			wantReady:     []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
+			wantReadyData: nil,
+			wantErr:       false,
+		},
+		{
+			name: "mismatched deposit finalized From address",
+			args: args{
+				localToken:                models.Address(localToken),
+				l1BridgeAdapterAddress:    l1BridgeAdapterAddress,
+				l2LiquidityManagerAddress: l2LiquidityManagerAddress,
+				sentLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+					{
+						To:               l2LiquidityManagerAddress,
+						Amount:           big.NewInt(100),
+						BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001"),
+					},
+				},
+				depositFinalizedLogs: []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{
+					{
+						L1Token: localToken,
+						From:    testutils.NewAddress(), // Mismatched address
+						To:      l2LiquidityManagerAddress,
+						Amount:  big.NewInt(100),
+					},
+				},
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
+			},
+			wantNotReady: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+				{
+					To:               l2LiquidityManagerAddress,
+					Amount:           big.NewInt(100),
+					BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001"),
+				},
+			},
+			wantReady:     []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
+			wantReadyData: nil,
+			wantErr:       false,
+		},
+		{
+			name: "mismatched deposit finalized To address",
+			args: args{
+				localToken:                models.Address(localToken),
+				l1BridgeAdapterAddress:    l1BridgeAdapterAddress,
+				l2LiquidityManagerAddress: l2LiquidityManagerAddress,
+				sentLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+					{
+						To:               l2LiquidityManagerAddress,
+						Amount:           big.NewInt(100),
+						BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001"),
+					},
+				},
+				depositFinalizedLogs: []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{
+					{
+						L1Token: localToken,
+						From:    l1BridgeAdapterAddress,
+						To:      testutils.NewAddress(), // Mismatched address
+						Amount:  big.NewInt(100),
+					},
+				},
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
+			},
+			wantNotReady: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+				{
+					To:               l2LiquidityManagerAddress,
+					Amount:           big.NewInt(100),
+					BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001"),
+				},
+			},
+			wantReady:     []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
+			wantReadyData: nil,
+			wantErr:       false,
+		},
+		{
+			name: "mismatched deposit finalized amount",
+			args: args{
+				localToken:                models.Address(localToken),
+				l1BridgeAdapterAddress:    l1BridgeAdapterAddress,
+				l2LiquidityManagerAddress: l2LiquidityManagerAddress,
+				sentLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+					{
+						To:               l2LiquidityManagerAddress,
+						Amount:           big.NewInt(100),
+						BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001"),
+					},
+				},
+				depositFinalizedLogs: []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{
+					{
+						L1Token: localToken,
+						From:    l1BridgeAdapterAddress,
+						To:      l2LiquidityManagerAddress,
+						Amount:  big.NewInt(200), // Mismatched amount
+					},
+				},
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
+			},
+			wantNotReady: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+				{
+					To:               l2LiquidityManagerAddress,
+					Amount:           big.NewInt(100),
+					BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001"),
+				},
+			},
+			wantReady:     []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
+			wantReadyData: nil,
+			wantErr:       false,
+		},
+		{
+			name: "amount matching for dep finalized event but mismatched for received log, should never happen",
+			args: args{
+				localToken:                models.Address(localToken),
+				l1BridgeAdapterAddress:    l1BridgeAdapterAddress,
+				l2LiquidityManagerAddress: l2LiquidityManagerAddress,
+				sentLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+					{
+						To:               l2LiquidityManagerAddress,
+						Amount:           big.NewInt(100),
+						BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001"),
+					},
+				},
+				depositFinalizedLogs: []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{
+					{
+						L1Token: localToken,
+						From:    l1BridgeAdapterAddress,
+						To:      l2LiquidityManagerAddress,
+						Amount:  big.NewInt(100),
+					},
+				},
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+					{
+						To:                 l2LiquidityManagerAddress,
+						Amount:             big.NewInt(200), // Mismatched amount
+						BridgeSpecificData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001"),
+					},
+				},
+			},
+			wantNotReady:  nil,
+			wantReady:     nil,
+			wantReadyData: nil,
+			wantErr:       true,
+		},
+		{
+			name: "mismatched bridge specific data for received event",
+			args: args{
+				localToken:                models.Address(localToken),
+				l1BridgeAdapterAddress:    l1BridgeAdapterAddress,
+				l2LiquidityManagerAddress: l2LiquidityManagerAddress,
+				sentLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+					{
+						To:               l2LiquidityManagerAddress,
+						Amount:           big.NewInt(100),
+						BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001"),
+					},
+				},
+				depositFinalizedLogs: []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{
+					{
+						L1Token: localToken,
+						From:    l1BridgeAdapterAddress,
+						To:      l2LiquidityManagerAddress,
+						Amount:  big.NewInt(100),
+					},
+				},
+				receivedLogs: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+					{
+						To:     l2LiquidityManagerAddress,
+						Amount: big.NewInt(100),
+						// Mismatched bridge specific data
+						BridgeSpecificData: bridgetestutils.MustPackBridgeData(t, "0x1111000000000000000000000000000000000000000000000000000000000001"),
+					},
+				},
+			},
+			wantNotReady: []*liquiditymanager.LiquidityManagerLiquidityTransferred{},
+			wantReady: []*liquiditymanager.LiquidityManagerLiquidityTransferred{
+				{
+					To:               l2LiquidityManagerAddress,
+					Amount:           big.NewInt(100),
+					BridgeReturnData: bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001"),
+				},
+			},
+			wantReadyData: [][]byte{bridgetestutils.MustPackBridgeData(t, "0x0000000000000000000000000000000000000000000000000000000000000001")},
+			wantErr:       false,
+		},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotNotReady, gotReady, gotReadyData, err := partitionTransfers(tt.args.localToken, tt.args.l1BridgeAdapterAddress, tt.args.l2LiquidityManagerAddress, tt.args.sentLogs, tt.args.depositFinalizedLogs, tt.args.receivedLogs)
@@ -774,8 +1064,8 @@ func Test_partitionTransfers(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tt.wantNotReady, gotNotReady)
-				require.Equal(t, tt.wantReady, gotReady)
+				bridgetestutils.AssertLiquidityTransferredEventSlicesEqual(t, tt.wantNotReady, gotNotReady, bridgetestutils.SortByBridgeReturnData)
+				bridgetestutils.AssertLiquidityTransferredEventSlicesEqual(t, tt.wantReady, gotReady, bridgetestutils.SortByBridgeReturnData)
 				require.Equal(t, tt.wantReadyData, gotReadyData)
 			}
 		})
@@ -1007,7 +1297,7 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 		notReady    []*liquiditymanager.LiquidityManagerLiquidityTransferred
 		ready       []*liquiditymanager.LiquidityManagerLiquidityTransferred
 		readyData   [][]byte
-		parsedToLP  map[logKey]logpoller.Log
+		parsedToLP  map[bridgecommon.LogKey]logpoller.Log
 	}
 	tests := []struct {
 		name    string
@@ -1072,7 +1362,7 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 				readyData: [][]byte{
 					{1, 2, 3},
 				},
-				parsedToLP: make(map[logKey]logpoller.Log),
+				parsedToLP: make(map[bridgecommon.LogKey]logpoller.Log),
 			},
 			[]models.PendingTransfer{
 				{
@@ -1087,6 +1377,7 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 						Date:               time.Time{},
 						BridgeData:         []byte{},
 						Stage:              1,
+						NativeBridgeFee:    ubig.NewI(0),
 					},
 					Status: models.TransferStatusNotReady,
 					ID:     fmt.Sprintf("%s-%d", common.HexToHash("0x1"), 1),
@@ -1103,6 +1394,7 @@ func Test_l1ToL2Bridge_toPendingTransfers(t *testing.T) {
 						Date:               time.Time{},
 						BridgeData:         []byte{1, 2, 3},
 						Stage:              2,
+						NativeBridgeFee:    ubig.NewI(0),
 					},
 					Status: models.TransferStatusReady,
 					ID:     fmt.Sprintf("%s-%d", common.HexToHash("0x2"), 2),
@@ -1141,7 +1433,7 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 		l2LogPoller               *lpmocks.LogPoller
 	}
 	type args struct {
-		ctx    context.Context
+		ctx    context.Context //nolint:containedctx
 		fromTs time.Time
 	}
 	var (
@@ -1184,12 +1476,12 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 			func(t *testing.T, f fields, a args) {
 				f.l1LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
-					LiquidityTransferredTopic,
+					bridgecommon.LiquidityTransferredTopic,
 					l1LiquidityManager.Address(),
-					LiquidityTransferredToChainSelectorTopicIndex,
-					[]common.Hash{toHash(remoteSelector)},
+					bridgecommon.LiquidityTransferredToChainSelectorTopicIndex,
+					[]common.Hash{bridgecommon.NetworkSelectorToHash(remoteSelector)},
 					a.fromTs,
-					logpoller.Confirmations(1),
+					evmtypes.Confirmations(1),
 				).Return(nil, errors.New("error"))
 			},
 			func(t *testing.T, f fields) {
@@ -1218,12 +1510,12 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 			func(t *testing.T, f fields, a args) {
 				f.l1LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
-					LiquidityTransferredTopic,
+					bridgecommon.LiquidityTransferredTopic,
 					l1LiquidityManager.Address(),
-					LiquidityTransferredToChainSelectorTopicIndex,
-					[]common.Hash{toHash(remoteSelector)},
+					bridgecommon.LiquidityTransferredToChainSelectorTopicIndex,
+					[]common.Hash{bridgecommon.NetworkSelectorToHash(remoteSelector)},
 					a.fromTs,
-					logpoller.Confirmations(1),
+					evmtypes.Confirmations(1),
 				).Return([]logpoller.Log{{}, {}}, nil)
 				f.l2LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
@@ -1232,7 +1524,7 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 					DepositFinalizedToAddressTopicIndex,
 					[]common.Hash{common.HexToHash(l2LiquidityManagerAddress.Hex())},
 					a.fromTs,
-					logpoller.Finalized,
+					evmtypes.Finalized,
 				).Return(nil, errors.New("error"))
 			},
 			func(t *testing.T, f fields) {
@@ -1262,12 +1554,12 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 			func(t *testing.T, f fields, a args) {
 				f.l1LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
-					LiquidityTransferredTopic,
+					bridgecommon.LiquidityTransferredTopic,
 					l1LiquidityManager.Address(),
-					LiquidityTransferredToChainSelectorTopicIndex,
-					[]common.Hash{toHash(remoteSelector)},
+					bridgecommon.LiquidityTransferredToChainSelectorTopicIndex,
+					[]common.Hash{bridgecommon.NetworkSelectorToHash(remoteSelector)},
 					a.fromTs,
-					logpoller.Confirmations(1),
+					evmtypes.Confirmations(1),
 				).Return([]logpoller.Log{{}, {}}, nil)
 				f.l2LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
@@ -1276,16 +1568,16 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 					DepositFinalizedToAddressTopicIndex,
 					[]common.Hash{common.HexToHash(l2LiquidityManagerAddress.Hex())},
 					a.fromTs,
-					logpoller.Finalized,
+					evmtypes.Finalized,
 				).Return([]logpoller.Log{{}, {}}, nil)
 				f.l2LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
-					LiquidityTransferredTopic,
+					bridgecommon.LiquidityTransferredTopic,
 					l2LiquidityManagerAddress,
-					LiquidityTransferredFromChainSelectorTopicIndex,
-					[]common.Hash{toHash(localSelector)},
+					bridgecommon.LiquidityTransferredFromChainSelectorTopicIndex,
+					[]common.Hash{bridgecommon.NetworkSelectorToHash(localSelector)},
 					a.fromTs,
-					logpoller.Confirmations(1),
+					evmtypes.Confirmations(1),
 				).Return(nil, errors.New("error"))
 			},
 			func(t *testing.T, f fields) {
@@ -1315,15 +1607,15 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 			func(t *testing.T, f fields, a args) {
 				f.l1LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
-					LiquidityTransferredTopic,
+					bridgecommon.LiquidityTransferredTopic,
 					l1LiquidityManager.Address(),
-					LiquidityTransferredToChainSelectorTopicIndex,
-					[]common.Hash{toHash(remoteSelector)},
+					bridgecommon.LiquidityTransferredToChainSelectorTopicIndex,
+					[]common.Hash{bridgecommon.NetworkSelectorToHash(remoteSelector)},
 					a.fromTs,
-					logpoller.Confirmations(1),
+					evmtypes.Confirmations(1),
 				).Return([]logpoller.Log{
-					{EventSig: LiquidityTransferredTopic, TxHash: common.HexToHash("0x1")},
-					{EventSig: LiquidityTransferredTopic, TxHash: common.HexToHash("0x2")},
+					{EventSig: bridgecommon.LiquidityTransferredTopic, TxHash: common.HexToHash("0x1")},
+					{EventSig: bridgecommon.LiquidityTransferredTopic, TxHash: common.HexToHash("0x2")},
 				}, nil)
 				f.l2LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
@@ -1332,22 +1624,22 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 					DepositFinalizedToAddressTopicIndex,
 					[]common.Hash{common.HexToHash(l2LiquidityManagerAddress.Hex())},
 					a.fromTs,
-					logpoller.Finalized,
+					evmtypes.Finalized,
 				).Return([]logpoller.Log{
 					{EventSig: DepositFinalizedTopic, TxHash: common.HexToHash("0x3")},
 					{EventSig: DepositFinalizedTopic, TxHash: common.HexToHash("0x4")},
 				}, nil)
 				f.l2LogPoller.On("IndexedLogsCreatedAfter",
 					mock.Anything,
-					LiquidityTransferredTopic,
+					bridgecommon.LiquidityTransferredTopic,
 					l2LiquidityManagerAddress,
-					LiquidityTransferredFromChainSelectorTopicIndex,
-					[]common.Hash{toHash(localSelector)},
+					bridgecommon.LiquidityTransferredFromChainSelectorTopicIndex,
+					[]common.Hash{bridgecommon.NetworkSelectorToHash(localSelector)},
 					a.fromTs,
-					logpoller.Confirmations(1),
+					evmtypes.Confirmations(1),
 				).Return([]logpoller.Log{
-					{EventSig: LiquidityTransferredTopic, TxHash: common.HexToHash("0x5")},
-					{EventSig: LiquidityTransferredTopic, TxHash: common.HexToHash("0x6")},
+					{EventSig: bridgecommon.LiquidityTransferredTopic, TxHash: common.HexToHash("0x5")},
+					{EventSig: bridgecommon.LiquidityTransferredTopic, TxHash: common.HexToHash("0x6")},
 				}, nil)
 			},
 			func(t *testing.T, f fields) {
@@ -1355,16 +1647,16 @@ func Test_l1ToL2Bridge_getLogs(t *testing.T) {
 				f.l2LogPoller.AssertExpectations(t)
 			},
 			[]logpoller.Log{
-				{EventSig: LiquidityTransferredTopic, TxHash: common.HexToHash("0x1")},
-				{EventSig: LiquidityTransferredTopic, TxHash: common.HexToHash("0x2")},
+				{EventSig: bridgecommon.LiquidityTransferredTopic, TxHash: common.HexToHash("0x1")},
+				{EventSig: bridgecommon.LiquidityTransferredTopic, TxHash: common.HexToHash("0x2")},
 			},
 			[]logpoller.Log{
 				{EventSig: DepositFinalizedTopic, TxHash: common.HexToHash("0x3")},
 				{EventSig: DepositFinalizedTopic, TxHash: common.HexToHash("0x4")},
 			},
 			[]logpoller.Log{
-				{EventSig: LiquidityTransferredTopic, TxHash: common.HexToHash("0x5")},
-				{EventSig: LiquidityTransferredTopic, TxHash: common.HexToHash("0x6")},
+				{EventSig: bridgecommon.LiquidityTransferredTopic, TxHash: common.HexToHash("0x5")},
+				{EventSig: bridgecommon.LiquidityTransferredTopic, TxHash: common.HexToHash("0x6")},
 			},
 			false,
 		},

@@ -28,7 +28,7 @@ type CommonContracts struct {
 	PriceAggregators   map[string]string `json:"price_aggregators,omitempty"`
 	ARM                string            `json:"arm"`
 	Router             string            `json:"router"`
-	PriceRegistry      string            `json:"price_registry"`
+	PriceRegistry      string            `json:"price_registry,omitempty"`
 	WrappedNative      string            `json:"wrapped_native"`
 	Multicall          string            `json:"multicall,omitempty"`
 	TokenTransmitter   string            `json:"token_transmitter,omitempty"`
@@ -38,7 +38,7 @@ type CommonContracts struct {
 
 type SourceContracts struct {
 	OnRamp     string `json:"on_ramp"`
-	DepolyedAt uint64 `json:"deployed_at"`
+	DeployedAt uint64 `json:"deployed_at"`
 }
 
 type DestContracts struct {

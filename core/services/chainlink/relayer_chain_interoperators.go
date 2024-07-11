@@ -69,12 +69,18 @@ type ChainsNodesStatuser interface {
 
 var _ RelayerChainInteroperators = &CoreRelayerChainInteroperators{}
 
+type DummyFactory interface {
+	NewDummy(config DummyFactoryConfig) (loop.Relayer, error)
+}
+
 // CoreRelayerChainInteroperators implements [RelayerChainInteroperators]
 // as needed for the core [chainlink.Application]
 type CoreRelayerChainInteroperators struct {
 	mu           sync.Mutex
 	loopRelayers map[types.RelayID]loop.Relayer
 	legacyChains legacyChains
+
+	dummyFactory DummyFactory
 
 	// we keep an explicit list of services because the legacy implementations have more than
 	// just the relayer service
@@ -97,6 +103,14 @@ func NewCoreRelayerChainInteroperators(initFuncs ...CoreRelayerChainInitFunc) (*
 
 // CoreRelayerChainInitFunc is a hook in the constructor to create relayers from a factory.
 type CoreRelayerChainInitFunc func(op *CoreRelayerChainInteroperators) error
+
+// InitDummy instantiates a dummy relayer
+func InitDummy(ctx context.Context, factory RelayerFactory) CoreRelayerChainInitFunc {
+	return func(op *CoreRelayerChainInteroperators) error {
+		op.dummyFactory = &factory
+		return nil
+	}
+}
 
 // InitEVM is a option for instantiating evm relayers
 func InitEVM(ctx context.Context, factory RelayerFactory, config EVMFactoryConfig) CoreRelayerChainInitFunc {
@@ -178,6 +192,16 @@ func (rs *CoreRelayerChainInteroperators) Get(id types.RelayID) (loop.Relayer, e
 	defer rs.mu.Unlock()
 	lr, exist := rs.loopRelayers[id]
 	if !exist {
+		// lazily create dummy relayers
+		if id.Network == "dummy" {
+			var err error
+			lr, err = rs.dummyFactory.NewDummy(DummyFactoryConfig{id.ChainID})
+			if err != nil {
+				return nil, err
+			}
+			rs.loopRelayers[id] = lr
+			return lr, nil
+		}
 		return nil, fmt.Errorf("%w: %s", ErrNoSuchRelayer, id)
 	}
 	return lr, nil
@@ -212,7 +236,6 @@ func (rs *CoreRelayerChainInteroperators) LegacyCosmosChains() LegacyCosmosConta
 
 // ChainStatus gets [types.ChainStatus]
 func (rs *CoreRelayerChainInteroperators) ChainStatus(ctx context.Context, id types.RelayID) (types.ChainStatus, error) {
-
 	lr, err := rs.Get(id)
 	if err != nil {
 		return types.ChainStatus{}, fmt.Errorf("%w: error getting chain status: %w", chains.ErrNotFound, err)
@@ -222,7 +245,6 @@ func (rs *CoreRelayerChainInteroperators) ChainStatus(ctx context.Context, id ty
 }
 
 func (rs *CoreRelayerChainInteroperators) ChainStatuses(ctx context.Context, offset, limit int) ([]types.ChainStatus, int, error) {
-
 	var (
 		stats    []types.ChainStatus
 		totalErr error
@@ -332,7 +354,6 @@ func FilterRelayersByType(network string) func(id types.RelayID) bool {
 // A typical usage pattern to use [List] with [FilterByType] to obtain a set of [RelayerChainInteroperators]
 // for a given chain
 func (rs *CoreRelayerChainInteroperators) List(filter FilterFn) RelayerChainInteroperators {
-
 	matches := make(map[types.RelayID]loop.Relayer)
 	rs.mu.Lock()
 	for id, relayer := range rs.loopRelayers {

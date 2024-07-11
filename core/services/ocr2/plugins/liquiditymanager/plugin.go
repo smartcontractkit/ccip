@@ -20,8 +20,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/discoverer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/graph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/inflight"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/liquidityrebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/models"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/rebalalgo"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/rebalcalc"
 )
 
@@ -33,7 +33,7 @@ type Plugin struct {
 	bridgeFactory           bridge.Factory
 	mu                      sync.RWMutex
 	liquidityGraph          graph.Graph
-	liquidityRebalancer     liquidityrebalancer.Rebalancer
+	liquidityRebalancer     rebalalgo.RebalancingAlgo
 	inflight                inflight.Container
 	lggr                    logger.Logger
 	reportCodec             evmliquiditymanager.OnchainReportCodec
@@ -47,7 +47,7 @@ func NewPlugin(
 	liquidityManagerFactory evmliquiditymanager.Factory,
 	discoverer discoverer.Discoverer,
 	bridgeFactory bridge.Factory,
-	liquidityRebalancer liquidityrebalancer.Rebalancer,
+	liquidityRebalancer rebalalgo.RebalancingAlgo,
 	reportCodec evmliquiditymanager.OnchainReportCodec,
 	lggr logger.Logger,
 ) *Plugin {
@@ -217,16 +217,16 @@ func combinedUnexecutedTransfers(
 	pendingTransfers []models.PendingTransfer,
 	resolvedTransfersQuorum []models.Transfer,
 	inflightTransfers []models.Transfer,
-) []liquidityrebalancer.UnexecutedTransfer {
-	unexecuted := make([]liquidityrebalancer.UnexecutedTransfer, 0, len(pendingTransfers)+len(resolvedTransfersQuorum)+len(inflightTransfers))
-	for _, pendingTransfer := range pendingTransfers {
-		unexecuted = append(unexecuted, pendingTransfer)
-	}
+) []rebalalgo.UnexecutedTransfer {
+	unexecuted := make([]rebalalgo.UnexecutedTransfer, 0, len(resolvedTransfersQuorum)+len(inflightTransfers)+len(pendingTransfers))
 	for _, resolvedTransfer := range resolvedTransfersQuorum {
 		unexecuted = append(unexecuted, resolvedTransfer)
 	}
 	for _, inflightTransfer := range inflightTransfers {
 		unexecuted = append(unexecuted, inflightTransfer)
+	}
+	for _, pendingTransfer := range pendingTransfers {
+		unexecuted = append(unexecuted, pendingTransfer)
 	}
 	return unexecuted
 }
@@ -439,7 +439,8 @@ func (p *Plugin) Close() error {
 
 	var errs []error
 	for _, networkID := range p.liquidityGraph.GetNetworks() {
-		p.lggr.Infow("closing liquidityManager network", "network", networkID)
+		lggr := p.lggr.With("network", networkID, "chainID", networkID.ChainID())
+		lggr.Infow("closing liquidityManager network")
 
 		liquidityManagerAddress, err := p.liquidityGraph.GetLiquidityManagerAddress(networkID)
 		if err != nil {
@@ -458,7 +459,7 @@ func (p *Plugin) Close() error {
 			continue
 		}
 
-		p.lggr.Infow("finished closing liquidityManager network", "network", networkID, "liquidityManager", liquidityManagerAddress.String())
+		lggr.Infow("finished closing liquidityManager network", "liquidityManager", liquidityManagerAddress.String())
 	}
 
 	return multierr.Combine(errs...)
@@ -497,7 +498,7 @@ func (p *Plugin) syncGraph(ctx context.Context) error {
 }
 
 func (p *Plugin) loadPendingTransfers(ctx context.Context, lggr logger.Logger) ([]models.PendingTransfer, error) {
-	p.lggr.Infow("loading pending transfers")
+	lggr.Infow("loading pending transfers")
 
 	pendingTransfers := make([]models.PendingTransfer, 0)
 	edges, err := p.liquidityGraph.GetEdges()
@@ -505,13 +506,14 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context, lggr logger.Logger) (
 		return nil, fmt.Errorf("get edges: %w", err)
 	}
 	for _, edge := range edges {
-		bridge, err := p.bridgeFactory.NewBridge(edge.Source, edge.Dest)
+		logger := lggr.With("sourceNetwork", edge.Source, "sourceChainID", edge.Source.ChainID(), "destNetwork", edge.Dest, "destChainID", edge.Dest.ChainID())
+		bridge, err := p.bridgeFactory.NewBridge(ctx, edge.Source, edge.Dest)
 		if err != nil {
 			return nil, fmt.Errorf("init bridge: %w", err)
 		}
 
 		if bridge == nil {
-			lggr.Warnw("no bridge found for network pair", "sourceNetwork", edge.Source, "destNetwork", edge.Dest)
+			logger.Warn("no bridge found for network pair")
 			continue
 		}
 
@@ -529,18 +531,16 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context, lggr logger.Logger) (
 			return nil, fmt.Errorf("get pending transfers: %w", err)
 		}
 
-		lggr.Infow("loaded pending transfers for network", "network", edge.Source, "pendingTransfers", netPendingTransfers)
+		logger.Infow("loaded pending transfers for network", "pendingTransfers", netPendingTransfers)
 		pendingTransfers = append(pendingTransfers, netPendingTransfers...)
 	}
 
-	// todo: why do we add this here? it's not used anywhere
 	return pendingTransfers, nil
 }
 
 // computeMedianGraph computes a graph with the provided median liquidities per chain and edges that quorum agreed on.
 func (p *Plugin) computeMedianGraph(
 	edges []models.Edge, medianLiquidities []models.NetworkLiquidity) (graph.Graph, error) {
-
 	g, err := graph.NewGraphFromEdges(edges)
 	if err != nil {
 		return nil, fmt.Errorf("new graph from edges: %w", err)
@@ -607,7 +607,7 @@ func (p *Plugin) computeResolvedTransfersQuorum(observations []models.Observatio
 			}
 			medianizedNativeFee := rebalcalc.BigIntSortedMiddle(bridgeFees)
 			medianizedDateUnix := rebalcalc.BigIntSortedMiddle(datesUnix)
-			bridge, err := p.bridgeFactory.NewBridge(k.From, k.To)
+			bridge, err := p.bridgeFactory.GetBridge(k.From, k.To)
 			if err != nil {
 				return nil, fmt.Errorf("init bridge: %w", err)
 			}
@@ -650,7 +650,7 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, lggr logger.Logge
 
 	resolvedTransfers := make([]models.Transfer, 0, len(outcome.ProposedTransfers))
 	for _, proposedTransfer := range outcome.ProposedTransfers {
-		bridge, err := p.bridgeFactory.NewBridge(proposedTransfer.From, proposedTransfer.To)
+		bridge, err := p.bridgeFactory.NewBridge(ctx, proposedTransfer.From, proposedTransfer.To)
 		if err != nil {
 			return nil, fmt.Errorf("init bridge: %w", err)
 		}

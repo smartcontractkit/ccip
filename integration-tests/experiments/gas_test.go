@@ -5,35 +5,27 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/seth"
+	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/utils/seth"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
-	actions_seth "github.com/smartcontractkit/chainlink/integration-tests/actions/seth"
+	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
-	"github.com/smartcontractkit/chainlink/integration-tests/utils"
 )
 
 func TestGasExperiment(t *testing.T) {
 	l := logging.GetTestLogger(t)
-	config, err := tc.GetConfig("Soak", tc.OCR)
+	config, err := tc.GetConfig([]string{"Soak"}, tc.OCR)
 	require.NoError(t, err, "Error getting config")
 
 	network := networks.MustGetSelectedNetworkConfig(config.GetNetworkConfig())[0]
-	readSethCfg := config.GetSethConfig()
-	require.NotNil(t, readSethCfg, "Seth config shouldn't be nil")
-
-	sethCfg, err := utils.MergeSethAndEvmNetworkConfigs(network, *readSethCfg)
-	require.NoError(t, err, "Error merging seth and evm network configs")
-	err = utils.ValidateSethNetworkConfig(sethCfg.Network)
-	require.NoError(t, err, "Error validating seth network config")
-
-	seth, err := seth.NewClientWithConfig(&sethCfg)
+	seth, err := seth_utils.GetChainClient(&config, network)
 	require.NoError(t, err, "Error creating seth client")
 
-	_, err = actions_seth.SendFunds(l, seth, actions_seth.FundsToSendPayload{
+	_, err = actions.SendFunds(l, seth, actions.FundsToSendPayload{
 		ToAddress:  seth.Addresses[0],
 		Amount:     big.NewInt(10_000_000),
 		PrivateKey: seth.PrivateKeys[0],

@@ -74,7 +74,7 @@ answer1      [type=median index=0];
 				assert.Equal(t, "median", string(r.PluginType))
 				var pc medianconfig.PluginConfig
 				require.NoError(t, json.Unmarshal(r.PluginConfig.Bytes(), &pc))
-				require.NoError(t, medianconfig.ValidatePluginConfig(pc))
+				require.NoError(t, pc.ValidatePluginConfig())
 				var oss validate.OCR2OnchainSigningStrategy
 				require.NoError(t, json.Unmarshal(r.OnchainSigningStrategy.Bytes(), &oss))
 			},
@@ -752,7 +752,7 @@ USDCConfig.AttestationAPIIntervalMilliseconds = 100
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
 				require.NoError(t, err)
-				expected := config.ExecutionPluginJobSpecConfig{
+				expected := config.ExecPluginJobSpecConfig{
 					SourceStartBlock: 1,
 					DestStartBlock:   2,
 					USDCConfig: config.USDCConfig{
@@ -763,7 +763,7 @@ USDCConfig.AttestationAPIIntervalMilliseconds = 100
 						AttestationAPIIntervalMilliseconds: 100,
 					},
 				}
-				var cfg config.ExecutionPluginJobSpecConfig
+				var cfg config.ExecPluginJobSpecConfig
 				err = json.Unmarshal(os.OCR2OracleSpec.PluginConfig.Bytes(), &cfg)
 				require.NoError(t, err)
 				require.Equal(t, expected, cfg)
@@ -1186,7 +1186,7 @@ UpdateInterval="1m"
 				assert.Equal(t, "median", string(r.PluginType))
 				var pc medianconfig.PluginConfig
 				require.NoError(t, json.Unmarshal(r.PluginConfig.Bytes(), &pc))
-				require.NoError(t, medianconfig.ValidatePluginConfig(pc))
+				require.NoError(t, pc.ValidatePluginConfig())
 			},
 		},
 	}
@@ -1242,4 +1242,37 @@ spec = "a spec"
 	assert.Equal(t, validate.PipelineSpec{Name: "default", Spec: "a spec"}, pc.Pipelines[0])
 	assert.Equal(t, "median", pc.PluginName)
 	assert.Equal(t, "median", pc.TelemetryType)
+}
+
+type envelope2 struct {
+	OnchainSigningStrategy *validate.OCR2OnchainSigningStrategy
+}
+
+func TestOCR2OnchainSigningStrategy_Unmarshal(t *testing.T) {
+	payload := `
+[onchainSigningStrategy]
+strategyName = "single-chain"
+[onchainSigningStrategy.config]
+evm = "08d14c6eed757414d72055d28de6caf06535806c6a14e450f3a2f1c854420e17"
+publicKey = "0x1234567890123456789012345678901234567890"
+`
+	oss := &envelope2{}
+	tree, err := toml.Load(payload)
+	require.NoError(t, err)
+	o := map[string]any{}
+	err = tree.Unmarshal(&o)
+	require.NoError(t, err)
+	b, err := json.Marshal(o)
+	require.NoError(t, err)
+	err = json.Unmarshal(b, oss)
+	require.NoError(t, err)
+
+	pk, err := oss.OnchainSigningStrategy.PublicKey()
+	require.NoError(t, err)
+	kbID, err := oss.OnchainSigningStrategy.KeyBundleID("evm")
+	require.NoError(t, err)
+
+	assert.False(t, oss.OnchainSigningStrategy.IsMultiChain())
+	assert.Equal(t, "0x1234567890123456789012345678901234567890", pk)
+	assert.Equal(t, "08d14c6eed757414d72055d28de6caf06535806c6a14e450f3a2f1c854420e17", kbID)
 }

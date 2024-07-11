@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -119,7 +120,11 @@ func TestFilters(t *testing.T) {
 			RpcBatchSize:             1,
 			KeepFinalizedBlocksDepth: 100,
 		}
-		lp := logpoller.NewLogPoller(o, esc, lggr, lpOpts)
+		headTracker := headtracker.NewSimulatedHeadTracker(esc, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+		if lpOpts.PollPeriod == 0 {
+			lpOpts.PollPeriod = 1 * time.Hour
+		}
+		lp := logpoller.NewLogPoller(o, esc, lggr, headTracker, lpOpts)
 
 		jobID1 := "job-1"
 		jobID2 := "job-2"
@@ -141,5 +146,4 @@ func TestFilters(t *testing.T) {
 		assert.True(t, lp.HasFilter(f1))
 		assert.False(t, lp.HasFilter(f2))
 	})
-
 }

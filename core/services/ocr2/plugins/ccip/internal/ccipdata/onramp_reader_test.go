@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -44,7 +45,6 @@ func TestNewOnRampReader_noContractAtAddress(t *testing.T) {
 }
 
 func TestOnRampReaderInit(t *testing.T) {
-
 	tests := []struct {
 		name    string
 		version string
@@ -86,10 +86,15 @@ func setupOnRampReaderTH(t *testing.T, version string) onRampReaderTH {
 		RpcBatchSize:             2,
 		KeepFinalizedBlocksDepth: 1000,
 	}
+	headTracker := headtracker.NewSimulatedHeadTracker(bc, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+	if lpOpts.PollPeriod == 0 {
+		lpOpts.PollPeriod = 1 * time.Hour
+	}
 	lp := logpoller.NewLogPoller(
 		orm,
 		bc,
 		log,
+		headTracker,
 		lpOpts)
 
 	// Setup onRamp.
@@ -325,13 +330,14 @@ func setupOnRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 func setupOnRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
 	linkTokenAddress := common.HexToAddress("0x000011")
 	staticConfig := evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
-		LinkToken:         linkTokenAddress,
-		ChainSelector:     testutils.SimulatedChainID.Uint64(),
-		DestChainSelector: testutils.SimulatedChainID.Uint64(),
-		DefaultTxGasLimit: 30000,
-		MaxNopFeesJuels:   big.NewInt(1000000),
-		PrevOnRamp:        common.Address{},
-		RmnProxy:          utils.RandomAddress(),
+		LinkToken:          linkTokenAddress,
+		ChainSelector:      testutils.SimulatedChainID.Uint64(),
+		DestChainSelector:  testutils.SimulatedChainID.Uint64(),
+		DefaultTxGasLimit:  30000,
+		MaxNopFeesJuels:    big.NewInt(1000000),
+		PrevOnRamp:         common.Address{},
+		RmnProxy:           utils.RandomAddress(),
+		TokenAdminRegistry: utils.RandomAddress(),
 	}
 	dynamicConfig := evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 		Router:                            common.HexToAddress("0x0000000000000000000000000000000000000150"),
@@ -369,7 +375,7 @@ func setupOnRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 			MaxFeeUSDCents:            0,
 			DeciBps:                   0,
 			DestGasOverhead:           0,
-			DestBytesOverhead:         0,
+			DestBytesOverhead:         64,
 			AggregateRateLimitEnabled: true,
 		},
 	}

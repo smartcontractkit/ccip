@@ -2,7 +2,8 @@
 pragma solidity 0.8.24;
 
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
-import {IPool} from "../../interfaces/IPool.sol";
+import {IPoolV1} from "../../interfaces/IPool.sol";
+import {ITokenMessenger} from "../../pools/USDC/ITokenMessenger.sol";
 
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {Router} from "../../Router.sol";
@@ -13,15 +14,15 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 import {USDCTokenPoolHelper} from "../helpers/USDCTokenPoolHelper.sol";
+import {MockE2EUSDCTransmitter} from "../mocks/MockE2EUSDCTransmitter.sol";
 import {MockUSDCTokenMessenger} from "../mocks/MockUSDCTokenMessenger.sol";
-import {MockUSDCTransmitter} from "../mocks/MockUSDCTransmitter.sol";
 
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolSetup is BaseTest {
   IBurnMintERC20 internal s_token;
   MockUSDCTokenMessenger internal s_mockUSDC;
-  MockUSDCTransmitter internal s_mockUSDCTransmitter;
+  MockE2EUSDCTransmitter internal s_mockUSDCTransmitter;
 
   struct USDCMessage {
     uint32 version;
@@ -40,6 +41,7 @@ contract USDCTokenPoolSetup is BaseTest {
   bytes32 internal constant SOURCE_CHAIN_TOKEN_SENDER = bytes32(uint256(uint160(0x01111111221)));
   address internal constant SOURCE_CHAIN_USDC_POOL = address(0x23789765456789);
   address internal constant DEST_CHAIN_USDC_POOL = address(0x987384873458734);
+  address internal constant DEST_CHAIN_USDC_TOKEN = address(0x23598918358198766);
 
   address internal s_routerAllowedOnRamp = address(3456);
   address internal s_routerAllowedOffRamp = address(234);
@@ -51,17 +53,19 @@ contract USDCTokenPoolSetup is BaseTest {
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    BurnMintERC677 linkToken = new BurnMintERC677("LINK", "LNK", 18, 0);
-    s_token = linkToken;
+    BurnMintERC677 usdcToken = new BurnMintERC677("LINK", "LNK", 18, 0);
+    s_token = usdcToken;
     deal(address(s_token), OWNER, type(uint256).max);
     setUpRamps();
 
-    s_mockUSDCTransmitter = new MockUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER);
+    s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER, address(s_token));
     s_mockUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
+
+    usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
 
     s_usdcTokenPool =
       new USDCTokenPoolHelper(s_mockUSDC, s_token, new address[](0), address(s_mockRMN), address(s_router));
-    linkToken.grantMintAndBurnRoles(address(s_mockUSDC));
+    usdcToken.grantMintAndBurnRoles(address(s_mockUSDC));
 
     s_allowedList.push(USER_1);
     s_usdcTokenPoolWithAllowList =
@@ -71,6 +75,7 @@ contract USDCTokenPoolSetup is BaseTest {
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       remotePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+      remoteTokenAddress: abi.encode(address(s_token)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -78,6 +83,7 @@ contract USDCTokenPoolSetup is BaseTest {
     chainUpdates[1] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       remotePoolAddress: abi.encode(DEST_CHAIN_USDC_POOL),
+      remoteTokenAddress: abi.encode(DEST_CHAIN_USDC_TOKEN),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -126,21 +132,6 @@ contract USDCTokenPoolSetup is BaseTest {
 }
 
 contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
-  error SenderNotAllowed(address sender);
-
-  event DepositForBurn(
-    uint64 indexed nonce,
-    address indexed burnToken,
-    uint256 amount,
-    address indexed depositor,
-    bytes32 mintRecipient,
-    uint32 destinationDomain,
-    bytes32 destinationTokenMessenger,
-    bytes32 destinationCaller
-  );
-  event Burned(address indexed sender, uint256 amount);
-  event TokensConsumed(uint256 tokens);
-
   // Base test case, included for PR gas comparisons as fuzz tests are excluded from forge snapshot due to being flaky.
   function test_LockOrBurn_Success() public {
     bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
@@ -151,29 +142,30 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
 
     vm.expectEmit();
-    emit TokensConsumed(amount);
+    emit RateLimiter.TokensConsumed(amount);
 
     vm.expectEmit();
-    emit DepositForBurn(
+    emit ITokenMessenger.DepositForBurn(
       s_mockUSDC.s_nonce(),
       address(s_token),
       amount,
       address(s_usdcTokenPool),
-      receiver,
+      expectedDomain.allowedCaller,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
     );
 
     vm.expectEmit();
-    emit Burned(s_routerAllowedOnRamp, amount);
+    emit TokenPool.Burned(s_routerAllowedOnRamp, amount);
 
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
         originalSender: OWNER,
         receiver: abi.encodePacked(receiver),
         amount: amount,
-        remoteChainSelector: DEST_CHAIN_SELECTOR
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_token)
       })
     );
 
@@ -190,35 +182,36 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
 
     vm.expectEmit();
-    emit TokensConsumed(amount);
+    emit RateLimiter.TokensConsumed(amount);
 
     vm.expectEmit();
-    emit DepositForBurn(
+    emit ITokenMessenger.DepositForBurn(
       s_mockUSDC.s_nonce(),
       address(s_token),
       amount,
       address(s_usdcTokenPool),
-      destinationReceiver,
+      expectedDomain.allowedCaller,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
     );
 
     vm.expectEmit();
-    emit Burned(s_routerAllowedOnRamp, amount);
+    emit TokenPool.Burned(s_routerAllowedOnRamp, amount);
 
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = s_usdcTokenPool.lockOrBurn(
       Pool.LockOrBurnInV1({
         originalSender: OWNER,
         receiver: abi.encodePacked(destinationReceiver),
         amount: amount,
-        remoteChainSelector: DEST_CHAIN_SELECTOR
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_token)
       })
     );
 
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
-    assertEq(poolReturnDataV1.destPoolAddress, abi.encode(DEST_CHAIN_USDC_POOL));
+    assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }
 
   function test_Fuzz_LockOrBurnWithAllowList_Success(bytes32 destinationReceiver, uint256 amount) public {
@@ -230,32 +223,33 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPoolWithAllowList.getDomain(DEST_CHAIN_SELECTOR);
 
     vm.expectEmit();
-    emit TokensConsumed(amount);
+    emit RateLimiter.TokensConsumed(amount);
     vm.expectEmit();
-    emit DepositForBurn(
+    emit ITokenMessenger.DepositForBurn(
       s_mockUSDC.s_nonce(),
       address(s_token),
       amount,
       address(s_usdcTokenPoolWithAllowList),
-      destinationReceiver,
+      expectedDomain.allowedCaller,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
     );
     vm.expectEmit();
-    emit Burned(s_routerAllowedOnRamp, amount);
+    emit TokenPool.Burned(s_routerAllowedOnRamp, amount);
 
     Pool.LockOrBurnOutV1 memory poolReturnDataV1 = s_usdcTokenPoolWithAllowList.lockOrBurn(
       Pool.LockOrBurnInV1({
         originalSender: s_allowedList[0],
         receiver: abi.encodePacked(destinationReceiver),
         amount: amount,
-        remoteChainSelector: DEST_CHAIN_SELECTOR
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_token)
       })
     );
     uint64 nonce = abi.decode(poolReturnDataV1.destPoolData, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
-    assertEq(poolReturnDataV1.destPoolAddress, abi.encode(DEST_CHAIN_USDC_POOL));
+    assertEq(poolReturnDataV1.destTokenAddress, abi.encode(DEST_CHAIN_USDC_TOKEN));
   }
 
   // Reverts
@@ -270,6 +264,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: wrongDomain,
       remotePoolAddress: abi.encode(address(1)),
+      remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -289,7 +284,8 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
         originalSender: OWNER,
         receiver: abi.encodePacked(address(0)),
         amount: amount,
-        remoteChainSelector: wrongDomain
+        remoteChainSelector: wrongDomain,
+        localToken: address(s_token)
       })
     );
   }
@@ -302,7 +298,8 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
         originalSender: OWNER,
         receiver: abi.encodePacked(address(0)),
         amount: 0,
-        remoteChainSelector: DEST_CHAIN_SELECTOR
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_token)
       })
     );
   }
@@ -310,14 +307,15 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
   function test_LockOrBurnWithAllowList_Revert() public {
     vm.startPrank(s_routerAllowedOnRamp);
 
-    vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, STRANGER));
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.SenderNotAllowed.selector, STRANGER));
 
     s_usdcTokenPoolWithAllowList.lockOrBurn(
       Pool.LockOrBurnInV1({
         originalSender: STRANGER,
         receiver: abi.encodePacked(address(0)),
         amount: 1000,
-        remoteChainSelector: DEST_CHAIN_SELECTOR
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_token)
       })
     );
   }
@@ -334,16 +332,16 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
         originalSender: OWNER,
         receiver: receiver,
         amount: 1,
-        remoteChainSelector: DEST_CHAIN_SELECTOR
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_token)
       })
     );
   }
 }
 
 contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
-  event Minted(address indexed sender, address indexed recipient, uint256 amount);
-
   function test_Fuzz_ReleaseOrMint_Success(address recipient, uint256 amount) public {
+    vm.assume(recipient != address(0) && recipient != address(s_token));
     amount = bound(amount, 0, getInboundRateLimiterConfig().capacity);
 
     USDCMessage memory usdcMessage = USDCMessage({
@@ -362,7 +360,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
-      destPoolAddress: abi.encode(address(s_usdcTokenPool)),
+      destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
         USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
         )
@@ -371,12 +369,15 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     bytes memory offchainTokenData =
       abi.encode(USDCTokenPool.MessageAndAttestation({message: message, attestation: attestation}));
 
+    // The mocked receiver does not release the token to the pool, so we manually do it here
+    deal(address(s_token), address(s_usdcTokenPool), amount);
+
     vm.expectEmit();
-    emit Minted(s_routerAllowedOffRamp, recipient, amount);
+    emit TokenPool.Minted(s_routerAllowedOffRamp, recipient, amount);
 
     vm.expectCall(
       address(s_mockUSDCTransmitter),
-      abi.encodeWithSelector(MockUSDCTransmitter.receiveMessage.selector, message, attestation)
+      abi.encodeWithSelector(MockE2EUSDCTransmitter.receiveMessage.selector, message, attestation)
     );
 
     vm.startPrank(s_routerAllowedOffRamp);
@@ -385,6 +386,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
         originalSender: abi.encode(OWNER),
         receiver: recipient,
         amount: amount,
+        localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: sourceTokenData.extraData,
@@ -401,19 +403,23 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
 
     uint32 nonce = 4730;
     uint32 sourceDomain = 3;
+    uint256 amount = 100;
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
-      destPoolAddress: abi.encode(address(s_usdcTokenPool)),
+      destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain}))
     });
+
+    // The mocked receiver does not release the token to the pool, so we manually do it here
+    deal(address(s_token), address(s_usdcTokenPool), amount);
 
     bytes memory offchainTokenData =
       abi.encode(USDCTokenPool.MessageAndAttestation({message: encodedUsdcMessage, attestation: attestation}));
 
     vm.expectCall(
       address(s_mockUSDCTransmitter),
-      abi.encodeWithSelector(MockUSDCTransmitter.receiveMessage.selector, encodedUsdcMessage, attestation)
+      abi.encodeWithSelector(MockE2EUSDCTransmitter.receiveMessage.selector, encodedUsdcMessage, attestation)
     );
 
     vm.startPrank(s_routerAllowedOffRamp);
@@ -421,7 +427,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       Pool.ReleaseOrMintInV1({
         originalSender: abi.encode(OWNER),
         receiver: OWNER,
-        amount: 100,
+        amount: amount,
+        localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: sourceTokenData.extraData,
@@ -450,7 +457,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
-      destPoolAddress: abi.encode(address(s_usdcTokenPool)),
+      destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
         USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
         )
@@ -467,6 +474,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
         originalSender: abi.encode(OWNER),
         receiver: OWNER,
         amount: amount,
+        localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: sourceTokenData.extraData,
@@ -483,7 +491,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
-      destPoolAddress: abi.encode(address(s_usdcTokenPool)),
+      destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER}))
     });
 
@@ -499,6 +507,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
         originalSender: abi.encode(OWNER),
         receiver: recipient,
         amount: amount,
+        localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
         sourcePoolData: sourceTokenData.extraData,
@@ -510,15 +519,12 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
 
 contract USDCTokenPool_supportsInterface is USDCTokenPoolSetup {
   function test_SupportsInterface_Success() public view {
-    assertTrue(s_usdcTokenPool.supportsInterface(s_usdcTokenPool.getUSDCInterfaceId()));
-    assertTrue(s_usdcTokenPool.supportsInterface(type(IPool).interfaceId));
+    assertTrue(s_usdcTokenPool.supportsInterface(type(IPoolV1).interfaceId));
     assertTrue(s_usdcTokenPool.supportsInterface(type(IERC165).interfaceId));
   }
 }
 
 contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
-  event DomainsSet(USDCTokenPool.DomainUpdate[]);
-
   mapping(uint64 destChainSelector => USDCTokenPool.Domain domain) private s_chainToDomain;
 
   // Setting lower fuzz run as 256 runs was causing differing gas results in snapshot.
@@ -546,7 +552,7 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
     }
 
     vm.expectEmit();
-    emit DomainsSet(domainUpdates);
+    emit USDCTokenPool.DomainsSet(domainUpdates);
 
     s_usdcTokenPool.setDomains(domainUpdates);
 

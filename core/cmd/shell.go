@@ -35,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 	"github.com/smartcontractkit/chainlink/v2/core/build"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -165,12 +166,15 @@ func (n ChainlinkAppFactory) NewApplication(ctx context.Context, cfg chainlink.G
 		LatestReportDeadline: cfg.Mercury().Cache().LatestReportDeadline(),
 	})
 
+	capabilitiesRegistry := capabilities.NewRegistry(appLggr)
+
 	// create the relayer-chain interoperators from application configuration
 	relayerFactory := chainlink.RelayerFactory{
-		Logger:       appLggr,
-		LoopRegistry: loopRegistry,
-		GRPCOpts:     grpcOpts,
-		MercuryPool:  mercuryPool,
+		Logger:               appLggr,
+		LoopRegistry:         loopRegistry,
+		GRPCOpts:             grpcOpts,
+		MercuryPool:          mercuryPool,
+		CapabilitiesRegistry: capabilitiesRegistry,
 	}
 
 	evmFactoryCfg := chainlink.EVMFactoryConfig{
@@ -180,7 +184,7 @@ func (n ChainlinkAppFactory) NewApplication(ctx context.Context, cfg chainlink.G
 	}
 	// evm always enabled for backward compatibility
 	// TODO BCF-2510 this needs to change in order to clear the path for EVM extraction
-	initOps := []chainlink.CoreRelayerChainInitFunc{chainlink.InitEVM(ctx, relayerFactory, evmFactoryCfg)}
+	initOps := []chainlink.CoreRelayerChainInitFunc{chainlink.InitDummy(ctx, relayerFactory), chainlink.InitEVM(ctx, relayerFactory, evmFactoryCfg)}
 
 	if cfg.CosmosEnabled() {
 		cosmosCfg := chainlink.CosmosFactoryConfig{
@@ -203,7 +207,6 @@ func (n ChainlinkAppFactory) NewApplication(ctx context.Context, cfg chainlink.G
 			TOMLConfigs: cfg.StarknetConfigs(),
 		}
 		initOps = append(initOps, chainlink.InitStarknet(ctx, relayerFactory, starkCfg))
-
 	}
 
 	relayChainInterops, err := chainlink.NewCoreRelayerChainInteroperators(initOps...)
@@ -236,6 +239,7 @@ func (n ChainlinkAppFactory) NewApplication(ctx context.Context, cfg chainlink.G
 		LoopRegistry:               loopRegistry,
 		GRPCOpts:                   grpcOpts,
 		MercuryPool:                mercuryPool,
+		CapabilitiesRegistry:       capabilitiesRegistry,
 	})
 }
 
@@ -259,9 +263,9 @@ func handleNodeVersioning(ctx context.Context, db *sqlx.DB, appLggr logger.Logge
 		if backupCfg.Mode() != config.DatabaseBackupModeNone && backupCfg.OnVersionUpgrade() {
 			if err = takeBackupIfVersionUpgrade(cfg.URL(), rootDir, cfg.Backup(), appLggr, appv, dbv, healthReportPort); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
-					appLggr.Debugf("Failed to find any node version in the DB: %w", err)
+					appLggr.Debugf("Failed to find any node version in the DB: %v", err)
 				} else if strings.Contains(err.Error(), "relation \"node_versions\" does not exist") {
-					appLggr.Debugf("Failed to find any node version in the DB, the node_versions table does not exist yet: %w", err)
+					appLggr.Debugf("Failed to find any node version in the DB, the node_versions table does not exist yet: %v", err)
 				} else {
 					return fmt.Errorf("initializeORM#FindLatestNodeVersion: %w", err)
 				}
@@ -826,7 +830,7 @@ func (t *promptingAPIInitializer) Initialize(ctx context.Context, orm sessions.B
 				continue
 			}
 			if err = orm.CreateUser(ctx, &user); err != nil {
-				lggr.Errorf("Error creating API user: ", err, "err")
+				lggr.Errorw("Error creating API user", "err", err)
 			}
 			return user, err
 		}

@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
+	"github.com/smartcontractkit/chainlink-testing-framework/networks"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/conversions"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/foundry"
 
@@ -257,6 +259,16 @@ func DeployLocalCluster(
 	privateEthereumNetworks := []*ctfconfig.EthereumNetworkConfig{}
 	for _, network := range testInputs.EnvInput.PrivateEthereumNetworks {
 		privateEthereumNetworks = append(privateEthereumNetworks, network)
+
+		for _, networkCfg := range networks.MustGetSelectedNetworkConfig(testInputs.EnvInput.Network) {
+			for _, key := range networkCfg.PrivateKeys {
+				address, err := conversions.PrivateKeyHexToAddress(key)
+				require.NoError(t, err, "failed to convert private key to address: %w", err)
+				network.EthereumChainConfig.AddressesToFund = append(
+					network.EthereumChainConfig.AddressesToFund, address.Hex(),
+				)
+			}
+		}
 	}
 
 	if len(selectedNetworks) > len(privateEthereumNetworks) {
@@ -334,11 +346,13 @@ func DeployLocalCluster(
 				ccipNode, err := test_env.NewClNode(
 					[]string{env.DockerNetwork.Name},
 					pointer.GetString(clNode.ChainlinkImage.Image),
-					pointer.GetString(clNode.ChainlinkImage.Version), toml,
+					pointer.GetString(clNode.ChainlinkImage.Version),
+					toml,
+					env.LogStream,
 					test_env.WithPgDBOptions(
 						ctftestenv.WithPostgresImageName(clNode.DBImage),
-						ctftestenv.WithPostgresImageVersion(clNode.DBTag)),
-					test_env.WithLogStream(env.LogStream),
+						ctftestenv.WithPostgresImageVersion(clNode.DBTag),
+					),
 				)
 				if err != nil {
 					return err
@@ -362,10 +376,12 @@ func DeployLocalCluster(
 					[]string{env.DockerNetwork.Name},
 					pointer.GetString(testInputs.EnvInput.NewCLCluster.Common.ChainlinkImage.Image),
 					pointer.GetString(testInputs.EnvInput.NewCLCluster.Common.ChainlinkImage.Version),
-					toml, test_env.WithPgDBOptions(
+					toml,
+					env.LogStream,
+					test_env.WithPgDBOptions(
 						ctftestenv.WithPostgresImageName(testInputs.EnvInput.NewCLCluster.Common.DBImage),
-						ctftestenv.WithPostgresImageVersion(testInputs.EnvInput.NewCLCluster.Common.DBTag)),
-					test_env.WithLogStream(env.LogStream),
+						ctftestenv.WithPostgresImageVersion(testInputs.EnvInput.NewCLCluster.Common.DBTag),
+					),
 				)
 				if err != nil {
 					return err
@@ -383,7 +399,7 @@ func DeployLocalCluster(
 // startIndex and endIndex are inclusive
 func UpgradeNodes(
 	t *testing.T,
-	lggr zerolog.Logger,
+	lggr *zerolog.Logger,
 	testInputs *CCIPTestConfig,
 	ccipEnv *actions.CCIPTestEnv,
 ) error {
@@ -460,10 +476,22 @@ func DeployEnvironments(
 			// if anvilconfig is specified for a network addhelm for anvil
 			if anvilConfig, exists := testInputs.EnvInput.Network.AnvilConfigs[strings.ToUpper(network.Name)]; exists {
 				charts = append(charts, foundry.ChartName)
+				if anvilConfig.BaseFee == nil {
+					anvilConfig.BaseFee = pointer.ToInt64(1000000)
+				}
+				if anvilConfig.BlockGaslimit == nil {
+					anvilConfig.BlockGaslimit = pointer.ToInt64(100000000)
+				}
 				testEnvironment.
-					AddHelm(foundry.New(&foundry.Props{
+					AddHelm(foundry.NewVersioned("0.1.9", &foundry.Props{
 						NetworkName: network.Name,
 						Values: map[string]interface{}{
+							"fullnameOverride": actions.NetworkName(network.Name),
+							"image": map[string]interface{}{
+								"repository": "ghcr.io/foundry-rs/foundry",
+								"tag":        "nightly-5ac78a9cd4b94dc53d1fe5e0f42372b28b5a7559",
+								//	"tag":        "nightly-ea2eff95b5c17edd3ffbdfc6daab5ce5cc80afc0",
+							},
 							"anvil": map[string]interface{}{
 								"chainId":                   fmt.Sprintf("%d", network.ChainID),
 								"blockTime":                 anvilConfig.BlockTime,
@@ -473,8 +501,11 @@ func DeployEnvironments(
 								"forkTimeout":               anvilConfig.Timeout,
 								"forkComputeUnitsPerSecond": anvilConfig.ComputePerSecond,
 								"forkNoRateLimit":           anvilConfig.RateLimitDisabled,
+								"blocksToKeepInMemory":      anvilConfig.BlocksToKeepInMem,
+								"blockGasLimit":             fmt.Sprintf("%d", pointer.GetInt64(anvilConfig.BlockGaslimit)),
+								"baseFee":                   fmt.Sprintf("%d", pointer.GetInt64(anvilConfig.BaseFee)),
 							},
-							"resources": testInputs.GethResourceProfile,
+							"resources": GethResourceProfile,
 						},
 					}))
 				selectedNetworks[i].Simulated = true
@@ -528,17 +559,19 @@ func DeployEnvironments(
 		if !network.Simulated {
 			return network.URLs, network.HTTPURLs
 		}
-		networkName := strings.ReplaceAll(strings.ToLower(network.Name), " ", "-")
+		networkName := actions.NetworkName(network.Name)
 		var internalWsURLs, internalHttpURLs []string
 		switch chart {
 		case foundry.ChartName:
-			internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s-%s:8545", networkName, foundry.ChartName))
-			internalHttpURLs = append(internalHttpURLs, fmt.Sprintf("http://%s-%s:8545", networkName, foundry.ChartName))
+			internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s:8545", networkName))
+			internalHttpURLs = append(internalHttpURLs, fmt.Sprintf("http://%s:8545", networkName))
 		case networkName:
 			for i := 0; i < numOfTxNodes; i++ {
 				internalWsURLs = append(internalWsURLs, fmt.Sprintf("ws://%s-ethereum-geth:8546", networkName))
 				internalHttpURLs = append(internalHttpURLs, fmt.Sprintf("http://%s-ethereum-geth:8544", networkName))
 			}
+		default:
+			return network.URLs, network.HTTPURLs
 		}
 
 		return internalWsURLs, internalHttpURLs

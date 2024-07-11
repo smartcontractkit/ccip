@@ -228,7 +228,6 @@ func loopRoutes(app chainlink.Application, r *gin.RouterGroup) {
 	loopRegistry := NewLoopRegistryServer(app)
 	r.GET("/discovery", ginHandlerFromHTTP(loopRegistry.discoveryHandler))
 	r.GET("/plugins/:name/metrics", loopRegistry.pluginMetricHandler)
-
 }
 
 func v2Routes(app chainlink.Application, r *gin.RouterGroup) {
@@ -351,6 +350,7 @@ func v2Routes(app chainlink.Application, r *gin.RouterGroup) {
 			{"solana", NewSolanaKeysController(app)},
 			{"cosmos", NewCosmosKeysController(app)},
 			{"starknet", NewStarkNetKeysController(app)},
+			{"aptos", NewAptosKeysController(app)},
 			{"dkgsign", NewDKGSignKeysController(app)},
 			{"dkgencrypt", NewDKGEncryptKeysController(app)},
 		} {
@@ -416,7 +416,7 @@ func v2Routes(app chainlink.Application, r *gin.RouterGroup) {
 			{"cosmos", NewCosmosNodesController(app)},
 		} {
 			if chain.path == "evm" {
-				// TODO still EVM only https://app.shortcut.com/chainlinklabs/story/26276/multi-chain-type-ui-node-chain-configuration
+				// TODO still EVM only . Archive ticket: story/26276/multi-chain-type-ui-node-chain-configuration
 				nodes.GET("", paginatedRequest(chain.nc.Index))
 			}
 			nodes.GET(chain.path, paginatedRequest(chain.nc.Index))

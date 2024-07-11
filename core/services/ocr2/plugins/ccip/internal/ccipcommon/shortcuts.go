@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/avast/retry-go/v4"
 
 	"golang.org/x/sync/errgroup"
 
@@ -118,8 +121,20 @@ func IsTxRevertError(err error) bool {
 	return strings.Contains(err.Error(), "execution reverted") || strings.Contains(err.Error(), "VM execution error")
 }
 
-func SelectorToBytes(chainSelector uint64) [32]byte {
-	var b [32]byte
+func SelectorToBytes(chainSelector uint64) [16]byte {
+	var b [16]byte
 	binary.BigEndian.PutUint64(b[:], chainSelector)
 	return b
+}
+
+// RetryUntilSuccess repeatedly calls fn until it returns a nil error. After each failed call there is an exponential
+// backoff applied, between initialDelay and maxDelay.
+func RetryUntilSuccess[T any](fn func() (T, error), initialDelay time.Duration, maxDelay time.Duration) (T, error) {
+	return retry.DoWithData(
+		fn,
+		retry.Delay(initialDelay),
+		retry.MaxDelay(maxDelay),
+		retry.DelayType(retry.BackOffDelay),
+		retry.UntilSucceeded(),
+	)
 }

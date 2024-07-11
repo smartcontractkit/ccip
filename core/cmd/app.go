@@ -128,7 +128,6 @@ func NewApp(s *Shell) *cli.App {
 		}
 
 		return nil
-
 	}
 	app.After = func(c *cli.Context) error {
 		if s.CloseLogger != nil {
@@ -195,6 +194,7 @@ func NewApp(s *Shell) *cli.App {
 				keysCommand("Cosmos", NewCosmosKeysClient(s)),
 				keysCommand("Solana", NewSolanaKeysClient(s)),
 				keysCommand("StarkNet", NewStarkNetKeysClient(s)),
+				keysCommand("Aptos", NewAptosKeysClient(s)),
 				keysCommand("DKGSign", NewDKGSignKeysClient(s)),
 				keysCommand("DKGEncrypt", NewDKGEncryptKeysClient(s)),
 

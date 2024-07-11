@@ -28,7 +28,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commonutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 
+	htMocks "github.com/smartcontractkit/chainlink/v2/common/headtracker/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -75,7 +77,6 @@ func populateDatabase(t testing.TB, o logpoller.ORM, chainID *big.Int) (common.H
 				Data:           logpoller.EvmWord(uint64(i + 1000*j)).Bytes(),
 				CreatedAt:      blockTimestamp,
 			})
-
 		}
 		require.NoError(t, o.InsertLogs(ctx, logs))
 		require.NoError(t, o.InsertBlock(ctx, utils.RandomHash(), int64((j+1)*1000-1), startDate.Add(time.Duration(j*1000)*time.Hour), 0))
@@ -718,7 +719,9 @@ func TestLogPoller_SynchronizedWithGeth(t *testing.T) {
 			RpcBatchSize:             2,
 			KeepFinalizedBlocksDepth: 1000,
 		}
-		lp := logpoller.NewLogPoller(orm, client.NewSimulatedBackendClient(t, ec, chainID), lggr, lpOpts)
+		simulatedClient := client.NewSimulatedBackendClient(t, ec, chainID)
+		ht := headtracker.NewSimulatedHeadTracker(simulatedClient, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+		lp := logpoller.NewLogPoller(orm, simulatedClient, lggr, ht, lpOpts)
 		for i := 0; i < finalityDepth; i++ { // Have enough blocks that we could reorg the full finalityDepth-1.
 			ec.Commit()
 		}
@@ -1494,7 +1497,7 @@ func TestLogPoller_DBErrorHandling(t *testing.T) {
 		RpcBatchSize:             2,
 		KeepFinalizedBlocksDepth: 1000,
 	}
-	lp := logpoller.NewLogPoller(o, client.NewSimulatedBackendClient(t, ec, chainID2), lggr, lpOpts)
+	lp := logpoller.NewLogPoller(o, client.NewSimulatedBackendClient(t, ec, chainID2), lggr, nil, lpOpts)
 
 	err = lp.Replay(ctx, 5) // block number too high
 	require.ErrorContains(t, err, "Invalid replay block number")
@@ -1549,7 +1552,8 @@ func TestTooManyLogResults(t *testing.T) {
 		RpcBatchSize:             10,
 		KeepFinalizedBlocksDepth: 1000,
 	}
-	lp := logpoller.NewLogPoller(o, ec, lggr, lpOpts)
+	headTracker := htMocks.NewHeadTracker[*evmtypes.Head, common.Hash](t)
+	lp := logpoller.NewLogPoller(o, ec, lggr, headTracker, lpOpts)
 	expected := []int64{10, 5, 2, 1}
 
 	clientErr := client.JsonError{
@@ -1558,9 +1562,13 @@ func TestTooManyLogResults(t *testing.T) {
 		Message: "query returned more than 10000 results. Try with this block range [0x100E698, 0x100E6D4].",
 	}
 
+	// Simulate currentBlock = 300
+	head := &evmtypes.Head{Number: 300}
+	finalized := &evmtypes.Head{Number: head.Number - lpOpts.FinalityDepth}
+	headTracker.On("LatestAndFinalizedBlock", mock.Anything).Return(head, finalized, nil).Once()
 	call1 := ec.On("HeadByNumber", mock.Anything, mock.Anything).Return(func(ctx context.Context, blockNumber *big.Int) (*evmtypes.Head, error) {
 		if blockNumber == nil {
-			return &evmtypes.Head{Number: 300}, nil // Simulate currentBlock = 300
+			require.FailNow(t, "unexpected call to get current head")
 		}
 		return &evmtypes.Head{Number: blockNumber.Int64()}, nil
 	})
@@ -1602,9 +1610,12 @@ func TestTooManyLogResults(t *testing.T) {
 
 	// Now jump to block 500, but return error no matter how small the block range gets.
 	//  Should exit the loop with a critical error instead of hanging.
+	head = &evmtypes.Head{Number: 500}
+	finalized = &evmtypes.Head{Number: head.Number - lpOpts.FinalityDepth}
+	headTracker.On("LatestAndFinalizedBlock", mock.Anything).Return(head, finalized, nil).Once()
 	call1.On("HeadByNumber", mock.Anything, mock.Anything).Return(func(ctx context.Context, blockNumber *big.Int) (*evmtypes.Head, error) {
 		if blockNumber == nil {
-			return &evmtypes.Head{Number: 500}, nil // Simulate currentBlock = 300
+			require.FailNow(t, "unexpected call to get current head")
 		}
 		return &evmtypes.Head{Number: blockNumber.Int64()}, nil
 	})
@@ -1679,7 +1690,7 @@ func Test_PollAndQueryFinalizedBlocks(t *testing.T) {
 		th.EmitterAddress1,
 		0,
 		common.Hash{},
-		logpoller.Finalized,
+		evmtypes.Finalized,
 	)
 	require.NoError(t, err)
 	require.Len(t, finalizedLogs, firstBatchLen, fmt.Sprintf("len(finalizedLogs) = %d, should have been %d", len(finalizedLogs), firstBatchLen))
@@ -1691,7 +1702,7 @@ func Test_PollAndQueryFinalizedBlocks(t *testing.T) {
 		th.EmitterAddress1,
 		0,
 		common.Hash{},
-		logpoller.Confirmations(numberOfConfirmations),
+		evmtypes.Confirmations(numberOfConfirmations),
 	)
 	require.NoError(t, err)
 	require.Len(t, logsByConfs, firstBatchLen+secondBatchLen-numberOfConfirmations)
@@ -1939,7 +1950,7 @@ func TestFindLCA(t *testing.T) {
 		KeepFinalizedBlocksDepth: 1000,
 	}
 
-	lp := logpoller.NewLogPoller(orm, ec, lggr, lpOpts)
+	lp := logpoller.NewLogPoller(orm, ec, lggr, nil, lpOpts)
 	t.Run("Fails, if failed to select oldest block", func(t *testing.T) {
 		_, err := lp.FindLCA(ctx)
 		require.ErrorContains(t, err, "failed to select the latest block")
@@ -1956,7 +1967,6 @@ func TestFindLCA(t *testing.T) {
 		}).Once()
 		_, err := lp.FindLCA(lCtx)
 		require.ErrorContains(t, err, "aborted, FindLCA request cancelled")
-
 	})
 	t.Run("Fails, if RPC returns an error", func(t *testing.T) {
 		expectedError := fmt.Errorf("failed to call RPC")

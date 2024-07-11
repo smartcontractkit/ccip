@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ethereum/go-ethereum"
+
 	"github.com/smartcontractkit/chainlink/core/scripts/vrfv2plus/testnet/v2plusscripts"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/chain_specific_util_helper"
@@ -18,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/vrf_coordinator_v2plus_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/vrf_v2plus_load_test_with_metrics"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -959,6 +960,10 @@ func main() {
 		fastestResponseTimeInSeconds, err := consumer.SFastestResponseTimeInBlocks(nil)
 		helpers.PanicErr(err)
 		fmt.Println("Fastest Response Time In Seconds: ", fastestResponseTimeInSeconds)
+		p90FulfillmentBlockTime, p95FulfillmentBlockTime, err := v2plusscripts.CalculateFulfillmentResponseTimePercentiles(e, consumer)
+		helpers.PanicErr(err)
+		fmt.Println("P90 Fulfillment Block Time: ", p90FulfillmentBlockTime)
+		fmt.Println("P95 Fulfillment Block Time: ", p95FulfillmentBlockTime)
 	case "eoa-load-test-reset-metrics":
 		request := flag.NewFlagSet("eoa-load-test-reset-metrics", flag.ExitOnError)
 		consumerAddress := request.String("consumer-address", "", "consumer address")
@@ -1234,7 +1239,13 @@ func main() {
 			uint32(*stalenessSeconds),
 			uint32(*fulfillmentFlatFeeNativePPM),
 			uint32(*fulfillmentFlatFeeLinkDiscountPPM))
-
+	case "wrapper-get-config":
+		cmd := flag.NewFlagSet("wrapper-get-config", flag.ExitOnError)
+		wrapperAddress := cmd.String("wrapper-address", "", "wrapper address")
+		helpers.ParseArgs(cmd, os.Args[2:], "wrapper-address")
+		wrapper, err := vrfv2plus_wrapper.NewVRFV2PlusWrapper(common.HexToAddress(*wrapperAddress), e.Ec)
+		helpers.PanicErr(err)
+		v2plusscripts.PrintWrapperConfig(wrapper)
 	case "wrapper-get-fulfillment-tx-size":
 		cmd := flag.NewFlagSet("wrapper-get-fulfillment-tx-size", flag.ExitOnError)
 		wrapperAddress := cmd.String("wrapper-address", "", "address of the VRFV2Wrapper contract")

@@ -8,8 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
+	ocr2plustypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
 
 var _ types.OffchainConfigDigester = (*MultichainConfigDigester)(nil)
@@ -48,7 +51,7 @@ func (d MultichainConfigDigester) ConfigDigest(cc types.ContractConfig) (types.C
 		if err != nil {
 			return types.ConfigDigest{}, fmt.Errorf("unable to split multi-transmitter %s: %w", multiTransmitter, err)
 		}
-		masterRelayID := commontypes.NewRelayID(commontypes.NetworkEVM, strconv.FormatUint(d.MasterChainDigester.ChainID, 10))
+		masterRelayID := commontypes.NewRelayID(relay.NetworkEVM, strconv.FormatUint(d.MasterChainDigester.ChainID, 10))
 		if _, ok := split[masterRelayID]; !ok {
 			return types.ConfigDigest{}, fmt.Errorf("multi-transmitter %s does not contain a transmitter for master chain %s", multiTransmitter, masterRelayID)
 		}
@@ -76,5 +79,5 @@ func (d MultichainConfigDigester) ConfigDigest(cc types.ContractConfig) (types.C
 }
 
 func (d MultichainConfigDigester) ConfigDigestPrefix() (types.ConfigDigestPrefix, error) {
-	return types.ConfigDigestPrefixEVM, nil
+	return ocr2plustypes.ConfigDigestPrefixEVMSimple, nil
 }

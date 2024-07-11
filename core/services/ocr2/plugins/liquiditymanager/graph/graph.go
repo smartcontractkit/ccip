@@ -10,11 +10,12 @@ import (
 
 // GraphWriter provides write access to the liquidity graph.
 type GraphWriter interface {
+	// Add adds new data and connection to the graph.
 	Add(from, to Data) error
-	// AddEdges adds a list of edges to the graph.
-	AddEdges(edges []models.Edge) error
 	// SetLiquidity sets the liquidity of the provided network.
 	SetLiquidity(n models.NetworkSelector, liquidity *big.Int) bool
+	// SetTargetLiquidity sets the target liquidity of the provided network.
+	SetTargetLiquidity(n models.NetworkSelector, liquidity *big.Int) bool
 }
 
 // NodeReader provides read access to the data saved in the graph nodes.
@@ -44,6 +45,9 @@ type GraphReader interface {
 	IsEmpty() bool
 	// Len returns the number of vertices in the graph.
 	Len() int
+	// FindPath returns the path from the source to the destination network.
+	// The iterator function is called for each node in the path with the data of the node.
+	FindPath(from, to models.NetworkSelector, maxEdgesTraversed int, iterator func(nodes ...Data) bool) []models.NetworkSelector
 }
 
 // Graph contains graphs functionality for networks and liquidity
@@ -57,6 +61,8 @@ type Graph interface {
 	String() string
 	// Reset resets the graph to it's empty state.
 	Reset()
+	// Clone creates a deep copy of the graph.
+	Clone() Graph
 }
 
 // GraphTest provides testing functionality for the graph.
@@ -136,7 +142,20 @@ func (g *liquidityGraph) String() string {
 	g.lock.RLock()
 	defer g.lock.RUnlock()
 
-	return fmt.Sprintf("Graph{networksGraph: %+v, networkBalance: %+v}", g.adj, g.data)
+	type network struct {
+		Selector models.NetworkSelector
+		ChainID  uint64
+	}
+	adj := make([]network, 0, len(g.adj))
+	for n := range g.adj {
+		adj = append(adj, network{Selector: n, ChainID: n.ChainID()})
+	}
+	data := make(map[network]Data, len(g.data))
+	for n, d := range g.data {
+		data[network{Selector: n, ChainID: n.ChainID()}] = d
+	}
+
+	return fmt.Sprintf("Graph{graph: %+v, data: %+v}", adj, data)
 }
 
 func (g *liquidityGraph) Reset() {
@@ -145,4 +164,26 @@ func (g *liquidityGraph) Reset() {
 
 	g.adj = make(map[models.NetworkSelector][]models.NetworkSelector)
 	g.data = make(map[models.NetworkSelector]Data)
+}
+
+func (g *liquidityGraph) Clone() Graph {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+
+	clone := &liquidityGraph{
+		adj:  make(map[models.NetworkSelector][]models.NetworkSelector, len(g.adj)),
+		data: make(map[models.NetworkSelector]Data, len(g.data)),
+	}
+
+	for k, v := range g.adj {
+		adjCopy := make([]models.NetworkSelector, len(v))
+		copy(adjCopy, v)
+		clone.adj[k] = adjCopy
+	}
+
+	for k, v := range g.data {
+		clone.data[k] = v.Clone()
+	}
+
+	return clone
 }
