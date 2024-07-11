@@ -8,7 +8,7 @@ import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/
 import {Address} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/Address.sol";
 
 /// @title CCIPBase
-/// @notice This contains the boilerplate code for managing chains and tokens your contract may interact with as part of CCIP. It does not send or receive messages through CCIP only manages supported chains and sources/destinations.
+/// @notice This contains the boilerplate code for managing chains and tokens your contract may interact with as part of CCIP.
 /// @dev This contract is abstract, but does not have any functions which must be implemented by a child.
 abstract contract CCIPBase is OwnerIsCreator {
   using SafeERC20 for IERC20;
@@ -38,10 +38,10 @@ abstract contract CCIPBase is OwnerIsCreator {
   }
 
   struct ChainUpdate {
-    uint64 chainSelector; // ──╮ The unique identifier for a chain to send/receive messages
-    bool allowed; // ──╯ Whether the chain should be enabled
-    bytes recipient; //     Address on the remote chain which should receive incoming messages from this. The should only be one per-chain
-    bytes extraArgsBytes; //     Additional arguments to pass with the message including manually specifying gas limit and and whether to allow out-of-order execution
+    uint64 chainSelector; // The unique identifier for a chain to send/receive messages
+    bool allowed; //         Whether the chain should be enabled
+    bytes recipient; //      Address on the remote chain which should receive incoming messages from this. The should only be one per-chain
+    bytes extraArgsBytes; // Additional arguments to pass with the message including manually specifying gas limit and and whether to allow out-of-order execution
   }
 
   struct ChainConfig {
@@ -68,7 +68,7 @@ abstract contract CCIPBase is OwnerIsCreator {
     return s_ccipRouter;
   }
 
-  /// @dev only calls from the set router are accepted.
+  /// @notice only calls from the set router are accepted.
   modifier onlyRouter() {
     if (msg.sender != getRouter()) revert InvalidRouter(msg.sender);
     _;
@@ -157,7 +157,6 @@ abstract contract CCIPBase is OwnerIsCreator {
     emit CCIPRouterModified(currentRouter, newRouter);
   }
 
-  // Reference similar function in TokenPool
   /// @notice Enable a remote-chain to send and receive messages to/from this contract via CCIP
   function applyChainUpdates(ChainUpdate[] calldata chains) external onlyOwner {
     for (uint256 i = 0; i < chains.length; ++i) {
