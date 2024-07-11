@@ -26,39 +26,6 @@ type BackfillArgs struct {
 	SourceStartBlock, DestStartBlock uint64
 }
 
-// GetDestinationTokens returns the destination chain fee tokens from the provided price registry
-// and the bridgeable tokens from the offramp.
-// func GetDestinationTokens(ctx context.Context, offRamp ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader) (fee, bridged []cciptypes.Address, err error) {
-// 	eg := new(errgroup.Group)
-
-// 	var destFeeTokens []cciptypes.Address
-// 	var destBridgeableTokens []cciptypes.Address
-
-// 	eg.Go(func() error {
-// 		tokens, err := priceRegistry.GetFeeTokens(ctx)
-// 		if err != nil {
-// 			return fmt.Errorf("get dest fee tokens: %w", err)
-// 		}
-// 		destFeeTokens = tokens
-// 		return nil
-// 	})
-
-// 	eg.Go(func() error {
-// 		tokens, err := offRamp.GetTokens(ctx)
-// 		if err != nil {
-// 			return fmt.Errorf("get dest bridgeable tokens: %w", err)
-// 		}
-// 		destBridgeableTokens = tokens.DestinationTokens
-// 		return nil
-// 	})
-
-// 	if err := eg.Wait(); err != nil {
-// 		return nil, nil, err
-// 	}
-
-// 	return destFeeTokens, destBridgeableTokens, nil
-// }
-
 // FlattenUniqueSlice returns a flattened slice that contains unique elements by preserving their order.
 func FlattenUniqueSlice[T comparable](slices ...[]T) []T {
 	seen := make(map[T]struct{})
