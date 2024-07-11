@@ -31,13 +31,12 @@ type ExecutionReportingPluginFactory struct {
 	destPriceRegReader ccipdata.PriceRegistryReader
 	destPriceRegAddr   cciptypes.Address
 	readersMu          *sync.Mutex
-
-	services []services.Service
+	lggr               logger.Logger
+	services           []services.Service
 }
 
 func (rf *ExecutionReportingPluginFactory) Name() string {
-	//TODO implement me
-	panic("implement me")
+	return rf.lggr.Name()
 }
 
 // Start is used to run chainHealthcheck and tokenDataWorker, which were previously passed
@@ -65,13 +64,11 @@ func (rf *ExecutionReportingPluginFactory) Close() (err error) {
 }
 
 func (rf *ExecutionReportingPluginFactory) Ready() error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (rf *ExecutionReportingPluginFactory) HealthReport() map[string]error {
-	//TODO implement me
-	panic("implement me")
+	return make(map[string]error)
 }
 
 func NewExecutionReportingPluginFactoryV2(ctx context.Context, lggr logger.Logger, sourceTokenAddress string, srcChainID int64, dstChainID int64, srcProvider commontypes.CCIPExecProvider, dstProvider commontypes.CCIPExecProvider) (*ExecutionReportingPluginFactory, error) {
@@ -183,6 +180,7 @@ func NewExecutionReportingPluginFactoryV2(ctx context.Context, lggr logger.Logge
 		},
 		services:  []services.Service{chainHealthcheck, tokenBackgroundWorker},
 		readersMu: &sync.Mutex{},
+		lggr:      logger.Sugared(lggr),
 
 		// the fields below are initially empty and populated on demand
 		destPriceRegReader: nil,

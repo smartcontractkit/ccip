@@ -64,13 +64,11 @@ type chainHealthcheck struct {
 }
 
 func (c *chainHealthcheck) HealthReport() map[string]error {
-	//TODO implement me
-	panic("implement me")
+	return make(map[string]error)
 }
 
 func (c *chainHealthcheck) Name() string {
-	//TODO implement me
-	panic("implement me")
+	return c.lggr.Name()
 }
 
 func NewChainHealthcheck(lggr logger.Logger, onRamp ccipdata.OnRampReader, commitStore ccipdata.CommitStoreReader) *chainHealthcheck {

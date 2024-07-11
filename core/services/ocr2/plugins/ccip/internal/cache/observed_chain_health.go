@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -38,7 +39,7 @@ func (o *ObservedChainHealthcheck) HealthReport() map[string]error {
 }
 
 func (o *ObservedChainHealthcheck) Name() string {
-	return "ObservedChainHealthcheck"
+	return fmt.Sprintf("ObservedChainHealthcheck.%v.%v.%v", o.plugin, o.sourceChain, o.destChain)
 }
 
 func NewObservedChainHealthCheck(

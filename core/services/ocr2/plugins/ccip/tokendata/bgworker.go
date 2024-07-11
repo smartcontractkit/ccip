@@ -46,13 +46,11 @@ type BackgroundWorker struct {
 }
 
 func (w *BackgroundWorker) HealthReport() map[string]error {
-	//TODO implement me
-	panic("implement me")
+	return make(map[string]error)
 }
 
 func (w *BackgroundWorker) Name() string {
-	//TODO implement me
-	panic("implement me")
+	return "TokenDataBackgroundWorker"
 }
 
 func NewBackgroundWorker(
