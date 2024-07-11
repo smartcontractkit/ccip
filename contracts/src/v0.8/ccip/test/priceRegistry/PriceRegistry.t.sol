@@ -155,10 +155,13 @@ contract PriceRegistrySetup is TokenSetup {
     );
 
     s_priceRegistry = new PriceRegistryHelper(
-      PriceRegistry.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS}),
+      PriceRegistry.StaticConfig({
+        linkToken: s_sourceTokens[0],
+        maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
+        stalenessThreshold: uint32(TWELVE_HOURS)
+      }),
       priceUpdaters,
       feeTokens,
-      uint32(TWELVE_HOURS),
       tokenPriceFeedUpdates,
       s_priceRegistryTokenTransferFeeConfigArgs,
       s_priceRegistryPremiumMultiplierWeiPerEthArgs,
@@ -445,23 +448,26 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
       s_priceRegistryPremiumMultiplierWeiPerEthArgs[1].premiumMultiplierWeiPerEth
     );
 
+    PriceRegistry.StaticConfig memory staticConfig = PriceRegistry.StaticConfig({
+      linkToken: s_sourceTokens[0],
+      maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
+      stalenessThreshold: uint32(TWELVE_HOURS)
+    });
     s_priceRegistry = new PriceRegistryHelper(
-      PriceRegistry.StaticConfig({linkToken: s_sourceTokens[0], maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS}),
+      staticConfig,
       priceUpdaters,
       feeTokens,
-      uint32(TWELVE_HOURS),
       tokenPriceFeedUpdates,
       s_priceRegistryTokenTransferFeeConfigArgs,
       s_priceRegistryPremiumMultiplierWeiPerEthArgs,
       _generatePriceRegistryDestChainDynamicConfigArgs()
     );
 
-    // TODO: assert staticConfig equality
     // TODO: assert dynamicConfig equality
-    // TODO: assert tokenTransferFeeConfig equality
+    // TODO: assert tokenTransferFeeConfigArgs (emit events)
 
+    _assertPriceRegistryStaticConfigsEqual(s_priceRegistry.getStaticConfig(), staticConfig);
     assertEq(feeTokens, s_priceRegistry.getFeeTokens());
-    assertEq(uint32(TWELVE_HOURS), s_priceRegistry.getStalenessThreshold());
     assertEq(priceUpdaters, s_priceRegistry.getAllAuthorizedCallers());
     assertEq(s_priceRegistry.typeAndVersion(), "PriceRegistry 1.6.0-dev");
 
@@ -480,6 +486,18 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
     uint64 gotFeeTokenConfig1 =
       s_priceRegistry.getPremiumMultiplierWeiPerEth(s_priceRegistryPremiumMultiplierWeiPerEthArgs[1].token);
     assertEq(s_priceRegistryPremiumMultiplierWeiPerEthArgs[1].premiumMultiplierWeiPerEth, gotFeeTokenConfig1);
+
+    PriceRegistry.TokenTransferFeeConfigArgs memory tokenTransferFeeConfigArg =
+      s_priceRegistryTokenTransferFeeConfigArgs[0];
+    for (uint256 i = 0; i < tokenTransferFeeConfigArg.tokenTransferFeeConfigs.length; ++i) {
+      PriceRegistry.TokenTransferFeeConfigSingleTokenArgs memory tokenFeeArgs =
+        s_priceRegistryTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[i];
+
+      _assertTokenTransferFeeConfigEqual(
+        tokenFeeArgs.tokenTransferFeeConfig,
+        s_priceRegistry.getTokenTransferFeeConfig(tokenTransferFeeConfigArg.destChainSelector, tokenFeeArgs.token)
+      );
+    }
   }
 
   // TODO: re-add test

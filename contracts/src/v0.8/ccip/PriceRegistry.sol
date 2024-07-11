@@ -32,12 +32,12 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   struct StaticConfig {
     uint96 maxFeeJuelsPerMsg; // ─╮ Maximum fee that can be charged for a message
     address linkToken; // ────────╯ LINK token address
+    uint32 stalenessThreshold; // The amount of time a gas price can be stale before it is considered invalid.
   }
 
   error TokenNotSupported(address token);
   error ChainNotSupported(uint64 chain);
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
-  error InvalidStalenessThreshold();
   error DataFeedValueOutOfUint224Range();
   error NotAFeeToken(address token);
   error InvalidDestBytesOverhead(address token, uint32 destBytesOverhead);
@@ -190,23 +190,24 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     StaticConfig memory staticConfig,
     address[] memory priceUpdaters,
     address[] memory feeTokens,
-    uint32 stalenessThreshold,
     TokenPriceFeedUpdate[] memory tokenPriceFeeds,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
     DestChainDynamicConfigArgs[] memory destChainConfigArgs
   ) AuthorizedCallers(priceUpdaters) {
-    if (staticConfig.linkToken == address(0) || staticConfig.maxFeeJuelsPerMsg == 0) {
+    if (
+      staticConfig.linkToken == address(0) || staticConfig.maxFeeJuelsPerMsg == 0
+        || staticConfig.stalenessThreshold == 0
+    ) {
       revert InvalidStaticConfig();
     }
 
     i_linkToken = staticConfig.linkToken;
     i_maxFeeJuelsPerMsg = staticConfig.maxFeeJuelsPerMsg;
-    i_stalenessThreshold = stalenessThreshold;
+    i_stalenessThreshold = staticConfig.stalenessThreshold;
 
     _applyFeeTokensUpdates(feeTokens, new address[](0));
     _updateTokenPriceFeeds(tokenPriceFeeds);
-    if (stalenessThreshold == 0) revert InvalidStalenessThreshold();
     _applyDestChainConfigUpdates(destChainConfigArgs);
     _applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
     _applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, new TokenTransferFeeConfigRemoveArgs[](0));
@@ -254,12 +255,6 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     returns (IPriceRegistry.TokenPriceFeedConfig memory)
   {
     return s_usdPriceFeedsPerToken[token];
-  }
-
-  /// @notice Get the staleness threshold.
-  /// @return stalenessThreshold The staleness threshold.
-  function getStalenessThreshold() external view returns (uint128) {
-    return i_stalenessThreshold;
   }
 
   /// @inheritdoc IPriceRegistry
@@ -873,7 +868,11 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   /// @dev RMN depends on this function, if changing, please notify the RMN maintainers.
   /// @return the configuration.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({maxFeeJuelsPerMsg: i_maxFeeJuelsPerMsg, linkToken: i_linkToken});
+    return StaticConfig({
+      maxFeeJuelsPerMsg: i_maxFeeJuelsPerMsg,
+      linkToken: i_linkToken,
+      stalenessThreshold: i_stalenessThreshold
+    });
   }
 
   // ================================================================
