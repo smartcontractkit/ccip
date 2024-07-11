@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -278,16 +277,7 @@ func (p *priceService) observePriceUpdates(
 	if p.gasPriceEstimator == nil || p.destPriceRegistryReader == nil {
 		return nil, nil, fmt.Errorf("gasPriceEstimator and/or destPriceRegistry is not set yet")
 	}
-
-	sortedLaneTokens, filteredLaneTokens, err := ccipcommon.GetFilteredSortedLaneTokens(ctx, p.offRampReader, p.destPriceRegistryReader, p.priceGetter)
-
-	lggr.Debugw("Filtered bridgeable tokens with no configured price getter", "filteredLaneTokens", filteredLaneTokens)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("get destination tokens: %w", err)
-	}
-
-	return p.generatePriceUpdates(ctx, lggr, sortedLaneTokens)
+	return p.generatePriceUpdates(ctx, lggr)
 }
 
 // All prices are USD ($1=1e18) denominated. All prices must be not nil.
@@ -295,37 +285,36 @@ func (p *priceService) observePriceUpdates(
 func (p *priceService) generatePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
-	sortedLaneTokens []cciptypes.Address,
+	// sortedLaneTokens []cciptypes.Address,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
 	// Include wrapped native in our token query as way to identify the source native USD price.
 	// notice USD is in 1e18 scale, i.e. $1 = 1e18
-	queryTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{p.sourceNative}, sortedLaneTokens)
 
-	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, queryTokens)
+	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, make([]cciptypes.Address, 0))
+
+	// Get all the tokens fetched from the PriceGetter
+	tokensFetched := make([]cciptypes.Address, 0, len(rawTokenPricesUSD))
+	for token := range rawTokenPricesUSD {
+		tokensFetched = append(tokensFetched, token)
+	}
+
 	if err != nil {
 		return nil, nil, err
 	}
 	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
-
-	// make sure that we got prices for all the tokens of our query
-	for _, token := range queryTokens {
-		if rawTokenPricesUSD[token] == nil {
-			return nil, nil, fmt.Errorf("missing token price: %+v", token)
-		}
-	}
 
 	sourceNativePriceUSD, exists := rawTokenPricesUSD[p.sourceNative]
 	if !exists {
 		return nil, nil, fmt.Errorf("missing source native (%s) price", p.sourceNative)
 	}
 
-	destTokensDecimals, err := p.destPriceRegistryReader.GetTokensDecimals(ctx, sortedLaneTokens)
+	destTokensDecimals, err := p.destPriceRegistryReader.GetTokensDecimals(ctx, tokensFetched)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get tokens decimals: %w", err)
 	}
 
 	tokenPricesUSD = make(map[cciptypes.Address]*big.Int, len(rawTokenPricesUSD))
-	for i, token := range sortedLaneTokens {
+	for i, token := range tokensFetched {
 		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], destTokensDecimals[i])
 	}
 

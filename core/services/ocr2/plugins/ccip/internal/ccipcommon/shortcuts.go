@@ -1,22 +1,16 @@
 package ccipcommon
 
 import (
-	"context"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/avast/retry-go/v4"
 
-	"golang.org/x/sync/errgroup"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
 func GetMessageIDsAsHexString(messages []cciptypes.EVM2EVMMessage) []string {
@@ -32,67 +26,38 @@ type BackfillArgs struct {
 	SourceStartBlock, DestStartBlock uint64
 }
 
-// GetFilteredSortedLaneTokens returns union of tokens supported on this lane, including fee tokens from the provided price registry
-// and the bridgeable tokens from offRamp. Bridgeable tokens are only included if they are configured on the pricegetter
-// Fee tokens are not filtered as they must always be priced
-func GetFilteredSortedLaneTokens(ctx context.Context, offRamp ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader, priceGetter cciptypes.PriceGetter) (laneTokens []cciptypes.Address, excludedTokens []cciptypes.Address, err error) {
-	destFeeTokens, destBridgeableTokens, err := GetDestinationTokens(ctx, offRamp, priceRegistry)
-	if err != nil {
-		return nil, nil, fmt.Errorf("get tokens with batch limit: %w", err)
-	}
-
-	destTokensWithPrice, destTokensWithoutPrice, err := priceGetter.FilterConfiguredTokens(ctx, destBridgeableTokens)
-	if err != nil {
-		return nil, nil, fmt.Errorf("filter for priced tokens: %w", err)
-	}
-
-	return flattenedAndSortedTokens(destFeeTokens, destTokensWithPrice), destTokensWithoutPrice, nil
-}
-
-func flattenedAndSortedTokens(slices ...[]cciptypes.Address) (tokens []cciptypes.Address) {
-	// fee token can overlap with bridgeable tokens, we need to dedup them to arrive at lane token set
-	tokens = FlattenUniqueSlice(slices...)
-
-	// return the tokens in deterministic order to aid with testing and debugging
-	sort.Slice(tokens, func(i, j int) bool {
-		return tokens[i] < tokens[j]
-	})
-
-	return tokens
-}
-
 // GetDestinationTokens returns the destination chain fee tokens from the provided price registry
 // and the bridgeable tokens from the offramp.
-func GetDestinationTokens(ctx context.Context, offRamp ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader) (fee, bridged []cciptypes.Address, err error) {
-	eg := new(errgroup.Group)
+// func GetDestinationTokens(ctx context.Context, offRamp ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader) (fee, bridged []cciptypes.Address, err error) {
+// 	eg := new(errgroup.Group)
 
-	var destFeeTokens []cciptypes.Address
-	var destBridgeableTokens []cciptypes.Address
+// 	var destFeeTokens []cciptypes.Address
+// 	var destBridgeableTokens []cciptypes.Address
 
-	eg.Go(func() error {
-		tokens, err := priceRegistry.GetFeeTokens(ctx)
-		if err != nil {
-			return fmt.Errorf("get dest fee tokens: %w", err)
-		}
-		destFeeTokens = tokens
-		return nil
-	})
+// 	eg.Go(func() error {
+// 		tokens, err := priceRegistry.GetFeeTokens(ctx)
+// 		if err != nil {
+// 			return fmt.Errorf("get dest fee tokens: %w", err)
+// 		}
+// 		destFeeTokens = tokens
+// 		return nil
+// 	})
 
-	eg.Go(func() error {
-		tokens, err := offRamp.GetTokens(ctx)
-		if err != nil {
-			return fmt.Errorf("get dest bridgeable tokens: %w", err)
-		}
-		destBridgeableTokens = tokens.DestinationTokens
-		return nil
-	})
+// 	eg.Go(func() error {
+// 		tokens, err := offRamp.GetTokens(ctx)
+// 		if err != nil {
+// 			return fmt.Errorf("get dest bridgeable tokens: %w", err)
+// 		}
+// 		destBridgeableTokens = tokens.DestinationTokens
+// 		return nil
+// 	})
 
-	if err := eg.Wait(); err != nil {
-		return nil, nil, err
-	}
+// 	if err := eg.Wait(); err != nil {
+// 		return nil, nil, err
+// 	}
 
-	return destFeeTokens, destBridgeableTokens, nil
-}
+// 	return destFeeTokens, destBridgeableTokens, nil
+// }
 
 // FlattenUniqueSlice returns a flattened slice that contains unique elements by preserving their order.
 func FlattenUniqueSlice[T comparable](slices ...[]T) []T {

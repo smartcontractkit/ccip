@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
@@ -60,7 +59,7 @@ func (d *PipelineGetter) FilterConfiguredTokens(ctx context.Context, tokens []cc
 	return configured, unconfigured, nil
 }
 
-func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
+func (d *PipelineGetter) TokenPricesUSD(ctx context.Context) (map[cciptypes.Address]*big.Int, error) {
 	_, trrs, err := d.runner.ExecuteRun(ctx, pipeline.Spec{
 		ID:           d.jobID,
 		DotDagSource: d.source,
@@ -84,7 +83,6 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.
 		return nil, errors.Errorf("expected map output of price pipeline, got %T", finalResult.Values[0])
 	}
 
-	providedTokensSet := mapset.NewSet(tokens...)
 	tokenPrices := make(map[cciptypes.Address]*big.Int)
 	for tokenAddressStr, rawPrice := range prices {
 		tokenAddressStr := ccipcalc.HexToAddress(tokenAddressStr)
@@ -93,17 +91,7 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.
 			return nil, err
 		}
 
-		if providedTokensSet.Contains(tokenAddressStr) {
-			tokenPrices[tokenAddressStr] = castedPrice
-		}
-	}
-
-	// The mapping of token address to source of token price has to live offchain.
-	// Best we can do is sanity check that the token price spec covers all our desired execution token prices.
-	for _, token := range tokens {
-		if _, ok = tokenPrices[token]; !ok {
-			return nil, errors.Errorf("missing token %s from tokensForFeeCoin spec, got %v", token, prices)
-		}
+		tokenPrices[tokenAddressStr] = castedPrice
 	}
 
 	return tokenPrices, nil
