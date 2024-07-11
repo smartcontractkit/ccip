@@ -111,12 +111,16 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     uint256 pageSize
   ) external view returns (CCIPConfigTypes.ChainConfigInfo[] memory) {
     uint256 totalItems = s_remoteChainSelectors.length(); // Total number of chain selectors
-    if (pageSize == 0 || pageIndex * pageSize >= totalItems) {
+    uint256 startIndex = pageIndex * pageSize;
+
+    if (pageSize == 0 || startIndex >= totalItems) {
       return new CCIPConfigTypes.ChainConfigInfo[](0); // Return an empty array if pageSize is 0 or pageIndex is out of bounds
     }
 
-    uint256 startIndex = pageIndex * pageSize;
-    uint256 endIndex = startIndex + pageSize > totalItems ? totalItems : startIndex + pageSize;
+    uint256 endIndex = startIndex + pageSize;
+    if (endIndex > totalItems) {
+      endIndex = totalItems;
+    }
 
     CCIPConfigTypes.ChainConfigInfo[] memory paginatedChainConfigs =
       new CCIPConfigTypes.ChainConfigInfo[](endIndex - startIndex);
