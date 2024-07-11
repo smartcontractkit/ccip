@@ -6,11 +6,12 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/message_hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/stretchr/testify/assert"
 )
 
-var randomExecuteReport = func(t *testing.T) cciptypes.ExecutePluginReport {
+var randomExecuteReport = func(t *testing.T, d *testSetupData) cciptypes.ExecutePluginReport {
 	const numChainReports = 10
 	const msgsPerReport = 10
 	const numTokensPerMsg = 3
@@ -32,6 +33,11 @@ var randomExecuteReport = func(t *testing.T) cciptypes.ExecutePluginReport {
 				}
 			}
 
+			extraArgs, err := d.contract.EncodeEVMExtraArgsV1(nil, message_hasher.ClientEVMExtraArgsV1{
+				GasLimit: utils.RandUint256(),
+			})
+			assert.NoError(t, err)
+
 			reportMessages[j] = cciptypes.Message{
 				Header: cciptypes.RampMessageHeader{
 					MessageID:           utils.RandomBytes32(),
@@ -45,7 +51,7 @@ var randomExecuteReport = func(t *testing.T) cciptypes.ExecutePluginReport {
 				Sender:         utils.RandomAddress().Bytes(),
 				Data:           data,
 				Receiver:       utils.RandomAddress().Bytes(),
-				ExtraArgs:      data,
+				ExtraArgs:      extraArgs,
 				FeeToken:       utils.RandomAddress().Bytes(),
 				FeeTokenAmount: cciptypes.NewBigInt(utils.RandUint256()),
 				TokenAmounts:   tokenAmounts,
@@ -70,6 +76,8 @@ var randomExecuteReport = func(t *testing.T) cciptypes.ExecutePluginReport {
 }
 
 func TestExecutePluginCodecV1(t *testing.T) {
+	d := testSetup(t)
+
 	testCases := []struct {
 		name   string
 		report func(report cciptypes.ExecutePluginReport) cciptypes.ExecutePluginReport
@@ -105,7 +113,7 @@ func TestExecutePluginCodecV1(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			codec := NewExecutePluginCodecV1()
-			report := tc.report(randomExecuteReport(t))
+			report := tc.report(randomExecuteReport(t, d))
 			bytes, err := codec.Encode(ctx, report)
 			if tc.expErr {
 				assert.Error(t, err)
@@ -121,8 +129,8 @@ func TestExecutePluginCodecV1(t *testing.T) {
 				for j := range report.ChainReports[i].Messages {
 					report.ChainReports[i].Messages[j].Header.MsgHash = cciptypes.Bytes32{}
 					report.ChainReports[i].Messages[j].Header.OnRamp = cciptypes.Bytes{}
-					report.ChainReports[i].Messages[j].ExtraArgs = cciptypes.Bytes{}
 					report.ChainReports[i].Messages[j].FeeToken = cciptypes.Bytes{}
+					report.ChainReports[i].Messages[j].ExtraArgs = cciptypes.Bytes{}
 					report.ChainReports[i].Messages[j].FeeTokenAmount = cciptypes.BigInt{}
 				}
 			}

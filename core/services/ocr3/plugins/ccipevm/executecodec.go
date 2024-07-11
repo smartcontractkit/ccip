@@ -3,7 +3,6 @@ package ccipevm
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -66,6 +65,11 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 				})
 			}
 
+			gasLimit, err := decodeExtraArgsV1V2(message.ExtraArgs)
+			if err != nil {
+				return nil, fmt.Errorf("decode extra args to get gas limit: %w", err)
+			}
+
 			evmMessages = append(evmMessages, evm_2_evm_multi_offramp.InternalAny2EVMRampMessage{
 				Header: evm_2_evm_multi_offramp.InternalRampMessageHeader{
 					MessageId:           message.Header.MessageID,
@@ -77,7 +81,7 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 				Sender:       message.Sender,
 				Data:         message.Data,
 				Receiver:     receiver,
-				GasLimit:     big.NewInt(0), // todo
+				GasLimit:     gasLimit,
 				TokenAmounts: tokenAmounts,
 			})
 		}
@@ -143,15 +147,15 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 					DestChainSelector:   cciptypes.ChainSelector(evmMessage.Header.DestChainSelector),
 					SequenceNumber:      cciptypes.SeqNum(evmMessage.Header.SequenceNumber),
 					Nonce:               evmMessage.Header.Nonce,
-					MsgHash:             cciptypes.Bytes32{}, // <-- todo
-					OnRamp:              cciptypes.Bytes{},   // <-- todo
+					MsgHash:             cciptypes.Bytes32{}, // <-- todo: info not available, but not required atm
+					OnRamp:              cciptypes.Bytes{},   // <-- todo: info not available, but not required atm
 				},
 				Sender:         evmMessage.Sender,
 				Data:           evmMessage.Data,
 				Receiver:       evmMessage.Receiver.Bytes(),
-				ExtraArgs:      cciptypes.Bytes{},  // <-- todo
-				FeeToken:       cciptypes.Bytes{},  // <-- todo
-				FeeTokenAmount: cciptypes.BigInt{}, // <-- todo
+				ExtraArgs:      cciptypes.Bytes{},  // <-- todo: info not available, but not required atm
+				FeeToken:       cciptypes.Bytes{},  // <-- todo: info not available, but not required atm
+				FeeTokenAmount: cciptypes.BigInt{}, // <-- todo: info not available, but not required atm
 				TokenAmounts:   tokenAmounts,
 			}
 			messages = append(messages, message)
