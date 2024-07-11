@@ -1,7 +1,6 @@
 package ccip_integration_tests
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -39,9 +38,21 @@ func TestPingPong(t *testing.T) {
 			log := logIter.Event
 			require.Equal(t, log.DestChainSelector, otherChain)
 			require.Equal(t, log.Message.Sender, pingPong.Address())
-			require.Equal(t, bytes.TrimLeft(log.Message.Receiver, "\x00"), pingPongs[otherChain][chainID].Address().Bytes())
+			chainPingPongAddr := pingPongs[otherChain][chainID].Address().Bytes()
+			// With chain agnostic addresses we need to pad the address to the correct length if the receiver is zero prefixed
+			paddedAddr := LeftPadByteArray(chainPingPongAddr, len(log.Message.Receiver))
+			require.Equal(t, log.Message.Receiver, paddedAddr)
 		}
 	}
+}
+
+func LeftPadByteArray(arr []byte, length int) []byte {
+	if len(arr) >= length {
+		return arr
+	}
+	padded := make([]byte, length)
+	copy(padded[length-len(arr):], arr)
+	return padded
 }
 
 // InitializeContracts initializes ping pong contracts on all chains and
