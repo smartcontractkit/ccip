@@ -34,7 +34,7 @@ func TestOnRamp_GetSendRequestsForSeqNums(t *testing.T) {
 		RpcBatchSize:             10,
 		KeepFinalizedBlocksDepth: 1000,
 	}
-	lp := logpoller.NewLogPoller(orm, nil, logger.TestLogger(t), lpOpts)
+	lp := logpoller.NewLogPoller(orm, nil, logger.TestLogger(t), nil, lpOpts)
 
 	onrampAddress := utils.RandomAddress()
 	inputLogs := []logpoller.Log{
@@ -187,7 +187,7 @@ func Benchmark_FilteredLogsQuery(b *testing.B) {
 		RpcBatchSize:             10,
 		KeepFinalizedBlocksDepth: 1000,
 	}
-	lp := logpoller.NewLogPoller(orm, nil, logger.TestLogger(b), lpOpts)
+	lp := logpoller.NewLogPoller(orm, nil, logger.TestLogger(b), nil, lpOpts)
 
 	onrampAddress := utils.RandomAddress()
 
