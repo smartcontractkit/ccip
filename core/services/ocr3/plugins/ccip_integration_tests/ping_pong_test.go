@@ -37,12 +37,12 @@ func TestPingPong(t *testing.T) {
 			for logIter.Next() {
 			}
 			log := logIter.Event
-			require.Equal(t, log.DestChainSelector, otherChain)
-			require.Equal(t, log.Message.Sender, pingPong.Address())
+			require.Equal(t, otherChain, log.DestChainSelector)
+			require.Equal(t, pingPong.Address(), log.Message.Sender)
 			chainPingPongAddr := pingPongs[otherChain][chainID].Address().Bytes()
 			// With chain agnostic addresses we need to pad the address to the correct length if the receiver is zero prefixed
 			paddedAddr := gethcommon.LeftPadBytes(chainPingPongAddr, len(log.Message.Receiver))
-			require.Equal(t, log.Message.Receiver, paddedAddr)
+			require.Equal(t, paddedAddr, log.Message.Receiver)
 		}
 	}
 }
