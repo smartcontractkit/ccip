@@ -1373,6 +1373,7 @@ contract PriceRegistry_getDataAvailabilityCost is PriceRegistrySetup {
     destChainConfigArgs[0].dynamicConfig.destDataAvailabilityMultiplierBps = destDataAvailabilityMultiplierBps;
     destChainConfigArgs[0].dynamicConfig.defaultTxGasLimit = GAS_LIMIT;
     destChainConfigArgs[0].dynamicConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
+    destChainConfigArgs[0].dynamicConfig.defaultTokenDestBytesOverhead = DEFAULT_TOKEN_BYTES_OVERHEAD;
 
     s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
 

@@ -35,7 +35,11 @@ contract PriceRegistryHelper is PriceRegistry {
     uint32 tokenTransferBytesOverhead
   ) external view returns (uint256) {
     return _getDataAvailabilityCost(
-      destChainSelector, dataAvailabilityGasPrice, messageDataLength, numberOfTokens, tokenTransferBytesOverhead
+      s_destChainDynamicConfigs[destChainSelector],
+      dataAvailabilityGasPrice,
+      messageDataLength,
+      numberOfTokens,
+      tokenTransferBytesOverhead
     );
   }
 
@@ -45,7 +49,9 @@ contract PriceRegistryHelper is PriceRegistry {
     uint224 feeTokenPrice,
     Client.EVMTokenAmount[] calldata tokenAmounts
   ) external view returns (uint256, uint32, uint32) {
-    return _getTokenTransferCost(destChainSelector, feeToken, feeTokenPrice, tokenAmounts);
+    return _getTokenTransferCost(
+      s_destChainDynamicConfigs[destChainSelector], destChainSelector, feeToken, feeTokenPrice, tokenAmounts
+    );
   }
 
   function parseEVMExtraArgsFromBytes(

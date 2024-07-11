@@ -155,6 +155,14 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     // Router address may be zero intentionally to pause.
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
 
+    address messageValidator = s_dynamicConfig.messageValidator;
+    if (messageValidator != address(0)) {
+      try IMessageInterceptor(messageValidator).onOutboundMessage(destChainSelector, message) {}
+      catch (bytes memory err) {
+        revert IMessageInterceptor.MessageValidationError(err);
+      }
+    }
+
     // Validate the message with various checks
     uint256 numberOfTokens = message.tokenAmounts.length;
 
@@ -180,36 +188,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     // Lock the tokens as last step. TokenPools may not always be trusted.
     // There should be no state changes after external call to TokenPools.
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
-
-      if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
-
-      IPoolV1 sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
-      // We don't have to check if it supports the pool version in a non-reverting way here because
-      // if we revert here, there is no effect on CCIP. Therefore we directly call the supportsInterface
-      // function and not through the ERC165Checker.
-      if (address(sourcePool) == address(0) || !sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
-        revert UnsupportedToken(tokenAndAmount.token);
-      }
-
-      Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
-        Pool.LockOrBurnInV1({
-          receiver: message.receiver,
-          remoteChainSelector: destChainSelector,
-          originalSender: originalSender,
-          amount: tokenAndAmount.amount,
-          localToken: tokenAndAmount.token
-        })
-      );
-
-      // NOTE: pool validations are outsourced to the PriceRegistry to handle family-specific logic handling
-
-      rampMessage.tokenAmounts[i] = Internal.RampTokenAmount({
-        sourcePoolAddress: abi.encode(sourcePool),
-        destTokenAddress: poolReturnData.destTokenAddress,
-        extraData: poolReturnData.destPoolData,
-        amount: tokenAndAmount.amount
-      });
+      rampMessage.tokenAmounts[i] =
+        _lockOrBurnSingleToken(message.tokenAmounts[i], destChainSelector, message.receiver, originalSender);
     }
 
     (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) =
@@ -221,14 +201,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       // may block ordered message nonces, which is not what we want.
       rampMessage.header.nonce =
         INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender);
-    }
-
-    address messageValidator = s_dynamicConfig.messageValidator;
-    if (messageValidator != address(0)) {
-      try IMessageInterceptor(messageValidator).onOutboundMessage(destChainSelector, message) {}
-      catch (bytes memory err) {
-        revert IMessageInterceptor.MessageValidationError(err);
-      }
     }
 
     // Override extraArgs with latest version
@@ -243,6 +215,48 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     );
 
     return rampMessage;
+  }
+
+  /// @notice Uses a pool to lock or burn a token
+  /// @param tokenAndAmount Token address and amount to lock or burn
+  /// @param destChainSelector Target dest chain selector of the message
+  /// @param receiver Message receiver
+  /// @param originalSender Message sender
+  /// @return rampTokenAndAmount Ramp token and amount data
+  function _lockOrBurnSingleToken(
+    Client.EVMTokenAmount memory tokenAndAmount,
+    uint64 destChainSelector,
+    bytes memory receiver,
+    address originalSender
+  ) internal returns (Internal.RampTokenAmount memory) {
+    if (tokenAndAmount.amount == 0) revert CannotSendZeroTokens();
+
+    IPoolV1 sourcePool = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token));
+    // We don't have to check if it supports the pool version in a non-reverting way here because
+    // if we revert here, there is no effect on CCIP. Therefore we directly call the supportsInterface
+    // function and not through the ERC165Checker.
+    if (address(sourcePool) == address(0) || !sourcePool.supportsInterface(Pool.CCIP_POOL_V1)) {
+      revert UnsupportedToken(tokenAndAmount.token);
+    }
+
+    Pool.LockOrBurnOutV1 memory poolReturnData = sourcePool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        receiver: receiver,
+        remoteChainSelector: destChainSelector,
+        originalSender: originalSender,
+        amount: tokenAndAmount.amount,
+        localToken: tokenAndAmount.token
+      })
+    );
+
+    // NOTE: pool data validations are outsourced to the PriceRegistry to handle family-specific logic handling
+
+    return Internal.RampTokenAmount({
+      sourcePoolAddress: abi.encode(sourcePool),
+      destTokenAddress: poolReturnData.destTokenAddress,
+      extraData: poolReturnData.destPoolData,
+      amount: tokenAndAmount.amount
+    });
   }
 
   // ================================================================

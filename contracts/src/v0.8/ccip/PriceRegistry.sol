@@ -448,6 +448,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   // ================================================================
 
   /// @inheritdoc IPriceRegistry
+  /// @dev The function should always validate message.extraArgs, message.receiver and family-specific configs
   function getValidatedFee(
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message
@@ -475,8 +476,9 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     uint32 tokenTransferGas = 0;
     uint32 tokenTransferBytesOverhead = 0;
     if (numberOfTokens > 0) {
-      (premiumFee, tokenTransferGas, tokenTransferBytesOverhead) =
-        _getTokenTransferCost(destChainSelector, message.feeToken, feeTokenPrice, message.tokenAmounts);
+      (premiumFee, tokenTransferGas, tokenTransferBytesOverhead) = _getTokenTransferCost(
+        destChainDynamicConfig, destChainSelector, message.feeToken, feeTokenPrice, message.tokenAmounts
+      );
     } else {
       // Convert USD cents with 2 decimals to 18 decimals.
       premiumFee = uint256(destChainDynamicConfig.networkFeeUSDCents) * 1e16;
@@ -490,7 +492,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     // The multiplier should be set to 0 if destination chain does not charge data availability cost.
     if (destChainDynamicConfig.destDataAvailabilityMultiplierBps > 0) {
       dataAvailabilityCost = _getDataAvailabilityCost(
-        destChainSelector,
+        destChainDynamicConfig,
         // Parse the data availability gas price stored in the higher-order 112 bits of the encoded gas price.
         uint112(packedGasPrice >> Internal.GAS_PRICE_BITS),
         message.data.length,
@@ -556,6 +558,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   /// @dev Assumes that tokenAmounts are validated to be listed tokens elsewhere.
   /// @dev Splitting one token transfer into multiple transfers is discouraged,
   /// as it will result in a transferFee equal or greater than the same amount aggregated/de-duped.
+  /// @param destChainDynamicConfig the dynamic config configured for the destination chain selector.
   /// @param destChainSelector the destination chain selector.
   /// @param feeToken address of the feeToken.
   /// @param feeTokenPrice price of feeToken in USD with 18 decimals.
@@ -564,7 +567,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   /// @return tokenTransferGas total execution gas of the token transfers.
   /// @return tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
   function _getTokenTransferCost(
-    // TODO: pass in dynamic config instead?
+    DestChainDynamicConfig memory destChainDynamicConfig,
     uint64 destChainSelector,
     address feeToken,
     uint224 feeTokenPrice,
@@ -578,7 +581,6 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
       // If the token has no specific overrides configured, we use the global defaults.
       if (!transferFeeConfig.isEnabled) {
-        DestChainDynamicConfig storage destChainDynamicConfig = s_destChainDynamicConfigs[destChainSelector];
         tokenTransferFeeUSDWei += uint256(destChainDynamicConfig.defaultTokenFeeUSDCents) * 1e16;
         tokenTransferGas += destChainDynamicConfig.defaultTokenDestGasOverhead;
         tokenTransferBytesOverhead += destChainDynamicConfig.defaultTokenDestBytesOverhead;
@@ -626,26 +628,24 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
   /// @notice Returns the estimated data availability cost of the message.
   /// @dev To save on gas, we use a single destGasPerDataAvailabilityByte value for both zero and non-zero bytes.
-  /// @param destChainSelector the destination chain selector.
+  /// @param destChainDynamicConfig the dynamic config configured for the destination chain selector.
   /// @param dataAvailabilityGasPrice USD per data availability gas in 18 decimals.
   /// @param messageDataLength length of the data field in the message.
   /// @param numberOfTokens number of distinct token transfers in the message.
   /// @param tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
   /// @return dataAvailabilityCostUSD36Decimal total data availability cost in USD with 36 decimals.
   function _getDataAvailabilityCost(
-    // TODO: pass in dynamic config instead?
-    uint64 destChainSelector,
+    DestChainDynamicConfig memory destChainDynamicConfig,
     uint112 dataAvailabilityGasPrice,
     uint256 messageDataLength,
     uint256 numberOfTokens,
     uint32 tokenTransferBytesOverhead
-  ) internal view returns (uint256 dataAvailabilityCostUSD36Decimal) {
+  ) internal pure returns (uint256 dataAvailabilityCostUSD36Decimal) {
     // dataAvailabilityLengthBytes sums up byte lengths of fixed message fields and dynamic message fields.
     // Fixed message fields do account for the offset and length slot of the dynamic fields.
     uint256 dataAvailabilityLengthBytes = Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES + messageDataLength
       + (numberOfTokens * Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN) + tokenTransferBytesOverhead;
 
-    DestChainDynamicConfig storage destChainDynamicConfig = s_destChainDynamicConfigs[destChainSelector];
     // destDataAvailabilityOverheadGas is a separate config value for flexibility to be updated independently of message cost.
     // Its value is determined by CCIP lane implementation, e.g. the overhead data posted for OCR.
     uint256 dataAvailabilityGas = (dataAvailabilityLengthBytes * destChainDynamicConfig.destGasPerDataAvailabilityByte)
@@ -820,8 +820,10 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
     if (msgFeeJuels > i_maxFeeJuelsPerMsg) revert MessageFeeTooHigh(msgFeeJuels, i_maxFeeJuelsPerMsg);
 
-    // NOTE: when supporting non-EVM chains, revisit this and parse non-EVM args
-    Client.EVMExtraArgsV2 memory extraArgs = _parseEVMExtraArgsFromBytes(message.extraArgs, destChainDynamicConfig);
+    // NOTE: when supporting non-EVM chains, revisit this and parse non-EVM args.
+    // We can parse unvalidated args since getValidatedRampMessageParams is called after getFee (which will already validate the params)
+    Client.EVMExtraArgsV2 memory extraArgs =
+      _parseUnvalidatedEVMExtraArgsFromBytes(message.extraArgs, destChainDynamicConfig.defaultTxGasLimit);
     isOutOfOrderExecution = extraArgs.allowOutOfOrderExecution;
 
     return (msgFeeJuels, isOutOfOrderExecution, abi.encode(extraArgs));
@@ -851,6 +853,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
       if (
         destChainSelector == 0 || destChainDynamicConfigArg.defaultTxGasLimit == 0
           || destChainDynamicConfigArg.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
+          || destChainDynamicConfigArg.defaultTokenDestBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
       ) {
         revert InvalidDestChainConfig(destChainSelector);
       }
