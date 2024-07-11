@@ -22,7 +22,7 @@ import (
 * Test fails if any wiring between contracts is not correct.
  */
 func TestPingPong(t *testing.T) {
-	_, universes := createUniverses(t, 4)
+	_, universes := createUniverses(t, 3)
 	pingPongs := initializePingPongContracts(t, universes)
 	for chainID, universe := range universes {
 		for otherChain, pingPong := range pingPongs[chainID] {

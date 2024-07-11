@@ -80,8 +80,8 @@ type chainBase struct {
 // createUniverses does the following:
 // 1. Creates 1 home chain and `numChains`-1 non-home chains
 // 2. Sets up home chain with the capability registry and the CCIP config contract
-// 2. Deploys the CCIP contracts to non-home chains.
-// 3. Sets up the initial configurations for the contracts on non-home chains.
+// 2. Deploys the CCIP contracts to all chains.
+// 3. Sets up the initial configurations for the contracts on all chains.
 // 4. Wires the chains together.
 func createUniverses(
 	t *testing.T,
@@ -94,13 +94,9 @@ func createUniverses(
 	// Set up home chain first
 	homeChainUniverse := setupHomeChain(t, homeChainBase.owner, homeChainBase.backend)
 
-	// deploy the ccip contracts on the non-home-chain chains (total of 3).
+	// deploy the ccip contracts on all chains
 	universes = make(map[uint64]onchainUniverse)
 	for chainID, base := range chains {
-		if chainID == homeChainID {
-			continue
-		}
-
 		owner := base.owner
 		backend := base.backend
 		// deploy the CCIP contracts
@@ -272,7 +268,6 @@ func connectUniverses(
 	t *testing.T,
 	universes map[uint64]onchainUniverse,
 ) {
-	// Initial configs for contracts on non-home chain
 	for _, uni := range universes {
 		wireRouter(t, uni, universes)
 		wireOnRamp(t, uni, universes)
