@@ -17,7 +17,7 @@ require (
 	github.com/slack-go/slack v0.12.2
 	github.com/smartcontractkit/chainlink-automation v1.0.4
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240708180634-24440372521a
-	github.com/smartcontractkit/chainlink-testing-framework v1.31.7
+	github.com/smartcontractkit/chainlink-testing-framework v1.31.10
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20240214231432-4ad5eb95178c
 	github.com/smartcontractkit/chainlink/v2 v2.9.0-beta0.0.20240216210048-da02459ddad8
 	github.com/smartcontractkit/libocr v0.0.0-20240702141926-063ceef8c42e
@@ -271,6 +271,7 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jmhodges/levigo v1.0.0 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
@@ -366,7 +367,7 @@ require (
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/smartcontractkit/chain-selectors v1.0.17 // indirect
+	github.com/smartcontractkit/chain-selectors v1.0.18 // indirect
 	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20240621143432-85370a54b141 // indirect
 	github.com/smartcontractkit/chainlink-data-streams v0.0.0-20240702144807-761f63e7b527 // indirect
 	github.com/smartcontractkit/chainlink-feeds v0.0.0-20240522213638-159fb2d99917 // indirect
