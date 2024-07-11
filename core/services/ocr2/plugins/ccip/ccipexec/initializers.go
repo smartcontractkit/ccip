@@ -53,6 +53,8 @@ var (
 var defaultNewReportingPluginRetryConfig = ccipdata.RetryConfig{InitialDelay: time.Second, MaxDelay: 5 * time.Minute}
 
 func NewExecServices(ctx context.Context, lggr logger.Logger, cfg plugins.RegistrarConfig, jb job.Job, sourceTokenAddress string, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider, srcChainID int64, dstChainID int64, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+	lggr.Named(fmt.Sprintf("ccip-exec-%v", jb.ID))
+
 	loopCmd := env.CCIPExecPlugin.Cmd.Get()
 	loopEnabled := loopCmd != ""
 
@@ -64,7 +66,7 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, cfg plugins.Regist
 			return nil, fmt.Errorf("failed to parse ccip exec env file: %w", err)
 		}
 		cmdFn, grpcOpts, err := cfg.RegisterLOOP(plugins.CmdConfig{
-			ID:  "ccip-exec",
+			ID:  lggr.Name(),
 			Cmd: loopCmd,
 			Env: envVars,
 		})
