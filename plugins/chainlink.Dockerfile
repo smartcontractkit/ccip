@@ -25,6 +25,9 @@ RUN make install-medianpoc
 # Install ocr3-capability binary
 RUN make install-ocr3-capability
 
+# Install ccip-exec binary
+RUN make install-ccip-exec
+
 # Link LOOP Plugin source dirs with simple names
 RUN go list -m -f "{{.Dir}}" github.com/smartcontractkit/chainlink-feeds | xargs -I % ln -s % /chainlink-feeds
 RUN go list -m -f "{{.Dir}}" github.com/smartcontractkit/chainlink-data-streams | xargs -I % ln -s % /chainlink-data-streams
@@ -68,6 +71,7 @@ RUN curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
 COPY --from=buildgo /go/bin/chainlink /usr/local/bin/
 COPY --from=buildgo /go/bin/chainlink-medianpoc /usr/local/bin/
 COPY --from=buildgo /go/bin/chainlink-ocr3-capability /usr/local/bin/
+COPY --from=buildgo /go/bin/chainlink-ccip-exec /usr/local/bin/
 
 COPY --from=buildplugins /go/bin/chainlink-feeds /usr/local/bin/
 ENV CL_MEDIAN_CMD chainlink-feeds
@@ -77,6 +81,7 @@ COPY --from=buildplugins /go/bin/chainlink-solana /usr/local/bin/
 ENV CL_SOLANA_CMD chainlink-solana
 COPY --from=buildplugins /go/bin/chainlink-starknet /usr/local/bin/
 ENV CL_STARKNET_CMD chainlink-starknet
+ENV CL_CCIP-EXEC_CMD chainlink-ccip-exec
 
 # Dependency of CosmWasm/wasmd
 COPY --from=buildgo /go/pkg/mod/github.com/\!cosm\!wasm/wasmvm@v*/internal/api/libwasmvm.*.so /usr/lib/

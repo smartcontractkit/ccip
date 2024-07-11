@@ -68,6 +68,9 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, cfg plugins.Regist
 			Cmd: loopCmd,
 			Env: envVars,
 		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to register ccip exec plugin: %w", err)
+		}
 		// get reporting plugin factory from loop
 		factoryServer := loop.NewExecutionService(lggr, grpcOpts, cmdFn, srcProvider, dstProvider, uint32(srcChainID), uint32(dstChainID), sourceTokenAddress)
 		pluginFactory = factoryServer
