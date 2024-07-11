@@ -24,9 +24,7 @@ import (
 func TestPingPong(t *testing.T) {
 	chains := createChains(t, 4)
 
-	homeChainUni, universes := setupUniverses(t, chains)
-	setupInitialConfigs(t, universes, homeChainUni)
-
+	_, universes := setupUniverses(t, chains)
 	pingPongs := initializePingPongContracts(t, universes)
 	for chainID, universe := range universes {
 		for otherChain, pingPong := range pingPongs[chainID] {

@@ -28,15 +28,15 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/maps"
 )
 
 var (
 	homeChainID = chainsel.GETH_TESTNET.EvmChainID
-	e18Mult     = func(amount uint64) *big.Int {
-		return new(big.Int).Mul(uintBigInt(amount), uintBigInt(1e18))
-	}
 )
+
+func e18Mult(amount uint64) *big.Int {
+	return new(big.Int).Mul(uintBigInt(amount), uintBigInt(1e18))
+}
 
 func uintBigInt(i uint64) *big.Int {
 	return new(big.Int).SetUint64(i)
@@ -99,24 +99,36 @@ func createChains(t *testing.T, numChains int) map[uint64]chainBase {
 	return chains
 }
 
-func setupHomeChain(t *testing.T, owner *bind.TransactOpts, homeChainBackend *backends.SimulatedBackend) homeChain {
+func setupHomeChain(t *testing.T, owner *bind.TransactOpts, backend *backends.SimulatedBackend) homeChain {
 	// deploy the capability registry on the home chain
-	addr, _, _, err := kcr.DeployCapabilitiesRegistry(owner, homeChainBackend)
+	addr, _, _, err := kcr.DeployCapabilitiesRegistry(owner, backend)
 	require.NoError(t, err, "failed to deploy capability registry on home chain")
-	homeChainBackend.Commit()
+	backend.Commit()
 
-	capabilityRegistry, err := kcr.NewCapabilitiesRegistry(addr, homeChainBackend)
+	capabilityRegistry, err := kcr.NewCapabilitiesRegistry(addr, backend)
 	require.NoError(t, err)
 
-	ccAddress, _, _, err := ccip_config.DeployCCIPConfig(owner, homeChainBackend, addr)
+	ccAddress, _, _, err := ccip_config.DeployCCIPConfig(owner, backend, addr)
 	require.NoError(t, err)
-	homeChainBackend.Commit()
+	backend.Commit()
 
-	capabilityConfig, err := ccip_config.NewCCIPConfig(ccAddress, homeChainBackend)
+	capabilityConfig, err := ccip_config.NewCCIPConfig(ccAddress, backend)
 	require.NoError(t, err)
+
+	_, err = capabilityRegistry.AddCapabilities(owner, []kcr.CapabilitiesRegistryCapability{
+		{
+			LabelledName:          "ccip",
+			Version:               "v1.0.0",
+			CapabilityType:        2, // consensus. not used (?)
+			ResponseType:          0, // report. not used (?)
+			ConfigurationContract: ccAddress,
+		},
+	})
+	require.NoError(t, err, "failed to add capabilities to the capability registry")
+	backend.Commit()
 
 	return homeChain{
-		backend:            homeChainBackend,
+		backend:            backend,
 		owner:              owner,
 		chainID:            homeChainID,
 		capabilityRegistry: capabilityRegistry,
@@ -125,11 +137,10 @@ func setupHomeChain(t *testing.T, owner *bind.TransactOpts, homeChainBackend *ba
 
 }
 
-/**
-* setupUniverses deploys the CCIP contracts on the home chain and the non-home chains.
-* All the contracts are deployed on the non-home chains.
-* The home chain is only used for the capability registry for simplicity.
- */
+// setupUniverses does the following:
+// 1. deploys the CCIP contracts on the home chain and the non-home chains.
+// 2. sets up the initial configurations for the contracts on the non-home chains.
+// 3. wires the chains together.
 func setupUniverses(
 	t *testing.T,
 	chains map[uint64]chainBase,
@@ -152,7 +163,6 @@ func setupUniverses(
 		backend := base.backend
 		// deploy the CCIP contracts
 		linkToken := deployLinkToken(t, owner, backend, chainID)
-		println("LinkToken: ", linkToken.Address().String())
 		rmn := deployMockARMContract(t, owner, backend, chainID)
 		rmnProxy := deployARMProxyContract(t, owner, backend, rmn.Address(), chainID)
 		weth := deployWETHContract(t, owner, backend, chainID)
@@ -162,7 +172,7 @@ func setupUniverses(
 		nonceManager := deployNonceManager(t, owner, backend, chainID)
 
 		//======================================================================
-		//===========================OnRamp=====================================
+		//							OnRamp
 		//======================================================================
 		//`withdrawFeeTokens` onRamp function is not part of the message flow
 		// so we can set this to any address
@@ -183,18 +193,29 @@ func setupUniverses(
 				PriceRegistry: priceRegistry.Address(),
 				FeeAggregator: feeAggregator,
 			},
+			// Destination chain configs will be set up later once we have all chains
 			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{},
-			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs{},
-			//TODO: Fill this out
+			// PremiumMultiplier is always needed if the onramp is enabled
+			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs{
+				{
+					PremiumMultiplierWeiPerEth: 9e17, //0.9 ETH
+					Token:                      linkToken.Address(),
+				},
+				{
+					PremiumMultiplierWeiPerEth: 1e18,
+					Token:                      weth.Address(),
+				},
+			},
+			//TODO: We'll need to have TransferFeeConfigArgs when we start testing with sending tokens
 			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampTokenTransferFeeConfigArgs{},
 		)
 		require.NoErrorf(t, err, "failed to deploy onramp on chain id %d", chainID)
 		backend.Commit()
 		onramp, err := evm_2_evm_multi_onramp.NewEVM2EVMMultiOnRamp(onRampAddr, backend)
 		require.NoError(t, err)
-		println("onRamp: ", onramp.Address().String())
+
 		//======================================================================
-		//===========================OffRamp=====================================
+		//							OffRamp
 		//======================================================================
 		offrampAddr, _, _, err := evm_2_evm_multi_offramp.DeployEVM2EVMMultiOffRamp(
 			owner,
@@ -205,15 +226,15 @@ func setupUniverses(
 				TokenAdminRegistry: tokenAdminRegistry.Address(),
 				NonceManager:       nonceManager.Address(),
 			},
+			// Source chain configs will be set up later once we have all chains
 			[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{},
 		)
 		require.NoErrorf(t, err, "failed to deploy offramp on chain id %d", chainID)
 		backend.Commit()
 		offramp, err := evm_2_evm_multi_offramp.NewEVM2EVMMultiOffRamp(offrampAddr, backend)
 		require.NoError(t, err)
-		println("offRamp: ", offramp.Address().String())
 
-		universes[chainID] = onchainUniverse{
+		universe := onchainUniverse{
 			backend:            backend,
 			owner:              owner,
 			chainID:            chainID,
@@ -228,194 +249,168 @@ func setupUniverses(
 			tokenAdminRegistry: tokenAdminRegistry,
 			nonceManager:       nonceManager,
 		}
+		// Set up the initial configurations for the contracts
+		setupUniverseBasics(t, universe)
+
+		universes[chainID] = universe
 	}
+
+	// Once we have all chains created and contracts deployed, we can set up the initial configurations and wire chains together
+	connectUniverses(t, universes)
 
 	return homeChainUniverse, universes
 }
 
-// setupInitialConfigs sets up the initial configurations for the CCIP contracts for all chains.
-// This function has 2 main purposes:
-// 1. Set up the capability registry and capability config on the home chain
-// 2. Set up the initial configurations for the contracts on the non-home chains
-//   - configurations involve connecting each chain to all other chains by updating the onRamp, offRamp, Router contracts
-//   - setting up the price registry with gas prices and token prices
-//   - setting up the premium multiplier for each token
-//   - setting up the dynamic config for each onRamp
-//   - setting up the source chain config for each offRamp
-//   - setting up the authorized callers for the nonce manager
-func setupInitialConfigs(
+func connectUniverses(
 	t *testing.T,
 	universes map[uint64]onchainUniverse,
-	homeChainUniverse homeChain,
 ) {
-	// Setup the capability registry on the home chain
-	_, err := homeChainUniverse.capabilityRegistry.AddCapabilities(homeChainUniverse.owner, []kcr.CapabilitiesRegistryCapability{
-		{
-			LabelledName:          "ccip",
-			Version:               "v1.0.0",
-			CapabilityType:        2, // consensus. not used (?)
-			ResponseType:          0, // report. not used (?)
-			ConfigurationContract: homeChainUniverse.ccipConfigContract,
-		},
-	})
-	require.NoError(t, err, "failed to add capabilities to the capability registry")
-	homeChainUniverse.backend.Commit()
-
 	// Initial configs for contracts on non-home chain
-	chainIDs := maps.Keys(universes)
-	for localChainID, uni := range universes {
-		//=============================================================================
-		//			Universe specific  updates/configs
-		//		These updates are specific to each universe and are set up here
-		//      These updates don't depend on other chains
-		//=============================================================================
-		owner := uni.owner
-		//=============================================================================
-		//							Mint 1000 LINK to owner
-		//=============================================================================
-		_, err := uni.linkToken.GrantMintRole(owner, owner.From)
-		require.NoError(t, err)
-		_, err = uni.linkToken.Mint(owner, owner.From, e18Mult(1000))
-		require.NoError(t, err)
-		uni.backend.Commit()
-
-		//=============================================================================
-		//						 PremiumMultiplier
-		// 			  This multiplier is used to calculate the premium/fees
-		// 				Some tokens like LINK will have a discounted fee
-		//			    This will be a config in current universe OnRamp
-		//=============================================================================
-		premiumMultiplierWeiPerEthUpdatesArgs := []evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs{
-			{
-				PremiumMultiplierWeiPerEth: 9e17, //0.9 ETH
-				Token:                      uni.linkToken.Address(),
-			},
-			{
-				PremiumMultiplierWeiPerEth: 1e18,
-				Token:                      uni.weth.Address(),
-			},
-		}
-
-		//=============================================================================
-		//						Price updates for tokens
-		//			These are the prices of the fee tokens of current chain in USD
-		//=============================================================================
-		tokenPriceUpdates := []price_registry.InternalTokenPriceUpdate{
-			{
-				SourceToken: uni.linkToken.Address(),
-				UsdPerToken: e18Mult(20),
-			},
-			{
-				SourceToken: uni.weth.Address(),
-				UsdPerToken: e18Mult(4000),
-			},
-		}
-		_, err = uni.priceRegistry.UpdatePrices(owner, price_registry.InternalPriceUpdates{
-			TokenPriceUpdates: tokenPriceUpdates,
-		})
-		require.NoErrorf(t, err, "failed to apply price registry updates on chain id %d", localChainID)
-		uni.backend.Commit()
-		//=============================================================================
-		//						Authorize OnRamp & OffRamp on NonceManager
-		//	Otherwise the onramp will not be able to call the nonceManager to get next Nonce
-		//=============================================================================
-		authorizedCallersAuthorizedCallerArgs := nonce_manager.AuthorizedCallersAuthorizedCallerArgs{
-			AddedCallers: []common.Address{
-				uni.onramp.Address(),
-				uni.offramp.Address(),
-			},
-		}
-		_, err = uni.nonceManager.ApplyAuthorizedCallerUpdates(owner, authorizedCallersAuthorizedCallerArgs)
-		require.NoError(t, err)
-		uni.backend.Commit()
-		//=============================================================================
-		//						END Per Universe updates/configs
-		//=============================================================================
-
-		var (
-			onrampDestChainConfigArgs    []evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs
-			routerOnrampUpdates          []router.RouterOnRamp
-			routerOfframpUpdates         []router.RouterOffRamp
-			offrampSourceChainConfigArgs []evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs
-			gasPriceUpdates              []price_registry.InternalGasPriceUpdate
-		)
-		for _, remoteChainID := range chainIDs {
-			if remoteChainID == localChainID {
-				continue
-			}
-
-			//===============================OnRamp=====================================
-			onrampDestChainConfigArgs = append(onrampDestChainConfigArgs, evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
-				DestChainSelector: remoteChainID,
-				DynamicConfig:     defaultOnRampDynamicConfig(t),
-			})
-
-			remoteUni, ok := universes[remoteChainID]
-			require.Truef(t, ok, "could not find universe for chain id %d", remoteChainID)
-
-			//================================OffRamp====================================
-			offrampSourceChainConfigArgs = append(offrampSourceChainConfigArgs, evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
-				SourceChainSelector: remoteChainID, // for each destination chain, add a source chain config
-				IsEnabled:           true,
-				OnRamp:              remoteUni.onramp.Address().Bytes(),
-			})
-
-			//==================================Router==================================
-			// As we can't change router contract. The contract was expecting onRamp and offRamp per lane and not per chain
-			// In the new architecture we have only one onRamp and one offRamp per chain.
-			// hence we add the mapping for all remote chains to the onRamp/offRamp contract of the local chain
-			routerOnrampUpdates = append(routerOnrampUpdates, router.RouterOnRamp{
-				DestChainSelector: remoteChainID,
-				OnRamp:            uni.onramp.Address(),
-			})
-			routerOfframpUpdates = append(routerOfframpUpdates, router.RouterOffRamp{
-				SourceChainSelector: remoteChainID,
-				OffRamp:             uni.offramp.Address(),
-			})
-
-			//===============================PriceRegistry=====================================
-			gasPriceUpdates = append(gasPriceUpdates,
-				price_registry.InternalGasPriceUpdate{
-					DestChainSelector: remoteChainID,
-					UsdPerUnitGas:     big.NewInt(2e12),
-				},
-			)
-		}
-
-		//=============================================================================
-		//							 	OnRamp
-		//=============================================================================
-		_, err = uni.onramp.ApplyDestChainConfigUpdates(owner, onrampDestChainConfigArgs)
-		require.NoErrorf(t, err, "failed to apply dest chain config updates on onramp on chain id %d", localChainID)
-		uni.backend.Commit()
-		//PremiumMultiplier is always needed if the onramp is enabled
-		_, err = uni.onramp.ApplyPremiumMultiplierWeiPerEthUpdates(owner, premiumMultiplierWeiPerEthUpdatesArgs)
-		require.NoErrorf(t, err, "failed to apply premium multiplier wei per eth updates on onramp on chain id %d", localChainID)
-		uni.backend.Commit()
-
-		//=============================================================================
-		//							 	OffRamp
-		//=============================================================================
-		_, err = uni.offramp.ApplySourceChainConfigUpdates(owner, offrampSourceChainConfigArgs)
-		require.NoErrorf(t, err, "failed to apply source chain config updates on offramp on chain id %d", localChainID)
-		uni.backend.Commit()
-
-		//=============================================================================
-		//							 	Router
-		//=============================================================================
-		_, err = uni.router.ApplyRampUpdates(owner, routerOnrampUpdates, []router.RouterOffRamp{}, routerOfframpUpdates)
-		require.NoErrorf(t, err, "failed to apply ramp updates on router on chain id %d", localChainID)
-		uni.backend.Commit()
-
-		//=============================================================================
-		//							 	PriceRegistry
-		//=============================================================================
-		_, err = uni.priceRegistry.UpdatePrices(owner, price_registry.InternalPriceUpdates{
-			GasPriceUpdates: gasPriceUpdates,
-		})
-		require.NoErrorf(t, err, "failed to apply price registry updates on chain id %d", localChainID)
-		uni.backend.Commit()
+	for _, uni := range universes {
+		wireRouter(t, uni, universes)
+		wireOnRamp(t, uni, universes)
+		wireOffRamp(t, uni, universes)
+		initRemoteChainsGasPrices(t, uni, universes)
 	}
+}
+
+// setupUniverseBasics sets up the initial configurations for the CCIP contracts on a single chain.
+// 1. Mint 1000 LINK to the owner
+// 2. Set the price registry with local token prices
+// 3. Authorize the onRamp and offRamp on the nonce manager
+func setupUniverseBasics(t *testing.T, uni onchainUniverse) {
+	//=============================================================================
+	//			Universe specific  updates/configs
+	//		These updates are specific to each universe and are set up here
+	//      These updates don't depend on other chains
+	//=============================================================================
+	owner := uni.owner
+	//=============================================================================
+	//							Mint 1000 LINK to owner
+	//=============================================================================
+	_, err := uni.linkToken.GrantMintRole(owner, owner.From)
+	require.NoError(t, err)
+	_, err = uni.linkToken.Mint(owner, owner.From, e18Mult(1000))
+	require.NoError(t, err)
+	uni.backend.Commit()
+
+	//=============================================================================
+	//						Price updates for tokens
+	//			These are the prices of the fee tokens of local chain in USD
+	//=============================================================================
+	tokenPriceUpdates := []price_registry.InternalTokenPriceUpdate{
+		{
+			SourceToken: uni.linkToken.Address(),
+			UsdPerToken: e18Mult(20),
+		},
+		{
+			SourceToken: uni.weth.Address(),
+			UsdPerToken: e18Mult(4000),
+		},
+	}
+	_, err = uni.priceRegistry.UpdatePrices(owner, price_registry.InternalPriceUpdates{
+		TokenPriceUpdates: tokenPriceUpdates,
+	})
+	require.NoErrorf(t, err, "failed to apply price registry updates on chain id %d", uni.chainID)
+	uni.backend.Commit()
+
+	//=============================================================================
+	//						Authorize OnRamp & OffRamp on NonceManager
+	//	Otherwise the onramp will not be able to call the nonceManager to get next Nonce
+	//=============================================================================
+	authorizedCallersAuthorizedCallerArgs := nonce_manager.AuthorizedCallersAuthorizedCallerArgs{
+		AddedCallers: []common.Address{
+			uni.onramp.Address(),
+			uni.offramp.Address(),
+		},
+	}
+	_, err = uni.nonceManager.ApplyAuthorizedCallerUpdates(owner, authorizedCallersAuthorizedCallerArgs)
+	require.NoError(t, err)
+	uni.backend.Commit()
+}
+
+// As we can't change router contract. The contract was expecting onRamp and offRamp per lane and not per chain
+// In the new architecture we have only one onRamp and one offRamp per chain.
+// hence we add the mapping for all remote chains to the onRamp/offRamp contract of the local chain
+func wireRouter(t *testing.T, uni onchainUniverse, universes map[uint64]onchainUniverse) {
+	owner := uni.owner
+	var (
+		routerOnrampUpdates  []router.RouterOnRamp
+		routerOfframpUpdates []router.RouterOffRamp
+	)
+	for remoteChainID, _ := range universes {
+		if remoteChainID == uni.chainID {
+			continue
+		}
+		routerOnrampUpdates = append(routerOnrampUpdates, router.RouterOnRamp{
+			DestChainSelector: remoteChainID,
+			OnRamp:            uni.onramp.Address(),
+		})
+		routerOfframpUpdates = append(routerOfframpUpdates, router.RouterOffRamp{
+			SourceChainSelector: remoteChainID,
+			OffRamp:             uni.offramp.Address(),
+		})
+	}
+	_, err := uni.router.ApplyRampUpdates(owner, routerOnrampUpdates, []router.RouterOffRamp{}, routerOfframpUpdates)
+	require.NoErrorf(t, err, "failed to apply ramp updates on router on chain id %d", uni.chainID)
+	uni.backend.Commit()
+}
+
+// Setting OnRampDestChainConfigs
+func wireOnRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchainUniverse) {
+	owner := uni.owner
+	var onrampDestChainConfigArgs []evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs
+	for remoteChainID, _ := range universes {
+		if remoteChainID == uni.chainID {
+			continue
+		}
+		onrampDestChainConfigArgs = append(onrampDestChainConfigArgs, evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
+			DestChainSelector: remoteChainID,
+			DynamicConfig:     defaultOnRampDynamicConfig(t),
+		})
+	}
+	_, err := uni.onramp.ApplyDestChainConfigUpdates(owner, onrampDestChainConfigArgs)
+	require.NoErrorf(t, err, "failed to apply dest chain config updates on onramp on chain id %d", uni.chainID)
+	uni.backend.Commit()
+}
+
+// Setting OffRampSourceChainConfigs
+func wireOffRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchainUniverse) {
+	owner := uni.owner
+	var offrampSourceChainConfigArgs []evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs
+	for remoteChainID, remoteUniverse := range universes {
+		if remoteChainID == uni.chainID {
+			continue
+		}
+		offrampSourceChainConfigArgs = append(offrampSourceChainConfigArgs, evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
+			SourceChainSelector: remoteChainID, // for each destination chain, add a source chain config
+			IsEnabled:           true,
+			OnRamp:              remoteUniverse.onramp.Address().Bytes(),
+		})
+	}
+	_, err := uni.offramp.ApplySourceChainConfigUpdates(owner, offrampSourceChainConfigArgs)
+	require.NoErrorf(t, err, "failed to apply source chain config updates on offramp on chain id %d", uni.chainID)
+	uni.backend.Commit()
+}
+
+// initRemoteChainsGasPrices sets the gas prices for all chains except the local chain in the local price registry
+func initRemoteChainsGasPrices(t *testing.T, uni onchainUniverse, universes map[uint64]onchainUniverse) {
+	var gasPriceUpdates []price_registry.InternalGasPriceUpdate
+	for remoteChainID, _ := range universes {
+		if remoteChainID == uni.chainID {
+			continue
+		}
+		gasPriceUpdates = append(gasPriceUpdates,
+			price_registry.InternalGasPriceUpdate{
+				DestChainSelector: remoteChainID,
+				UsdPerUnitGas:     big.NewInt(2e12),
+			},
+		)
+	}
+	_, err := uni.priceRegistry.UpdatePrices(uni.owner, price_registry.InternalPriceUpdates{
+		GasPriceUpdates: gasPriceUpdates,
+	})
+	require.NoError(t, err)
 }
 
 func defaultOnRampDynamicConfig(t *testing.T) evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainDynamicConfig {
