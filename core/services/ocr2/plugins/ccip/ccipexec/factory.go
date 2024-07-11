@@ -112,18 +112,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.Rep
 			return reportingPluginAndInfo{}, fmt.Errorf("get onchain config from offramp: %w", err)
 		}
 
-		var batchingStrategy BatchingStrategy
-		batchingStrategyID := offchainConfig.BatchingStrategyID
-		switch batchingStrategyID {
-		case 0:
-			batchingStrategy = &BestEffortBatchingStrategy{}
-		case 1:
-			batchingStrategy = &ZKOverflowBatchingStrategy{
-				statuschecker: statuschecker.NewTxmStatusChecker(rf.config.txManager),
-			}
-		default:
-			batchingStrategy = &BestEffortBatchingStrategy{} // Default strategy
-		}
+		batchingStrategy := NewBatchingStrategy(offchainConfig.BatchingStrategyID, statuschecker.NewTxmStatusChecker(rf.config.txManager))
 
 		msgVisibilityInterval := offchainConfig.MessageVisibilityInterval.Duration()
 		if msgVisibilityInterval.Seconds() == 0 {

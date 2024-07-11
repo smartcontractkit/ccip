@@ -55,6 +55,21 @@ type ZKOverflowBatchingStrategy struct {
 	statuschecker statuschecker.CCIPTransactionStatusChecker
 }
 
+func NewBatchingStrategy(batchingStrategyID uint32, statusChecker statuschecker.CCIPTransactionStatusChecker) BatchingStrategy {
+	var batchingStrategy BatchingStrategy
+	switch batchingStrategyID {
+	case 0:
+		batchingStrategy = &BestEffortBatchingStrategy{}
+	case 1:
+		batchingStrategy = &ZKOverflowBatchingStrategy{
+			statuschecker: statusChecker,
+		}
+	default:
+		batchingStrategy = &BestEffortBatchingStrategy{} // Default strategy
+	}
+	return batchingStrategy
+}
+
 // BestEffortBatchingStrategy is a batching strategy that tries to batch as many messages as possible (up to certain limits).
 func (s *BestEffortBatchingStrategy) BuildBatch(
 	ctx context.Context,
@@ -74,23 +89,8 @@ func (s *BestEffortBatchingStrategy) BuildBatch(
 			continue
 		}
 
-		batchCtx.availableGas -= messageMaxGas
-		batchCtx.availableDataLen -= len(msg.Data)
-		batchCtx.aggregateTokenLimit.Sub(batchCtx.aggregateTokenLimit, msgValue)
-		if msg.Nonce > 0 {
-			batchCtx.expectedNonces[msg.Sender] = msg.Nonce + 1
-		}
+		updateBatchContext(batchCtx, msg, messageMaxGas, msgValue, msgLggr)
 		batchBuilder.addToBatch(msg, tokenData)
-
-		msgLggr.Infow(
-			"Message added to execution batch",
-			"nonce", msg.Nonce,
-			"sender", msg.Sender,
-			"value", msgValue,
-			"availableAggrTokenLimit", batchCtx.aggregateTokenLimit,
-			"availableGas", batchCtx.availableGas,
-			"availableDataLen", batchCtx.availableDataLen,
-		)
 	}
 	return batchBuilder.batch, batchBuilder.statuses
 }
@@ -155,20 +155,8 @@ func (bs ZKOverflowBatchingStrategy) BuildBatch(
 			continue
 		}
 
-		batchCtx.availableGas -= messageMaxGas
-		batchCtx.availableDataLen -= len(msg.Data)
-		batchCtx.aggregateTokenLimit.Sub(batchCtx.aggregateTokenLimit, msgValue)
+		updateBatchContext(batchCtx, msg, messageMaxGas, msgValue, msgLggr)
 		batchBuilder.addToBatch(msg, tokenData)
-
-		msgLggr.Infow(
-			"Message added to ZKOverflow execution batch",
-			"nonce", msg.Nonce,
-			"sender", msg.Sender,
-			"value", msgValue,
-			"availableAggrTokenLimit", batchCtx.aggregateTokenLimit,
-			"availableGas", batchCtx.availableGas,
-			"availableDataLen", batchCtx.availableDataLen,
-		)
 
 		// Batch size is limited to 1 for ZK Overflow chains
 		break
@@ -368,6 +356,30 @@ func getInflightSeqNums(inflight []InflightInternalExecutionReport) mapset.Set[u
 		}
 	}
 	return seqNums
+}
+
+func updateBatchContext(
+	batchCtx *BatchContext,
+	msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta,
+	messageMaxGas uint64,
+	msgValue *big.Int,
+	msgLggr logger.Logger) {
+	batchCtx.availableGas -= messageMaxGas
+	batchCtx.availableDataLen -= len(msg.Data)
+	batchCtx.aggregateTokenLimit.Sub(batchCtx.aggregateTokenLimit, msgValue)
+	if msg.Nonce > 0 {
+		batchCtx.expectedNonces[msg.Sender] = msg.Nonce + 1
+	}
+
+	msgLggr.Infow(
+		"Message successfully added to execution batch",
+		"nonce", msg.Nonce,
+		"sender", msg.Sender,
+		"value", msgValue,
+		"availableAggrTokenLimit", batchCtx.aggregateTokenLimit,
+		"availableGas", batchCtx.availableGas,
+		"availableDataLen", batchCtx.availableDataLen,
+	)
 }
 
 func hasEnoughTokens(tokenLimit *big.Int, msgValue *big.Int, inflightValue *big.Int) (*big.Int, bool) {
