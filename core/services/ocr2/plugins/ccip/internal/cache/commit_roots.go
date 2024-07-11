@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/patrickmn/go-cache"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
@@ -82,7 +83,9 @@ type commitRootsCache struct {
 	// Whenever the root is executed (all messages executed and ExecutionStateChange events are finalized), we remove the root from the map.
 	finalizedRoots *orderedmap.OrderedMap[string, ccip.CommitStoreReportWithTxMeta]
 	// snoozedRoots used only for temporary snoozing roots. It's a cache with TTL (usually around 5 minutes, but this configuration is set up on chain using rootSnoozeTime)
-	snoozedRoots  *cache.Cache
+	snoozedRoots *cache.Cache
+	// executedRoots is a cache with TTL (usually around 8 hours, but this configuration is set up on chain using messageVisibilityInterval).
+	// We keep executed roots there to make sure we don't accidentally try to reprocess already executed CommitReport
 	executedRoots *cache.Cache
 	// latestFinalizedCommitRootTs is the timestamp of the latest finalized commit root (youngest in terms of timestamp).
 	// It's used get only the logs that were considered as unfinalized in a previous run.
@@ -108,7 +111,6 @@ func (r *commitRootsCache) RootsEligibleForExecution(ctx context.Context) ([]cci
 	// 3. Join finalized commit reports with unfinalized reports and outfilter snoozed roots.
 	// Return only the reports that are not snoozed.
 	return r.pickReadyToExecute(finalizedReports, unfinalizedReports), nil
-
 }
 
 // MarkAsExecuted marks the root as executed. It means that all the messages from the root were executed and the ExecutionStateChange event was finalized.
@@ -136,6 +138,11 @@ func (r *commitRootsCache) isSnoozed(merkleRoot [32]byte) bool {
 	return snoozed
 }
 
+func (r *commitRootsCache) isExecuted(merkleRoot [32]byte) bool {
+	_, executed := r.executedRoots.Get(merkleRootToString(merkleRoot))
+	return executed
+}
+
 func (r *commitRootsCache) fetchLogsFromCommitStore(ctx context.Context) ([]ccip.CommitStoreReportWithTxMeta, error) {
 	r.cacheMu.Lock()
 	messageVisibilityWindow := time.Now().Add(-r.messageVisibilityInterval)
@@ -159,7 +166,7 @@ func (r *commitRootsCache) updateFinalizedRoots(logs []ccip.CommitStoreReportWit
 	for _, log := range logs {
 		prettyMerkleRoot := merkleRootToString(log.MerkleRoot)
 		// Defensive check, if something is marked as executed, never allow it to come back to the cache
-		if _, executed := r.executedRoots.Get(prettyMerkleRoot); executed {
+		if r.isExecuted(log.MerkleRoot) {
 			r.lggr.Debugw("Ignoring root marked as executed", "merkleRoot", prettyMerkleRoot, "blockTimestamp", log.BlockTimestampUnixMilli)
 			continue
 		}
@@ -178,15 +185,24 @@ func (r *commitRootsCache) updateFinalizedRoots(logs []ccip.CommitStoreReportWit
 	}
 
 	var finalizedRoots []ccip.CommitStoreReportWithTxMeta
+	var rootsToDelete []string
+
 	messageVisibilityWindow := time.Now().Add(-r.messageVisibilityInterval)
 	for pair := r.finalizedRoots.Oldest(); pair != nil; pair = pair.Next() {
-		// Evict stale items
+		// Mark items as stale if they are older than the messageVisibilityInterval
+		// SortedMap doesn't allow to iterate and delete, so we mark roots for deletion and remove them in a separate loop
 		if time.UnixMilli(pair.Value.BlockTimestampUnixMilli).Before(messageVisibilityWindow) {
-			r.finalizedRoots.Delete(pair.Key)
+			rootsToDelete = append(rootsToDelete, pair.Key)
 			continue
 		}
 		finalizedRoots = append(finalizedRoots, pair.Value)
 	}
+
+	// Remove stale items
+	for _, root := range rootsToDelete {
+		r.finalizedRoots.Delete(root)
+	}
+
 	return finalizedRoots, unfinalizedReports
 }
 
@@ -195,6 +211,10 @@ func (r *commitRootsCache) pickReadyToExecute(r1 []ccip.CommitStoreReportWithTxM
 	eligibleReports := make([]ccip.CommitStoreReport, 0, len(allReports))
 	for _, report := range allReports {
 		if r.isSnoozed(report.MerkleRoot) {
+			r.lggr.Debugw("Skipping snoozed root",
+				"minSeqNr", report.Interval.Min,
+				"maxSeqNr", report.Interval.Max,
+				"merkleRoot", merkleRootToString(report.MerkleRoot))
 			continue
 		}
 		eligibleReports = append(eligibleReports, report.CommitStoreReport)

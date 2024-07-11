@@ -563,7 +563,6 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 
 			var executedEvents []cciptypes.ExecutionStateChangedWithTxMeta
 			for _, executedSeqNum := range tc.destExecutedSeqNums {
-
 				executedEvents = append(executedEvents, cciptypes.ExecutionStateChangedWithTxMeta{
 					ExecutionStateChanged: cciptypes.ExecutionStateChanged{
 						SequenceNumber: executedSeqNum,

@@ -14,8 +14,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
@@ -348,12 +349,22 @@ func (c *CommitStore) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, 
 		return nil, err
 	}
 
-	logs, err := c.lp.LogsCreatedAfter(
+	reportsQuery, err := query.Where(
+		c.address.String(),
+		logpoller.NewAddressFilter(c.address),
+		logpoller.NewEventSigFilter(c.reportAcceptedSig),
+		query.Timestamp(uint64(ts.Unix()), primitives.Gte),
+		logpoller.NewConfirmationsFilter(evmtypes.Confirmations(confs)),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	logs, err := c.lp.FilteredLogs(
 		ctx,
-		c.reportAcceptedSig,
-		c.address,
-		ts,
-		evmtypes.Confirmations(confs),
+		reportsQuery,
+		query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Asc)),
+		"GetAcceptedCommitReportsGteTimestamp",
 	)
 	if err != nil {
 		return nil, err

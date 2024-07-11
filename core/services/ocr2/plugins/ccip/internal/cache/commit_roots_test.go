@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/stretchr/testify/require"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -194,6 +195,49 @@ func Test_RootsEligibleForExecutionWithReorgs(t *testing.T) {
 	assertRoots(t, roots, root1)
 }
 
+// Not very likely, but let's be more defensive here and verify if cache works properly and can deal with duplicates
+func Test_BlocksWithTheSameTimestamps(t *testing.T) {
+	ctx := testutils.Context(t)
+	chainID := testutils.NewRandomEVMChainID()
+	orm := logpoller.NewORM(chainID, pgtest.NewSqlxDB(t), logger.TestLogger(t))
+	lpOpts := logpoller.Opts{
+		PollPeriod:               time.Hour,
+		FinalityDepth:            2,
+		BackfillBatchSize:        20,
+		RpcBatchSize:             10,
+		KeepFinalizedBlocksDepth: 1000,
+	}
+	lp := logpoller.NewLogPoller(orm, nil, logger.TestLogger(t), nil, lpOpts)
+
+	commitStoreAddr := utils.RandomAddress()
+
+	block1 := time.Now().Add(-1 * time.Hour).Truncate(time.Second)
+	root1 := utils.RandomBytes32()
+	root2 := utils.RandomBytes32()
+
+	inputLogs := []logpoller.Log{
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 2, 1, root1, block1),
+	}
+	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 2, time.Now(), 2)))
+
+	commitStore, err := v1_2_0.NewCommitStore(logger.TestLogger(t), commitStoreAddr, nil, lp)
+	require.NoError(t, err)
+
+	rootsCache := cache.NewCommitRootsCache(logger.TestLogger(t), commitStore, 10*time.Hour, time.Second)
+	roots, err := rootsCache.RootsEligibleForExecution(ctx)
+	require.NoError(t, err)
+	assertRoots(t, roots, root1)
+
+	inputLogs = []logpoller.Log{
+		createReportAcceptedLog(t, chainID, commitStoreAddr, 3, 1, root2, block1),
+	}
+	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 3, time.Now(), 3)))
+
+	roots, err = rootsCache.RootsEligibleForExecution(ctx)
+	require.NoError(t, err)
+	assertRoots(t, roots, root1, root2)
+}
+
 func assertRoots(t *testing.T, roots []cciptypes.CommitStoreReport, root ...[32]byte) {
 	require.Len(t, roots, len(root))
 	for i, r := range root {
@@ -243,7 +287,7 @@ func createReportAcceptedLog(t testing.TB, chainID *big.Int, address common.Addr
 		LogIndex:       logIndex,
 		BlockHash:      utils.RandomBytes32(),
 		BlockNumber:    blockNumber,
-		BlockTimestamp: blockTimestamp,
+		BlockTimestamp: blockTimestamp.Truncate(time.Millisecond),
 		EventSig:       topic0,
 		Address:        address,
 		TxHash:         utils.RandomBytes32(),

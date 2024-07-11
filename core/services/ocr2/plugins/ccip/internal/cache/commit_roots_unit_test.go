@@ -4,11 +4,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -53,6 +54,44 @@ func Test_CacheExpiration(t *testing.T) {
 		require.NoError(t, err)
 		return len(roots) == 1 && roots[0].MerkleRoot == root3
 	}, 5*time.Second, 1*time.Second)
+}
+
+func Test_CacheFullEviction(t *testing.T) {
+	commitStoreReader := mocks.NewCommitStoreReader(t)
+	cache := newCommitRootsCache(logger.TestLogger(t), commitStoreReader, 2*time.Second, 1*time.Second, time.Second, time.Second)
+
+	maxElements := 10000
+	commitRoots := make([]ccip.CommitStoreReportWithTxMeta, maxElements)
+	for i := 0; i < maxElements; i++ {
+		finalized := i >= maxElements/2
+		commitRoots[i] = createCommitStoreEntry(utils.RandomBytes32(), time.Now(), finalized)
+	}
+	mockCommitStoreReader(commitStoreReader, time.Time{}, commitRoots)
+
+	roots, err := cache.RootsEligibleForExecution(tests.Context(t))
+	require.NoError(t, err)
+	require.Len(t, roots, maxElements)
+
+	// Marks some of them as exeucted and some of them as snoozed
+	for i := 0; i < maxElements; i++ {
+		if i%3 == 0 {
+			cache.MarkAsExecuted(commitRoots[i].MerkleRoot)
+		}
+		if i%3 == 1 {
+			cache.Snooze(commitRoots[i].MerkleRoot)
+		}
+	}
+	// Eventually everything should be entirely removed from cache. We need that check to verify if cache doesn't grow indefinitely
+	require.Eventually(t, func() bool {
+		mockCommitStoreReader(commitStoreReader, time.Time{}, []ccip.CommitStoreReportWithTxMeta{})
+		roots1, err1 := cache.RootsEligibleForExecution(tests.Context(t))
+		require.NoError(t, err1)
+
+		return len(roots1) == 0 &&
+			cache.finalizedRoots.Len() == 0 &&
+			len(cache.snoozedRoots.Items()) == 0 &&
+			len(cache.executedRoots.Items()) == 0
+	}, 10*time.Second, time.Second)
 }
 
 func Test_CacheProgression_Internal(t *testing.T) {
