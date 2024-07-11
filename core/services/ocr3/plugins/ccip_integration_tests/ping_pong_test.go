@@ -26,7 +26,7 @@ func TestPingPong(t *testing.T) {
 	pingPongs := initializePingPongContracts(t, universes)
 	for chainID, universe := range universes {
 		for otherChain, pingPong := range pingPongs[chainID] {
-			println("PingPong From: ", chainID, " To: ", otherChain)
+			t.Log("PingPong From: ", chainID, " To: ", otherChain)
 			_, err := pingPong.StartPingPong(universe.owner)
 			require.NoError(t, err)
 			universe.backend.Commit()

@@ -36,8 +36,8 @@ var (
 )
 
 const (
-	CapabilityRegistryLabellableName = "ccip"
-	CapabilityRegistryVersion        = "v1.0.0"
+	CapabilityLabelledName = "ccip"
+	CapabilityVersion      = "v1.0.0"
 )
 
 func e18Mult(amount uint64) *big.Int {
@@ -79,10 +79,10 @@ type chainBase struct {
 
 // createUniverses does the following:
 // 1. Creates 1 home chain and `numChains`-1 non-home chains
-// 2. Deploys the CCIP contracts on the home chain and the non-home chains.
-// 3. Sets up the initial configurations for the contracts on the non-home chains.
+// 2. Sets up home chain with the capability registry and the CCIP config contract
+// 2. Deploys the CCIP contracts to non-home chains.
+// 3. Sets up the initial configurations for the contracts on non-home chains.
 // 4. Wires the chains together.
-
 func createUniverses(
 	t *testing.T,
 	numUniverses int,
@@ -249,8 +249,8 @@ func setupHomeChain(t *testing.T, owner *bind.TransactOpts, backend *backends.Si
 
 	_, err = capabilityRegistry.AddCapabilities(owner, []kcr.CapabilitiesRegistryCapability{
 		{
-			LabelledName:          CapabilityRegistryLabellableName,
-			Version:               CapabilityRegistryVersion,
+			LabelledName:          CapabilityLabelledName,
+			Version:               CapabilityVersion,
 			CapabilityType:        2, // consensus. not used (?)
 			ResponseType:          0, // report. not used (?)
 			ConfigurationContract: ccAddress,
