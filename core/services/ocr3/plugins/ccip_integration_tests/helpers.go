@@ -35,6 +35,11 @@ var (
 	homeChainID = chainsel.GETH_TESTNET.EvmChainID
 )
 
+const (
+	CapabilityRegistryLabellableName = "ccip"
+	CapabilityRegistryVersion        = "v1.0.0"
+)
+
 func e18Mult(amount uint64) *big.Int {
 	return new(big.Int).Mul(uintBigInt(amount), uintBigInt(1e18))
 }
@@ -111,9 +116,6 @@ func createUniverses(
 		//======================================================================
 		//							OnRamp
 		//======================================================================
-		//`withdrawFeeTokens` onRamp function is not part of the message flow
-		// so we can set this to any address
-		feeAggregator := testutils.NewAddress()
 		onRampAddr, _, _, err := evm_2_evm_multi_onramp.DeployEVM2EVMMultiOnRamp(
 			owner,
 			backend,
@@ -128,7 +130,9 @@ func createUniverses(
 			evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDynamicConfig{
 				Router:        rout.Address(),
 				PriceRegistry: priceRegistry.Address(),
-				FeeAggregator: feeAggregator,
+				//`withdrawFeeTokens` onRamp function is not part of the message flow
+				// so we can set this to any address
+				FeeAggregator: testutils.NewAddress(),
 			},
 			// Destination chain configs will be set up later once we have all chains
 			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{},
@@ -229,14 +233,14 @@ func createChains(t *testing.T, numChains int) map[uint64]chainBase {
 
 func setupHomeChain(t *testing.T, owner *bind.TransactOpts, backend *backends.SimulatedBackend) homeChain {
 	// deploy the capability registry on the home chain
-	addr, _, _, err := kcr.DeployCapabilitiesRegistry(owner, backend)
+	crAddress, _, _, err := kcr.DeployCapabilitiesRegistry(owner, backend)
 	require.NoError(t, err, "failed to deploy capability registry on home chain")
 	backend.Commit()
 
-	capabilityRegistry, err := kcr.NewCapabilitiesRegistry(addr, backend)
+	capabilityRegistry, err := kcr.NewCapabilitiesRegistry(crAddress, backend)
 	require.NoError(t, err)
 
-	ccAddress, _, _, err := ccip_config.DeployCCIPConfig(owner, backend, addr)
+	ccAddress, _, _, err := ccip_config.DeployCCIPConfig(owner, backend, crAddress)
 	require.NoError(t, err)
 	backend.Commit()
 
@@ -245,8 +249,8 @@ func setupHomeChain(t *testing.T, owner *bind.TransactOpts, backend *backends.Si
 
 	_, err = capabilityRegistry.AddCapabilities(owner, []kcr.CapabilitiesRegistryCapability{
 		{
-			LabelledName:          "ccip",
-			Version:               "v1.0.0",
+			LabelledName:          CapabilityRegistryLabellableName,
+			Version:               CapabilityRegistryVersion,
 			CapabilityType:        2, // consensus. not used (?)
 			ResponseType:          0, // report. not used (?)
 			ConfigurationContract: ccAddress,
