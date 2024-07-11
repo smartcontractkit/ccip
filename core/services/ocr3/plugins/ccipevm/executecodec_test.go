@@ -1,7 +1,6 @@
 package ccipevm
 
 import (
-	rand2 "crypto/rand"
 	"math/rand"
 	"testing"
 
@@ -54,16 +53,6 @@ var randomExecuteReport = func(t *testing.T) cciptypes.ExecutePluginReport {
 		}
 
 		tokenData := make([][][]byte, numTokensPerMsg)
-		for j := 0; j < msgsPerReport; j++ {
-			tokenData[j] = make([][]byte, numTokensPerMsg)
-			for z := 0; z < numTokensPerMsg; z++ {
-				tokenData[z] = make([][]byte, 32)
-				for k := 0; k < 32; k++ {
-					_, err := rand2.Read(tokenData[z][k])
-					assert.NoError(t, err)
-				}
-			}
-		}
 
 		chainReports[i] = cciptypes.ExecutePluginReportSingleChain{
 			SourceChainSelector: cciptypes.ChainSelector(rand.Uint64()),

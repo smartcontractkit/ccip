@@ -95,8 +95,76 @@ func (e *ExecutePluginCodecV1) Encode(ctx context.Context, report cciptypes.Exec
 	return e.executeReportEventInputs.PackValues([]interface{}{&evmReport})
 }
 
-func (e *ExecutePluginCodecV1) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecutePluginReport, error) {
-	panic("implement me")
+func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte) (cciptypes.ExecutePluginReport, error) {
+	unpacked, err := e.executeReportEventInputs.Unpack(encodedReport)
+	if err != nil {
+		return cciptypes.ExecutePluginReport{}, fmt.Errorf("unpack encoded report: %w", err)
+	}
+	if len(unpacked) != 1 {
+		return cciptypes.ExecutePluginReport{}, fmt.Errorf("unpacked report is empty")
+	}
+
+	evmReportRaw := abi.ConvertType(unpacked[0], []evm_2_evm_multi_offramp.InternalExecutionReportSingleChain{})
+	evmReport, is := evmReportRaw.([]evm_2_evm_multi_offramp.InternalExecutionReportSingleChain)
+	if !is {
+		return cciptypes.ExecutePluginReport{}, fmt.Errorf("got an unexpected report type %T", unpacked[0])
+	}
+
+	executeReport := cciptypes.ExecutePluginReport{
+		ChainReports: make([]cciptypes.ExecutePluginReportSingleChain, 0, len(evmReport)),
+	}
+
+	for _, evmChainReport := range evmReport {
+		proofs := make([]cciptypes.Bytes32, 0, len(evmChainReport.Proofs))
+		for _, proof := range evmChainReport.Proofs {
+			proofs = append(proofs, proof)
+		}
+
+		messages := make([]cciptypes.Message, 0, len(evmChainReport.Messages))
+		for _, evmMessage := range evmChainReport.Messages {
+			tokenAmounts := make([]cciptypes.RampTokenAmount, 0, len(evmMessage.TokenAmounts))
+			for _, tokenAmount := range evmMessage.TokenAmounts {
+				tokenAmounts = append(tokenAmounts, cciptypes.RampTokenAmount{
+					SourcePoolAddress: tokenAmount.SourcePoolAddress,
+					DestTokenAddress:  tokenAmount.DestTokenAddress,
+					ExtraData:         tokenAmount.ExtraData,
+					Amount:            cciptypes.NewBigInt(tokenAmount.Amount),
+				})
+			}
+
+			message := cciptypes.Message{
+				Header: cciptypes.RampMessageHeader{
+					MessageID:           evmMessage.Header.MessageId,
+					SourceChainSelector: cciptypes.ChainSelector(evmMessage.Header.SourceChainSelector),
+					DestChainSelector:   cciptypes.ChainSelector(evmMessage.Header.DestChainSelector),
+					SequenceNumber:      cciptypes.SeqNum(evmMessage.Header.SequenceNumber),
+					Nonce:               evmMessage.Header.Nonce,
+					MsgHash:             cciptypes.Bytes32{}, // <-- todo
+					OnRamp:              cciptypes.Bytes{},   // <-- todo
+				},
+				Sender:         evmMessage.Sender,
+				Data:           evmMessage.Data,
+				Receiver:       evmMessage.Receiver.Bytes(),
+				ExtraArgs:      cciptypes.Bytes{},  // <-- todo
+				FeeToken:       cciptypes.Bytes{},  // <-- todo
+				FeeTokenAmount: cciptypes.BigInt{}, // <-- todo
+				TokenAmounts:   tokenAmounts,
+			}
+			messages = append(messages, message)
+		}
+
+		chainReport := cciptypes.ExecutePluginReportSingleChain{
+			SourceChainSelector: cciptypes.ChainSelector(evmChainReport.SourceChainSelector),
+			Messages:            messages,
+			OffchainTokenData:   evmChainReport.OffchainTokenData,
+			Proofs:              proofs,
+			ProofFlagBits:       cciptypes.NewBigInt(evmChainReport.ProofFlagBits),
+		}
+
+		executeReport.ChainReports = append(executeReport.ChainReports, chainReport)
+	}
+
+	return executeReport, nil
 }
 
 // Ensure ExecutePluginCodec implements the ExecutePluginCodec interface
