@@ -472,6 +472,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     try this.executeSingleMessage(message, offchainTokenData) {}
     catch (bytes memory err) {
       // return the message execution state as FAILURE and the revert data
+      // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES
       return (Internal.MessageExecutionState.FAILURE, err);
     }
     // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
