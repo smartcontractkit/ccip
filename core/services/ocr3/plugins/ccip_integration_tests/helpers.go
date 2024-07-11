@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 
@@ -71,81 +72,17 @@ type chainBase struct {
 	owner   *bind.TransactOpts
 }
 
-func createChains(t *testing.T, numChains int) map[uint64]chainBase {
-	chains := make(map[uint64]chainBase)
+// createUniverses does the following:
+// 1. Creates 1 home chain and `numChains`-1 non-home chains
+// 2. Deploys the CCIP contracts on the home chain and the non-home chains.
+// 3. Sets up the initial configurations for the contracts on the non-home chains.
+// 4. Wires the chains together.
 
-	homeChainOwner := testutils.MustNewSimTransactor(t)
-	chains[homeChainID] = chainBase{
-		owner: homeChainOwner,
-		backend: backends.NewSimulatedBackend(core.GenesisAlloc{
-			homeChainOwner.From: core.GenesisAccount{
-				Balance: assets.Ether(10_000).ToInt(),
-			},
-		}, 30e6),
-	}
-
-	for chainID := chainsel.TEST_90000001.EvmChainID; len(chains) < numChains && chainID < chainsel.TEST_90000020.EvmChainID; chainID++ {
-		owner := testutils.MustNewSimTransactor(t)
-		chains[chainID] = chainBase{
-			owner: owner,
-			backend: backends.NewSimulatedBackend(core.GenesisAlloc{
-				owner.From: core.GenesisAccount{
-					Balance: assets.Ether(10_000).ToInt(),
-				},
-			}, 30e6),
-		}
-	}
-
-	return chains
-}
-
-func setupHomeChain(t *testing.T, owner *bind.TransactOpts, backend *backends.SimulatedBackend) homeChain {
-	// deploy the capability registry on the home chain
-	addr, _, _, err := kcr.DeployCapabilitiesRegistry(owner, backend)
-	require.NoError(t, err, "failed to deploy capability registry on home chain")
-	backend.Commit()
-
-	capabilityRegistry, err := kcr.NewCapabilitiesRegistry(addr, backend)
-	require.NoError(t, err)
-
-	ccAddress, _, _, err := ccip_config.DeployCCIPConfig(owner, backend, addr)
-	require.NoError(t, err)
-	backend.Commit()
-
-	capabilityConfig, err := ccip_config.NewCCIPConfig(ccAddress, backend)
-	require.NoError(t, err)
-
-	_, err = capabilityRegistry.AddCapabilities(owner, []kcr.CapabilitiesRegistryCapability{
-		{
-			LabelledName:          "ccip",
-			Version:               "v1.0.0",
-			CapabilityType:        2, // consensus. not used (?)
-			ResponseType:          0, // report. not used (?)
-			ConfigurationContract: ccAddress,
-		},
-	})
-	require.NoError(t, err, "failed to add capabilities to the capability registry")
-	backend.Commit()
-
-	return homeChain{
-		backend:            backend,
-		owner:              owner,
-		chainID:            homeChainID,
-		capabilityRegistry: capabilityRegistry,
-		ccipConfigContract: capabilityConfig.Address(),
-	}
-
-}
-
-// setupUniverses does the following:
-// 1. deploys the CCIP contracts on the home chain and the non-home chains.
-// 2. sets up the initial configurations for the contracts on the non-home chains.
-// 3. wires the chains together.
-func setupUniverses(
+func createUniverses(
 	t *testing.T,
-	chains map[uint64]chainBase,
+	numUniverses int,
 ) (homeChainUni homeChain, universes map[uint64]onchainUniverse) {
-	require.Len(t, chains, 4, "must have 4 chains total, 1 home chain and 3 non-home-chains")
+	chains := createChains(t, numUniverses)
 
 	homeChainBase, ok := chains[homeChainID]
 	require.True(t, ok, "home chain backend not available")
@@ -261,6 +198,72 @@ func setupUniverses(
 	return homeChainUniverse, universes
 }
 
+// Creates 1 home chain and `numChains`-1 non-home chains
+func createChains(t *testing.T, numChains int) map[uint64]chainBase {
+	chains := make(map[uint64]chainBase)
+
+	homeChainOwner := testutils.MustNewSimTransactor(t)
+	chains[homeChainID] = chainBase{
+		owner: homeChainOwner,
+		backend: backends.NewSimulatedBackend(core.GenesisAlloc{
+			homeChainOwner.From: core.GenesisAccount{
+				Balance: assets.Ether(10_000).ToInt(),
+			},
+		}, 30e6),
+	}
+
+	for chainID := chainsel.TEST_90000001.EvmChainID; len(chains) < numChains && chainID < chainsel.TEST_90000020.EvmChainID; chainID++ {
+		owner := testutils.MustNewSimTransactor(t)
+		chains[chainID] = chainBase{
+			owner: owner,
+			backend: backends.NewSimulatedBackend(core.GenesisAlloc{
+				owner.From: core.GenesisAccount{
+					Balance: assets.Ether(10_000).ToInt(),
+				},
+			}, 30e6),
+		}
+	}
+
+	return chains
+}
+
+func setupHomeChain(t *testing.T, owner *bind.TransactOpts, backend *backends.SimulatedBackend) homeChain {
+	// deploy the capability registry on the home chain
+	addr, _, _, err := kcr.DeployCapabilitiesRegistry(owner, backend)
+	require.NoError(t, err, "failed to deploy capability registry on home chain")
+	backend.Commit()
+
+	capabilityRegistry, err := kcr.NewCapabilitiesRegistry(addr, backend)
+	require.NoError(t, err)
+
+	ccAddress, _, _, err := ccip_config.DeployCCIPConfig(owner, backend, addr)
+	require.NoError(t, err)
+	backend.Commit()
+
+	capabilityConfig, err := ccip_config.NewCCIPConfig(ccAddress, backend)
+	require.NoError(t, err)
+
+	_, err = capabilityRegistry.AddCapabilities(owner, []kcr.CapabilitiesRegistryCapability{
+		{
+			LabelledName:          "ccip",
+			Version:               "v1.0.0",
+			CapabilityType:        2, // consensus. not used (?)
+			ResponseType:          0, // report. not used (?)
+			ConfigurationContract: ccAddress,
+		},
+	})
+	require.NoError(t, err, "failed to add capabilities to the capability registry")
+	backend.Commit()
+
+	return homeChain{
+		backend:            backend,
+		owner:              owner,
+		chainID:            homeChainID,
+		capabilityRegistry: capabilityRegistry,
+		ccipConfigContract: capabilityConfig.Address(),
+	}
+}
+
 func connectUniverses(
 	t *testing.T,
 	universes map[uint64]onchainUniverse,
@@ -338,7 +341,7 @@ func wireRouter(t *testing.T, uni onchainUniverse, universes map[uint64]onchainU
 		routerOnrampUpdates  []router.RouterOnRamp
 		routerOfframpUpdates []router.RouterOffRamp
 	)
-	for remoteChainID, _ := range universes {
+	for remoteChainID := range universes {
 		if remoteChainID == uni.chainID {
 			continue
 		}
@@ -360,7 +363,7 @@ func wireRouter(t *testing.T, uni onchainUniverse, universes map[uint64]onchainU
 func wireOnRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchainUniverse) {
 	owner := uni.owner
 	var onrampDestChainConfigArgs []evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs
-	for remoteChainID, _ := range universes {
+	for remoteChainID := range universes {
 		if remoteChainID == uni.chainID {
 			continue
 		}
@@ -396,7 +399,7 @@ func wireOffRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchain
 // initRemoteChainsGasPrices sets the gas prices for all chains except the local chain in the local price registry
 func initRemoteChainsGasPrices(t *testing.T, uni onchainUniverse, universes map[uint64]onchainUniverse) {
 	var gasPriceUpdates []price_registry.InternalGasPriceUpdate
-	for remoteChainID, _ := range universes {
+	for remoteChainID := range universes {
 		if remoteChainID == uni.chainID {
 			continue
 		}
