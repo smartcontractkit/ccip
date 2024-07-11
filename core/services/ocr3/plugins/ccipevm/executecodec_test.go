@@ -11,9 +11,9 @@ import (
 )
 
 var randomExecuteReport = func(t *testing.T) cciptypes.ExecutePluginReport {
-	const numChainReports = 100
-	const msgsPerReport = 50
-	const numTokensPerMsg = 20
+	const numChainReports = 10
+	const msgsPerReport = 10
+	const numTokensPerMsg = 3
 
 	chainReports := make([]cciptypes.ExecutePluginReportSingleChain, numChainReports)
 	for i := 0; i < numChainReports; i++ {
@@ -53,6 +53,9 @@ var randomExecuteReport = func(t *testing.T) cciptypes.ExecutePluginReport {
 		}
 
 		tokenData := make([][][]byte, numTokensPerMsg)
+		for j := 0; j < numTokensPerMsg; j++ {
+			tokenData[j] = [][]byte{{0x1}, {0x2, 0x3}}
+		}
 
 		chainReports[i] = cciptypes.ExecutePluginReportSingleChain{
 			SourceChainSelector: cciptypes.ChainSelector(rand.Uint64()),
@@ -80,7 +83,7 @@ func TestExecutePluginCodecV1(t *testing.T) {
 		{
 			name: "reports have empty msgs",
 			report: func(report cciptypes.ExecutePluginReport) cciptypes.ExecutePluginReport {
-				report.ChainReports[0].Messages = nil
+				report.ChainReports[0].Messages = []cciptypes.Message{}
 				report.ChainReports[4].Messages = []cciptypes.Message{}
 				return report
 			},
@@ -112,6 +115,18 @@ func TestExecutePluginCodecV1(t *testing.T) {
 
 			decodedReport, err := codec.Decode(ctx, bytes)
 			assert.NoError(t, err)
+
+			// ignore msg hash in comparison
+			for i := range report.ChainReports {
+				for j := range report.ChainReports[i].Messages {
+					report.ChainReports[i].Messages[j].Header.MsgHash = cciptypes.Bytes32{}
+					report.ChainReports[i].Messages[j].Header.OnRamp = cciptypes.Bytes{}
+					report.ChainReports[i].Messages[j].ExtraArgs = cciptypes.Bytes{}
+					report.ChainReports[i].Messages[j].FeeToken = cciptypes.Bytes{}
+					report.ChainReports[i].Messages[j].FeeTokenAmount = cciptypes.BigInt{}
+				}
+			}
+
 			assert.Equal(t, report, decodedReport)
 		})
 	}

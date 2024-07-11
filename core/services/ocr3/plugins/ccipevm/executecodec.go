@@ -104,12 +104,16 @@ func (e *ExecutePluginCodecV1) Decode(ctx context.Context, encodedReport []byte)
 		return cciptypes.ExecutePluginReport{}, fmt.Errorf("unpacked report is empty")
 	}
 
-	evmReportRaw := abi.ConvertType(unpacked[0], []evm_2_evm_multi_offramp.InternalExecutionReportSingleChain{})
-	evmReport, is := evmReportRaw.([]evm_2_evm_multi_offramp.InternalExecutionReportSingleChain)
+	evmReportRaw := abi.ConvertType(unpacked[0], new([]evm_2_evm_multi_offramp.InternalExecutionReportSingleChain))
+	evmReportPtr, is := evmReportRaw.(*[]evm_2_evm_multi_offramp.InternalExecutionReportSingleChain)
 	if !is {
 		return cciptypes.ExecutePluginReport{}, fmt.Errorf("got an unexpected report type %T", unpacked[0])
 	}
+	if evmReportPtr == nil {
+		return cciptypes.ExecutePluginReport{}, fmt.Errorf("evm report is nil")
+	}
 
+	evmReport := *evmReportPtr
 	executeReport := cciptypes.ExecutePluginReport{
 		ChainReports: make([]cciptypes.ExecutePluginReportSingleChain, 0, len(evmReport)),
 	}
