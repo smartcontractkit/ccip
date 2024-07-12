@@ -364,9 +364,15 @@ func (c *ChainlinkDeployment) LoadFromEnv() error {
 	if c.Common == nil {
 		c.Common = &Node{}
 	}
+	if c.Common.ChainlinkImage == nil {
+		c.Common.ChainlinkImage = &ctfconfig.ChainlinkImageConfig{}
+	}
 	err := c.Common.ChainlinkImage.LoadFromEnv("E2E_TEST_CHAINLINK_IMAGE")
 	if err != nil {
 		return err
+	}
+	if c.Common.ChainlinkUpgradeImage == nil {
+		c.Common.ChainlinkUpgradeImage = &ctfconfig.ChainlinkImageConfig{}
 	}
 	err = c.Common.ChainlinkUpgradeImage.LoadFromEnv("E2E_TEST_CHAINLINK_UPGRADE_IMAGE")
 	if err != nil {
