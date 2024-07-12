@@ -4,10 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink/v2/common/txmgr"
+
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
+)
+
+var (
+	offrampABI = evmtypes.MustGetABI(evm_2_evm_multi_offramp.EVM2EVMMultiOffRampABI)
 )
 
 func MustChainWriterConfig(fromAddress common.Address) []byte {
@@ -24,17 +32,17 @@ func MustChainWriterConfig(fromAddress common.Address) []byte {
 func ChainWriterConfigRaw(fromAddress common.Address) evmrelaytypes.ChainWriterConfig {
 	return evmrelaytypes.ChainWriterConfig{
 		Contracts: map[string]*evmrelaytypes.ContractConfig{
-			"offRamp": {
+			consts.ContractNameOffRamp: {
 				ContractABI: evm_2_evm_multi_offramp.EVM2EVMMultiOffRampABI,
 				Configs: map[string]*evmrelaytypes.ChainWriterDefinition{
-					"commit": {
-						ChainSpecificName: "commit",
+					consts.MethodCommit: {
+						ChainSpecificName: mustGetMethodName("commit", offrampABI),
 						FromAddress:       fromAddress,
 						// TODO: probably need to fetch this from home chain config?
 						GasLimit: 500_000,
 					},
-					"execute": {
-						ChainSpecificName: "execute",
+					consts.MethodExecute: {
+						ChainSpecificName: mustGetMethodName("execute", offrampABI),
 						FromAddress:       fromAddress,
 						// TODO: probably need to fetch this from home chain config?
 						GasLimit: 6_500_000,
@@ -44,4 +52,12 @@ func ChainWriterConfigRaw(fromAddress common.Address) evmrelaytypes.ChainWriterC
 		},
 		SendStrategy: txmgr.NewSendEveryStrategy(),
 	}
+}
+
+func mustGetMethodName(name string, tabi abi.ABI) (methodName string) {
+	m, ok := tabi.Methods[name]
+	if !ok {
+		panic(fmt.Sprintf("missing method %s in offrampABI", name))
+	}
+	return m.Name
 }

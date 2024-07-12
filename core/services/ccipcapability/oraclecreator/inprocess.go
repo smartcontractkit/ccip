@@ -221,6 +221,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	}
 
 	var factory ocr3types.ReportingPluginFactory[[]byte]
+	var transmitter ocr3types.ContractTransmitter[[]byte]
 	if config.Config.PluginType == uint8(cctypes.PluginTypeCCIPCommit) {
 		factory = commitocr3.NewPluginFactory(
 			i.lggr.
@@ -233,6 +234,10 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			i.homeChainReader,
 			contractReaders,
 			chainWriters,
+		)
+		transmitter = ocrimpls.NewCommitContractTransmitter(destChainWriter,
+			ocrtypes.Account(destFromAccount[0]),
+			hexutil.Encode(config.Config.OfframpAddress), // TODO: this works for evm only, how about non-evm?
 		)
 	} else if config.Config.PluginType == uint8(cctypes.PluginTypeCCIPExec) {
 		factory = execocr3.NewPluginFactory(
@@ -247,6 +252,10 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			contractReaders,
 			chainWriters,
 		)
+		transmitter = ocrimpls.NewExecContractTransmitter(destChainWriter,
+			ocrtypes.Account(destFromAccount[0]),
+			hexutil.Encode(config.Config.OfframpAddress), // TODO: this works for evm only, how about non-evm?
+		)
 	} else {
 		return nil, fmt.Errorf("unsupported plugin type %d", config.Config.PluginType)
 	}
@@ -256,8 +265,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 		Database:                     i.db,
 		V2Bootstrappers:              i.bootstrapperLocators,
 		ContractConfigTracker:        ocrimpls.NewConfigTracker(config),
-		ContractTransmitter: ocrimpls.NewContractTransmitter(destChainWriter,
-			ocrtypes.Account(destFromAccount[0])),
+		ContractTransmitter:          transmitter,
 		LocalConfig: ocrtypes.LocalConfig{
 			BlockchainTimeout: 10 * time.Second,
 			// Config tracking is handled by the launcher, since we're doing blue-green

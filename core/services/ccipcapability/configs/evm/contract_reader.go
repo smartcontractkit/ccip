@@ -4,16 +4,34 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
 	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
-// MustSourceReaderConfig returns a ChainReaderConfig that can be used to read from the CCIP contracts
-// on both the source and destination chains. The configuration is marshaled into JSON so that it can be passed
-// to the relayer NewContractReader() method.
+var (
+	onrampABI = evmtypes.MustGetABI(evm_2_evm_multi_onramp.EVM2EVMMultiOnRampABI)
+)
+
+// MustSourceReaderConfig returns a ChainReaderConfig that can be used to read from the onramp.
+// The configuration is marshaled into JSON so that it can be passed to the relayer NewContractReader() method.
 func MustSourceReaderConfig() []byte {
 	rawConfig := SourceReaderConfig()
+	encoded, err := json.Marshal(rawConfig)
+	if err != nil {
+		panic(fmt.Errorf("failed to marshal ChainReaderConfig into JSON: %w", err))
+	}
+
+	return encoded
+}
+
+// MustDestReaderConfig returns a ChainReaderConfig that can be used to read from the offramp.
+// The configuration is marshaled into JSON so that it can be passed to the relayer NewContractReader() method.
+func MustDestReaderConfig() []byte {
+	rawConfig := DestReaderConfig()
 	encoded, err := json.Marshal(rawConfig)
 	if err != nil {
 		panic(fmt.Errorf("failed to marshal ChainReaderConfig into JSON: %w", err))
@@ -26,41 +44,41 @@ func MustSourceReaderConfig() []byte {
 func DestReaderConfig() evmrelaytypes.ChainReaderConfig {
 	return evmrelaytypes.ChainReaderConfig{
 		Contracts: map[string]evmrelaytypes.ChainContractReader{
-			"offRamp": {
+			consts.ContractNameOffRamp: {
 				ContractABI: evm_2_evm_multi_offramp.EVM2EVMMultiOffRampABI,
 				ContractPollingFilter: evmrelaytypes.ContractPollingFilter{
 					GenericEventNames: []string{
-						"ExecutionStateChanged",
-						"CommitReportAccepted",
+						mustGetEventName(consts.EventNameExecutionStateChanged, offrampABI),
+						mustGetEventName(consts.EventNameCommitReportAccepted, offrampABI),
 					},
 				},
 				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
-					"getExecutionState": {
-						ChainSpecificName: "getExecutionState",
+					consts.MethodNameGetExecutionState: {
+						ChainSpecificName: mustGetMethodName("getExecutionState", offrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
-					"getMerkleRoot": {
-						ChainSpecificName: "getMerkleRoot",
+					consts.MethodNameGetMerkleRoot: {
+						ChainSpecificName: mustGetMethodName("getMerkleRoot", offrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
-					"isBlessed": {
-						ChainSpecificName: "isBlessed",
+					consts.MethodNameIsBlessed: {
+						ChainSpecificName: mustGetMethodName("isBlessed", offrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
-					"getLatestPriceSequenceNumber": {
-						ChainSpecificName: "getLatestPriceSequenceNumber",
+					consts.MethodNameGetLatestPriceSequenceNumber: {
+						ChainSpecificName: mustGetMethodName("getLatestPriceSequenceNumber", offrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
-					"getStaticConfig": {
-						ChainSpecificName: "getStaticConfig",
+					consts.MethodNameOfframpGetStaticConfig: {
+						ChainSpecificName: mustGetMethodName("getStaticConfig", offrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
-					"getDynamicConfig": {
-						ChainSpecificName: "getDynamicConfig",
+					consts.MethodNameOfframpGetDynamicConfig: {
+						ChainSpecificName: mustGetMethodName("getDynamicConfig", offrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
-					"getSourceChainConfig": {
-						ChainSpecificName: "getSourceChainConfig",
+					consts.MethodNameGetSourceChainConfig: {
+						ChainSpecificName: mustGetMethodName("getSourceChainConfig", offrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
 				},
@@ -73,42 +91,50 @@ func DestReaderConfig() evmrelaytypes.ChainReaderConfig {
 func SourceReaderConfig() evmrelaytypes.ChainReaderConfig {
 	return evmrelaytypes.ChainReaderConfig{
 		Contracts: map[string]evmrelaytypes.ChainContractReader{
-			"onRamp": {
+			consts.ContractNameOnRamp: {
 				ContractABI: evm_2_evm_multi_onramp.EVM2EVMMultiOnRampABI,
 				ContractPollingFilter: evmrelaytypes.ContractPollingFilter{
 					GenericEventNames: []string{
-						"CCIPSendRequested",
+						mustGetEventName(consts.EventNameCCIPSendRequested, onrampABI),
 					},
 				},
 				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
 					// all "{external|public} view" functions in the onramp except for getFee and getPoolBySourceToken are here.
 					// getFee is not expected to get called offchain and is only called by end-user contracts.
-					"getExpectedNextSequenceNumber": {
-						ChainSpecificName: "getExpectedNextSequenceNumber",
+					consts.MethodNameGetExpectedNextSequenceNumber: {
+						ChainSpecificName: mustGetMethodName("getExpectedNextSequenceNumber", onrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
-					"getStaticConfig": {
-						ChainSpecificName: "getStaticConfig",
+					consts.MethodNameOnrampGetStaticConfig: {
+						ChainSpecificName: mustGetMethodName("getStaticConfig", onrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
-					"getDynamicConfig": {
-						ChainSpecificName: "getDynamicConfig",
+					consts.MethodNameOnrampGetDynamicConfig: {
+						ChainSpecificName: mustGetMethodName("getDynamicConfig", onrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
-					"getDestChainConfig": {
-						ChainSpecificName: "getDestChainConfig",
+					consts.MethodNameGetDestChainConfig: {
+						ChainSpecificName: mustGetMethodName("getDestChainConfig", onrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
-					"getPremiumMultiplierWeiPerEth": {
-						ChainSpecificName: "getPremiumMultiplierWeiPerEth",
+					consts.MethodNameGetPremiumMultiplierWeiPerEth: {
+						ChainSpecificName: mustGetMethodName("getPremiumMultiplierWeiPerEth", onrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
-					"getTokenTransferFeeConfig": {
-						ChainSpecificName: "getTokenTransferFeeConfig",
+					consts.MethodNameGetTokenTransferFeeConfig: {
+						ChainSpecificName: mustGetMethodName("getTokenTransferFeeConfig", onrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
 				},
 			},
 		},
 	}
+}
+
+func mustGetEventName(event string, tabi abi.ABI) string {
+	e, ok := tabi.Events[event]
+	if !ok {
+		panic(fmt.Sprintf("missing event %s in onrampABI", event))
+	}
+	return e.Name
 }
