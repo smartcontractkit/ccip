@@ -934,6 +934,7 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates() {
 // events as per leader lane definitions.
 func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) error {
 	transactions := make(map[string]map[uint64]actions.GasUpdateEvent)
+	transactionsBySource := make(map[string]string)
 	destToSourcesList := make(map[string][]string)
 	for _, n := range o.Cfg.NetworkPairs {
 		if _, ok := destToSourcesList[n.NetworkB.Name]; ok {
@@ -950,7 +951,7 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) e
 		}
 	}
 	lggr.Info().Interface("list", destToSourcesList).Msg("Dest to Source")
-	readGasUpdateTx := func(lane *actions.CCIPLane) error {
+	filterGasUpdateByTx := func(lane *actions.CCIPLane) error {
 		for _, g := range lane.Source.Common.GasUpdateEvents {
 			if g.Value == nil {
 				return fmt.Errorf("gas update value should not be nil in tx %s", g.Tx)
@@ -976,20 +977,32 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) e
 	}
 
 	for _, lanes := range o.ReadLanes() {
-		if err := readGasUpdateTx(lanes.ForwardLane); err != nil {
+		if err := filterGasUpdateByTx(lanes.ForwardLane); err != nil {
 			return err
 		}
 		if lanes.ReverseLane != nil {
-			if err := readGasUpdateTx(lanes.ReverseLane); err != nil {
+			if err := filterGasUpdateByTx(lanes.ReverseLane); err != nil {
 				return err
 			}
 		}
 	}
+
+	// filter the transaction hashes by source as there may be more than one transaction from the same source
+	// this could more likely happen in load test
+	for key, transactionDetails := range transactions {
+		for _, event := range transactionDetails {
+			if _, ok := transactionsBySource[event.Source]; !ok {
+				transactionsBySource[event.Source] = key
+			}
+		}
+	}
 	lggr.Info().Interface("Tx hashes", transactions).Msg("Checked Gas Update Transactions")
+	lggr.Info().Interface("Tx hashes by source", transactionsBySource).Msg("Checked Gas Update Transactions by Source")
 	// when leader lane setup is enabled, number of transaction should match the number of leader lanes defined.
-	if len(transactions) != len(o.Cfg.LeaderLanes) {
+	if len(transactionsBySource) != len(o.Cfg.LeaderLanes) {
 		lggr.Warn().
 			Int("Tx hashes", len(transactions)).
+			Int("Tx hashes", len(transactionsBySource)).
 			Int("Leader lanes count", len(o.Cfg.LeaderLanes)).
 			Msg("Checked Gas Update transactions count doesn't match")
 		//return fmt.Errorf("transaction count %d should match the number of leader lanes %d",
@@ -997,46 +1010,33 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) e
 	} else {
 		lggr.Info().
 			Int("Tx hashes", len(transactions)).
+			Int("Tx hashes", len(transactionsBySource)).
 			Int("Leader lanes count", len(o.Cfg.LeaderLanes)).
 			Msg("Checked Gas Update transactions count matches")
 	}
 	// each transaction should have number of network - 1 chain selectors and corresponding gas values.
 	// Say we have 3 networks, then we have expected every transaction to have 2 chain selectors
-	//failed := false
-	for k, chainsReceivesPriceUpdate := range transactions {
-		var (
-			priceReceivedFromChain string
-			sender                 string
-		)
-		for _, chain := range chainsReceivesPriceUpdate {
-			priceReceivedFromChain = chain.Source
-			sender = chain.Sender
-			break
+	for source, tx := range transactionsBySource {
+		l, ok := destToSourcesList[source]
+		if !ok {
+			lggr.Warn().Str("Tx hash", tx).Msg("this transaction is probably from non-leader lane which is not expected")
 		}
-		if len(chainsReceivesPriceUpdate) != len(destToSourcesList[priceReceivedFromChain]) {
+		if len(transactions[tx]) != len(l) {
 			lggr.Warn().
-				Str("Tx hash", k).
-				Str("Source", priceReceivedFromChain).
-				Str("Sender", sender).
-				Int("Expected event count", len(destToSourcesList[priceReceivedFromChain])).
-				Int("Event emitted count", len(chainsReceivesPriceUpdate)).
+				Str("Tx hash", tx).
+				Str("Source", source).
+				Int("Expected event count", len(l)).
+				Int("Event emitted count", len(transactions[tx])).
 				Msg("Checked Gas Update transaction events count doesn't match")
-			//failed = true
-
 		} else {
 			lggr.Info().
-				Str("Tx hash", k).
-				Str("Source", priceReceivedFromChain).
-				Str("Sender", sender).
-				Int("Expected event count", len(destToSourcesList[priceReceivedFromChain])).
-				Int("Event emitted count", len(chainsReceivesPriceUpdate)).
+				Str("Tx hash", tx).
+				Str("Source", source).
+				Int("Expected event count", len(l)).
+				Int("Event emitted count", len(transactions[tx])).
 				Msg("Checked Gas Update transaction events count")
 		}
 	}
-	//if failed {
-	//	return fmt.Errorf("number of chain selector count should match the number of " +
-	//		"networks minus one ")
-	//}
 	return nil
 }
 
