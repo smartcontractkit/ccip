@@ -183,7 +183,7 @@ func (s *SrcExecProvider) NewOnRampReader(ctx context.Context, onRampAddress cci
 	versionFinder := ccip.NewEvmVersionFinder()
 	onRampReader, err = ccip.NewOnRampReader(s.lggr, versionFinder, sourceChainSelector, destChainSelector, onRampAddress, s.lp, s.client)
 	if err != nil {
-
+		return nil, err
 	}
 	err = s.feeEstimatorConfig.SetOnRampReader(onRampReader)
 	if err != nil {
