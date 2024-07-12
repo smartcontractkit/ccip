@@ -13,6 +13,8 @@ inputs:
     description: The networks to run tests against
   chainlinkVersion:
     description: The git commit sha to use for the image tag
+  upgradeVersion:
+    description: The git commit sha to use for the image tag    
   logstreamLogTargets:
     description: Where to send logs (e.g. file, loki)
   customEvmNodes:
@@ -20,18 +22,24 @@ inputs:
   evmNodeLogLevel:
     description: Log level for the custom EVM nodes
     default: "info"
+outputs:
+  base64_config:
+    description: The base64-encoded config
+    value: ${{ steps.base64_config_override.outputs.base64_config }}
 
 runs:
   using: composite
   steps:
     - name: Prepare Base64 TOML override
       shell: bash
-      id: base64-config-override
+      id: base64_config_override
       env:
         RUN_ID: ${{ inputs.runId }}
         SELECTED_NETWORKS: ${{ inputs.selectedNetworks }}
         EXISTING_NAMESPACE: ${{ inputs.existingNamespace }}
         TEST_LOG_COLLECT: ${{ inputs.testLogCollect }}
+        CHAINLINK_VERSION: ${{ inputs.chainlinkVersion }}
+        UPGRADE_VERSION: ${{ inputs.upgradeVersion }}
         LOGSTREAM_LOG_TARGETS: ${{ inputs.logstreamLogTargets }}
         CUSTOM_EVM_NODES: ${{ inputs.customEvmNodes }}
         EVM_NODE_LOG_LEVEL: ${{ inputs.evmNodeLogLevel }}
@@ -108,6 +116,10 @@ runs:
         EnvToConnect="$EXISTING_NAMESPACE"
         [CCIP.Env.Network]
         selected_networks = $selected_networks
+        [CCIP.Env.NewCLCluster]
+        [CCIP.Env.NewCLCluster.Common]
+        [CCIP.Env.NewCLCluster.Common.ChainlinkImage]
+        version="$CHAINLINK_VERSION"
 
         $custom_nodes_toml
 
@@ -125,6 +137,14 @@ runs:
         TestRunName = '$EXISTING_NAMESPACE'
 
         EOF
+
+        # Check if UPGRADE_VERSION is not empty and append to config.toml
+        if [ -n "$UPGRADE_VERSION" ]; then
+          cat << EOF >> config.toml
+        [CCIP.Env.NewCLCluster.Common.ChainlinkUpgradeImage]
+        version="$UPGRADE_VERSION"
+        EOF
+        fi        
 
         BASE64_CONFIG=$(cat config.toml | base64 -w 0)
         echo ::add-mask::$BASE64_CONFIG
