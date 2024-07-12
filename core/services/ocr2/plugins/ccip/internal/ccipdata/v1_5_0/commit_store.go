@@ -2,6 +2,7 @@ package v1_5_0
 
 import (
 	"context"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -47,9 +48,9 @@ func NewCommitStore(
 	addr common.Address,
 	ec client.Client,
 	lp logpoller.LogPoller,
-	dacc ccipdata.DAConfigCacheReader,
+	feeEstimatorConfig ccipdata.FeeEstimatorConfigReader,
 ) (*CommitStore, error) {
-	v120, err := v1_2_0.NewCommitStore(lggr, addr, ec, lp, dacc)
+	v120, err := v1_2_0.NewCommitStore(lggr, addr, ec, lp, feeEstimatorConfig)
 	if err != nil {
 		return nil, err
 	}

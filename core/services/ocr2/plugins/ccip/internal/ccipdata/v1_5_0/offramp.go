@@ -70,7 +70,7 @@ type OffRamp struct {
 	*v1_2_0.OffRamp
 	offRampV150           evm_2_evm_offramp.EVM2EVMOffRampInterface
 	cachedRateLimitTokens cache.AutoSync[cciptypes.OffRampTokens]
-	daConfigCache         ccipdata.DAConfigCacheReader
+	feeEstimatorConfig    ccipdata.FeeEstimatorConfigReader
 }
 
 // GetTokens Returns no data as the offRamps no longer have this information.
@@ -156,7 +156,7 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds),
 		Router:                                  cciptypes.Address(onchainConfigParsed.Router.String()),
 	}
-	priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0, 0, o.daConfigCache)
+	priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0, 0, o.feeEstimatorConfig)
 
 	o.UpdateDynamicConfig(onchainConfig, offchainConfig, priceEstimator)
 
@@ -174,9 +174,9 @@ func NewOffRamp(
 	lp logpoller.LogPoller,
 	estimator gas.EvmFeeEstimator,
 	destMaxGasPrice *big.Int,
-	dacc ccipdata.DAConfigCacheReader,
+	feeEstimatorConfig ccipdata.FeeEstimatorConfigReader,
 ) (*OffRamp, error) {
-	v120, err := v1_2_0.NewOffRamp(lggr, addr, ec, lp, estimator, destMaxGasPrice, dacc)
+	v120, err := v1_2_0.NewOffRamp(lggr, addr, ec, lp, estimator, destMaxGasPrice, feeEstimatorConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -189,9 +189,9 @@ func NewOffRamp(
 	v120.ExecutionReportArgs = abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRamp)[:1]
 
 	return &OffRamp{
-		daConfigCache: dacc,
-		OffRamp:       v120,
-		offRampV150:   offRamp,
+		feeEstimatorConfig: feeEstimatorConfig,
+		OffRamp:            v120,
+		offRampV150:        offRamp,
 		cachedRateLimitTokens: cache.NewLogpollerEventsBased[cciptypes.OffRampTokens](
 			lp,
 			[]common.Hash{RateLimitTokenAddedEvent, RateLimitTokenRemovedEvent},

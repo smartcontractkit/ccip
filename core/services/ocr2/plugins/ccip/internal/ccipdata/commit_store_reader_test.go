@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
@@ -35,9 +34,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
+	onRampMock "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 )
@@ -193,15 +194,19 @@ func TestCommitStoreReaders(t *testing.T) {
 	lm := new(rollupMocks.L1Oracle)
 	ge.On("L1Oracle").Return(lm)
 
+	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
+	onRampReader := onRampMock.NewOnRampReader(t)
+	assert.NoError(t, feeEstimatorConfig.SetOnRampReader(onRampReader))
+
 	maxGasPrice := big.NewInt(1e8)
-	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp) // ge, maxGasPrice
+	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp, feeEstimatorConfig) // ge, maxGasPrice
 	require.NoError(t, err)
 	err = c10r.SetGasEstimator(ctx, ge)
 	require.NoError(t, err)
 	err = c10r.SetSourceMaxGasPrice(ctx, maxGasPrice)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&v1_0_0.CommitStore{}).String())
-	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr2), ec, lp)
+	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr2), ec, lp, feeEstimatorConfig)
 	require.NoError(t, err)
 	err = c12r.SetGasEstimator(ctx, ge)
 	require.NoError(t, err)
@@ -412,7 +417,14 @@ func TestNewCommitStoreReader(t *testing.T) {
 			if tc.expectedErr == "" {
 				lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil)
 			}
-			_, err = factory.NewCommitStoreReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp)
+
+			feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
+			onRampReader := onRampMock.NewOnRampReader(t)
+			onRampReader.On("GetDynamicConfig", context.Background()).
+				Return(cciptypes.OnRampDynamicConfig{}, nil).Maybe()
+			assert.NoError(t, feeEstimatorConfig.SetOnRampReader(onRampReader))
+
+			_, err = factory.NewCommitStoreReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp, feeEstimatorConfig)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {

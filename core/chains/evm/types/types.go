@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"log/slog"
 	"math/big"
 	"os"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -419,7 +420,7 @@ func (h *HashArray) Scan(src interface{}) error {
 	return err
 }
 
-type DAConfigProvider interface {
-	SetOnRampReader(reader ccip.OnRampReader)
-	Get(ctx context.Context) (destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64, err error)
+type FeeEstimatorConfigProvider interface {
+	SetOnRampReader(reader ccip.OnRampReader) error
+	GetDataAvailabilityConfig(ctx context.Context) (destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64, err error)
 }

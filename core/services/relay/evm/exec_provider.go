@@ -3,10 +3,11 @@ package evm
 import (
 	"context"
 	"fmt"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"math/big"
 	"net/url"
 	"time"
+
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 
 	"go.uber.org/multierr"
 
@@ -41,7 +42,7 @@ type SrcExecProvider struct {
 	usdcAttestationAPIIntervalMilliseconds int
 	usdcSrcMsgTransmitterAddr              common.Address
 
-	daConfigCache types.DAConfigProvider
+	feeEstimatorConfig types.FeeEstimatorConfigProvider
 
 	// these values are nil and are updated for Close()
 	seenOnRampAddress       *cciptypes.Address
@@ -62,7 +63,7 @@ func NewSrcExecProvider(
 	usdcAttestationAPITimeoutSeconds int,
 	usdcAttestationAPIIntervalMilliseconds int,
 	usdcSrcMsgTransmitterAddr common.Address,
-	dacc types.DAConfigProvider,
+	feeEstimatorConfig types.FeeEstimatorConfigProvider,
 ) (commontypes.CCIPExecProvider, error) {
 	var usdcReader *ccip.USDCReaderImpl
 	var err error
@@ -86,7 +87,7 @@ func NewSrcExecProvider(
 		usdcAttestationAPITimeoutSeconds:       usdcAttestationAPITimeoutSeconds,
 		usdcAttestationAPIIntervalMilliseconds: usdcAttestationAPIIntervalMilliseconds,
 		usdcSrcMsgTransmitterAddr:              usdcSrcMsgTransmitterAddr,
-		daConfigCache:                          dacc,
+		feeEstimatorConfig:                     feeEstimatorConfig,
 	}, nil
 }
 
@@ -168,7 +169,7 @@ func (s *SrcExecProvider) GetTransactionStatus(ctx context.Context, transactionI
 }
 
 func (s *SrcExecProvider) NewCommitStoreReader(ctx context.Context, addr cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
-	commitStoreReader = NewIncompleteSourceCommitStoreReader(s.estimator, s.maxGasPrice, s.daConfigCache)
+	commitStoreReader = NewIncompleteSourceCommitStoreReader(s.estimator, s.maxGasPrice, s.feeEstimatorConfig)
 	return
 }
 
@@ -181,7 +182,13 @@ func (s *SrcExecProvider) NewOnRampReader(ctx context.Context, onRampAddress cci
 
 	versionFinder := ccip.NewEvmVersionFinder()
 	onRampReader, err = ccip.NewOnRampReader(s.lggr, versionFinder, sourceChainSelector, destChainSelector, onRampAddress, s.lp, s.client)
-	s.daConfigCache.SetOnRampReader(onRampReader)
+	if err != nil {
+
+	}
+	err = s.feeEstimatorConfig.SetOnRampReader(onRampReader)
+	if err != nil {
+		return nil, fmt.Errorf("SrcExecProvider set onRampReader to FeeEstimatorService: %w", err)
+	}
 	return
 }
 
@@ -242,7 +249,7 @@ type DstExecProvider struct {
 	configWatcher       *configWatcher
 	gasEstimator        gas.EvmFeeEstimator
 	maxGasPrice         big.Int
-	daConfigCache       types.DAConfigProvider
+	feeEstimatorConfig  types.FeeEstimatorConfigProvider
 	txm                 txmgr.TxManager
 	offRampAddress      cciptypes.Address
 
@@ -260,7 +267,7 @@ func NewDstExecProvider(
 	configWatcher *configWatcher,
 	gasEstimator gas.EvmFeeEstimator,
 	maxGasPrice big.Int,
-	dacc types.DAConfigProvider,
+	feeEstimatorConfig types.FeeEstimatorConfigProvider,
 	txm txmgr.TxManager,
 	offRampAddress cciptypes.Address,
 ) (commontypes.CCIPExecProvider, error) {
@@ -274,7 +281,7 @@ func NewDstExecProvider(
 		configWatcher:       configWatcher,
 		gasEstimator:        gasEstimator,
 		maxGasPrice:         maxGasPrice,
-		daConfigCache:       dacc,
+		feeEstimatorConfig:  feeEstimatorConfig,
 		txm:                 txm,
 		offRampAddress:      offRampAddress,
 	}, nil
@@ -355,12 +362,12 @@ func (d *DstExecProvider) NewCommitStoreReader(ctx context.Context, addr cciptyp
 	d.seenCommitStoreAddr = &addr
 
 	versionFinder := ccip.NewEvmVersionFinder()
-	commitStoreReader, err = NewIncompleteDestCommitStoreReader(d.lggr, versionFinder, addr, d.client, d.lp, d.daConfigCache)
+	commitStoreReader, err = NewIncompleteDestCommitStoreReader(d.lggr, versionFinder, addr, d.client, d.lp, d.feeEstimatorConfig)
 	return
 }
 
 func (d *DstExecProvider) NewOffRampReader(ctx context.Context, offRampAddress cciptypes.Address) (offRampReader cciptypes.OffRampReader, err error) {
-	offRampReader, err = ccip.NewOffRampReader(d.lggr, d.versionFinder, offRampAddress, d.client, d.lp, d.gasEstimator, &d.maxGasPrice, true, d.daConfigCache)
+	offRampReader, err = ccip.NewOffRampReader(d.lggr, d.versionFinder, offRampAddress, d.client, d.lp, d.gasEstimator, &d.maxGasPrice, true, d.feeEstimatorConfig)
 	return
 }
 

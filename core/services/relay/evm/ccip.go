@@ -3,9 +3,10 @@ package evm
 import (
 	"context"
 	"fmt"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"math/big"
 	"time"
+
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 
@@ -27,18 +28,18 @@ var _ cciptypes.CommitStoreReader = (*IncompleteDestCommitStoreReader)(nil)
 // IncompleteSourceCommitStoreReader is an implementation of CommitStoreReader with the only valid methods being
 // GasPriceEstimator, ChangeConfig, and OffchainConfig
 type IncompleteSourceCommitStoreReader struct {
-	estimator         gas.EvmFeeEstimator
-	gasPriceEstimator *prices.DAGasPriceEstimator
-	sourceMaxGasPrice *big.Int
-	offchainConfig    cciptypes.CommitOffchainConfig
-	daConfigCache     types.DAConfigProvider
+	estimator          gas.EvmFeeEstimator
+	gasPriceEstimator  *prices.DAGasPriceEstimator
+	sourceMaxGasPrice  *big.Int
+	offchainConfig     cciptypes.CommitOffchainConfig
+	feeEstimatorConfig types.FeeEstimatorConfigProvider
 }
 
-func NewIncompleteSourceCommitStoreReader(estimator gas.EvmFeeEstimator, sourceMaxGasPrice *big.Int, dacc types.DAConfigProvider) *IncompleteSourceCommitStoreReader {
+func NewIncompleteSourceCommitStoreReader(estimator gas.EvmFeeEstimator, sourceMaxGasPrice *big.Int, feeEstimatorConfig types.FeeEstimatorConfigProvider) *IncompleteSourceCommitStoreReader {
 	return &IncompleteSourceCommitStoreReader{
-		estimator:         estimator,
-		sourceMaxGasPrice: sourceMaxGasPrice,
-		daConfigCache:     dacc,
+		estimator:          estimator,
+		sourceMaxGasPrice:  sourceMaxGasPrice,
+		feeEstimatorConfig: feeEstimatorConfig,
 	}
 }
 
@@ -58,7 +59,7 @@ func (i *IncompleteSourceCommitStoreReader) ChangeConfig(ctx context.Context, on
 		i.sourceMaxGasPrice,
 		int64(offchainConfigParsed.ExecGasPriceDeviationPPB),
 		int64(offchainConfigParsed.DAGasPriceDeviationPPB),
-		i.daConfigCache,
+		i.feeEstimatorConfig,
 	)
 	i.offchainConfig = ccip.NewCommitOffchainConfig(
 		offchainConfigParsed.ExecGasPriceDeviationPPB,
@@ -143,9 +144,9 @@ func NewIncompleteDestCommitStoreReader(
 	address cciptypes.Address,
 	ec client.Client,
 	lp logpoller.LogPoller,
-	dacc types.DAConfigProvider,
+	feeEstimatorConfig types.FeeEstimatorConfigProvider,
 ) (*IncompleteDestCommitStoreReader, error) {
-	cs, err := ccip.NewCommitStoreReader(lggr, versionFinder, address, ec, lp, dacc)
+	cs, err := ccip.NewCommitStoreReader(lggr, versionFinder, address, ec, lp, feeEstimatorConfig)
 	if err != nil {
 		return nil, err
 	}

@@ -3,8 +3,9 @@ package prices
 import (
 	"context"
 	"fmt"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"math/big"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
@@ -15,7 +16,7 @@ import (
 type DAGasPriceEstimator struct {
 	execEstimator       GasPriceEstimator
 	l1Oracle            rollups.L1Oracle
-	dacc                ccipdata.DAConfigCacheReader
+	feeEstimatorConfig  ccipdata.FeeEstimatorConfigReader
 	priceEncodingLength uint
 	daDeviationPPB      int64
 }
@@ -25,14 +26,14 @@ func NewDAGasPriceEstimator(
 	maxGasPrice *big.Int,
 	deviationPPB int64,
 	daDeviationPPB int64,
-	dacc ccipdata.DAConfigCacheReader, // DA Config Cache updates in the onRamp reader and shares the state
+	feeEstimatorConfig ccipdata.FeeEstimatorConfigReader, // DA Config Cache updates in the onRamp reader and shares the state
 ) *DAGasPriceEstimator {
 	return &DAGasPriceEstimator{
 		execEstimator:       NewExecGasPriceEstimator(estimator, maxGasPrice, deviationPPB),
 		l1Oracle:            estimator.L1Oracle(),
 		priceEncodingLength: daGasPriceEncodingLength,
 		daDeviationPPB:      daDeviationPPB,
-		dacc:                dacc,
+		feeEstimatorConfig:  feeEstimatorConfig,
 	}
 }
 
@@ -170,7 +171,7 @@ func (g DAGasPriceEstimator) estimateDACostUSD(daGasPrice *big.Int, wrappedNativ
 		sourceTokenDataLen += len(tokenData)
 	}
 
-	daOverheadGas, gasPerDAByte, daMultiplier, err := g.dacc.Get(context.Background())
+	daOverheadGas, gasPerDAByte, daMultiplier, err := g.feeEstimatorConfig.GetDataAvailabilityConfig(context.Background())
 	if err != nil {
 		return nil, err
 	}

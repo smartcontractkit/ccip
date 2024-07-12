@@ -4,6 +4,6 @@ import (
 	"context"
 )
 
-type DAConfigCacheReader interface {
-	Get(ctx context.Context) (destDAOverheadGas, destGasPerDAByte, destDAMultiplierBps int64, err error)
+type FeeEstimatorConfigReader interface {
+	GetDataAvailabilityConfig(ctx context.Context) (destDAOverheadGas, destGasPerDAByte, destDAMultiplierBps int64, err error)
 }
