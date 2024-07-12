@@ -111,23 +111,26 @@ func NewConfig() (*Config, error) {
 		return nil, errors.Wrap(err, ErrReadConfig)
 	}
 
-	// load config from env var if specified
-	rawConfig, _ := osutil.GetEnv(OVERIDECONFIG)
-	if rawConfig != "" {
-		err = DecodeConfig(rawConfig, &override)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode override config: %w", err)
-		}
-	}
-	if override != nil {
-		// apply overrides for all products
-		if override.CCIP != nil {
-			if cfg.CCIP == nil {
-				cfg.CCIP = override.CCIP
-			} else {
-				err = cfg.CCIP.ApplyOverrides(override.CCIP)
-				if err != nil {
-					return nil, err
+	// load config overrides from env var if specified
+	// there can be multiple overrides separated by comma
+	rawConfigs, _ := osutil.GetEnv(OVERIDECONFIG)
+	if rawConfigs == "" {
+		for _, rawConfig := range strings.Split(rawConfigs, ",") {
+			err = DecodeConfig(rawConfig, &override)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode override config: %w", err)
+			}
+			if override != nil {
+				// apply overrides for all products
+				if override.CCIP != nil {
+					if cfg.CCIP == nil {
+						cfg.CCIP = override.CCIP
+					} else {
+						err = cfg.CCIP.ApplyOverrides(override.CCIP)
+						if err != nil {
+							return nil, err
+						}
+					}
 				}
 			}
 		}
