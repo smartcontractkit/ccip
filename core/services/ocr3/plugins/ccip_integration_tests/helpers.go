@@ -41,10 +41,10 @@ const (
 )
 
 func e18Mult(amount uint64) *big.Int {
-	return new(big.Int).Mul(uintBigInt(amount), uintBigInt(1e18))
+	return new(big.Int).Mul(uBigInt(amount), uBigInt(1e18))
 }
 
-func uintBigInt(i uint64) *big.Int {
+func uBigInt(i uint64) *big.Int {
 	return new(big.Int).SetUint64(i)
 }
 
