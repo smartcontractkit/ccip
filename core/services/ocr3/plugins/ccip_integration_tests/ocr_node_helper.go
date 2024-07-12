@@ -12,15 +12,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/jmoiron/sqlx"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	v2toml "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
-	encodeutils "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	evmutils "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest/heavyweight"
@@ -34,8 +33,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
 	"github.com/smartcontractkit/libocr/commontypes"
-	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 )
@@ -85,7 +82,7 @@ func setupNodeOCR3(
 	})
 
 	lggr := logger.TestLogger(t)
-	lggr.SetLogLevel(zapcore.DebugLevel)
+	lggr.SetLogLevel(zapcore.InfoLevel)
 	ctx := testutils.Context(t)
 	clients := make(map[uint64]client.Client)
 
@@ -253,97 +250,11 @@ func createConfigV2Chain(chainID *big.Int) *v2toml.EVMConfig {
 	}
 }
 
-func donOCRConfig(t *testing.T, uni onchainUniverse, oracles []confighelper2.OracleIdentityExtra) []byte {
-	var schedule []int
-	for range oracles {
-		schedule = append(schedule, 1)
-	}
-	offchainConfig, onchainConfig := []byte{}, []byte{}
-	f := uint8(1)
-	_, _, f, _, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
-		30*time.Second, // deltaProgress
-		10*time.Second, // deltaResend
-		20*time.Second, // deltaInitial
-		2*time.Second,  // deltaRound
-		20*time.Second, // deltaGrace
-		10*time.Second, // deltaCertifiedCommitRequest
-		10*time.Second, // deltaStage
-		3,              // rmax
-		schedule,
-		oracles,
-		offchainConfig,
-		50*time.Millisecond, // maxDurationQuery
-		5*time.Second,       // maxDurationObservation
-		10*time.Second,      // maxDurationShouldAcceptAttestedReport
-		10*time.Second,      // maxDurationShouldTransmitAcceptedReport
-		int(f),
-		onchainConfig)
-	require.NoError(t, err, "failed to create contract config")
-	/*
-		struct OCR3Config {
-			PluginType pluginType; // ────────╮ The plugin that the configuration is for.
-			uint64 chainSelector; //          | The (remote) chain that the configuration is for.
-			uint8 F; //                       | The "big F" parameter for the role DON.
-			uint64 offchainConfigVersion; // ─╯ The version of the offchain configuration.
-			bytes32 offrampAddress; // The remote chain combined (offramp|commit store) address.
-			bytes32[2][] signers; // An associative array that contains (p2p id, onchain signer public key) pairs.
-			bytes32[2][] transmitters; // An associative array that contains (p2p id, transmitter) pairs.
-			bytes offchainConfig; // The offchain configuration for the OCR3 protocol. Protobuf encoded.
-		}
-	*/
-	ocrConfigABI := `
-{
-	[
-		{
-			"type": "uint8"
-		},
-		{
-			"type": "uint64"
-		},
-		{
-			"type": "uint8"
-		},
-		{
-			"type": "uint64"
-		},
-		{
-			"type": "bytes32"
-		},
-		{
-			"type": "bytes32[2][]"
-		},
-		{
-			"type": "bytes32[2][]"
-		},
-		{
-			"type": "bytes"
-		}
-	]
-}`
-	chainSelector, ok := chainsel.EvmChainIdToChainSelector()[uni.chainID]
-	require.True(t, ok, "chain selector not found for chain id", uni.chainID)
-	var offrampAddressBytes32 [32]byte
-	copy(offrampAddressBytes32[:], uni.offramp.Address().Bytes())
-	commitConfig, err := encodeutils.ABIEncode(ocrConfigABI,
-		uint8(0),              // pluginType
-		chainSelector,         // chainSelector
-		f,                     // F
-		offchainConfigVersion, // offchainConfigVersion
-		offrampAddressBytes32, // offrampAddress
-		nil,                   // TODO signers
-		nil,                   // TODO transmitters
-		offchainConfig,        // offchainConfig
-	)
-	require.NoError(t, err, "failed to encode commit OCR3 config")
-	// TODO: implement
-	return commitConfig
-}
-
 func createCCIPSpecToml(nodeP2PID, bootstrapP2PID string, bootstrapPort int, ocrKeyBundleID string) string {
 	return fmt.Sprintf(`
 type = "ccip"
-capabilityVersion = "v1.0.0"
-capabilityLabelledName = "ccip"
+capabilityVersion = "%s"
+capabilityLabelledName = "%s"
 p2pKeyID = "%s"
 p2pV2Bootstrappers = ["%s"]
 [ocrKeyBundleIDs]
@@ -356,6 +267,8 @@ chainSpecificName = "getStuffEVM"
 
 [pluginConfig]
 tokenPricesPipeline = "the pipeline"`,
+		CapabilityVersion,
+		CcipCapabilityLabelledName,
 		nodeP2PID,
 		fmt.Sprintf("%s@127.0.0.1:%d", bootstrapP2PID,
 			bootstrapPort,

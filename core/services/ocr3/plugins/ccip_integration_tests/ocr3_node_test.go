@@ -34,20 +34,12 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		// The bootstrap node will be the first node (index 0)
 		bootstrapPort  int
 		bootstrapP2PID p2pkey.PeerID
+		bootStrappers  []commontypes.BootstrapperLocator
 	)
-
-	bootstrapNodePort := freeport.GetOne(t)
-	bootstrapNode := setupNodeOCR3(t, bootstrapNodePort, nil, universes)
 
 	ports := freeport.GetN(t, numNodes)
 	for i := 0; i < numNodes; i++ {
-		// Supply the bootstrap IP and port as a V2 peer address
-		bootstrappers := []commontypes.BootstrapperLocator{
-			{PeerID: bootstrapNode.peerID, Addrs: []string{
-				fmt.Sprintf("127.0.0.1:%d", bootstrapNodePort),
-			}},
-		}
-		node := setupNodeOCR3(t, ports[i], bootstrappers, universes)
+		node := setupNodeOCR3(t, ports[i], bootStrappers, universes)
 
 		apps = append(apps, node.app)
 		for chainID, transmitter := range node.transmitters {
@@ -69,6 +61,17 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		peerID, err := p2pkey.MakePeerID(node.peerID)
 		require.NoError(t, err)
 		p2pIDs = append(p2pIDs, peerID)
+
+		// First Node is the bootstrap node
+		if i == 0 {
+			bootstrapPort = ports[i]
+			bootstrapP2PID = peerID
+			bootStrappers = []commontypes.BootstrapperLocator{
+				{PeerID: node.peerID, Addrs: []string{
+					fmt.Sprintf("127.0.0.1:%d", bootstrapPort),
+				}},
+			}
+		}
 	}
 
 	t.Log("starting ticker to commit blocks")
@@ -96,6 +99,8 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		wg.Wait()
 	})
 
+	bootstrapNode := nodes[0]
+
 	t.Log("adding bootstrap node job")
 	err := bootstrapNode.app.Start(testutils.Context(t))
 	require.NoError(t, err, "failed to start bootstrap node")
@@ -109,15 +114,16 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 
 	t.Log("creating ocr3 jobs")
 	for i := 0; i < numNodes; i++ {
-		err := apps[i].Start(testutils.Context(t))
-		require.NoError(t, err)
-		tapp := apps[i]
-		t.Cleanup(func() {
-			require.NoError(t, tapp.Stop())
-		})
+		//err := apps[i].Start(testutils.Context(t))
+		//require.NoError(t, err)
+		//tApp := apps[i]
+		//t.Cleanup(func() {
+		//	require.NoError(t, tApp.Stop())
+		//})
+		//
+		//ccipSpecToml := createCCIPSpecToml(nodes[i].peerID, bootstrapP2PID.String(), bootstrapPort, nodes[i].keybundle.ID())
+		//t.Log("Creating ccip job with spec:\n", ccipSpecToml)
 
-		ccipSpecToml := createCCIPSpecToml(nodes[i].peerID, bootstrapP2PID.String(), bootstrapPort, nodes[i].keybundle.ID())
-		t.Log("Creating ccip job with spec:\n", ccipSpecToml)
 		//ccipJob, err2 := ccipcapability(ccipSpecToml)
 		//require.NoError(t, err2, "failed to validate ccip job")
 		//err2 = apps[i].AddJobV2(testutils.Context(t), &ccipJob)
@@ -128,13 +134,20 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	ccipCapabilityID, err := homeChainUni.capabilityRegistry.GetHashedCapabilityId(nil, CapabilityLabelledName, CapabilityVersion)
 	require.NoError(t, err, "failed to get hashed capability id for ccip")
 	require.NotEqual(t, [32]byte{}, ccipCapabilityID, "ccip capability id is empty")
+
+	homeChainUni.AddNodes(t, p2pIDs, [][32]byte{ccipCapabilityID})
 	// create a DON for each chain
-	//for _, uni := range universes {
-	//	homeChainUni.capabilityRegistry.AddDON(uni.owner, p2pIDs, []kcr.CapabilitiesRegistryCapabilityConfiguration{
-	//		{
-	//			CapabilityId: ccipCapabilityID,
-	//			Config:       donOCRConfig(t, uni, oracles[uni.chainID]),
-	//		},
-	//	}, false, false, 1 /* f value: unused for ccip */)
-	//}
+	for _, uni := range universes {
+		// Add nodes and give them the capability
+		t.Log("AddingDON for universe: ", uni.chainID)
+		homeChainUni.AddDON(t,
+			ccipCapabilityID,
+			uni.chainID,
+			uni.offramp.Address().Bytes(),
+			1, // f
+			bootstrapP2PID,
+			p2pIDs,
+			oracles[uni.chainID],
+		)
+	}
 }

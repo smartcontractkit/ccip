@@ -3,12 +3,19 @@ package ccip_integration_tests
 import (
 	"encoding/hex"
 	"math/big"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ocr3_config_encoder"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
+	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
@@ -23,7 +30,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/link_token"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -38,6 +44,7 @@ var (
 const (
 	CapabilityLabelledName = "ccip"
 	CapabilityVersion      = "v1.0.0"
+	NodeOperatorID         = 1
 )
 
 func e18Mult(amount uint64) *big.Int {
@@ -53,7 +60,7 @@ type homeChain struct {
 	owner              *bind.TransactOpts
 	chainID            uint64
 	capabilityRegistry *kcr.CapabilitiesRegistry
-	ccipConfigContract common.Address
+	ccipConfig         *ccip_config.CCIPConfig
 }
 
 type onchainUniverse struct {
@@ -255,13 +262,152 @@ func setupHomeChain(t *testing.T, owner *bind.TransactOpts, backend *backends.Si
 	require.NoError(t, err, "failed to add capabilities to the capability registry")
 	backend.Commit()
 
+	// Add NodeOperator, for simplicity we'll add one NodeOperator only
+	// First NodeOperator will have NodeOperatorId = 1
+	_, err = capabilityRegistry.AddNodeOperators(owner, []kcr.CapabilitiesRegistryNodeOperator{
+		{
+			Admin: owner.From,
+			Name:  "NodeOperator",
+		},
+	})
+	require.NoError(t, err, "failed to add node operator to the capability registry")
+	backend.Commit()
+
 	return homeChain{
 		backend:            backend,
 		owner:              owner,
 		chainID:            homeChainID,
 		capabilityRegistry: capabilityRegistry,
-		ccipConfigContract: capabilityConfig.Address(),
+		ccipConfig:         capabilityConfig,
 	}
+}
+
+// bubble sort, n^2 but p2pIDs never should be more than a handful
+func sortP2pIDS(p2pIDs [][32]byte) {
+	for i := 0; i < len(p2pIDs); i++ {
+		for j := i + 1; j < len(p2pIDs); j++ {
+			if hex.EncodeToString(p2pIDs[i][:]) > hex.EncodeToString(p2pIDs[j][:]) {
+				p2pIDs[i], p2pIDs[j] = p2pIDs[j], p2pIDs[i]
+			}
+		}
+	}
+}
+
+func (h *homeChain) AddNodes(
+	t *testing.T,
+	p2pIDs [][32]byte,
+	capabilityIDs [][32]byte,
+) {
+	// Need to sort, otherwise _checkIsValidUniqueSubset onChain will fail
+	sortP2pIDS(p2pIDs)
+	var nodeParams []kcr.CapabilitiesRegistryNodeParams
+	for _, p2pID := range p2pIDs {
+		nodeParam := kcr.CapabilitiesRegistryNodeParams{
+			NodeOperatorId:      NodeOperatorID,
+			Signer:              p2pID, // Not used in tests
+			P2pId:               p2pID,
+			HashedCapabilityIds: capabilityIDs,
+		}
+		nodeParams = append(nodeParams, nodeParam)
+	}
+	_, err := h.capabilityRegistry.AddNodes(h.owner, nodeParams)
+	require.NoError(t, err, "failed to add node operator oracles")
+	h.backend.Commit()
+}
+
+func (h *homeChain) AddDON(
+	t *testing.T,
+	ccipCapabilityID [32]byte,
+	chainSelector uint64,
+	OfframpAddress []byte,
+	f uint8,
+	bootstrapP2PID [32]byte,
+	p2pIDs [][32]byte,
+	oracles []confighelper2.OracleIdentityExtra,
+) {
+	// Need to sort, otherwise _checkIsValidUniqueSubset onChain will fail
+	sortP2pIDS(p2pIDs)
+	// First Add ChainConfig that includes all p2pIDs as readers
+	chainConfig := SetupConfigInfo(chainSelector, p2pIDs, FChainA, []byte(strconv.FormatUint(chainSelector, 10)))
+	inputConfig := []ccip_config.CCIPConfigTypesChainConfigInfo{
+		chainConfig,
+	}
+	_, err := h.ccipConfig.ApplyChainConfigUpdates(h.owner, nil, inputConfig)
+	require.NoError(t, err)
+	h.backend.Commit()
+
+	// Get OCR3 Config from helper
+	var schedule []int
+	for range oracles {
+		schedule = append(schedule, 1)
+	}
+	offchainConfig, onchainConfig := []byte{}, []byte{}
+	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
+		30*time.Second, // deltaProgress
+		10*time.Second, // deltaResend
+		20*time.Second, // deltaInitial
+		2*time.Second,  // deltaRound
+		20*time.Second, // deltaGrace
+		10*time.Second, // deltaCertifiedCommitRequest
+		10*time.Second, // deltaStage
+		3,              // rmax
+		schedule,
+		oracles,
+		offchainConfig,
+		50*time.Millisecond, // maxDurationQuery
+		5*time.Second,       // maxDurationObservation
+		10*time.Second,      // maxDurationShouldAcceptAttestedReport
+		10*time.Second,      // maxDurationShouldTransmitAcceptedReport
+		int(f),
+		onchainConfig)
+	require.NoError(t, err, "failed to create contract config")
+
+	tabi, err := ocr3_config_encoder.IOCR3ConfigEncoderMetaData.GetAbi()
+	require.NoError(t, err)
+
+	signersBytes := make([][]byte, len(signers))
+	for i, signer := range signers {
+		signersBytes[i] = signer
+	}
+
+	transmittersBytes := make([][]byte, len(transmitters))
+	for i, transmitter := range transmitters {
+		parsed, err := common.ParseHexOrString(string(transmitter))
+		require.NoError(t, err)
+		transmittersBytes[i] = parsed
+	}
+
+	// Add DON on capability registry contract
+	var ocr3Configs []ocr3_config_encoder.CCIPConfigTypesOCR3Config
+	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
+		ocr3Configs = append(ocr3Configs, ocr3_config_encoder.CCIPConfigTypesOCR3Config{
+			PluginType:            uint8(pluginType),
+			ChainSelector:         chainSelector,
+			F:                     f,
+			OffchainConfigVersion: offchainConfigVersion,
+			OfframpAddress:        OfframpAddress,
+			BootstrapP2PIds:       [][32]byte{bootstrapP2PID},
+			P2pIds:                p2pIDs,
+			Signers:               signersBytes,
+			Transmitters:          transmittersBytes,
+			OffchainConfig:        offchainConfig,
+		})
+	}
+
+	encodedCall, err := tabi.Pack("exposeOCR3Config", ocr3Configs)
+	require.NoError(t, err)
+
+	// Trim first four bytes to remove function selector.
+	encodedConfigs := encodedCall[4:]
+
+	_, err = h.capabilityRegistry.AddDON(h.owner, p2pIDs, []kcr.CapabilitiesRegistryCapabilityConfiguration{
+		{
+			CapabilityId: ccipCapabilityID,
+			Config:       encodedConfigs,
+		},
+	}, false, false, f)
+	require.NoError(t, err)
+	h.backend.Commit()
 }
 
 func connectUniverses(
@@ -329,6 +475,17 @@ func setupUniverseBasics(t *testing.T, uni onchainUniverse) {
 	_, err = uni.nonceManager.ApplyAuthorizedCallerUpdates(owner, authorizedCallersAuthorizedCallerArgs)
 	require.NoError(t, err)
 	uni.backend.Commit()
+}
+
+func SetupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) ccip_config.CCIPConfigTypesChainConfigInfo {
+	return ccip_config.CCIPConfigTypesChainConfigInfo{
+		ChainSelector: chainSelector,
+		ChainConfig: ccip_config.CCIPConfigTypesChainConfig{
+			Readers: readers,
+			FChain:  fChain,
+			Config:  cfg,
+		},
+	}
 }
 
 // As we can't change router contract. The contract was expecting onRamp and offRamp per lane and not per chain
