@@ -936,6 +936,7 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) e
 	transactions := make(map[string]map[uint64]actions.GasUpdateEvent)
 	transactionsBySource := make(map[string]string)
 	destToSourcesList := make(map[string][]string)
+	// create a map to hold the unique destination with list of sources
 	for _, n := range o.Cfg.NetworkPairs {
 		if _, ok := destToSourcesList[n.NetworkB.Name]; ok {
 			destToSourcesList[n.NetworkB.Name] = append(destToSourcesList[n.NetworkB.Name], n.NetworkA.Name)
@@ -951,13 +952,13 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) e
 		}
 	}
 	lggr.Info().Interface("list", destToSourcesList).Msg("Dest to Source")
+	// a function to read the events and create a map by tx hash with the event details
 	filterGasUpdateByTx := func(lane *actions.CCIPLane) error {
 		for _, g := range lane.Source.Common.GasUpdateEvents {
 			if g.Value == nil {
 				return fmt.Errorf("gas update value should not be nil in tx %s", g.Tx)
 			}
 			if v, ok := transactions[g.Tx]; ok {
-
 				v[g.DestChain] = g
 				transactions[g.Tx] = v
 			} else {
@@ -965,13 +966,6 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) e
 					g.DestChain: g,
 				}
 			}
-
-			lane.Logger.Info().
-				Str("Sender", g.Sender).
-				Str("Tx Hash", g.Tx).
-				Uint64("Dest", g.DestChain).
-				Str("Value", g.Value.String()).
-				Msg("Gas price Updater details")
 		}
 		return nil
 	}
@@ -996,17 +990,18 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) e
 			}
 		}
 	}
-	lggr.Info().Interface("Tx hashes", transactions).Msg("Checked Gas Update Transactions")
+	lggr.Debug().Interface("Tx hashes", transactions).Msg("Checked Gas Update Transactions")
 	lggr.Info().Interface("Tx hashes by source", transactionsBySource).Msg("Checked Gas Update Transactions by Source")
-	// when leader lane setup is enabled, number of transaction should match the number of leader lanes defined.
+	// when leader lane setup is enabled, number of unique transaction from the source
+	//should match the number of leader lanes defined.
+	var failed bool
 	if len(transactionsBySource) != len(o.Cfg.LeaderLanes) {
-		lggr.Warn().
-			Int("Tx hashes", len(transactions)).
-			Int("Tx hashes", len(transactionsBySource)).
+		lggr.Error().
+			Int("Tx hashes expected", len(o.Cfg.LeaderLanes)).
+			Int("Tx hashes received", len(transactionsBySource)).
 			Int("Leader lanes count", len(o.Cfg.LeaderLanes)).
 			Msg("Checked Gas Update transactions count doesn't match")
-		//return fmt.Errorf("transaction count %d should match the number of leader lanes %d",
-		//	len(transactions), len(o.Cfg.LeaderLanes))
+		failed = true
 	} else {
 		lggr.Info().
 			Int("Tx hashes", len(transactions)).
@@ -1019,23 +1014,28 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) e
 	for source, tx := range transactionsBySource {
 		l, ok := destToSourcesList[source]
 		if !ok {
-			lggr.Warn().Str("Tx hash", tx).Msg("this transaction is probably from non-leader lane which is not expected")
+			lggr.Error().Str("Tx hash", tx).Msg("this transaction is probably " +
+				"from non-leader lane which is not expected")
 		}
 		if len(transactions[tx]) != len(l) {
-			lggr.Warn().
+			lggr.Error().
 				Str("Tx hash", tx).
 				Str("Source", source).
 				Int("Expected event count", len(l)).
 				Int("Event emitted count", len(transactions[tx])).
 				Msg("Checked Gas Update transaction events count doesn't match")
+			failed = true
 		} else {
-			lggr.Info().
+			lggr.Debug().
 				Str("Tx hash", tx).
 				Str("Source", source).
 				Int("Expected event count", len(l)).
 				Int("Event emitted count", len(transactions[tx])).
 				Msg("Checked Gas Update transaction events count")
 		}
+	}
+	if failed {
+		return fmt.Errorf("gas update transaction verification failed. Refer the logs for the errors")
 	}
 	return nil
 }
