@@ -1,15 +1,107 @@
 package ccipexec
 
 import (
+	"context"
+	"fmt"
 	"testing"
+
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/stretchr/testify/assert"
 
-	legacyEvmORMMocks "github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
+
+type MockCCIPExecProvider struct{}
+
+func (m MockCCIPExecProvider) Name() string {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) Start(ctx context.Context) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) Close() error {
+	return fmt.Errorf("expected err")
+}
+
+func (m MockCCIPExecProvider) Ready() error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) HealthReport() map[string]error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) ChainReader() types.ChainReader {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) Codec() types.Codec {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) NewCommitStoreReader(ctx context.Context, addr cciptypes.Address) (cciptypes.CommitStoreReader, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) NewOffRampReader(ctx context.Context, addr cciptypes.Address) (cciptypes.OffRampReader, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) NewOnRampReader(ctx context.Context, addr cciptypes.Address, sourceSelector uint64, destSelector uint64) (cciptypes.OnRampReader, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) NewPriceRegistryReader(ctx context.Context, addr cciptypes.Address) (cciptypes.PriceRegistryReader, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cciptypes.Address) (cciptypes.TokenDataReader, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampAddress cciptypes.Address, sourceSelector uint64) (cciptypes.TokenPoolBatchedReader, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m MockCCIPExecProvider) SourceNativeToken(ctx context.Context, addr cciptypes.Address) (cciptypes.Address, error) {
+	//TODO implement me
+	panic("implement me")
+}
 
 func TestGetExecutionPluginFilterNamesFromSpec(t *testing.T) {
 	testCases := []struct {
@@ -48,9 +140,8 @@ func TestGetExecutionPluginFilterNamesFromSpec(t *testing.T) {
 	ctx := testutils.Context(t)
 
 	for _, tc := range testCases {
-		chainSet := &legacyEvmORMMocks.LegacyChainContainer{}
 		t.Run(tc.description, func(t *testing.T) {
-			err := UnregisterExecPluginLpFilters(ctx, logger.TestLogger(t), job.Job{OCR2OracleSpec: tc.spec}, chainSet)
+			err := UnregisterExecPluginLpFilters(ctx, logger.TestLogger(t), job.Job{}, MockCCIPExecProvider{}, MockCCIPExecProvider{})
 			if tc.expectingErr {
 				assert.Error(t, err)
 			} else {

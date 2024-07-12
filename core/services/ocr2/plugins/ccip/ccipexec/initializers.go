@@ -199,33 +199,17 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 // UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
 // See comment in UnregisterCommitPluginLpFilters
 // It MUST mirror the filters registered in NewExecServices.
-func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer) error {
-	params, err := extractJobSpecParams(lggr, jb, chainSet, false)
-	if err != nil {
-		return err
-	}
-
-	offRampAddress, err := params.offRampReader.Address(ctx)
-	if err != nil {
-		return fmt.Errorf("get offramp reader address: %w", err)
-	}
-
-	versionFinder := factory.NewEvmVersionFinder()
+// This currently works because the filters registered by the created custom providers when the job is first added
+// are stored in the db. Those same filters are unregistered (i.e. deleted from the db) by the newly created providers
+// that are passed in from cleanupEVM, as while the providers have no knowledge of each other, they are created
+// on the same source and dest relayer.
+func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider) error {
 	unregisterFuncs := []func() error{
 		func() error {
-			return factory.CloseCommitStoreReader(lggr, versionFinder, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller())
+			return srcProvider.Close()
 		},
 		func() error {
-			return factory.CloseOnRampReader(lggr, versionFinder, params.offRampConfig.SourceChainSelector, params.offRampConfig.ChainSelector, params.offRampConfig.OnRamp, params.sourceChain.LogPoller(), params.sourceChain.Client())
-		},
-		func() error {
-			return factory.CloseOffRampReader(lggr, versionFinder, offRampAddress, params.destChain.Client(), params.destChain.LogPoller(), params.destChain.GasEstimator(), params.destChain.Config().EVM().GasEstimator().PriceMax().ToInt())
-		},
-		func() error { // usdc token data reader
-			if usdcDisabled := params.pluginConfig.USDCConfig.AttestationAPI == ""; usdcDisabled {
-				return nil
-			}
-			return ccipdata.CloseUSDCReader(lggr, jobIDToString(jb.ID), params.pluginConfig.USDCConfig.SourceMessageTransmitterAddress, params.sourceChain.LogPoller())
+			return dstProvider.Close()
 		},
 	}
 

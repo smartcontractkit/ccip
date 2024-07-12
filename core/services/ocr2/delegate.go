@@ -346,7 +346,27 @@ func (d *Delegate) cleanupEVM(ctx context.Context, jb job.Job, relayID types.Rel
 		}
 		return nil
 	case types.CCIPExecution:
-		err = ccipexec.UnregisterExecPluginLpFilters(context.Background(), d.lggr, jb, d.legacyChains)
+		spec := jb.OCR2OracleSpec
+		transmitterID := spec.TransmitterID.String
+
+		// PROVIDER BASED ARG CONSTRUCTION
+		// Write PluginConfig bytes to send source/dest relayer provider + info outside of top level rargs/pargs over the wire
+		var pluginJobSpecConfig ccipconfig.ExecPluginJobSpecConfig
+		err = json.Unmarshal(spec.PluginConfig.Bytes(), &pluginJobSpecConfig)
+		if err != nil {
+			return err
+		}
+
+		dstProvider, err := d.ccipExecGetDstProvider(ctx, jb, pluginJobSpecConfig, transmitterID)
+		if err != nil {
+			return err
+		}
+
+		srcProvider, _, err := d.ccipExecGetSrcProvider(ctx, jb, pluginJobSpecConfig, transmitterID, dstProvider)
+		if err != nil {
+			return err
+		}
+		err = ccipexec.UnregisterExecPluginLpFilters(ctx, d.lggr, jb, srcProvider, dstProvider)
 		if err != nil {
 			d.lggr.Errorw("failed to unregister ccip exec plugin filters", "err", err, "spec", spec)
 		}
