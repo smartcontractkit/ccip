@@ -39,6 +39,24 @@ type testCase struct {
 	skipGasPriceEstimator                            bool
 }
 
+func Test_NewBatchingStrategy(t *testing.T) {
+	t.Parallel()
+
+	mockStatusChecker := mockstatuschecker.NewCCIPTransactionStatusChecker(t)
+
+	testCases := []int{0, 1, 2}
+
+	for _, batchingStrategyId := range testCases {
+		factory, err := NewBatchingStrategy(uint32(batchingStrategyId), mockStatusChecker)
+		if batchingStrategyId == 2 {
+			assert.Error(t, err)
+		} else {
+			assert.NotNil(t, factory)
+			assert.NoError(t, err)
+		}
+	}
+}
+
 func Test_validateSendRequests(t *testing.T) {
 	testCases := []struct {
 		name             string

@@ -55,7 +55,7 @@ type ZKOverflowBatchingStrategy struct {
 	statuschecker statuschecker.CCIPTransactionStatusChecker
 }
 
-func NewBatchingStrategy(batchingStrategyID uint32, statusChecker statuschecker.CCIPTransactionStatusChecker) BatchingStrategy {
+func NewBatchingStrategy(batchingStrategyID uint32, statusChecker statuschecker.CCIPTransactionStatusChecker) (BatchingStrategy, error) {
 	var batchingStrategy BatchingStrategy
 	switch batchingStrategyID {
 	case 0:
@@ -65,9 +65,10 @@ func NewBatchingStrategy(batchingStrategyID uint32, statusChecker statuschecker.
 			statuschecker: statusChecker,
 		}
 	default:
-		batchingStrategy = &BestEffortBatchingStrategy{} // Default strategy
+		return nil, errors.Errorf("unknown batching strategy ID %d", batchingStrategyID)
+
 	}
-	return batchingStrategy
+	return batchingStrategy, nil
 }
 
 // BestEffortBatchingStrategy is a batching strategy that tries to batch as many messages as possible (up to certain limits).
