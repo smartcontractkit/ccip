@@ -1,0 +1,196 @@
+[CCIP]
+[CCIP.ContractVersions]
+PriceRegistry = '1.2.0'
+OffRamp = '1.2.0'
+OnRamp = '1.2.0'
+TokenPool = '1.4.0'
+CommitStore = '1.2.0'
+
+[CCIP.Deployments]
+
+Data = """
+{
+    "lane_configs": {
+      "Avalanche Fuji": {
+        "fee_token": 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
+        "bridge_tokens": ["0xb03ab64bdcFeb74eA50433fa5e70A5f7D4036107"],
+        "bridge_tokens_pools": ["0x8Efa598611693eCAf9B664629ABAe84A3c0d6C13"],
+        "arm": "0x89710289637a2bF7244C531E8E165494a54315b6",
+        "router": "0xA5be7FE1d63dC5e1c1345a47B8a22b587E1A3045",
+        "price_registry": "0x0E9546E1D097dC62CCEe3BFD3C6CB53b0fE504e9",
+        "wrapped_native": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
+        "src_contracts": {
+          "BSC Testnet": {
+            "on_ramp": "0x07500D13Fe42bd6F44Cb51eDd636f994E7dDB44f",
+            "deployed_at": 30397174
+          }
+        },
+        "dest_contracts": {
+          "BSC Testnet": {
+            "off_ramp": "0x803588c6649f74542EE71E3ADC182865b2aBf429",
+            "commit_store": "0x98E72eE79599d902939bE5ad4a222c647811Cda8",
+            "receiver_dapp": "0x1A2A69e3eB1382FE34Bc579AdD5Bae39e31d4A2c"
+          }
+        }
+      },
+      "BSC Testnet": {
+        "is_native_fee_token": true,
+        "fee_token": "",
+        "bridge_tokens": ["0xEeeEdbb1433c02CFab6F28d2b16933eb2643839f"],
+        "bridge_tokens_pools": ["0xe174680679b0C0Bd6494d0776B74414b6Ea2214c"],
+        "arm": "0xeF296E1c0eAD424498CF0032db68da128F763247",
+        "router": "0x35E1803E0E7c4aD0Ee5C77F178440453F53b544c",
+        "price_registry": "0x27c75f08711fdEaF5224a7Dc9fa82ca82DDa88Aa",
+        "wrapped_native": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
+        "src_contracts": {
+          "Avalanche Fuji": {
+            "on_ramp": "0x5A872d68C93a7C6aDFF84Dd754eFD02672dA9a72",
+            "deployed_at": 38150070
+          }
+        },
+        "dest_contracts": {
+          "Avalanche Fuji": {
+            "off_ramp": "0x64638AEE39A1d8b730Fb62a1CCB1Da33e2354801",
+            "commit_store": "0x3a6163006129b1EFDf0Bb6Ef312560c779edc880",
+            "receiver_dapp": "0x1A2A69e3eB1382FE34Bc579AdD5Bae39e31d4A2c"
+          }
+        }
+      }
+    }
+  }
+"""
+
+[CCIP.Env]
+TTL = '8h'
+
+[CCIP.Env.Network]
+selected_networks = [
+  'ETHEREUM_MAINNET',
+  'ARBITRUM_MAINNET',
+  'BASE_MAINNET',
+  'WEMIX_MAINNET',
+  'OPTIMISM_MAINNET',
+  'POLYGON_MAINNET',
+  'AVALANCHE_MAINNET',
+  'BSC_MAINNET',
+  'AVALANCHE_FUJI',
+  'BSC_TESTNET'
+  #'KROMA_MAINNET'
+  ]
+
+[CCIP.Groups.load]
+NetworkPairs = [
+#   'ETHEREUM_MAINNET,OPTIMISM_MAINNET',
+#   'ETHEREUM_MAINNET,AVALANCHE_MAINNET',
+#   'ETHEREUM_MAINNET,POLYGON_MAINNET',
+#   'ETHEREUM_MAINNET,BSC_MAINNET',
+#   'ETHEREUM_MAINNET,ARBITRUM_MAINNET',
+#   'ETHEREUM_MAINNET,BASE_MAINNET',
+#   'ETHEREUM_MAINNET,WEMIX_MAINNET',
+#   'AVALANCHE_MAINNET,POLYGON_MAINNET',
+#   'BASE_MAINNET,OPTIMISM_MAINNET',
+#   'BASE_MAINNET,ARBITRUM_MAINNET',
+#   'AVALANCHE_MAINNET,BSC_MAINNET',
+#   'BSC_MAINNET,POLYGON_MAINNET',
+#   'OPTIMISM_MAINNET,POLYGON_MAINNET',
+#   'BASE_MAINNET,BSC_MAINNET',
+#   'POLYGON_MAINNET,ARBITRUM_MAINNET', # added as batch 1
+#   'ARBITRUM_MAINNET,BSC_MAINNET', # added as batch 1
+#   'ARBITRUM_MAINNET,OPTIMISM_MAINNET', # added as batch 1
+#   'AVALANCHE_MAINNET,OPTIMISM_MAINNET', # added as batch 2
+#   'AVALANCHE_MAINNET,ARBITRUM_MAINNET', # added as batch 2
+#   'BASE_MAINNET,POLYGON_MAINNET', # added as batch 2
+#   'BSC_MAINNET,OPTIMISM_MAINNET', # added as batch 2
+#   'AVALANCHE_MAINNET,BASE_MAINNET', # added as batch 2
+#   'WEMIX_MAINNET,KROMA_MAINNET',
+#   'BSC_MAINNET,WEMIX_MAINNET', # added as batch 2
+#   'AVALANCHE_MAINNET,WEMIX_MAINNET', # added as batch 2
+#   'POLYGON_MAINNET,WEMIX_MAINNET', # added as batch 2
+#   'WEMIX_MAINNET,ARBITRUM_MAINNET', # added as batch 2
+#   'OPTIMISM_MAINNET,WEMIX_MAINNET' # added as batch 2
+    'GNOSIS_MAINNET,POLYGON_MAINNET'
+    # 'GNOSIS_MAINNET,OPTIMISM_MAINNET',
+    # 'GNOSIS_MAINNET,BASE_MAINNET',
+    # 'GNOSIS_MAINNET,ARBITRUM_MAINNET',
+    # 'GNOSIS_MAINNET,BSC_MAINNET',
+    # 'GNOSIS_MAINNET,AVALANCHE_MAINNET'
+]
+
+BiDirectionalLane = true
+PhaseTimeout = '20m'
+ExistingDeployment = true
+
+[CCIP.Groups.load.TokenConfig]
+NoOfTokensPerChain = 1
+
+[CCIP.Groups.load.LoadProfile]
+RequestPerUnitTime = [1]
+TimeUnit = '1h'
+TestDuration = '45m'
+TestRunName = 'mainnet-2.7-ccip1.2'
+FailOnFirstErrorInLoad = true
+SkipRequestIfAnotherRequestTriggeredWithin = '40m'
+
+[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+MsgType = 'Token'
+DestGasLimit = 0
+DataLength = 100
+NoOfTokens = 1
+AmountPerToken = 1
+
+[CCIP.Groups.smoke]
+# these are all the valid network pairs
+NetworkPairs = [
+    'AVALANCHE_FUJI,BSC_TESTNET'
+#   'ETHEREUM_MAINNET,OPTIMISM_MAINNET', 
+#   'ETHEREUM_MAINNET,AVALANCHE_MAINNET',
+#   'ETHEREUM_MAINNET,POLYGON_MAINNET',
+#   'ETHEREUM_MAINNET,BSC_MAINNET',
+#   'ETHEREUM_MAINNET,ARBITRUM_MAINNET', 
+#   'ETHEREUM_MAINNET,BASE_MAINNET',
+#   'ETHEREUM_MAINNET,WEMIX_MAINNET',
+#   'AVALANCHE_MAINNET,POLYGON_MAINNET',
+#   'BASE_MAINNET,OPTIMISM_MAINNET',
+#   'BASE_MAINNET,ARBITRUM_MAINNET',
+#   'AVALANCHE_MAINNET,BSC_MAINNET',
+#   'BSC_MAINNET,POLYGON_MAINNET',
+#   'OPTIMISM_MAINNET,POLYGON_MAINNET',
+#   'BASE_MAINNET,BSC_MAINNET',
+#   'POLYGON_MAINNET,ARBITRUM_MAINNET', # added as batch 1
+#   'ARBITRUM_MAINNET,BSC_MAINNET', # added as batch 1
+#   'ARBITRUM_MAINNET,OPTIMISM_MAINNET', # added as batch 1 
+#   'AVALANCHE_MAINNET,OPTIMISM_MAINNET', # added as batch 2
+#   'AVALANCHE_MAINNET,ARBITRUM_MAINNET', # added as batch 2
+#   'BASE_MAINNET,POLYGON_MAINNET', # added as batch 2
+#   'BSC_MAINNET,OPTIMISM_MAINNET', # added as batch 2
+#   'AVALANCHE_MAINNET,BASE_MAINNET', # added as batch 2
+#   'WEMIX_MAINNET,KROMA_MAINNET',
+#   'BSC_MAINNET,WEMIX_MAINNET', # added as batch 2
+#   'AVALANCHE_MAINNET,WEMIX_MAINNET', # added as batch 2
+#   'POLYGON_MAINNET,WEMIX_MAINNET', # added as batch 2
+#   'WEMIX_MAINNET,ARBITRUM_MAINNET', # added as batch 2
+#   'OPTIMISM_MAINNET,WEMIX_MAINNET' # added as batch 2
+    # GNOSIS_MAINNET,POLYGON_MAINNET'
+    #'GNOSIS_MAINNET,OPTIMISM_MAINNET'
+    # 'GNOSIS_MAINNET,BASE_MAINNET',
+    # 'GNOSIS_MAINNET,ARBITRUM_MAINNET',
+    #'GNOSIS_MAINNET,BSC_MAINNET'
+    #'GNOSIS_MAINNET,AVALANCHE_MAINNET'
+]
+
+BiDirectionalLane = true
+PhaseTimeout = '20m'
+LocalCluster = false
+ExistingDeployment = true
+ReuseContracts = true
+
+
+[CCIP.Groups.smoke.TokenConfig]
+NoOfTokensPerChain = 1
+
+[CCIP.Groups.smoke.MsgDetails]
+MsgType = 'DataWithToken'
+DestGasLimit = 0
+DataLength = 100
+NoOfTokens = 1
+AmountPerToken = 1
