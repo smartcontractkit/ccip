@@ -933,31 +933,48 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates() {
 // CheckGasUpdateTransaction checks the gas update transactions count, and it has required number of
 // events as per leader lane definitions.
 func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) error {
-	transactions := make(map[string]map[uint64]string)
+	transactions := make(map[string]map[uint64]actions.GasUpdateEvent)
+	destToSourcesList := make(map[string][]string)
+	for _, n := range o.Cfg.NetworkPairs {
+		if _, ok := destToSourcesList[n.NetworkB.Name]; ok {
+			destToSourcesList[n.NetworkB.Name] = append(destToSourcesList[n.NetworkB.Name], n.NetworkA.Name)
+		} else {
+			destToSourcesList[n.NetworkB.Name] = []string{n.NetworkA.Name}
+		}
+		if pointer.GetBool(o.Cfg.TestGroupInput.BiDirectionalLane) {
+			if _, ok := destToSourcesList[n.NetworkA.Name]; ok {
+				destToSourcesList[n.NetworkA.Name] = append(destToSourcesList[n.NetworkA.Name], n.NetworkB.Name)
+			} else {
+				destToSourcesList[n.NetworkA.Name] = []string{n.NetworkB.Name}
+			}
+		}
+	}
+	lggr.Info().Interface("list", destToSourcesList).Msg("Dest to Source")
 	readGasUpdateTx := func(lane *actions.CCIPLane) error {
 		for _, g := range lane.Source.Common.GasUpdateEvents {
 			if g.Value == nil {
-				return fmt.Errorf("gas update value should not be nil for chain selected %v in tx %s", g.ChainSelector, g.Tx)
+				return fmt.Errorf("gas update value should not be nil in tx %s", g.Tx)
 			}
 			if v, ok := transactions[g.Tx]; ok {
-				v[g.ChainSelector] = g.Value.String()
+
+				v[g.DestChain] = g
 				transactions[g.Tx] = v
 			} else {
-				transactions[g.Tx] = map[uint64]string{
-					g.ChainSelector: g.Value.String(),
+				transactions[g.Tx] = map[uint64]actions.GasUpdateEvent{
+					g.DestChain: g,
 				}
 			}
 
-			lane.Logger.Debug().
+			lane.Logger.Info().
 				Str("Sender", g.Sender).
 				Str("Tx Hash", g.Tx).
 				Uint64("Dest", g.DestChain).
-				Uint64("ChainSelector", g.ChainSelector).
 				Str("Value", g.Value.String()).
 				Msg("Gas price Updater details")
 		}
 		return nil
 	}
+
 	for _, lanes := range o.ReadLanes() {
 		if err := readGasUpdateTx(lanes.ForwardLane); err != nil {
 			return err
@@ -986,20 +1003,33 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) e
 	// each transaction should have number of network - 1 chain selectors and corresponding gas values.
 	// Say we have 3 networks, then we have expected every transaction to have 2 chain selectors
 	//failed := false
-	for k, v := range transactions {
-		if len(v) != o.Cfg.TestGroupInput.NoOfNetworks-1 {
+	for k, chainsReceivesPriceUpdate := range transactions {
+		var (
+			priceReceivedFromChain string
+			sender                 string
+		)
+		for _, chain := range chainsReceivesPriceUpdate {
+			priceReceivedFromChain = chain.Source
+			sender = chain.Sender
+			break
+		}
+		if len(chainsReceivesPriceUpdate) != len(destToSourcesList[priceReceivedFromChain]) {
 			lggr.Warn().
 				Str("Tx hash", k).
-				Interface("Chain selectors", v).
-				Int("Event emitted count", len(v)).
+				Str("Source", priceReceivedFromChain).
+				Str("Sender", sender).
+				Int("Expected event count", len(destToSourcesList[priceReceivedFromChain])).
+				Int("Event emitted count", len(chainsReceivesPriceUpdate)).
 				Msg("Checked Gas Update transaction events count doesn't match")
 			//failed = true
 
 		} else {
 			lggr.Info().
 				Str("Tx hash", k).
-				Interface("Chain selectors", v).
-				Int("Event emitted count", len(v)).
+				Str("Source", priceReceivedFromChain).
+				Str("Sender", sender).
+				Int("Expected event count", len(destToSourcesList[priceReceivedFromChain])).
+				Int("Event emitted count", len(chainsReceivesPriceUpdate)).
 				Msg("Checked Gas Update transaction events count")
 		}
 	}
