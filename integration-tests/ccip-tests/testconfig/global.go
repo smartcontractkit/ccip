@@ -137,8 +137,11 @@ func NewConfig() (*Config, error) {
 	}
 	// read secrets for all products
 	if cfg.CCIP != nil {
-		ctfconfig.LoadSecretDotEnvFiles()
-		err := cfg.CCIP.LoadFromEnv()
+		err := ctfconfig.LoadSecretDotEnvFiles()
+		if err != nil {
+			return nil, errors.Wrap(err, "error loading testsecrets files")
+		}
+		err = cfg.CCIP.LoadFromEnv()
 		if err != nil {
 			return nil, errors.Wrap(err, "error loading env vars into CCIP config")
 		}
@@ -167,25 +170,25 @@ type Common struct {
 }
 
 // LoadFromEnv loads selected env vars into the config
-func (c *Common) LoadFromEnv() error {
-	if c.Logging == nil {
-		c.Logging = &ctfconfig.LoggingConfig{}
+func (p *Common) LoadFromEnv() error {
+	if p.Logging == nil {
+		p.Logging = &ctfconfig.LoggingConfig{}
 	}
-	err := c.Logging.LoadFromEnv()
+	err := p.Logging.LoadFromEnv()
 	if err != nil {
 		return errors.Wrap(err, "error loading logging config from env")
 	}
-	if c.Network == nil {
-		c.Network = &ctfconfig.NetworkConfig{}
+	if p.Network == nil {
+		p.Network = &ctfconfig.NetworkConfig{}
 	}
-	err = c.Network.LoadFromEnv()
+	err = p.Network.LoadFromEnv()
 	if err != nil {
 		return errors.Wrap(err, "error loading network config from env")
 	}
-	if c.NewCLCluster == nil {
-		c.NewCLCluster = &ChainlinkDeployment{}
+	if p.NewCLCluster == nil {
+		p.NewCLCluster = &ChainlinkDeployment{}
 	}
-	err = c.NewCLCluster.LoadFromEnv()
+	err = p.NewCLCluster.LoadFromEnv()
 	if err != nil {
 		return errors.Wrap(err, "error loading chainlink deployment config from env")
 	}
