@@ -102,14 +102,13 @@ func (bs ZKOverflowBatchingStrategy) BuildBatch(
 	ctx context.Context,
 	batchCtx *BatchContext,
 ) ([]ccip.ObservedMessage, []messageExecStatus) {
-	batchBuilder := newBatchBuildContainer(1)
+	batchBuilder := newBatchBuildContainer(len(batchCtx.report.sendRequestsWithMeta))
+	inflightSeqNums := getInflightSeqNums(batchCtx.inflight)
 
 	for _, msg := range batchCtx.report.sendRequestsWithMeta {
 		msgLggr := batchCtx.lggr.With("messageID", hexutil.Encode(msg.MessageID[:]), "seqNr", msg.SequenceNumber)
 
-		// Check if the message is inflight
-		inflightSeqNums := getInflightSeqNums(batchCtx.inflight)
-
+		// Check if msg is inflight
 		if exists := inflightSeqNums.Contains(msg.SequenceNumber); exists {
 			// Message is inflight, skip it
 			msgLggr.Infow("Skipping message - already inflight")
