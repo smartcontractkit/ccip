@@ -1,27 +1,27 @@
 package ccip_integration_tests
 
 import (
-	"context"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/consul/sdk/freeport"
+
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	"github.com/stretchr/testify/require"
 )
 
 func TestIntegration_OCR3Nodes(t *testing.T) {
 	numChains := 3
 	homeChainUni, universes := createUniverses(t, numChains)
-	//homeChainUni, universes := createUniverses(t, 3)
 	numNodes := 4
 	t.Log("creating ocr3 nodes")
 	var (
@@ -74,69 +74,27 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		}
 	}
 
-	t.Log("starting ticker to commit blocks")
-	tick := time.NewTicker(1 * time.Second)
-	defer tick.Stop()
-	tickCtx, tickCancel := context.WithCancel(testutils.Context(t))
-	defer tickCancel()
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			select {
-			case <-tick.C:
-				for _, uni := range universes {
-					uni.backend.Commit()
-				}
-			case <-tickCtx.Done():
-				return
-			}
-		}
-	}()
-	t.Cleanup(func() {
-		tickCancel()
-		wg.Wait()
-	})
-
-	bootstrapNode := nodes[0]
-
-	t.Log("adding bootstrap node job")
-	err := bootstrapNode.app.Start(testutils.Context(t))
-	require.NoError(t, err, "failed to start bootstrap node")
-	t.Cleanup(func() {
-		require.NoError(t, bootstrapNode.app.Stop())
-	})
-
-	evmChains := bootstrapNode.app.GetRelayers().LegacyEVMChains()
-	require.NotNil(t, evmChains)
-	require.Len(t, evmChains.Slice(), numChains)
+	// Start committing periodically in the background for all the chains
+	commitBlocksBackground(t, universes, time.NewTicker(1*time.Second))
 
 	t.Log("creating ocr3 jobs")
-	for i := 0; i < numNodes; i++ {
-		//err := apps[i].Start(testutils.Context(t))
-		//require.NoError(t, err)
-		//tApp := apps[i]
-		//t.Cleanup(func() {
-		//	require.NoError(t, tApp.Stop())
-		//})
-		//
-		//ccipSpecToml := createCCIPSpecToml(nodes[i].peerID, bootstrapP2PID.String(), bootstrapPort, nodes[i].keybundle.ID())
-		//t.Log("Creating ccip job with spec:\n", ccipSpecToml)
-
-		//ccipJob, err2 := ccipcapability(ccipSpecToml)
-		//require.NoError(t, err2, "failed to validate ccip job")
-		//err2 = apps[i].AddJobV2(testutils.Context(t), &ccipJob)
-		//require.NoError(t, err2, "failed to add ccip job")
+	for i := 0; i < len(nodes); i++ {
+		err := nodes[i].app.Start(testutils.Context(t))
+		require.NoError(t, err)
+		tApp := apps[i]
+		t.Cleanup(func() {
+			require.NoError(t, tApp.Stop())
+		})
+		//TODO: Create Jobs and add them to the app
 	}
 
-	// add the ccip dons to the capability registry.
 	ccipCapabilityID, err := homeChainUni.capabilityRegistry.GetHashedCapabilityId(nil, CapabilityLabelledName, CapabilityVersion)
 	require.NoError(t, err, "failed to get hashed capability id for ccip")
 	require.NotEqual(t, [32]byte{}, ccipCapabilityID, "ccip capability id is empty")
 
+	// Need to Add nodes and assign capabilities to them before creating DONS
 	homeChainUni.AddNodes(t, p2pIDs, [][32]byte{ccipCapabilityID})
-	// create a DON for each chain
+	// Create a DON for each chain
 	for _, uni := range universes {
 		// Add nodes and give them the capability
 		t.Log("AddingDON for universe: ", uni.chainID)

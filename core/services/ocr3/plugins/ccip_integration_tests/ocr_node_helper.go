@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,9 +15,11 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/jmoiron/sqlx"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	v2toml "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
@@ -32,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -250,29 +254,29 @@ func createConfigV2Chain(chainID *big.Int) *v2toml.EVMConfig {
 	}
 }
 
-func createCCIPSpecToml(nodeP2PID, bootstrapP2PID string, bootstrapPort int, ocrKeyBundleID string) string {
-	return fmt.Sprintf(`
-type = "ccip"
-capabilityVersion = "%s"
-capabilityLabelledName = "%s"
-p2pKeyID = "%s"
-p2pV2Bootstrappers = ["%s"]
-[ocrKeyBundleIDs]
-evm = "%s"
-[relayConfigs.evm.chainReaderConfig.contracts.Offramp]
-contractABI = "the abi"
-
-[relayConfigs.evm.chainReaderConfig.contracts.Offramp.configs.getStuff]
-chainSpecificName = "getStuffEVM"
-
-[pluginConfig]
-tokenPricesPipeline = "the pipeline"`,
-		CapabilityVersion,
-		CcipCapabilityLabelledName,
-		nodeP2PID,
-		fmt.Sprintf("%s@127.0.0.1:%d", bootstrapP2PID,
-			bootstrapPort,
-		),
-		ocrKeyBundleID,
-	)
+// Commit blocks periodically in the background for all chains
+func commitBlocksBackground(t *testing.T, universes map[uint64]onchainUniverse, tick *time.Ticker) {
+	t.Log("starting ticker to commit blocks")
+	defer tick.Stop()
+	tickCtx, tickCancel := context.WithCancel(testutils.Context(t))
+	defer tickCancel()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-tick.C:
+				for _, uni := range universes {
+					uni.backend.Commit()
+				}
+			case <-tickCtx.Done():
+				return
+			}
+		}
+	}()
+	t.Cleanup(func() {
+		tickCancel()
+		wg.Wait()
+	})
 }

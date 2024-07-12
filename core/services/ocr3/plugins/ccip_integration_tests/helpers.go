@@ -11,28 +11,28 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ocr3_config_encoder"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
-	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
-
-	chainsel "github.com/smartcontractkit/chain-selectors"
-
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ocr3_config_encoder"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/link_token"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
+
+	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/stretchr/testify/require"
 )
@@ -341,8 +341,7 @@ func (h *homeChain) AddDON(
 	for range oracles {
 		schedule = append(schedule, 1)
 	}
-	offchainConfig, onchainConfig := []byte{}, []byte{}
-	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
+	signers, transmitters, f, _, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
 		30*time.Second, // deltaProgress
 		10*time.Second, // deltaResend
 		20*time.Second, // deltaInitial
@@ -353,13 +352,13 @@ func (h *homeChain) AddDON(
 		3,              // rmax
 		schedule,
 		oracles,
-		offchainConfig,
+		[]byte{},            // empty offchain config
 		50*time.Millisecond, // maxDurationQuery
 		5*time.Second,       // maxDurationObservation
 		10*time.Second,      // maxDurationShouldAcceptAttestedReport
 		10*time.Second,      // maxDurationShouldTransmitAcceptedReport
 		int(f),
-		onchainConfig)
+		[]byte{}) // empty OnChainConfig
 	require.NoError(t, err, "failed to create contract config")
 
 	tabi, err := ocr3_config_encoder.IOCR3ConfigEncoderMetaData.GetAbi()
@@ -372,8 +371,9 @@ func (h *homeChain) AddDON(
 
 	transmittersBytes := make([][]byte, len(transmitters))
 	for i, transmitter := range transmitters {
-		parsed, err := common.ParseHexOrString(string(transmitter))
-		require.NoError(t, err)
+		// anotherErr because linting doesn't want to shadow err
+		parsed, anotherErr := common.ParseHexOrString(string(transmitter))
+		require.NoError(t, anotherErr)
 		transmittersBytes[i] = parsed
 	}
 
