@@ -2,4 +2,4 @@
 "ccip": patch
 ---
 
-generic token pool io
+Bumped chain selectors
