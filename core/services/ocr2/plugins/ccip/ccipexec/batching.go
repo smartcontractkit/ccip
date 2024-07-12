@@ -66,7 +66,6 @@ func NewBatchingStrategy(batchingStrategyID uint32, statusChecker statuschecker.
 		}
 	default:
 		return nil, errors.Errorf("unknown batching strategy ID %d", batchingStrategyID)
-
 	}
 	return batchingStrategy, nil
 }
