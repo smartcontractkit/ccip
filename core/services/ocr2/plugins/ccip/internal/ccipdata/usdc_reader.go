@@ -16,6 +16,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
+var (
+	// shortLivedInMemLogsCacheExpiration is used for the short lived in meme logs cache. Value should not be set
+	// to a very high value as it is used to prevent frequent log fetching (e.g. in caller's a loop).
+	shortLivedInMemLogsCacheExpiration = 20 * time.Second
+)
+
 const (
 	MESSAGE_SENT_FILTER_NAME = "USDC message sent"
 )
@@ -80,7 +86,7 @@ func (u *USDCReaderImpl) GetUSDCMessagePriorToLogIndexInTx(ctx context.Context, 
 	var lpLogs []logpoller.Log
 
 	// fetch all the usdc logs for the provided tx hash
-	k := fmt.Sprintf("getUsdcMsgPriorToLogIdx-%s", txHash)
+	k := fmt.Sprintf("usdc-%s", txHash) // custom prefix to avoid key collision if someone re-uses the cache
 	if rawLogs, foundInMem := u.shortLivedInMemLogs.Get(k); foundInMem {
 		inMemLogs, ok := rawLogs.([]logpoller.Log)
 		if !ok {
@@ -143,7 +149,7 @@ func NewUSDCReader(lggr logger.Logger, jobID string, transmitter common.Address,
 			Retention: CommitExecLogsRetention,
 		},
 		transmitterAddress:  transmitter,
-		shortLivedInMemLogs: cache.New(20*time.Second, time.Minute),
+		shortLivedInMemLogs: cache.New(shortLivedInMemLogsCacheExpiration, 2*shortLivedInMemLogsCacheExpiration),
 	}
 
 	if registerFilters {

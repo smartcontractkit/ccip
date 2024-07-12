@@ -197,8 +197,9 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg cciptypes.EVM2E
 		return []byte{}, errors.Wrap(err, "failed calling usdc attestation API ")
 	}
 
-	s.lggr.Infow("Got response from attestation API", "messageBodyHash", msgBody, "messageID", msgID,
-		"ar.status", attestationResp.Status, "ar.attestation", attestationResp.Attestation, "ar.error", attestationResp.Error)
+	s.lggr.Infow("Got response from attestation API", "messageID", msgID,
+		"attestationStatus", attestationResp.Status, "attestation", attestationResp.Attestation,
+		"attestationError", attestationResp.Error)
 
 	switch attestationResp.Status {
 	case attestationStatusSuccess:
