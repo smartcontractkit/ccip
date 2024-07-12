@@ -8,10 +8,9 @@ The test config is read in following order:
   - The file content needs to be encoded in base64 format and set in `BASE64_CCIP_CONFIG_OVERRIDE` environment variable. 
   - The config mentioned in this file will override the default config.
   - Example override file - [override.toml.example](./examples/override.toml.example)
-- If there are sensitive details like private keys, credentials in test config, they can be specified in a separate secret file. 
-  - The file content needs to be encoded in base64 format and set in `BASE64_CCIP_SECRETS_CONFIG` environment variable. 
-  - The config mentioned in this file will override the default and override config.
-  - Example secret file - [secrets.toml.example](./examples/secrets.toml.example)
+- If there are sensitive details like private keys, credentials in test config, they can be specified in a separate dotenv file as env vars
+  - The `~/.testsecrets` file in home directory is automatically loaded and should have all test secrets as env vars  
+  - Example secret file - [.testsecrets.example](./examples/.testsecrets.example)
 
 ## CCIP.ContractVersions
 Specifies contract versions of different contracts to be referred by test.

@@ -29,7 +29,6 @@ import (
 const (
 	OVERIDECONFIG = "BASE64_CCIP_CONFIG_OVERRIDE"
 
-	SECRETSCONFIG             = "BASE64_CCIP_SECRETS_CONFIG"
 	ErrReadConfig             = "failed to read TOML config"
 	ErrUnmarshalConfig        = "failed to unmarshal TOML config"
 	Load               string = "load"
@@ -105,7 +104,7 @@ func EncodeConfigAndSetEnv(c any, envVar string) (string, error) {
 func NewConfig() (*Config, error) {
 	cfg := &Config{}
 	var override *Config
-	var secrets *Config
+	// var secrets *Config
 	// load config from default file
 	err := config.DecodeTOML(bytes.NewReader(DefaultConfig), cfg)
 	if err != nil {
@@ -135,22 +134,10 @@ func NewConfig() (*Config, error) {
 	}
 	// read secrets for all products
 	if cfg.CCIP != nil {
-		// load config from env var if specified for secrets
-		secretRawConfig, _ := osutil.GetEnv(SECRETSCONFIG)
-		if secretRawConfig != "" {
-			err = DecodeConfig(secretRawConfig, &secrets)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decode secrets config: %w", err)
-			}
-			if secrets != nil {
-				// apply secrets for all products
-				if secrets.CCIP != nil {
-					err = cfg.CCIP.ApplyOverrides(secrets.CCIP)
-					if err != nil {
-						return nil, fmt.Errorf("failed to apply secrets: %w", err)
-					}
-				}
-			}
+		ctfconfig.LoadSecretDotEnvFiles()
+		err := cfg.CCIP.LoadFromEnv()
+		if err != nil {
+			return nil, errors.Wrap(err, "error loading env vars into CCIP config")
 		}
 		// validate all products
 		err = cfg.CCIP.Validate()
@@ -174,6 +161,33 @@ type Common struct {
 	Network                 *ctfconfig.NetworkConfig                    `toml:",omitempty"`
 	PrivateEthereumNetworks map[string]*ctfconfig.EthereumNetworkConfig `toml:",omitempty"`
 	Logging                 *ctfconfig.LoggingConfig                    `toml:",omitempty"`
+}
+
+// LoadFromEnv loads selected env vars into the config
+func (c *Common) LoadFromEnv() error {
+	if c.Logging == nil {
+		c.Logging = &ctfconfig.LoggingConfig{}
+	}
+	err := c.Logging.LoadFromEnv()
+	if err != nil {
+		return errors.Wrap(err, "error loading logging config from env")
+	}
+	if c.Network == nil {
+		c.Network = &ctfconfig.NetworkConfig{}
+	}
+	err = c.Network.LoadFromEnv()
+	if err != nil {
+		return errors.Wrap(err, "error loading network config from env")
+	}
+	if c.NewCLCluster == nil {
+		c.NewCLCluster = &ChainlinkDeployment{}
+	}
+	err = c.NewCLCluster.LoadFromEnv()
+	if err != nil {
+		return errors.Wrap(err, "error loading chainlink deployment config from env")
+	}
+
+	return nil
 }
 
 func (p *Common) GetNodeConfig() *ctfconfig.NodeConfig {
@@ -338,6 +352,21 @@ type ChainlinkDeployment struct {
 	DBArgs         []string `toml:",omitempty"`
 	NoOfNodes      *int     `toml:",omitempty"`
 	Nodes          []*Node  `toml:",omitempty"` // to be mentioned only if diff nodes follow diff configs; not required if all nodes follow CommonConfig
+}
+
+func (c *ChainlinkDeployment) LoadFromEnv() error {
+	if c.Common == nil {
+		c.Common = &Node{}
+	}
+	err := c.Common.ChainlinkImage.LoadFromEnv("E2E_TEST_CHAINLINK_IMAGE")
+	if err != nil {
+		return err
+	}
+	err = c.Common.ChainlinkUpgradeImage.LoadFromEnv("E2E_TEST_CHAINLINK_UPGRADE_IMAGE")
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *ChainlinkDeployment) Validate() error {

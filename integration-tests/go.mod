@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/ccip/integration-tests
 
-go 1.21.7
+go 1.22.5
 
 // Make sure we're working with the latest chainlink libs
 replace github.com/smartcontractkit/chainlink/v2 => ../
@@ -64,6 +64,8 @@ require (
 exclude github.com/hashicorp/consul v1.2.1
 
 replace (
+	github.com/smartcontractkit/chainlink-testing-framework => /Users/lukasz/Documents/smartcontractkit/chainlink-testing-framework
+
 	k8s.io/api => k8s.io/api v0.25.11
 	k8s.io/client-go => k8s.io/client-go v0.25.11
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230303024457-afdc3dddf62d
