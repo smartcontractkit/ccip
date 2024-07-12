@@ -392,7 +392,7 @@ func (c *CCIP) LoadFromEnv() error {
 	if c.Env == nil {
 		c.Env = &Common{}
 	}
-	err := c.Env.LoadFromEnv()
+	err := c.Env.ReadFromEnvVar()
 	if err != nil {
 		return err
 	}

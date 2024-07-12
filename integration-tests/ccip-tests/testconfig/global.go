@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/seth"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
+	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
@@ -137,7 +138,7 @@ func NewConfig() (*Config, error) {
 	}
 	// read secrets for all products
 	if cfg.CCIP != nil {
-		err := ctfconfig.LoadSecretDotEnvFiles()
+		err := ctfconfig.LoadSecretEnvsFromFiles()
 		if err != nil {
 			return nil, errors.Wrap(err, "error loading testsecrets files")
 		}
@@ -169,28 +170,151 @@ type Common struct {
 	Logging                 *ctfconfig.LoggingConfig                    `toml:",omitempty"`
 }
 
-// LoadFromEnv loads selected env vars into the config
-func (p *Common) LoadFromEnv() error {
-	if p.Logging == nil {
-		p.Logging = &ctfconfig.LoggingConfig{}
+// ReadFromEnvVar loads selected env vars into the config
+func (p *Common) ReadFromEnvVar() error {
+	logger := logging.GetTestLogger(nil)
+
+	lokiTenantID := ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_LOKI_TENANT_ID_ENV)
+	if lokiTenantID != "" {
+		if p.Logging == nil {
+			p.Logging = &ctfconfig.LoggingConfig{}
+		}
+		if p.Logging.Loki == nil {
+			p.Logging.Loki = &ctfconfig.LokiConfig{}
+		}
+		logger.Debug().Msgf("Using %s env var to override Logging.Loki.TenantId", ctfconfig.E2E_TEST_LOKI_TENANT_ID_ENV)
+		p.Logging.Loki.TenantId = &lokiTenantID
 	}
-	err := p.Logging.LoadFromEnv()
-	if err != nil {
-		return errors.Wrap(err, "error loading logging config from env")
+
+	lokiEndpoint := ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_LOKI_ENDPOINT_ENV)
+	if lokiEndpoint != "" {
+		if p.Logging == nil {
+			p.Logging = &ctfconfig.LoggingConfig{}
+		}
+		if p.Logging.Loki == nil {
+			p.Logging.Loki = &ctfconfig.LokiConfig{}
+		}
+		logger.Debug().Msgf("Using %s env var to override Logging.Loki.Endpoint", ctfconfig.E2E_TEST_LOKI_ENDPOINT_ENV)
+		p.Logging.Loki.Endpoint = &lokiEndpoint
 	}
-	if p.Network == nil {
-		p.Network = &ctfconfig.NetworkConfig{}
+
+	lokiBasicAuth := ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_LOKI_BASIC_AUTH_ENV)
+	if lokiBasicAuth != "" {
+		if p.Logging == nil {
+			p.Logging = &ctfconfig.LoggingConfig{}
+		}
+		if p.Logging.Loki == nil {
+			p.Logging.Loki = &ctfconfig.LokiConfig{}
+		}
+		logger.Debug().Msgf("Using %s env var to override Logging.Loki.BasicAuth", ctfconfig.E2E_TEST_LOKI_BASIC_AUTH_ENV)
+		p.Logging.Loki.BasicAuth = &lokiBasicAuth
 	}
-	err = p.Network.LoadFromEnv()
-	if err != nil {
-		return errors.Wrap(err, "error loading network config from env")
+
+	lokiBearerToken := ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_LOKI_BEARER_TOKEN_ENV)
+	if lokiBearerToken != "" {
+		if p.Logging == nil {
+			p.Logging = &ctfconfig.LoggingConfig{}
+		}
+		if p.Logging.Loki == nil {
+			p.Logging.Loki = &ctfconfig.LokiConfig{}
+		}
+		logger.Debug().Msgf("Using %s env var to override Logging.Loki.BearerToken", ctfconfig.E2E_TEST_LOKI_BEARER_TOKEN_ENV)
+		p.Logging.Loki.BearerToken = &lokiBearerToken
 	}
-	if p.NewCLCluster == nil {
-		p.NewCLCluster = &ChainlinkDeployment{}
+
+	grafanaBaseUrl := ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_GRAFANA_BASE_URL_ENV)
+	if grafanaBaseUrl != "" {
+		if p.Logging == nil {
+			p.Logging = &ctfconfig.LoggingConfig{}
+		}
+		if p.Logging.Grafana == nil {
+			p.Logging.Grafana = &ctfconfig.GrafanaConfig{}
+		}
+		logger.Debug().Msgf("Using %s env var to override Logging.Grafana.BaseUrl", ctfconfig.E2E_TEST_GRAFANA_BASE_URL_ENV)
+		p.Logging.Grafana.BaseUrl = &grafanaBaseUrl
 	}
-	err = p.NewCLCluster.LoadFromEnv()
-	if err != nil {
-		return errors.Wrap(err, "error loading chainlink deployment config from env")
+
+	grafanaDashboardUrl := ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_GRAFANA_DASHBOARD_URL_ENV)
+	if grafanaDashboardUrl != "" {
+		if p.Logging == nil {
+			p.Logging = &ctfconfig.LoggingConfig{}
+		}
+		if p.Logging.Grafana == nil {
+			p.Logging.Grafana = &ctfconfig.GrafanaConfig{}
+		}
+		logger.Debug().Msgf("Using %s env var to override Logging.Grafana.DashboardUrl", ctfconfig.E2E_TEST_GRAFANA_DASHBOARD_URL_ENV)
+		p.Logging.Grafana.DashboardUrl = &grafanaDashboardUrl
+	}
+
+	grafanaBearerToken := ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_GRAFANA_BEARER_TOKEN_ENV)
+	if grafanaBearerToken != "" {
+		if p.Logging == nil {
+			p.Logging = &ctfconfig.LoggingConfig{}
+		}
+		if p.Logging.Grafana == nil {
+			p.Logging.Grafana = &ctfconfig.GrafanaConfig{}
+		}
+		logger.Debug().Msgf("Using %s env var to override Logging.Grafana.BearerToken", ctfconfig.E2E_TEST_GRAFANA_BEARER_TOKEN_ENV)
+		p.Logging.Grafana.BearerToken = &grafanaBearerToken
+	}
+
+	walletKeys := ctfconfig.ReadEnvVarGroupedMap(ctfconfig.E2E_TEST_WALLET_KEY_ENV, ctfconfig.E2E_TEST_WALLET_KEYS_ENV)
+	if len(walletKeys) > 0 {
+		if p.Network == nil {
+			p.Network = &ctfconfig.NetworkConfig{}
+		}
+		logger.Debug().Msgf("Using %s and/or %s env vars to override Network.WalletKeys", ctfconfig.E2E_TEST_WALLET_KEY_ENV, ctfconfig.E2E_TEST_WALLET_KEYS_ENV)
+		p.Network.WalletKeys = walletKeys
+	}
+
+	rpcHttpUrls := ctfconfig.ReadEnvVarGroupedMap(ctfconfig.E2E_TEST_RPC_HTTP_URL_ENV, ctfconfig.E2E_TEST_RPC_HTTP_URLS_ENV)
+	if len(rpcHttpUrls) > 0 {
+		if p.Network == nil {
+			p.Network = &ctfconfig.NetworkConfig{}
+		}
+		logger.Debug().Msgf("Using %s and/or %s env vars to override Network.RpcHttpUrls", ctfconfig.E2E_TEST_RPC_HTTP_URL_ENV, ctfconfig.E2E_TEST_RPC_HTTP_URLS_ENV)
+		p.Network.RpcHttpUrls = rpcHttpUrls
+	}
+
+	rpcWsUrls := ctfconfig.ReadEnvVarGroupedMap(ctfconfig.E2E_TEST_RPC_WS_URL_ENV, ctfconfig.E2E_TEST_RPC_WS_URLS_ENV)
+	if len(rpcWsUrls) > 0 {
+		if p.Network == nil {
+			p.Network = &ctfconfig.NetworkConfig{}
+		}
+		logger.Debug().Msgf("Using %s and/or %s env vars to override Network.RpcWsUrls", ctfconfig.E2E_TEST_RPC_WS_URL_ENV, ctfconfig.E2E_TEST_RPC_WS_URLS_ENV)
+		p.Network.RpcWsUrls = rpcWsUrls
+	}
+
+	chainlinkImage := ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV)
+	if chainlinkImage != "" {
+		if p.NewCLCluster == nil {
+			p.NewCLCluster = &ChainlinkDeployment{}
+		}
+		if p.NewCLCluster.Common == nil {
+			p.NewCLCluster.Common = &Node{}
+		}
+		if p.NewCLCluster.Common.ChainlinkImage == nil {
+			p.NewCLCluster.Common.ChainlinkImage = &ctfconfig.ChainlinkImageConfig{}
+		}
+
+		logger.Debug().Msgf("Using %s env var to override NewCLCluster.Common.ChainlinkImage.Image", ctfconfig.E2E_TEST_CHAINLINK_IMAGE_ENV)
+		p.NewCLCluster.Common.ChainlinkImage.Image = &chainlinkImage
+	}
+
+	chainlinkUpgradeImage := ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_CHAINLINK_UPGRADE_IMAGE_ENV)
+	if chainlinkUpgradeImage != "" {
+		if p.NewCLCluster == nil {
+			p.NewCLCluster = &ChainlinkDeployment{}
+		}
+		if p.NewCLCluster.Common == nil {
+			p.NewCLCluster.Common = &Node{}
+		}
+		if p.NewCLCluster.Common.ChainlinkUpgradeImage == nil {
+			p.NewCLCluster.Common.ChainlinkUpgradeImage = &ctfconfig.ChainlinkImageConfig{}
+		}
+
+		logger.Debug().Msgf("Using %s env var to override NewCLCluster.Common.ChainlinkUpgradeImage.Image", ctfconfig.E2E_TEST_CHAINLINK_UPGRADE_IMAGE_ENV)
+		p.NewCLCluster.Common.ChainlinkUpgradeImage.Image = &chainlinkUpgradeImage
 	}
 
 	return nil
@@ -358,27 +482,6 @@ type ChainlinkDeployment struct {
 	DBArgs         []string `toml:",omitempty"`
 	NoOfNodes      *int     `toml:",omitempty"`
 	Nodes          []*Node  `toml:",omitempty"` // to be mentioned only if diff nodes follow diff configs; not required if all nodes follow CommonConfig
-}
-
-func (c *ChainlinkDeployment) LoadFromEnv() error {
-	if c.Common == nil {
-		c.Common = &Node{}
-	}
-	if c.Common.ChainlinkImage == nil {
-		c.Common.ChainlinkImage = &ctfconfig.ChainlinkImageConfig{}
-	}
-	err := c.Common.ChainlinkImage.LoadFromEnv("E2E_TEST_CHAINLINK_IMAGE")
-	if err != nil {
-		return err
-	}
-	if c.Common.ChainlinkUpgradeImage == nil {
-		c.Common.ChainlinkUpgradeImage = &ctfconfig.ChainlinkImageConfig{}
-	}
-	err = c.Common.ChainlinkUpgradeImage.LoadFromEnv("E2E_TEST_CHAINLINK_UPGRADE_IMAGE")
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (c *ChainlinkDeployment) Validate() error {
