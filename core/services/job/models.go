@@ -615,7 +615,7 @@ type BlockhashStoreSpec struct {
 	// WaitBlocks defines the minimum age of blocks whose hashes should be stored.
 	WaitBlocks int32 `toml:"waitBlocks"`
 
-	// HeartbeatPeriodTime defines the number of seconds by which we "heartbeat store"
+	// HeartbeatPeriod defines the number of seconds by which we "heartbeat store"
 	// a blockhash into the blockhash store contract.
 	// This is so that we always have a blockhash to anchor to in the event we need to do a
 	// backwards mode on the contract.
@@ -640,7 +640,7 @@ type BlockhashStoreSpec struct {
 	// EVMChainID defines the chain ID for monitoring and storing of blockhashes.
 	EVMChainID *big.Big `toml:"evmChainID"`
 
-	// FromAddress is the sender address that should be used to store blockhashes.
+	// FromAddresses is the sender address that should be used to store blockhashes.
 	FromAddresses []evmtypes.EIP55Address `toml:"fromAddresses"`
 
 	// CreatedAt is the time this job was created.
@@ -689,10 +689,10 @@ type BlockHeaderFeederSpec struct {
 	// EVMChainID defines the chain ID for monitoring and storing of blockhashes.
 	EVMChainID *big.Big `toml:"evmChainID"`
 
-	// FromAddress is the sender address that should be used to store blockhashes.
+	// FromAddresses is the sender address that should be used to store blockhashes.
 	FromAddresses []evmtypes.EIP55Address `toml:"fromAddresses"`
 
-	// GetBlockHashesBatchSize is the RPC call batch size for retrieving blockhashes
+	// GetBlockhashesBatchSize is the RPC call batch size for retrieving blockhashes
 	GetBlockhashesBatchSize uint16 `toml:"getBlockhashesBatchSize"`
 
 	// StoreBlockhashesBatchSize is the RPC call batch size for storing blockhashes
@@ -720,7 +720,7 @@ type LegacyGasStationServerSpec struct {
 	// This selector is equivalent to (source) chainID specified in SendTransaction request
 	CCIPChainSelector *big.Big `toml:"ccipChainSelector"`
 
-	// FromAddress is the sender address that should be used to send meta-transactions
+	// FromAddresses is the sender address that should be used to send meta-transactions
 	FromAddresses []evmtypes.EIP55Address `toml:"fromAddresses"`
 
 	// CreatedAt is the time this job was created.
@@ -826,7 +826,7 @@ type EALSpec struct {
 	// EVMChainID defines the chain ID from which the meta-transaction request originates.
 	EVMChainID *big.Big `toml:"evmChainID"`
 
-	// FromAddress is the sender address that should be used to send meta-transactions
+	// FromAddresses is the sender address that should be used to send meta-transactions
 	FromAddresses []evmtypes.EIP55Address `toml:"fromAddresses"`
 
 	// LookbackBlocks defines the maximum age of blocks to lookback in status tracker

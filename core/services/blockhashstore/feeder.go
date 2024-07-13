@@ -58,7 +58,7 @@ type Feeder struct {
 	lookbackBlocks      int
 	latestBlock         func(ctx context.Context) (uint64, error)
 
-	// heartbeatPeriodTime is a heartbeat period in seconds by which
+	// heartbeatPeriod is a heartbeat period in seconds by which
 	// the feeder will always store a blockhash, even if there are no
 	// unfulfilled requests. This is to ensure that there are blockhashes
 	// in the store to start from if we ever need to run backwards mode.
