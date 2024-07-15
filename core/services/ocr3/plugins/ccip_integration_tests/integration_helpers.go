@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"sort"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 
 	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ocr3_config_encoder"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
@@ -111,7 +113,11 @@ func NewTestUniverse(ctx context.Context, t *testing.T, lggr logger.Logger) Test
 		KeepFinalizedBlocksDepth: 100000,
 	}
 	cl := client.NewSimulatedBackendClient(t, backend, big.NewInt(chainID))
-	lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(chainID), db, lggr), cl, logger.NullLogger, lpOpts)
+	headTracker := headtracker.NewSimulatedHeadTracker(cl, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+	if lpOpts.PollPeriod == 0 {
+		lpOpts.PollPeriod = 1 * time.Hour
+	}
+	lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(chainID), db, lggr), cl, logger.NullLogger, headTracker, lpOpts)
 	require.NoError(t, lp.Start(ctx))
 	t.Cleanup(func() { require.NoError(t, lp.Close()) })
 
@@ -141,6 +147,16 @@ func P2pIDsFromInts(ints []int64) [][32]byte {
 		p2pID := p2pkey.MustNewV2XXXTestingOnly(big.NewInt(i)).PeerID()
 		p2pIDs = append(p2pIDs, p2pID)
 	}
+	sort.Slice(p2pIDs, func(i, j int) bool {
+		for k := 0; k < 32; k++ {
+			if p2pIDs[i][k] < p2pIDs[j][k] {
+				return true
+			} else if p2pIDs[i][k] > p2pIDs[j][k] {
+				return false
+			}
+		}
+		return false
+	})
 	return p2pIDs
 }
 
