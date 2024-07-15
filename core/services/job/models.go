@@ -936,7 +936,8 @@ type CCIPSpec struct {
 	// OCRKeyBundleIDs is a mapping from chain type to OCR key bundle ID.
 	// These are explicitly specified here so that we don't run into strange errors auto-detecting
 	// the valid bundle, since nops can create as many bundles as they want.
-	// This means that the job spec must be updated for every new chain family supported by CCIP.
+	// This will most likely never change for a particular CCIP capability version,
+	// since new chain families will likely require a new capability version.
 	// {"evm": "evm_key_bundle_id", "solana": "solana_key_bundle_id", ... }
 	OCRKeyBundleIDs JSONConfig `toml:"ocrKeyBundleIDs" db:"ocr_key_bundle_ids"`
 
@@ -947,16 +948,14 @@ type CCIPSpec struct {
 	// e.g we will have one chain writer config for EVM, one for solana, starknet, etc.
 	// See tests for examples of relay configs in TOML.
 	// { "evm": {"chainReader": {...}, "chainWriter": {...}}, "solana": {...}, ... }
-	// Relay config structure
-	// see core/services/relay/evm/types/types.go
+	// see core/services/relay/evm/types/types.go for EVM configs.
 	RelayConfigs JSONConfig `toml:"relayConfigs" db:"relay_configs"`
 
 	// P2PKeyID is the ID of the P2P key of the node.
 	// This must be present in the capability registry otherwise the job will not start correctly.
 	P2PKeyID string `toml:"p2pKeyID" db:"p2p_key_id"`
 
-	// PluginConfig contains plugin-specific config, like token price pipelines.
-	// The job spec will have to be updated once a new token needs its price posted.
-	// TODO: might get axed in favor of workflows' ccip price posting.
+	// PluginConfig contains plugin-specific config, like token price pipelines
+	// and RMN network info for offchain blessing.
 	PluginConfig JSONConfig `toml:"pluginConfig"`
 }
