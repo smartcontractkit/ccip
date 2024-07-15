@@ -175,7 +175,7 @@ jobs:
           chainlinkVersion: ${{ env.CHAINLINK_VERSION }}
           logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@75a9005952a9e905649cfb5a6971fd9429436acd # v2.3.25
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@d38226be720c5ccc1ff4d3cee40608ebf264cd59 # v2.3.26
         env:
           TEST_SUITE: load
           TEST_ARGS: -test.timeout 900h
@@ -272,7 +272,7 @@ jobs:
           chainlinkVersion: ${{ env.CHAINLINK_VERSION }}
           logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@75a9005952a9e905649cfb5a6971fd9429436acd # v2.3.25
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@d38226be720c5ccc1ff4d3cee40608ebf264cd59 # v2.3.26
         env:
           TEST_SUITE: smoke
           TEST_ARGS: -test.timeout 900h
