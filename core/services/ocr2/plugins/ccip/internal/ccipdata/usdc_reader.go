@@ -17,8 +17,9 @@ import (
 )
 
 var (
-	// shortLivedInMemLogsCacheExpiration is used for the short lived in meme logs cache. Value should not be set
-	// to a very high value as it is used to prevent frequent log fetching (e.g. in caller's a loop).
+	// shortLivedInMemLogsCacheExpiration is used for the short-lived in meme logs cache.
+	// Value should usually be set to just a few seconds, a larger duration will not increase performance and might
+	// cause performance issues on re-orged logs.
 	shortLivedInMemLogsCacheExpiration = 20 * time.Second
 )
 
