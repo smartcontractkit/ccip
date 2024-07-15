@@ -253,7 +253,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 				Named(destRelayID.String()).
 				Named(hexutil.Encode(config.Config.OfframpAddress)),
 			ccipreaderpkg.OCR3ConfigWithMeta(config),
-			nil, // TODO: ccipevm.NewExecutePluginCodecV1(),
+			ccipevm.NewExecutePluginCodecV1(),
 			ccipevm.NewMessageHasherV1(),
 			i.homeChainReader,
 			contractReaders,
