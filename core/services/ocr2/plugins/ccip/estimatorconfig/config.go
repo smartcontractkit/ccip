@@ -17,12 +17,9 @@ func NewFeeEstimatorConfigService() *FeeEstimatorConfigService {
 
 // SetOnRampReader Sets the onRamp reader instance.
 // must be called once for each instance.
-func (c *FeeEstimatorConfigService) SetOnRampReader(reader ccip.OnRampReader) error {
-	if c.onRampReader != nil {
-		return errors.New("OnRampReader already set in the FeeEstimatorConfigService")
-	}
+func (c *FeeEstimatorConfigService) SetOnRampReader(reader ccip.OnRampReader) {
 	c.onRampReader = reader
-	return nil
+	return
 }
 
 // GetDataAvailabilityConfig Returns dynamic config data availability parameters.

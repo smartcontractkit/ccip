@@ -109,7 +109,7 @@ func (o *OnRamp) GetDynamicConfig(ctx context.Context) (cciptypes.OnRampDynamicC
 		if o.onRamp == nil {
 			return cciptypes.OnRampDynamicConfig{}, fmt.Errorf("onramp not initialized")
 		}
-		legacyDynamicConfig, err := o.onRamp.GetDynamicConfig(nil)
+		legacyDynamicConfig, err := o.onRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return cciptypes.OnRampDynamicConfig{}, err
 		}
@@ -165,8 +165,8 @@ func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, s
 	return res, nil
 }
 
-func (o *OnRamp) RouterAddress(context.Context) (cciptypes.Address, error) {
-	config, err := o.onRamp.GetDynamicConfig(nil)
+func (o *OnRamp) RouterAddress(ctx context.Context) (cciptypes.Address, error) {
+	config, err := o.onRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return "", err
 	}

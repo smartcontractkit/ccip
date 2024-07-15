@@ -97,10 +97,7 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 	}
 
 	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
-	err = feeEstimatorConfig.SetOnRampReader(onRampReader)
-	if err != nil {
-		return nil, fmt.Errorf("NewExecServices set onRampReader to FeeEstimatorService: %w", err)
-	}
+	feeEstimatorConfig.SetOnRampReader(onRampReader)
 
 	srcCommitStore, err := srcProvider.NewCommitStoreReader(ctx, offRampConfig.CommitStore)
 	if err != nil {

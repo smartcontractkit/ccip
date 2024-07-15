@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 )
@@ -27,9 +26,7 @@ func TestExecutionReportEncodingV100(t *testing.T) {
 		ProofFlagBits:     big.NewInt(133),
 	}
 
-	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
-	onRampReader := mocks.NewOnRampReader(t)
-	require.NoError(t, feeEstimatorConfig.SetOnRampReader(onRampReader))
+	feeEstimatorConfig := mocks.NewFeeEstimatorConfigReader(t)
 
 	offRamp, err := v1_0_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, lpmocks.NewLogPoller(t), nil, nil, feeEstimatorConfig)
 	require.NoError(t, err)

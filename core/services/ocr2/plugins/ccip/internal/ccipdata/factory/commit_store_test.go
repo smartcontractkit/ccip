@@ -13,9 +13,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	onRampMock "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
+	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 )
 
@@ -25,9 +24,7 @@ func TestCommitStore(t *testing.T) {
 		addr := cciptypes.Address(utils.RandomAddress().String())
 		lp := mocks2.NewLogPoller(t)
 
-		feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
-		onRampReader := onRampMock.NewOnRampReader(t)
-		assert.NoError(t, feeEstimatorConfig.SetOnRampReader(onRampReader))
+		feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
 
 		lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil)
 		versionFinder := newMockVersionFinder(ccipconfig.CommitStore, *semver.MustParse(versionStr), nil)

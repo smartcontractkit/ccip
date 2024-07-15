@@ -36,7 +36,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	ccipcachemocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
@@ -409,7 +408,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			evmEstimator := mocks.NewEvmFeeEstimator(t)
 			evmEstimator.On("L1Oracle").Return(nil)
 
-			feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
+			feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
 			gasPriceEstimator := prices.NewDAGasPriceEstimator(evmEstimator, nil, 2e9, 2e9, feeEstimatorConfig) // 200% deviation
 
 			var destTokens []cciptypes.Address
@@ -1532,7 +1531,7 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				nil,
 				tc.daGasPriceDeviationPPB,
 				tc.execGasPriceDeviationPPB,
-				estimatorconfig.NewFeeEstimatorConfigService(),
+				ccipdatamocks.NewFeeEstimatorConfigReader(t),
 			)
 
 			r := &CommitReportingPlugin{

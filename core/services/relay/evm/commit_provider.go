@@ -272,10 +272,7 @@ func (P *SrcCommitProvider) NewOnRampReader(ctx context.Context, onRampAddress c
 	if err != nil {
 		return nil, err
 	}
-	err = P.feeEstimatorConfig.SetOnRampReader(onRampReader)
-	if err != nil {
-		return nil, fmt.Errorf("SrcCommitProvider set onRampReader to FeeEstimatorService: %w", err)
-	}
+	P.feeEstimatorConfig.SetOnRampReader(onRampReader)
 	return
 }
 

@@ -28,11 +28,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
-	onRampMock "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
+	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 )
@@ -195,9 +194,7 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 		require.Fail(t, "Unknown version: ", version)
 	}
 
-	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
-	onRampReader := onRampMock.NewOnRampReader(t)
-	assert.NoError(t, feeEstimatorConfig.SetOnRampReader(onRampReader))
+	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
 
 	// Create the version-specific reader.
 	reader, err := factory.NewOffRampReader(log, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(offRampAddress), bc, lp, nil, nil, true, feeEstimatorConfig)
@@ -407,9 +404,7 @@ func TestNewOffRampReader(t *testing.T) {
 			require.NoError(t, err)
 			c := evmclientmocks.NewClient(t)
 
-			feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
-			onRampReader := onRampMock.NewOnRampReader(t)
-			assert.NoError(t, feeEstimatorConfig.SetOnRampReader(onRampReader))
+			feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
 
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
 			addr := ccipcalc.EvmAddrToGeneric(utils.RandomAddress())

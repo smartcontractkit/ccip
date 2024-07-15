@@ -34,11 +34,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
-	onRampMock "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
+	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 )
@@ -194,9 +193,7 @@ func TestCommitStoreReaders(t *testing.T) {
 	lm := new(rollupMocks.L1Oracle)
 	ge.On("L1Oracle").Return(lm)
 
-	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
-	onRampReader := onRampMock.NewOnRampReader(t)
-	assert.NoError(t, feeEstimatorConfig.SetOnRampReader(onRampReader))
+	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
 
 	maxGasPrice := big.NewInt(1e8)
 	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp, feeEstimatorConfig) // ge, maxGasPrice
@@ -418,11 +415,7 @@ func TestNewCommitStoreReader(t *testing.T) {
 				lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil)
 			}
 
-			feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
-			onRampReader := onRampMock.NewOnRampReader(t)
-			onRampReader.On("GetDynamicConfig", context.Background()).
-				Return(cciptypes.OnRampDynamicConfig{}, nil).Maybe()
-			assert.NoError(t, feeEstimatorConfig.SetOnRampReader(onRampReader))
+			feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
 
 			_, err = factory.NewCommitStoreReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp, feeEstimatorConfig)
 			if tc.expectedErr != "" {

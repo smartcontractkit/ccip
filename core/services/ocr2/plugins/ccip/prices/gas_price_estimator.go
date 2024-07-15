@@ -47,7 +47,6 @@ func NewGasPriceEstimatorForCommitPlugin(
 	commitStoreVersion semver.Version,
 	estimator gas.EvmFeeEstimator,
 	maxExecGasPrice *big.Int,
-
 	daDeviationPPB int64,
 	execDeviationPPB int64,
 	feeEstimatorConfig ccipdata.FeeEstimatorConfigReader,

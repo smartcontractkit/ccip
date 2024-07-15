@@ -185,10 +185,7 @@ func (s *SrcExecProvider) NewOnRampReader(ctx context.Context, onRampAddress cci
 	if err != nil {
 		return nil, err
 	}
-	err = s.feeEstimatorConfig.SetOnRampReader(onRampReader)
-	if err != nil {
-		return nil, fmt.Errorf("SrcExecProvider set onRampReader to FeeEstimatorService: %w", err)
-	}
+	s.feeEstimatorConfig.SetOnRampReader(onRampReader)
 	return
 }
 

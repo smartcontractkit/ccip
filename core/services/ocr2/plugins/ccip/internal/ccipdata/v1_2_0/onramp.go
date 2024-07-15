@@ -126,7 +126,7 @@ func (o *OnRamp) GetDynamicConfig(ctx context.Context) (cciptypes.OnRampDynamicC
 		if o.onRamp == nil {
 			return cciptypes.OnRampDynamicConfig{}, fmt.Errorf("onramp not initialized")
 		}
-		config, err := o.onRamp.GetDynamicConfig(&bind.CallOpts{})
+		config, err := o.onRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 		if err != nil {
 			return cciptypes.OnRampDynamicConfig{}, fmt.Errorf("get dynamic config v1.2: %w", err)
 		}

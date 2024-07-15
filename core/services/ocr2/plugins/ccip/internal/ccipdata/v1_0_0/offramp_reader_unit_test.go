@@ -21,10 +21,9 @@ import (
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
-	onRampMock "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
+	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib/rpclibmocks"
 )
@@ -190,9 +189,7 @@ func Test_LogsAreProperlyMarkedAsFinalized(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			offrampAddress := utils.RandomAddress()
 
-			feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
-			onRampReader := onRampMock.NewOnRampReader(t)
-			assert.NoError(t, feeEstimatorConfig.SetOnRampReader(onRampReader))
+			feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
 
 			lp := mocks.NewLogPoller(t)
 			lp.On("LatestBlock", mock.Anything).

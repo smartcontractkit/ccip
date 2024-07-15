@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
@@ -22,9 +22,8 @@ func TestFeeEstimatorConfigService(t *testing.T) {
 
 	onRampReader := mocks.NewOnRampReader(t)
 	_, _, _, err := svc.GetDataAvailabilityConfig(ctx)
-	assert.Error(t, err)
-	assert.NoError(t, svc.SetOnRampReader(onRampReader))
-	assert.Error(t, svc.SetOnRampReader(onRampReader))
+	require.Error(t, err)
+	svc.SetOnRampReader(onRampReader)
 
 	onRampReader.On("GetDynamicConfig", ctx).
 		Return(ccip.OnRampDynamicConfig{
@@ -34,13 +33,13 @@ func TestFeeEstimatorConfigService(t *testing.T) {
 		}, nil).Once()
 
 	destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps, err := svc.GetDataAvailabilityConfig(ctx)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedDestDataAvailabilityOverheadGas, destDataAvailabilityOverheadGas)
-	assert.Equal(t, expectedDestGasPerDataAvailabilityByte, destGasPerDataAvailabilityByte)
-	assert.Equal(t, expectedDestDataAvailabilityMultiplierBps, destDataAvailabilityMultiplierBps)
+	require.NoError(t, err)
+	require.Equal(t, expectedDestDataAvailabilityOverheadGas, destDataAvailabilityOverheadGas)
+	require.Equal(t, expectedDestGasPerDataAvailabilityByte, destGasPerDataAvailabilityByte)
+	require.Equal(t, expectedDestDataAvailabilityMultiplierBps, destDataAvailabilityMultiplierBps)
 
 	onRampReader.On("GetDynamicConfig", ctx).
 		Return(ccip.OnRampDynamicConfig{}, errors.New("test")).Once()
 	_, _, _, err = svc.GetDataAvailabilityConfig(ctx)
-	assert.Error(t, err)
+	require.Error(t, err)
 }

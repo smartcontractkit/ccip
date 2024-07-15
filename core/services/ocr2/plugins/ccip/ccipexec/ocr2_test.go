@@ -30,7 +30,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	ccipcachemocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
@@ -428,9 +427,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	p.metricsCollector = ccip.NoopMetricsCollector
 	p.commitStoreReader = commitStore
 
-	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
-	onRampReader := ccipdatamocks.NewOnRampReader(t)
-	assert.NoError(t, feeEstimatorConfig.SetOnRampReader(onRampReader))
+	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
 
 	lp := lpMocks.NewLogPoller(t)
 	offRampReader, err := v1_0_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil, nil, feeEstimatorConfig)
@@ -1380,9 +1377,7 @@ func Test_prepareTokenExecData(t *testing.T) {
 }
 
 func encodeExecutionReport(t *testing.T, report cciptypes.ExecReport) []byte {
-	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
-	onRampReader := ccipdatamocks.NewOnRampReader(t)
-	assert.NoError(t, feeEstimatorConfig.SetOnRampReader(onRampReader))
+	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
 
 	reader, err := v1_2_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, nil, nil, nil, feeEstimatorConfig)
 	require.NoError(t, err)

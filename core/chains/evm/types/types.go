@@ -421,6 +421,6 @@ func (h *HashArray) Scan(src interface{}) error {
 }
 
 type FeeEstimatorConfigProvider interface {
-	SetOnRampReader(reader ccip.OnRampReader) error
+	SetOnRampReader(reader ccip.OnRampReader)
 	GetDataAvailabilityConfig(ctx context.Context) (destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64, err error)
 }

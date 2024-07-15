@@ -12,8 +12,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/rollups/mocks"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
-	mocks2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
+	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 )
 
 func encodeGasPrice(daPrice, execPrice *big.Int) *big.Int {
@@ -328,17 +327,17 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 	execCostUSD := big.NewInt(100_000)
 
 	testCases := []struct {
-		name               string
-		gasPrice           *big.Int
-		wrappedNativePrice *big.Int
-		msg                cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta
-		daOverheadGas      int64
-		gasPerDAByte       int64
-		daMultiplier       int64
-		expUSD             *big.Int
-		onRampConfig       cciptypes.OnRampDynamicConfig
-		onRampReaderErr    error
-		execEstimatorErr   error
+		name                  string
+		gasPrice              *big.Int
+		wrappedNativePrice    *big.Int
+		msg                   cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta
+		daOverheadGas         int64
+		gasPerDAByte          int64
+		daMultiplier          int64
+		expUSD                *big.Int
+		onRampConfig          cciptypes.OnRampDynamicConfig
+		execEstimatorResponse []any
+		execEstimatorErr      error
 	}{
 		{
 			name:               "only DA overhead",
@@ -351,12 +350,8 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					SourceTokenData: [][]byte{},
 				},
 			},
-			onRampConfig: cciptypes.OnRampDynamicConfig{
-				DestDataAvailabilityOverheadGas:   100_000,
-				DestGasPerDataAvailabilityByte:    0,
-				DestDataAvailabilityMultiplierBps: 10_000,
-			},
-			expUSD: new(big.Int).Add(execCostUSD, big.NewInt(100_000e9)),
+			expUSD:                new(big.Int).Add(execCostUSD, big.NewInt(100_000e9)),
+			execEstimatorResponse: []any{int64(100_000), int64(0), int64(10_000), nil},
 		},
 		{
 			name:               "include message data gas",
@@ -371,12 +366,8 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					},
 				},
 			},
-			onRampConfig: cciptypes.OnRampDynamicConfig{
-				DestDataAvailabilityOverheadGas:   100_000,
-				DestGasPerDataAvailabilityByte:    16,
-				DestDataAvailabilityMultiplierBps: 10_000,
-			},
-			expUSD: new(big.Int).Add(execCostUSD, big.NewInt(134_208e9)),
+			expUSD:                new(big.Int).Add(execCostUSD, big.NewInt(134_208e9)),
+			execEstimatorResponse: []any{int64(100_000), int64(16), int64(10_000), nil},
 		},
 		{
 			name:               "zero DA price",
@@ -388,11 +379,6 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					TokenAmounts:    []cciptypes.TokenAmount{},
 					SourceTokenData: [][]byte{},
 				},
-			},
-			onRampConfig: cciptypes.OnRampDynamicConfig{
-				DestDataAvailabilityOverheadGas:   100_000,
-				DestGasPerDataAvailabilityByte:    16,
-				DestDataAvailabilityMultiplierBps: 10_000, // 1x multiplier
 			},
 			expUSD: execCostUSD,
 		},
@@ -407,12 +393,8 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					SourceTokenData: [][]byte{},
 				},
 			},
-			onRampConfig: cciptypes.OnRampDynamicConfig{
-				DestDataAvailabilityOverheadGas:   100_000,
-				DestGasPerDataAvailabilityByte:    0,
-				DestDataAvailabilityMultiplierBps: 10_000, // 1x multiplier
-			},
-			expUSD: new(big.Int).Add(execCostUSD, big.NewInt(200_000e9)),
+			expUSD:                new(big.Int).Add(execCostUSD, big.NewInt(200_000e9)),
+			execEstimatorResponse: []any{int64(100_000), int64(0), int64(10_000), nil},
 		},
 		{
 			name:               "half multiplier",
@@ -425,12 +407,8 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					SourceTokenData: [][]byte{},
 				},
 			},
-			onRampConfig: cciptypes.OnRampDynamicConfig{
-				DestDataAvailabilityOverheadGas:   100_000,
-				DestGasPerDataAvailabilityByte:    0,
-				DestDataAvailabilityMultiplierBps: 5_000, // 0.5x multiplier
-			},
-			expUSD: new(big.Int).Add(execCostUSD, big.NewInt(50_000e9)),
+			expUSD:                new(big.Int).Add(execCostUSD, big.NewInt(50_000e9)),
+			execEstimatorResponse: []any{int64(100_000), int64(0), int64(5_000), nil},
 		},
 		{
 			name:               "onRamp reader error",
@@ -443,7 +421,7 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					SourceTokenData: [][]byte{},
 				},
 			},
-			onRampReaderErr: errors.New("some reader error"),
+			execEstimatorResponse: []any{int64(0), int64(0), int64(0), errors.New("some reader error")},
 		},
 		{
 			name:               "execEstimator error",
@@ -466,12 +444,11 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 			execEstimator.On("EstimateMsgCostUSD", mock.Anything, tc.wrappedNativePrice, tc.msg).
 				Return(execCostUSD, tc.execEstimatorErr)
 
-			feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
-			onRampReader := mocks2.NewOnRampReader(t)
-
-			onRampReader.On("GetDynamicConfig", context.Background()).
-				Return(tc.onRampConfig, tc.onRampReaderErr).Maybe()
-			assert.NoError(t, feeEstimatorConfig.SetOnRampReader(onRampReader))
+			feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
+			if len(tc.execEstimatorResponse) > 0 {
+				feeEstimatorConfig.On("GetDataAvailabilityConfig", mock.Anything).
+					Return(tc.execEstimatorResponse...)
+			}
 
 			g := DAGasPriceEstimator{
 				execEstimator:       execEstimator,
@@ -481,17 +458,14 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 			}
 
 			costUSD, err := g.EstimateMsgCostUSD(tc.gasPrice, tc.wrappedNativePrice, tc.msg)
-			if tc.onRampReaderErr == nil && tc.execEstimatorErr == nil {
-				assert.NoError(t, err)
-				assert.Equal(t, tc.expUSD, costUSD)
-			}
 
 			switch {
-			case tc.onRampReaderErr == nil && tc.execEstimatorErr == nil:
+			case len(tc.execEstimatorResponse) == 4 && tc.execEstimatorResponse[3] != nil,
+				tc.execEstimatorErr != nil:
+				assert.Error(t, err)
+			default:
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expUSD, costUSD)
-			default:
-				assert.Error(t, err)
 			}
 		})
 	}
