@@ -42,6 +42,7 @@ package ccip
 // Audited Reference Contracts
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPReceiver/CCIPReceiver.abi ../../../contracts/solc/v0.8.24/CCIPReceiver/CCIPReceiver.bin CCIPReceiver ccipReceiver
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPClient/CCIPClient.abi ../../../contracts/solc/v0.8.24/CCIPClient/CCIPClient.bin CCIPClient ccipClient
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPClientWithACK/CCIPClientWithACK.abi ../../../contracts/solc/v0.8.24/CCIPClientWithACK/CCIPClientWithACK.bin CCIPClientWithACK ccipClientWithACK
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPSender/CCIPSender.abi ../../../contracts/solc/v0.8.24/CCIPSender/CCIPSender.bin CCIPSender ccipSender
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPReceiverWithACK/CCIPReceiverWithACK.abi ../../../contracts/solc/v0.8.24/CCIPReceiverWithACK/CCIPReceiverWithACK.bin CCIPReceiverWithACK ccipReceiverWithACK
 
