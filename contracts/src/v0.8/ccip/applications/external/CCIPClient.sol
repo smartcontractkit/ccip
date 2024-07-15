@@ -45,6 +45,15 @@ contract CCIPClient is CCIPReceiver {
       feeToken: address(s_feeToken)
     });
 
+    uint256 fee = IRouterClient(s_ccipRouter).getFee(destChainSelector, message);
+
+    // Additional tokens for fees do not need to be approved to the router since it is already handled by setting s_feeToken
+    // Fee transfers need first, that way balanceOf(address(this)) does not conflict with any tokens sent in tokenAmounts
+    // to support fee-token pre-funding
+    if ((address(s_feeToken) != address(0)) && (s_feeToken.balanceOf(address(this)) < fee)) {
+      IERC20(s_feeToken).safeTransferFrom(msg.sender, address(this), fee);
+    }
+
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       // Transfer the tokens to pay for tokens in tokenAmounts
       IERC20(tokenAmounts[i].token).safeTransferFrom(msg.sender, address(this), tokenAmounts[i].amount);
@@ -53,13 +62,6 @@ contract CCIPClient is CCIPReceiver {
       if (tokenAmounts[i].token != address(s_feeToken)) {
         IERC20(tokenAmounts[i].token).safeApprove(s_ccipRouter, tokenAmounts[i].amount);
       }
-    }
-
-    uint256 fee = IRouterClient(s_ccipRouter).getFee(destChainSelector, message);
-
-    // Additional tokens for fees do not need to be approved to the router since it is already handled by setting s_feeToken
-    if ((address(s_feeToken) != address(0)) && (s_feeToken.balanceOf(address(this)) < fee)) {
-      IERC20(s_feeToken).safeTransferFrom(msg.sender, address(this), fee);
     }
 
     // messageId is only generated in the on-ramp, and therefore cannot be calcualated head of time.
