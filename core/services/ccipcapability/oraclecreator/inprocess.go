@@ -235,7 +235,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			contractReaders,
 			chainWriters,
 		)
-		transmitter = ocrimpls.NewCommitContractTransmitter(destChainWriter,
+		transmitter = ocrimpls.NewCommitContractTransmitter[[]byte](destChainWriter,
 			ocrtypes.Account(destFromAccount[0]),
 			hexutil.Encode(config.Config.OfframpAddress), // TODO: this works for evm only, how about non-evm?
 		)
@@ -252,7 +252,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			contractReaders,
 			chainWriters,
 		)
-		transmitter = ocrimpls.NewExecContractTransmitter(destChainWriter,
+		transmitter = ocrimpls.NewExecContractTransmitter[[]byte](destChainWriter,
 			ocrtypes.Account(destFromAccount[0]),
 			hexutil.Encode(config.Config.OfframpAddress), // TODO: this works for evm only, how about non-evm?
 		)

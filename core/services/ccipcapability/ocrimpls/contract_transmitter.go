@@ -15,55 +15,104 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
-var _ ocr3types.ContractTransmitter[[]byte] = &commitTransmitter{}
+type ToCalldataFunc func(rawReportCtx [3][32]byte, report []byte, rs, ss [][32]byte, vs [32]byte) any
 
-type commitTransmitter struct {
+func ToCommitCalldata(rawReportCtx [3][32]byte, report []byte, rs, ss [][32]byte, vs [32]byte) any {
+	return struct {
+		ReportContext [3][32]byte
+		Report        []byte
+		Rs            [][32]byte
+		Ss            [][32]byte
+		Vs            [32]byte
+	}{
+		ReportContext: rawReportCtx,
+		Report:        report,
+		Rs:            rs,
+		Ss:            ss,
+		Vs:            vs,
+	}
+}
+
+func ToExecCalldata(rawReportCtx [3][32]byte, report []byte, _, _ [][32]byte, _ [32]byte) any {
+	return struct {
+		ReportContext [3][32]byte
+		Report        []byte
+	}{
+		ReportContext: rawReportCtx,
+		Report:        report,
+	}
+}
+
+var _ ocr3types.ContractTransmitter[[]byte] = &commitTransmitter[[]byte]{}
+
+type commitTransmitter[RI any] struct {
 	cw             types.ChainWriter
 	fromAccount    ocrtypes.Account
 	contractName   string
 	method         string
 	offrampAddress string
+	toCalldataFn   ToCalldataFunc
 }
 
-func NewCommitContractTransmitter(
+func XXXNewContractTransmitterTestsOnly[RI any](
+	cw types.ChainWriter,
+	fromAccount ocrtypes.Account,
+	contractName string,
+	method string,
+	offrampAddress string,
+	toCalldataFn ToCalldataFunc,
+) ocr3types.ContractTransmitter[RI] {
+	return &commitTransmitter[RI]{
+		cw:             cw,
+		fromAccount:    fromAccount,
+		contractName:   contractName,
+		method:         method,
+		offrampAddress: offrampAddress,
+		toCalldataFn:   toCalldataFn,
+	}
+}
+
+func NewCommitContractTransmitter[RI any](
 	cw types.ChainWriter,
 	fromAccount ocrtypes.Account,
 	offrampAddress string,
-) ocr3types.ContractTransmitter[[]byte] {
-	return &commitTransmitter{
+) ocr3types.ContractTransmitter[RI] {
+	return &commitTransmitter[RI]{
 		cw:             cw,
 		fromAccount:    fromAccount,
 		contractName:   consts.ContractNameOffRamp,
 		method:         consts.MethodCommit,
 		offrampAddress: offrampAddress,
+		toCalldataFn:   ToCommitCalldata,
 	}
 }
 
-func NewExecContractTransmitter(
+func NewExecContractTransmitter[RI any](
 	cw types.ChainWriter,
 	fromAccount ocrtypes.Account,
 	offrampAddress string,
-) ocr3types.ContractTransmitter[[]byte] {
-	return &commitTransmitter{
+) ocr3types.ContractTransmitter[RI] {
+	return &commitTransmitter[RI]{
 		cw:             cw,
 		fromAccount:    fromAccount,
 		contractName:   consts.ContractNameOffRamp,
 		method:         consts.MethodExecute,
 		offrampAddress: offrampAddress,
+		toCalldataFn:   ToExecCalldata,
 	}
 }
 
 // FromAccount implements ocr3types.ContractTransmitter.
-func (c *commitTransmitter) FromAccount() (ocrtypes.Account, error) {
+func (c *commitTransmitter[RI]) FromAccount() (ocrtypes.Account, error) {
 	return c.fromAccount, nil
 }
 
 // Transmit implements ocr3types.ContractTransmitter.
-func (c *commitTransmitter) Transmit(
+func (c *commitTransmitter[RI]) Transmit(
 	ctx context.Context,
 	configDigest ocrtypes.ConfigDigest,
 	seqNr uint64,
-	reportWithInfo ocr3types.ReportWithInfo[[]byte],
+	reportWithInfo ocr3types.ReportWithInfo[RI],
 	sigs []ocrtypes.AttributedOnchainSignature,
 ) error {
 	var rs [][32]byte
@@ -102,34 +151,12 @@ func (c *commitTransmitter) Transmit(
 		// ExtraData not used in OCR3
 	})
 
-	// chain writer takes in the raw calldata and packs it on its own.
-	var args any
-	if c.method == consts.MethodCommit {
-		args = struct {
-			ReportContext [3][32]byte
-			Report        []byte
-			Rs            [][32]byte
-			Ss            [][32]byte
-			Vs            [32]byte
-		}{
-			ReportContext: rawReportCtx,
-			Report:        reportWithInfo.Report,
-			Rs:            rs,
-			Ss:            ss,
-			Vs:            vs,
-		}
-	} else if c.method == consts.MethodExecute {
-		// Exec method does not take in signatures.
-		args = struct {
-			ReportContext [3][32]byte
-			Report        []byte
-		}{
-			ReportContext: rawReportCtx,
-			Report:        reportWithInfo.Report,
-		}
-	} else {
-		return fmt.Errorf("unknown method: %v", c.method)
+	if c.toCalldataFn == nil {
+		return errors.New("toCalldataFn is nil")
 	}
+
+	// chain writer takes in the raw calldata and packs it on its own.
+	args := c.toCalldataFn(rawReportCtx, reportWithInfo.Report, rs, ss, vs)
 
 	// TODO: no meta fields yet, what should we add?
 	// probably whats in the info part of the report?

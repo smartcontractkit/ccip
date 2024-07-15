@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink/v2/common/txmgr"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
@@ -18,8 +19,8 @@ var (
 	offrampABI = evmtypes.MustGetABI(evm_2_evm_multi_offramp.EVM2EVMMultiOffRampABI)
 )
 
-func MustChainWriterConfig(fromAddress common.Address) []byte {
-	rawConfig := ChainWriterConfigRaw(fromAddress)
+func MustChainWriterConfig(fromAddress common.Address, maxGasPrice *assets.Wei) []byte {
+	rawConfig := ChainWriterConfigRaw(fromAddress, maxGasPrice)
 	encoded, err := json.Marshal(rawConfig)
 	if err != nil {
 		panic(fmt.Errorf("failed to marshal ChainWriterConfig: %w", err))
@@ -29,7 +30,7 @@ func MustChainWriterConfig(fromAddress common.Address) []byte {
 }
 
 // ChainWriterConfigRaw returns a ChainWriterConfig that can be used to transmit commit and execute reports.
-func ChainWriterConfigRaw(fromAddress common.Address) evmrelaytypes.ChainWriterConfig {
+func ChainWriterConfigRaw(fromAddress common.Address, maxGasPrice *assets.Wei) evmrelaytypes.ChainWriterConfig {
 	return evmrelaytypes.ChainWriterConfig{
 		Contracts: map[string]*evmrelaytypes.ContractConfig{
 			consts.ContractNameOffRamp: {
@@ -51,6 +52,7 @@ func ChainWriterConfigRaw(fromAddress common.Address) evmrelaytypes.ChainWriterC
 			},
 		},
 		SendStrategy: txmgr.NewSendEveryStrategy(),
+		MaxGasPrice:  maxGasPrice,
 	}
 }
 
