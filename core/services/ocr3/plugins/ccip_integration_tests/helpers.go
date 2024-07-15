@@ -1,6 +1,7 @@
 package ccip_integration_tests
 
 import (
+	"bytes"
 	"encoding/hex"
 	"math/big"
 	"sort"
@@ -289,7 +290,7 @@ func setupHomeChain(t *testing.T, owner *bind.TransactOpts, backend *backends.Si
 
 func sortP2PIDS(p2pIDs [][32]byte) {
 	sort.Slice(p2pIDs, func(i, j int) bool {
-		return hex.EncodeToString(p2pIDs[i][:]) < hex.EncodeToString(p2pIDs[j][:])
+		return bytes.Compare(p2pIDs[i][:], p2pIDs[j][:]) < 0
 	})
 }
 

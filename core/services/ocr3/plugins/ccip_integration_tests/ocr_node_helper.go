@@ -55,10 +55,10 @@ func setupNodeOCR3(
 	t *testing.T,
 	port int,
 	p2pV2Bootstrappers []commontypes.BootstrapperLocator,
-	universe map[uint64]onchainUniverse,
+	universes map[uint64]onchainUniverse,
 ) *ocr3Node {
 	// Do not want to load fixtures as they contain a dummy chainID.
-	config, db := heavyweight.FullTestDBNoFixturesV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
+	cfg, db := heavyweight.FullTestDBNoFixturesV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
 		c.Insecure.OCRDevelopmentMode = ptr(true) // Disables ocr spec validation so we can have fast polling for the test.
 
 		c.Feature.LogPoller = ptr(true)
@@ -79,7 +79,7 @@ func setupNodeOCR3(
 		c.OCR2.ContractPollInterval = config.MustNewDuration(5 * time.Second)
 
 		var chains v2toml.EVMConfigs
-		for chainID := range universe {
+		for chainID := range universes {
 			chains = append(chains, createConfigV2Chain(uBigInt(chainID)))
 		}
 		c.EVM = chains
@@ -90,13 +90,13 @@ func setupNodeOCR3(
 	ctx := testutils.Context(t)
 	clients := make(map[uint64]client.Client)
 
-	for chainID, uni := range universe {
+	for chainID, uni := range universes {
 		clients[chainID] = client.NewSimulatedBackendClient(t, uni.backend, uBigInt(chainID))
 	}
 
 	master := keystore.New(db, utils.FastScryptParams, lggr)
 
-	keystore := KeystoreSim{
+	kStore := KeystoreSim{
 		eks: &EthKeystoreSim{
 			Eth: master.Eth(),
 			t:   t,
@@ -106,7 +106,7 @@ func setupNodeOCR3(
 	mailMon := mailbox.NewMonitor("ccip", lggr.Named("mailbox"))
 	evmOpts := chainlink.EVMFactoryConfig{
 		ChainOpts: legacyevm.ChainOpts{
-			AppConfig: config,
+			AppConfig: cfg,
 			GenEthClient: func(i *big.Int) client.Client {
 				t.Log("genning eth client for chain id:", i.String())
 				client, ok := clients[i.Uint64()]
@@ -118,11 +118,11 @@ func setupNodeOCR3(
 			MailMon: mailMon,
 			DS:      db,
 		},
-		CSAETHKeystore: keystore,
+		CSAETHKeystore: kStore,
 	}
 	relayerFactory := chainlink.RelayerFactory{
 		Logger:       lggr,
-		LoopRegistry: plugins.NewLoopRegistry(lggr.Named("LoopRegistry"), config.Tracing()),
+		LoopRegistry: plugins.NewLoopRegistry(lggr.Named("LoopRegistry"), cfg.Tracing()),
 		GRPCOpts:     loop.GRPCOpts{},
 	}
 	initOps := []chainlink.CoreRelayerChainInitFunc{chainlink.InitEVM(testutils.Context(t), relayerFactory, evmOpts)}
@@ -130,7 +130,7 @@ func setupNodeOCR3(
 	require.NoError(t, err)
 
 	app, err := chainlink.NewApplication(chainlink.ApplicationOpts{
-		Config:                     config,
+		Config:                     cfg,
 		DS:                         db,
 		KeyStore:                   master,
 		RelayerChainInteroperators: rci,
@@ -141,7 +141,7 @@ func setupNodeOCR3(
 		RestrictedHTTPClient:       &http.Client{},
 		AuditLogger:                audit.NoopLogger,
 		MailMon:                    mailMon,
-		LoopRegistry:               plugins.NewLoopRegistry(lggr, config.Tracing()),
+		LoopRegistry:               plugins.NewLoopRegistry(lggr, cfg.Tracing()),
 	})
 	require.NoError(t, err)
 	require.NoError(t, app.GetKeyStore().Unlock(ctx, "password"))
@@ -155,7 +155,7 @@ func setupNodeOCR3(
 
 	// create a transmitter for each chain
 	transmitters := make(map[uint64]common.Address)
-	for chainID, uni := range universe {
+	for chainID, uni := range universes {
 		backend := uni.backend
 		owner := uni.owner
 		cID := uBigInt(chainID)
@@ -176,7 +176,7 @@ func setupNodeOCR3(
 			transmitters[chainID] = sendingKeys[0]
 		}
 	}
-	require.Len(t, transmitters, len(universe))
+	require.Len(t, transmitters, len(universes))
 
 	keybundle, err := app.GetKeyStore().OCR2().Create(ctx, chaintype.EVM)
 	require.NoError(t, err)

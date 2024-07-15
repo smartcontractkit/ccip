@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/consul/sdk/freeport"
 
@@ -73,7 +74,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	}
 
 	// Start committing periodically in the background for all the chains
-	tick := time.NewTicker(1 * time.Second)
+	tick := time.NewTicker(100 * time.Millisecond)
 	defer tick.Stop()
 	commitBlocksBackground(t, universes, tick)
 
@@ -89,7 +90,9 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		//TODO: Create Jobs and add them to the app
 	}
 
-	ccipCapabilityID, err := homeChainUni.capabilityRegistry.GetHashedCapabilityId(nil, CapabilityLabelledName, CapabilityVersion)
+	ccipCapabilityID, err := homeChainUni.capabilityRegistry.GetHashedCapabilityId(&bind.CallOpts{
+		Context: ctx,
+	}, CapabilityLabelledName, CapabilityVersion)
 	require.NoError(t, err, "failed to get hashed capability id for ccip")
 	require.NotEqual(t, [32]byte{}, ccipCapabilityID, "ccip capability id is empty")
 
