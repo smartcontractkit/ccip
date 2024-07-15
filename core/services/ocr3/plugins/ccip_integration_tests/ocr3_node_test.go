@@ -34,18 +34,16 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		// The bootstrap node will be the first node (index 0)
 		bootstrapPort  int
 		bootstrapP2PID p2pkey.PeerID
-		bootStrappers  []commontypes.BootstrapperLocator
+		bootstrappers  []commontypes.BootstrapperLocator
 	)
 
 	ports := freeport.GetN(t, numNodes)
 	for i := 0; i < numNodes; i++ {
-		node := setupNodeOCR3(t, ports[i], bootStrappers, universes)
+		node := setupNodeOCR3(t, ports[i], bootstrappers, universes)
 
 		apps = append(apps, node.app)
 		for chainID, transmitter := range node.transmitters {
 			transmitters[chainID] = append(transmitters[chainID], transmitter)
-		}
-		for chainID, transmitter := range node.transmitters {
 			identity := confighelper2.OracleIdentityExtra{
 				OracleIdentity: confighelper2.OracleIdentity{
 					OnchainPublicKey:  node.keybundle.PublicKey(),
@@ -66,7 +64,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		if i == 0 {
 			bootstrapPort = ports[i]
 			bootstrapP2PID = peerID
-			bootStrappers = []commontypes.BootstrapperLocator{
+			bootstrappers = []commontypes.BootstrapperLocator{
 				{PeerID: node.peerID, Addrs: []string{
 					fmt.Sprintf("127.0.0.1:%d", bootstrapPort),
 				}},
@@ -75,11 +73,14 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	}
 
 	// Start committing periodically in the background for all the chains
-	commitBlocksBackground(t, universes, time.NewTicker(1*time.Second))
+	tick := time.NewTicker(1 * time.Second)
+	defer tick.Stop()
+	commitBlocksBackground(t, universes, tick)
 
+	ctx := testutils.Context(t)
 	t.Log("creating ocr3 jobs")
 	for i := 0; i < len(nodes); i++ {
-		err := nodes[i].app.Start(testutils.Context(t))
+		err := nodes[i].app.Start(ctx)
 		require.NoError(t, err)
 		tApp := apps[i]
 		t.Cleanup(func() {

@@ -257,9 +257,7 @@ func createConfigV2Chain(chainID *big.Int) *v2toml.EVMConfig {
 // Commit blocks periodically in the background for all chains
 func commitBlocksBackground(t *testing.T, universes map[uint64]onchainUniverse, tick *time.Ticker) {
 	t.Log("starting ticker to commit blocks")
-	defer tick.Stop()
 	tickCtx, tickCancel := context.WithCancel(testutils.Context(t))
-	defer tickCancel()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {

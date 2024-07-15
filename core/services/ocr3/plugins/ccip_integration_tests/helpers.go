@@ -3,6 +3,7 @@ package ccip_integration_tests
 import (
 	"encoding/hex"
 	"math/big"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -282,15 +283,10 @@ func setupHomeChain(t *testing.T, owner *bind.TransactOpts, backend *backends.Si
 	}
 }
 
-// bubble sort, n^2 but p2pIDs never should be more than a handful
-func sortP2pIDS(p2pIDs [][32]byte) {
-	for i := 0; i < len(p2pIDs); i++ {
-		for j := i + 1; j < len(p2pIDs); j++ {
-			if hex.EncodeToString(p2pIDs[i][:]) > hex.EncodeToString(p2pIDs[j][:]) {
-				p2pIDs[i], p2pIDs[j] = p2pIDs[j], p2pIDs[i]
-			}
-		}
-	}
+func sortP2PIDS(p2pIDs [][32]byte) {
+	sort.Slice(p2pIDs, func(i, j int) bool {
+		return hex.EncodeToString(p2pIDs[i][:]) < hex.EncodeToString(p2pIDs[j][:])
+	})
 }
 
 func (h *homeChain) AddNodes(
@@ -299,7 +295,7 @@ func (h *homeChain) AddNodes(
 	capabilityIDs [][32]byte,
 ) {
 	// Need to sort, otherwise _checkIsValidUniqueSubset onChain will fail
-	sortP2pIDS(p2pIDs)
+	sortP2PIDS(p2pIDs)
 	var nodeParams []kcr.CapabilitiesRegistryNodeParams
 	for _, p2pID := range p2pIDs {
 		nodeParam := kcr.CapabilitiesRegistryNodeParams{
@@ -326,7 +322,7 @@ func (h *homeChain) AddDON(
 	oracles []confighelper2.OracleIdentityExtra,
 ) {
 	// Need to sort, otherwise _checkIsValidUniqueSubset onChain will fail
-	sortP2pIDS(p2pIDs)
+	sortP2PIDS(p2pIDs)
 	// First Add ChainConfig that includes all p2pIDs as readers
 	chainConfig := SetupConfigInfo(chainSelector, p2pIDs, FChainA, []byte(strconv.FormatUint(chainSelector, 10)))
 	inputConfig := []ccip_config.CCIPConfigTypesChainConfigInfo{
