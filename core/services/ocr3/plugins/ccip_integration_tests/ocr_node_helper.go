@@ -181,6 +181,10 @@ func setupNodeOCR3(
 	keybundle, err := app.GetKeyStore().OCR2().Create(ctx, chaintype.EVM)
 	require.NoError(t, err)
 
+	t.Cleanup(func() {
+		require.NoError(t, db.Close())
+	})
+
 	return &ocr3Node{
 		// can't use this app because it doesn't have the right toml config
 		// missing bootstrapp
