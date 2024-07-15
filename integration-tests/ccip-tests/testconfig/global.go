@@ -115,7 +115,7 @@ func NewConfig() (*Config, error) {
 	// load config overrides from env var if specified
 	// there can be multiple overrides separated by comma
 	rawConfigs, _ := osutil.GetEnv(OVERIDECONFIG)
-	if rawConfigs == "" {
+	if rawConfigs != "" {
 		for _, rawConfig := range strings.Split(rawConfigs, ",") {
 			err = DecodeConfig(rawConfig, &override)
 			if err != nil {

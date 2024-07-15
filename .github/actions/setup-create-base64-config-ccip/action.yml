@@ -146,9 +146,6 @@ runs:
         EOF
         fi     
 
-        echo "Generated config.toml:"
-        cat config.toml   
-
         BASE64_CONFIG=$(cat config.toml | base64 -w 0)
         echo ::add-mask::$BASE64_CONFIG
         echo "base64_config=$BASE64_CONFIG" >> $GITHUB_OUTPUT

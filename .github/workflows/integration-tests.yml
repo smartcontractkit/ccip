@@ -554,7 +554,7 @@ jobs:
           runId: ${{ github.run_id }}
           testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
           selectedNetworks: SIMULATED_1,SIMULATED_2
-          chainlinkVersion: ${{ github.sha }}
+          chainlinkVersion: ${{ inputs.evm-ref || github.sha }}
           logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
 
       ## Run this step when changes that require tests to be run are made
