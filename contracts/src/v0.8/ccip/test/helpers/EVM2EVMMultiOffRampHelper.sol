@@ -11,8 +11,9 @@ contract EVM2EVMMultiOffRampHelper is EVM2EVMMultiOffRamp, IgnoreContractSize {
 
   constructor(
     StaticConfig memory staticConfig,
+    DynamicConfig memory dynamicConfig,
     SourceChainConfigArgs[] memory sourceChainConfigs
-  ) EVM2EVMMultiOffRamp(staticConfig, sourceChainConfigs) {}
+  ) EVM2EVMMultiOffRamp(staticConfig, dynamicConfig, sourceChainConfigs) {}
 
   function setExecutionStateHelper(
     uint64 sourceChainSelector,
@@ -26,38 +27,29 @@ contract EVM2EVMMultiOffRampHelper is EVM2EVMMultiOffRamp, IgnoreContractSize {
     return s_executionStates[sourceChainSelector][bitmapIndex];
   }
 
-  function metadataHash(uint64 sourceChainSelector, address onRamp) external view returns (bytes32) {
-    return _metadataHash(sourceChainSelector, onRamp, Internal.EVM_2_EVM_MESSAGE_HASH);
-  }
-
   function releaseOrMintSingleToken(
-    uint256 sourceTokenAmount,
+    Internal.RampTokenAmount memory sourceTokenAmount,
     bytes calldata originalSender,
     address receiver,
     uint64 sourceChainSelector,
-    Internal.SourceTokenData calldata sourceTokenData,
     bytes calldata offchainTokenData
   ) external returns (Client.EVMTokenAmount memory) {
-    return _releaseOrMintSingleToken(
-      sourceTokenAmount, originalSender, receiver, sourceChainSelector, sourceTokenData, offchainTokenData
-    );
+    return
+      _releaseOrMintSingleToken(sourceTokenAmount, originalSender, receiver, sourceChainSelector, offchainTokenData);
   }
 
   function releaseOrMintTokens(
-    Client.EVMTokenAmount[] memory sourceTokenAmounts,
+    Internal.RampTokenAmount[] memory sourceTokenAmounts,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
-    bytes[] calldata sourceTokenData,
     bytes[] calldata offchainTokenData
   ) external returns (Client.EVMTokenAmount[] memory) {
-    return _releaseOrMintTokens(
-      sourceTokenAmounts, originalSender, receiver, sourceChainSelector, sourceTokenData, offchainTokenData
-    );
+    return _releaseOrMintTokens(sourceTokenAmounts, originalSender, receiver, sourceChainSelector, offchainTokenData);
   }
 
   function trialExecute(
-    Internal.EVM2EVMMessage memory message,
+    Internal.Any2EVMRampMessage memory message,
     bytes[] memory offchainTokenData
   ) external returns (Internal.MessageExecutionState, bytes memory) {
     return _trialExecute(message, offchainTokenData);
