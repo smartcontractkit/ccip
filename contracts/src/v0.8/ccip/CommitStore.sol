@@ -198,7 +198,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
     // Check if the report contains price updates
-    if (report.priceUpdates.tokenPriceUpdates.length != 0 || report.priceUpdates.gasPriceUpdates.length != 0) {
+    if (report.priceUpdates.tokenPriceUpdates.length > 0 || report.priceUpdates.gasPriceUpdates.length > 0) {
       // Check for price staleness based on the epoch and round
       if (s_latestPriceEpochAndRound < epochAndRound) {
         // If prices are not stale, update the latest epoch and round

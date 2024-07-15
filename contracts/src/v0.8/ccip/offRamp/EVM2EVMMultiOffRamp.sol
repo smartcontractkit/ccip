@@ -501,7 +501,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   function executeSingleMessage(Internal.EVM2EVMMessage memory message, bytes[] memory offchainTokenData) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
-    if (message.tokenAmounts.length != 0) {
+    if (message.tokenAmounts.length > 0) {
       destTokenAmounts = _releaseOrMintTokens(
         message.tokenAmounts,
         abi.encode(message.sender),
