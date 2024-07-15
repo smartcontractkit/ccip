@@ -15,35 +15,21 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
-type Calldata interface {
-	ToAny() any
-}
+type ToCalldataFunc func(rawReportCtx [3][32]byte, report []byte, rs, ss [][32]byte, vs [32]byte) any
 
-type commitCalldata struct {
-	ReportContext [3][32]byte
-	Report        []byte
-	Rs            [][32]byte
-	Ss            [][32]byte
-	RawVs         [32]byte
-}
-
-func (c commitCalldata) ToAny() any {
-	return c
-}
-
-type execCalldata struct {
-	ReportContext [3][32]byte
-	Report        []byte
-}
-
-func (e execCalldata) ToAny() any {
-	return e
-}
-
-type ToCalldataFunc func(rawReportCtx [3][32]byte, report []byte, rs, ss [][32]byte, vs [32]byte) Calldata
-
-func ToCommitCalldata(rawReportCtx [3][32]byte, report []byte, rs, ss [][32]byte, vs [32]byte) Calldata {
-	return commitCalldata{
+func ToCommitCalldata(rawReportCtx [3][32]byte, report []byte, rs, ss [][32]byte, vs [32]byte) any {
+	// Note that the name of the struct field is very important, since the encoder used
+	// by the chainwriter uses mapstructure, which will use the struct field name to map
+	// to the argument name in the function call.
+	// If, for whatever reason, we want to change the field name, make sure to add a `mapstructure:"<arg_name>"` tag
+	// for that field.
+	return struct {
+		ReportContext [3][32]byte
+		Report        []byte
+		Rs            [][32]byte
+		Ss            [][32]byte
+		RawVs         [32]byte
+	}{
 		ReportContext: rawReportCtx,
 		Report:        report,
 		Rs:            rs,
@@ -52,8 +38,16 @@ func ToCommitCalldata(rawReportCtx [3][32]byte, report []byte, rs, ss [][32]byte
 	}
 }
 
-func ToExecCalldata(rawReportCtx [3][32]byte, report []byte, _, _ [][32]byte, _ [32]byte) Calldata {
-	return execCalldata{
+func ToExecCalldata(rawReportCtx [3][32]byte, report []byte, _, _ [][32]byte, _ [32]byte) any {
+	// Note that the name of the struct field is very important, since the encoder used
+	// by the chainwriter uses mapstructure, which will use the struct field name to map
+	// to the argument name in the function call.
+	// If, for whatever reason, we want to change the field name, make sure to add a `mapstructure:"<arg_name>"` tag
+	// for that field.
+	return struct {
+		ReportContext [3][32]byte
+		Report        []byte
+	}{
 		ReportContext: rawReportCtx,
 		Report:        report,
 	}
