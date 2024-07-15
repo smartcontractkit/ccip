@@ -13,12 +13,15 @@ import (
 	"gopkg.in/guregu/null.v4"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
@@ -41,14 +44,13 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 	"github.com/smartcontractkit/chainlink/v2/core/testdata/testspecs"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
-	"github.com/smartcontractkit/libocr/commontypes"
 )
 
 func TestOracleCreator_CreateBootstrap(t *testing.T) {
 	db := pgtest.NewSqlxDB(t)
 
 	keyStore := keystore.New(db, utils.DefaultScryptParams, logger.NullLogger)
-	keyStore.Unlock(testutils.Context(t), cltest.Password)
+	require.NoError(t, keyStore.Unlock(testutils.Context(t), cltest.Password), "unable to unlock keystore")
 	p2pKey, err := keyStore.P2P().Create(testutils.Context(t))
 	require.NoError(t, err)
 	peerID := p2pKey.PeerID()
@@ -140,8 +142,8 @@ func TestOracleCreator_CreateBootstrap(t *testing.T) {
 			P2PIds: func() [][32]byte {
 				var ids [][32]byte
 				for _, o := range oracles {
-					id, err := p2pkey.MakePeerID(o.PeerID)
-					require.NoError(t, err)
+					id, err2 := p2pkey.MakePeerID(o.PeerID)
+					require.NoError(t, err2)
 					ids = append(ids, id)
 				}
 				return ids

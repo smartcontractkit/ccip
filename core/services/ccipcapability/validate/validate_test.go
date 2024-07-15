@@ -3,9 +3,10 @@ package validate_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/stretchr/testify/require"
 )
 
 func TestNewCCIPSpecToml(t *testing.T) {

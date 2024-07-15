@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/config"

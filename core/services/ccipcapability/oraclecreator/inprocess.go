@@ -9,14 +9,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	commitocr3 "github.com/smartcontractkit/chainlink-ccip/commit"
-	execocr3 "github.com/smartcontractkit/chainlink-ccip/execute"
-	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocr3 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	commitocr3 "github.com/smartcontractkit/chainlink-ccip/commit"
+	execocr3 "github.com/smartcontractkit/chainlink-ccip/execute"
+	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
@@ -161,7 +162,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 		} else {
 			chainReaderConfig = evmconfigs.SourceReaderConfig()
 		}
-		cr, err := evm.NewChainReaderService(
+		cr, err2 := evm.NewChainReaderService(
 			context.Background(),
 			i.lggr.
 				Named("EVMChainReaderService").
@@ -171,13 +172,13 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			chain.Client(),
 			chainReaderConfig,
 		)
-		if err != nil {
+		if err2 != nil {
 			return nil, fmt.Errorf("failed to create contract reader for chain %s: %w", chain.ID(), err)
 		}
 
 		// Even though we only write to the dest chain, we need to create chain writers for all chains
 		// we know about in order to post gas prices on the dest.
-		cw, err := evm.NewChainWriterService(
+		cw, err2 := evm.NewChainWriterService(
 			i.lggr.Named("EVMChainWriterService").
 				Named(chain.ID().String()).
 				Named(pluginType.String()),
@@ -186,7 +187,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			chain.GasEstimator(),
 			evmrelaytypes.ChainWriterConfig{}, // TODO: pass in config
 		)
-		if err != nil {
+		if err2 != nil {
 			return nil, fmt.Errorf("failed to create chain writer for chain %s: %w", chain.ID(), err)
 		}
 
@@ -210,7 +211,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	// assume that we are using the first account in the keybundle as the from account
 	// and that we are able to transmit to the dest chain.
 	// TODO: revisit this in the future, since not all oracles will be able to transmit to the dest chain.
-	destChainWriter, ok := chainWriters[cciptypes.ChainSelector(config.Config.ChainSelector)]
+	destChainWriter, ok := chainWriters[config.Config.ChainSelector]
 	if !ok {
 		return nil, fmt.Errorf("no chain writer found for dest chain selector %d, can't create contract transmitter",
 			config.Config.ChainSelector)
@@ -288,7 +289,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			func(ctx context.Context, msg string) {}),
 		MetricsRegisterer: prometheus.WrapRegistererWith(map[string]string{"name": fmt.Sprintf("commit-%d", config.Config.ChainSelector)}, prometheus.DefaultRegisterer),
 		MonitoringEndpoint: i.monitoringEndpointGen.GenMonitoringEndpoint(
-			string(destChainFamily),
+			destChainFamily,
 			destRelayID.ChainID,
 			string(config.Config.OfframpAddress),
 			synchronization.OCR3CCIPCommit,

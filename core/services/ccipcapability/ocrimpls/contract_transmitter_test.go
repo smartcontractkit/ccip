@@ -1,6 +1,7 @@
 package ocrimpls_test
 
 import (
+	"crypto/rand"
 	"math/big"
 	"net/url"
 	"testing"
@@ -12,14 +13,15 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/jmoiron/sqlx"
+	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	txmgrcommon "github.com/smartcontractkit/chainlink/v2/common/txmgr"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
+	txmgrcommon "github.com/smartcontractkit/chainlink/v2/common/txmgr"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -46,91 +48,132 @@ import (
 )
 
 func Test_ContractTransmitter_TransmitWithoutSignatures(t *testing.T) {
-	t.Run("empty report", func(t *testing.T) {
-		uni := newTestUniverse[[]byte](t, nil)
+	type testCase struct {
+		name                string
+		pluginType          uint8
+		withSigs            bool
+		expectedSigsEnabled bool
+		report              []byte
+	}
 
-		c, err := uni.wrapper.LatestConfigDetails(nil, uint8(cctypes.PluginTypeCCIPExec))
-		require.NoError(t, err, "failed to get latest config details")
-		configDigest := c.ConfigInfo.ConfigDigest
-
-		// create attributed sigs
-		// only need f+1 which is 2 in this case
-		rwi := ocr3types.ReportWithInfo[[]byte]{
-			Report: []byte{},
-			Info:   []byte{},
-		}
-		seqNr := uint64(1)
-		attributedSigs := uni.SignReport(t, configDigest, rwi, seqNr)
-
-		account, err := uni.transmitterWithoutSigs.FromAccount()
-		require.NoError(t, err, "failed to get from account")
-		require.Equal(t, ocrtypes.Account(uni.transmitters[0].Hex()), account, "from account mismatch")
-		err = uni.transmitterWithoutSigs.Transmit(testutils.Context(t), configDigest, seqNr, rwi, attributedSigs)
-		require.NoError(t, err, "failed to transmit")
-		uni.backend.Commit()
-
-		var txStatus uint64
-		tests.AssertEventually(t, func() bool {
-			uni.backend.Commit()
-			rows, err := uni.db.QueryContext(testutils.Context(t), `SELECT hash FROM evm.tx_attempts LIMIT 1`)
-			require.NoError(t, err, "failed to query txes")
-			defer rows.Close()
-			var txHash []byte
-			for rows.Next() {
-				err = rows.Scan(&txHash)
-				require.NoError(t, err, "failed to scan")
-			}
-			t.Log("txHash:", txHash)
-			receipt, err := uni.simClient.TransactionReceipt(testutils.Context(t), common.BytesToHash(txHash))
-			if err != nil {
-				t.Log("tx not found yet:", hexutil.Encode(txHash))
-				return false
-			}
-			t.Log("tx found:", hexutil.Encode(txHash), "status:", receipt.Status)
-			txStatus = receipt.Status
-			return true
+	testCases := []testCase{
+		{
+			"empty report with sigs",
+			uint8(cctypes.PluginTypeCCIPCommit),
+			true,
+			true,
+			[]byte{},
+		},
+		{
+			"empty report without sigs",
+			uint8(cctypes.PluginTypeCCIPExec),
+			false,
+			false,
+			[]byte{},
+		},
+		{
+			"report with data with sigs",
+			uint8(cctypes.PluginTypeCCIPCommit),
+			true,
+			true,
+			randomReport(t, 96),
+		},
+		{
+			"report with data without sigs",
+			uint8(cctypes.PluginTypeCCIPExec),
+			false,
+			false,
+			randomReport(t, 96),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			testTransmitter(t, tc.pluginType, tc.withSigs, tc.expectedSigsEnabled, tc.report)
 		})
-
-		require.Equal(t, uint64(1), txStatus, "tx status should be success")
-
-		// check that the event was emitted
-		events := uni.TransmittedEvents(t)
-		require.Len(t, events, 1, "expected 1 event")
-		require.Equal(t, configDigest, events[0].ConfigDigest, "config digest mismatch")
-		require.Equal(t, seqNr, events[0].SequenceNumber, "seq num mismatch")
-	})
+	}
 }
 
-func Test_ContractTransmitter_TransmitWithSignatures(t *testing.T) {
-	t.Run("empty report", func(t *testing.T) {
-		uni := newTestUniverse[[]byte](t, nil)
+func testTransmitter(
+	t *testing.T,
+	pluginType uint8,
+	withSigs bool,
+	expectedSigsEnabled bool,
+	report []byte,
+) {
+	uni := newTestUniverse[[]byte](t, nil)
 
-		c, err := uni.wrapper.LatestConfigDetails(nil, uint8(cctypes.PluginTypeCCIPCommit))
-		require.NoError(t, err, "failed to get latest config details")
-		configDigest := c.ConfigInfo.ConfigDigest
+	c, err := uni.wrapper.LatestConfigDetails(nil, pluginType)
+	require.NoError(t, err, "failed to get latest config details")
+	configDigest := c.ConfigInfo.ConfigDigest
+	require.Equal(t, expectedSigsEnabled, c.ConfigInfo.IsSignatureVerificationEnabled, "signature verification enabled setting not correct")
 
-		// create attributed sigs
-		// only need f+1 which is 2 in this case
-		rwi := ocr3types.ReportWithInfo[[]byte]{
-			Report: []byte{},
-			Info:   []byte{},
-		}
-		seqNr := uint64(1)
-		attributedSigs := uni.SignReport(t, configDigest, rwi, seqNr)
+	// set the plugin type on the helper so it fetches the right config info.
+	// the important aspect is whether signatures should be enabled or not.
+	_, err = uni.wrapper.SetTransmitOcrPluginType(uni.deployer, pluginType)
+	require.NoError(t, err, "failed to set plugin type")
+	uni.backend.Commit()
 
-		account, err := uni.transmitterWithSigs.FromAccount()
-		require.NoError(t, err, "failed to get from account")
-		require.Equal(t, ocrtypes.Account(uni.transmitters[0].Hex()), account, "from account mismatch")
+	// create attributed sigs
+	// only need f+1 which is 2 in this case
+	rwi := ocr3types.ReportWithInfo[[]byte]{
+		Report: report,
+		Info:   []byte{},
+	}
+	seqNr := uint64(1)
+	attributedSigs := uni.SignReport(t, configDigest, rwi, seqNr)
+
+	account, err := uni.transmitterWithSigs.FromAccount()
+	require.NoError(t, err, "failed to get from account")
+	require.Equal(t, ocrtypes.Account(uni.transmitters[0].Hex()), account, "from account mismatch")
+	if withSigs {
 		err = uni.transmitterWithSigs.Transmit(testutils.Context(t), configDigest, seqNr, rwi, attributedSigs)
-		require.NoError(t, err, "failed to transmit")
-		uni.backend.Commit()
+	} else {
+		err = uni.transmitterWithoutSigs.Transmit(testutils.Context(t), configDigest, seqNr, rwi, attributedSigs)
+	}
+	require.NoError(t, err, "failed to transmit")
+	uni.backend.Commit()
 
-		// check that the event was emitted
-		events := uni.TransmittedEvents(t)
-		require.Len(t, events, 1, "expected 1 event")
-		require.Equal(t, configDigest, events[0].ConfigDigest, "config digest mismatch")
-		require.Equal(t, seqNr, events[0].SequenceNumber, "seq num mismatch")
-	})
+	var txStatus uint64
+	gomega.NewWithT(t).Eventually(func() bool {
+		uni.backend.Commit()
+		rows, err := uni.db.QueryContext(testutils.Context(t), `SELECT hash FROM evm.tx_attempts LIMIT 1`)
+		require.NoError(t, err, "failed to query txes")
+		defer rows.Close()
+		var txHash []byte
+		for rows.Next() {
+			require.NoError(t, rows.Scan(&txHash), "failed to scan")
+		}
+		t.Log("txHash:", txHash)
+		receipt, err := uni.simClient.TransactionReceipt(testutils.Context(t), common.BytesToHash(txHash))
+		if err != nil {
+			t.Log("tx not found yet:", hexutil.Encode(txHash))
+			return false
+		}
+		t.Log("tx found:", hexutil.Encode(txHash), "status:", receipt.Status)
+		txStatus = receipt.Status
+		return true
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
+
+	// wait for receipt to be written to the db
+	gomega.NewWithT(t).Eventually(func() bool {
+		rows, err := uni.db.QueryContext(testutils.Context(t), `SELECT count(*) as cnt FROM evm.receipts LIMIT 1`)
+		require.NoError(t, err, "failed to query receipts")
+		defer rows.Close()
+		var count int
+		for rows.Next() {
+			require.NoError(t, rows.Scan(&count), "failed to scan")
+		}
+		return count == 1
+	}, testutils.WaitTimeout(t), 2*time.Second).Should(gomega.BeTrue())
+
+	require.Equal(t, uint64(1), txStatus, "tx status should be success")
+
+	// check that the event was emitted
+	events := uni.TransmittedEvents(t)
+	require.Len(t, events, 1, "expected 1 event")
+	require.Equal(t, configDigest, events[0].ConfigDigest, "config digest mismatch")
+	require.Equal(t, seqNr, events[0].SequenceNumber, "seq num mismatch")
 }
 
 type testUniverse[RI any] struct {
@@ -226,7 +269,7 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 				ConfigDigest:                   execConfigDigest,
 				OcrPluginType:                  uint8(cctypes.PluginTypeCCIPExec),
 				F:                              f,
-				IsSignatureVerificationEnabled: true,
+				IsSignatureVerificationEnabled: false,
 				Signers:                        signers,
 				Transmitters: []common.Address{
 					transmitters[0],
@@ -253,6 +296,7 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 	txm, gasEstimator := makeTestEvmTxm(t, db, simClient, keyStore.Eth())
 	require.NoError(t, txm.Start(testutils.Context(t)), "failed to start tx manager")
 	t.Cleanup(func() { require.NoError(t, txm.Close()) })
+
 	chainWriter, err := evm.NewChainWriterService(
 		logger.TestLogger(t),
 		simClient,
@@ -260,10 +304,12 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 		gasEstimator,
 		chainWriterConfigRaw(transmitters[0], assets.GWei(1)))
 	require.NoError(t, err, "failed to create chain writer")
+	require.NoError(t, chainWriter.Start(testutils.Context(t)), "failed to start chain writer")
+	t.Cleanup(func() { require.NoError(t, chainWriter.Close()) })
 
 	transmitterWithSigs := ocrimpls.XXXNewContractTransmitterTestsOnly[RI](
 		chainWriter,
-		types.Account(transmitters[0].Hex()),
+		ocrtypes.Account(transmitters[0].Hex()),
 		contractName,
 		methodTransmitWithSignatures,
 		ocr3HelperAddr.Hex(),
@@ -271,7 +317,7 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 	)
 	transmitterWithoutSigs := ocrimpls.XXXNewContractTransmitterTestsOnly[RI](
 		chainWriter,
-		types.Account(transmitters[0].Hex()),
+		ocrtypes.Account(transmitters[0].Hex()),
 		contractName,
 		methodTransmitWithoutSignatures,
 		ocr3HelperAddr.Hex(),
@@ -320,6 +366,13 @@ func (uni testUniverse[RI]) TransmittedEvents(t *testing.T) []*multi_ocr3_helper
 		events = append(events, event)
 	}
 	return events
+}
+
+func randomReport(t *testing.T, len int) []byte {
+	report := make([]byte, len)
+	_, err := rand.Reader.Read(report)
+	require.NoError(t, err, "failed to read random bytes")
+	return report
 }
 
 const (
@@ -371,8 +424,34 @@ func makeTestEvmTxm(
 		KeepFinalizedBlocksDepth: 1000,
 	}
 
-	ht := headtracker.NewSimulatedHeadTracker(ethClient, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
-	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.FixtureChainID, db, logger.NullLogger), ethClient, logger.NullLogger, ht, lpOpts)
+	chainID := big.NewInt(1337)
+	headSaver := headtracker.NewHeadSaver(
+		logger.NullLogger,
+		headtracker.NewORM(*chainID, db),
+		evmConfig,
+		evmConfig.HeadTrackerConfig,
+	)
+
+	broadcaster := headtracker.NewHeadBroadcaster(logger.NullLogger)
+	require.NoError(t, broadcaster.Start(testutils.Context(t)), "failed to start head broadcaster")
+	t.Cleanup(func() { require.NoError(t, broadcaster.Close()) })
+
+	ht := headtracker.NewHeadTracker(
+		logger.NullLogger,
+		ethClient,
+		evmConfig,
+		evmConfig.HeadTrackerConfig,
+		broadcaster,
+		headSaver,
+		mailbox.NewMonitor("contract_transmitter_test", logger.NullLogger),
+	)
+	require.NoError(t, ht.Start(testutils.Context(t)), "failed to start head tracker")
+	t.Cleanup(func() { require.NoError(t, ht.Close()) })
+
+	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.FixtureChainID, db, logger.NullLogger),
+		ethClient, logger.NullLogger, ht, lpOpts)
+	require.NoError(t, lp.Start(testutils.Context(t)), "failed to start log poller")
+	t.Cleanup(func() { require.NoError(t, lp.Close()) })
 
 	// logic for building components (from evm/evm_txm.go) -------
 	lggr.Infow("Initializing EVM transaction manager",
@@ -397,6 +476,9 @@ func makeTestEvmTxm(
 		keyStore,
 		estimator)
 	require.NoError(t, err, "can't create tx manager")
+
+	_, unsub := broadcaster.Subscribe(txm)
+	t.Cleanup(unsub)
 
 	return txm, estimator
 }
@@ -430,8 +512,38 @@ func (d *TestDatabaseConfig) Listener() config.Listener {
 	return &TestListenerConfig{}
 }
 
+type TestHeadTrackerConfig struct{}
+
+// FinalityTagBypass implements config.HeadTracker.
+func (t *TestHeadTrackerConfig) FinalityTagBypass() bool {
+	return false
+}
+
+// HistoryDepth implements config.HeadTracker.
+func (t *TestHeadTrackerConfig) HistoryDepth() uint32 {
+	return 50
+}
+
+// MaxAllowedFinalityDepth implements config.HeadTracker.
+func (t *TestHeadTrackerConfig) MaxAllowedFinalityDepth() uint32 {
+	return 100
+}
+
+// MaxBufferSize implements config.HeadTracker.
+func (t *TestHeadTrackerConfig) MaxBufferSize() uint32 {
+	return 100
+}
+
+// SamplingInterval implements config.HeadTracker.
+func (t *TestHeadTrackerConfig) SamplingInterval() time.Duration {
+	return 1 * time.Second
+}
+
+var _ evmconfig.HeadTracker = (*TestHeadTrackerConfig)(nil)
+
 type TestEvmConfig struct {
 	evmconfig.EVM
+	HeadTrackerConfig    evmconfig.HeadTracker
 	MaxInFlight          uint32
 	ReaperInterval       time.Duration
 	ReaperThreshold      time.Duration
@@ -444,13 +556,27 @@ type TestEvmConfig struct {
 	DetectionApiUrl      *url.URL
 }
 
+func (e *TestEvmConfig) FinalityTagEnabled() bool {
+	return false
+}
+
+func (e *TestEvmConfig) FinalityDepth() uint32 {
+	return 42
+}
+
+func (e *TestEvmConfig) FinalizedBlockOffset() uint32 {
+	return 42
+}
+
+func (e *TestEvmConfig) BlockEmissionIdleWarningThreshold() time.Duration {
+	return 10 * time.Second
+}
+
 func (e *TestEvmConfig) Transactions() evmconfig.Transactions {
 	return &transactionsConfig{e: e, autoPurge: &autoPurgeConfig{}}
 }
 
 func (e *TestEvmConfig) NonceAutoSync() bool { return true }
-
-func (e *TestEvmConfig) FinalityDepth() uint32 { return 42 }
 
 func (e *TestEvmConfig) ChainType() chaintype.ChainType { return "" }
 
@@ -463,26 +589,26 @@ func (g *TestGasEstimatorConfig) BlockHistory() evmconfig.BlockHistory {
 }
 
 func (g *TestGasEstimatorConfig) EIP1559DynamicFees() bool   { return false }
-func (g *TestGasEstimatorConfig) LimitDefault() uint64       { return 42 }
-func (g *TestGasEstimatorConfig) BumpPercent() uint16        { return 42 }
+func (g *TestGasEstimatorConfig) LimitDefault() uint64       { return 1e6 }
+func (g *TestGasEstimatorConfig) BumpPercent() uint16        { return 2 }
 func (g *TestGasEstimatorConfig) BumpThreshold() uint64      { return g.bumpThreshold }
-func (g *TestGasEstimatorConfig) BumpMin() *assets.Wei       { return assets.NewWeiI(42) }
-func (g *TestGasEstimatorConfig) FeeCapDefault() *assets.Wei { return assets.NewWeiI(42) }
-func (g *TestGasEstimatorConfig) PriceDefault() *assets.Wei  { return assets.NewWeiI(42) }
-func (g *TestGasEstimatorConfig) TipCapDefault() *assets.Wei { return assets.NewWeiI(42) }
-func (g *TestGasEstimatorConfig) TipCapMin() *assets.Wei     { return assets.NewWeiI(42) }
+func (g *TestGasEstimatorConfig) BumpMin() *assets.Wei       { return assets.GWei(1) }
+func (g *TestGasEstimatorConfig) FeeCapDefault() *assets.Wei { return assets.GWei(1) }
+func (g *TestGasEstimatorConfig) PriceDefault() *assets.Wei  { return assets.GWei(1) }
+func (g *TestGasEstimatorConfig) TipCapDefault() *assets.Wei { return assets.GWei(1) }
+func (g *TestGasEstimatorConfig) TipCapMin() *assets.Wei     { return assets.GWei(1) }
 func (g *TestGasEstimatorConfig) LimitMax() uint64           { return 0 }
-func (g *TestGasEstimatorConfig) LimitMultiplier() float32   { return 0 }
+func (g *TestGasEstimatorConfig) LimitMultiplier() float32   { return 1 }
 func (g *TestGasEstimatorConfig) BumpTxDepth() uint32        { return 42 }
 func (g *TestGasEstimatorConfig) LimitTransfer() uint64      { return 42 }
-func (g *TestGasEstimatorConfig) PriceMax() *assets.Wei      { return assets.NewWeiI(42) }
-func (g *TestGasEstimatorConfig) PriceMin() *assets.Wei      { return assets.NewWeiI(42) }
+func (g *TestGasEstimatorConfig) PriceMax() *assets.Wei      { return assets.GWei(1) }
+func (g *TestGasEstimatorConfig) PriceMin() *assets.Wei      { return assets.GWei(1) }
 func (g *TestGasEstimatorConfig) Mode() string               { return "FixedPrice" }
 func (g *TestGasEstimatorConfig) LimitJobType() evmconfig.LimitJobType {
 	return &TestLimitJobTypeConfig{}
 }
 func (g *TestGasEstimatorConfig) PriceMaxKey(addr common.Address) *assets.Wei {
-	return assets.NewWeiI(42)
+	return assets.GWei(1)
 }
 
 func (e *TestEvmConfig) GasEstimator() evmconfig.GasEstimator {
@@ -515,7 +641,7 @@ type transactionsConfig struct {
 	autoPurge evmconfig.AutoPurgeConfig
 }
 
-func (*transactionsConfig) ForwardersEnabled() bool                { return true }
+func (*transactionsConfig) ForwardersEnabled() bool                { return false }
 func (t *transactionsConfig) MaxInFlight() uint32                  { return t.e.MaxInFlight }
 func (t *transactionsConfig) MaxQueued() uint64                    { return t.e.MaxQueued }
 func (t *transactionsConfig) ReaperInterval() time.Duration        { return t.e.ReaperInterval }
@@ -549,7 +675,14 @@ func (c *MockConfig) RPCDefaultBatchSize() uint32    { return c.RpcDefaultBatchS
 
 func MakeTestConfigs(t *testing.T) (*MockConfig, *TestDatabaseConfig, *TestEvmConfig) {
 	db := &TestDatabaseConfig{defaultQueryTimeout: utils.DefaultQueryTimeout}
-	ec := &TestEvmConfig{BumpThreshold: 42, MaxInFlight: uint32(42), MaxQueued: uint64(0), ReaperInterval: time.Duration(0), ReaperThreshold: time.Duration(0)}
+	ec := &TestEvmConfig{
+		HeadTrackerConfig: &TestHeadTrackerConfig{},
+		BumpThreshold:     42,
+		MaxInFlight:       uint32(42),
+		MaxQueued:         uint64(0),
+		ReaperInterval:    time.Duration(0),
+		ReaperThreshold:   time.Duration(0),
+	}
 	config := &MockConfig{EvmConfig: ec}
 	return config, db, ec
 }

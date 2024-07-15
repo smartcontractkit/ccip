@@ -7,37 +7,54 @@ import (
 	"math/big"
 
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
-type ToCalldataFunc func(rawReportCtx [3][32]byte, report []byte, rs, ss [][32]byte, vs [32]byte) any
+type Calldata interface {
+	ToAny() any
+}
 
-func ToCommitCalldata(rawReportCtx [3][32]byte, report []byte, rs, ss [][32]byte, vs [32]byte) any {
-	return struct {
-		ReportContext [3][32]byte
-		Report        []byte
-		Rs            [][32]byte
-		Ss            [][32]byte
-		Vs            [32]byte
-	}{
+type commitCalldata struct {
+	ReportContext [3][32]byte
+	Report        []byte
+	Rs            [][32]byte
+	Ss            [][32]byte
+	RawVs         [32]byte
+}
+
+func (c commitCalldata) ToAny() any {
+	return c
+}
+
+type execCalldata struct {
+	ReportContext [3][32]byte
+	Report        []byte
+}
+
+func (e execCalldata) ToAny() any {
+	return e
+}
+
+type ToCalldataFunc func(rawReportCtx [3][32]byte, report []byte, rs, ss [][32]byte, vs [32]byte) Calldata
+
+func ToCommitCalldata(rawReportCtx [3][32]byte, report []byte, rs, ss [][32]byte, vs [32]byte) Calldata {
+	return commitCalldata{
 		ReportContext: rawReportCtx,
 		Report:        report,
 		Rs:            rs,
 		Ss:            ss,
-		Vs:            vs,
+		RawVs:         vs,
 	}
 }
 
-func ToExecCalldata(rawReportCtx [3][32]byte, report []byte, _, _ [][32]byte, _ [32]byte) any {
-	return struct {
-		ReportContext [3][32]byte
-		Report        []byte
-	}{
+func ToExecCalldata(rawReportCtx [3][32]byte, report []byte, _, _ [][32]byte, _ [32]byte) Calldata {
+	return execCalldata{
 		ReportContext: rawReportCtx,
 		Report:        report,
 	}
