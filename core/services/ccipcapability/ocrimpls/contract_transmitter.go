@@ -12,7 +12,6 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
@@ -63,7 +62,7 @@ func ToExecCalldata(rawReportCtx [3][32]byte, report []byte, _, _ [][32]byte, _ 
 var _ ocr3types.ContractTransmitter[[]byte] = &commitTransmitter[[]byte]{}
 
 type commitTransmitter[RI any] struct {
-	cw             types.ChainWriter
+	cw             commontypes.ChainWriter
 	fromAccount    ocrtypes.Account
 	contractName   string
 	method         string
@@ -72,7 +71,7 @@ type commitTransmitter[RI any] struct {
 }
 
 func XXXNewContractTransmitterTestsOnly[RI any](
-	cw types.ChainWriter,
+	cw commontypes.ChainWriter,
 	fromAccount ocrtypes.Account,
 	contractName string,
 	method string,
@@ -90,7 +89,7 @@ func XXXNewContractTransmitterTestsOnly[RI any](
 }
 
 func NewCommitContractTransmitter[RI any](
-	cw types.ChainWriter,
+	cw commontypes.ChainWriter,
 	fromAccount ocrtypes.Account,
 	offrampAddress string,
 ) ocr3types.ContractTransmitter[RI] {
@@ -105,7 +104,7 @@ func NewCommitContractTransmitter[RI any](
 }
 
 func NewExecContractTransmitter[RI any](
-	cw types.ChainWriter,
+	cw commontypes.ChainWriter,
 	fromAccount ocrtypes.Account,
 	offrampAddress string,
 ) ocr3types.ContractTransmitter[RI] {
