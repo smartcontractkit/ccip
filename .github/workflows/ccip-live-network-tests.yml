@@ -17,6 +17,10 @@ on:
         options:
           - 'load'
           - 'smoke'
+      test_secrets_override_key:
+        description: 'Key to run tests with custom test secrets. Find more at: https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md#run-github-workflow-with-your-test-secrets'
+        required: false
+        type: string           
 
 # Only run 1 of this workflow at a time per PR
 concurrency:
@@ -189,6 +193,7 @@ jobs:
         with:
           test_command_to_run: cd ./integration-tests/ccip-tests && go test -v -timeout 70m -count=1 -json -run ^TestLoadCCIPStableRPS$ ./load 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          test_secrets_override_base64: ${{ secrets[inputs.test_secrets_override_key] }}
           token: ${{ secrets.GITHUB_TOKEN }}
           go_mod_path: ./integration-tests/go.mod
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
