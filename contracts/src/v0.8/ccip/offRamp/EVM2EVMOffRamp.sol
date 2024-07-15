@@ -367,13 +367,12 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // revert the entire transaction if it fails. This will show the user if
       // their manual exec will fail before they submit it.
       if (manualExecution) {
-        if (
-          newState == Internal.MessageExecutionState.FAILURE
-            && originalState != Internal.MessageExecutionState.UNTOUCHED
-        ) {
-          // If manual execution fails, we revert the entire transaction, unless the originalState is UNTOUCHED as we
-          // would still be making progress by changing the state from UNTOUCHED to FAILURE.
-          revert ExecutionError(returnData);
+        if (newState == Internal.MessageExecutionState.FAILURE) {
+          if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
+            // If manual execution fails, we revert the entire transaction, unless the originalState is UNTOUCHED as we
+            // would still be making progress by changing the state from UNTOUCHED to FAILURE.
+            revert ExecutionError(returnData);
+          }
         }
       }
 
