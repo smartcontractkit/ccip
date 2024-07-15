@@ -18,9 +18,9 @@ on:
           - 'load'
           - 'smoke'
       test_secrets_override_key:
-        description: 'Key to run tests with custom test secrets. Find more at: https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md#run-github-workflow-with-your-test-secrets'
+        description: 'Key to run tests with custom test secrets'
         required: false
-        type: string           
+        type: string
 
 # Only run 1 of this workflow at a time per PR
 concurrency:
