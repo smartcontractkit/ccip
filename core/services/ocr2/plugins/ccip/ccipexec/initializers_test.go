@@ -12,8 +12,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
 
@@ -137,11 +135,9 @@ func TestGetExecutionPluginFilterNamesFromSpec(t *testing.T) {
 		},
 	}
 
-	ctx := testutils.Context(t)
-
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := UnregisterExecPluginLpFilters(ctx, logger.TestLogger(t), job.Job{}, MockCCIPExecProvider{}, MockCCIPExecProvider{})
+			err := UnregisterExecPluginLpFilters(MockCCIPExecProvider{}, MockCCIPExecProvider{})
 			if tc.expectingErr {
 				assert.Error(t, err)
 			} else {

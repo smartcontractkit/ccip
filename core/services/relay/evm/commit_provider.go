@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"go.uber.org/multierr"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -28,6 +30,11 @@ type SrcCommitProvider struct {
 	lp          logpoller.LogPoller
 	estimator   gas.EvmFeeEstimator
 	maxGasPrice *big.Int
+
+	// these values will be lazily initialized
+	seenOnRampAddress       *cciptypes.Address
+	seenSourceChainSelector *uint64
+	seenDestChainSelector   *uint64
 }
 
 func NewSrcCommitProvider(
@@ -58,6 +65,10 @@ type DstCommitProvider struct {
 	configWatcher       *configWatcher
 	gasEstimator        gas.EvmFeeEstimator
 	maxGasPrice         big.Int
+
+	// these values will be lazily initialized
+	seenCommitStoreAddress *cciptypes.Address
+	seenOffRampAddress     *cciptypes.Address
 }
 
 func NewDstCommitProvider(
@@ -88,8 +99,29 @@ func (P SrcCommitProvider) Name() string {
 	return "CCIPCommitProvider.SrcRelayerProvider"
 }
 
+// Close is called when the job that created this provider is deleted.
+// At this time, any of the methods on the provider may or may not have been called.
+// If NewOnRampReader has not been called, their corresponding
+// Close methods will be expected to error.
 func (P SrcCommitProvider) Close() error {
-	return nil
+	versionFinder := ccip.NewEvmVersionFinder()
+
+	unregisterFuncs := make([]func() error, 0, 2)
+	unregisterFuncs = append(unregisterFuncs, func() error {
+		// avoid panic in the case NewOnRampReader wasn't called
+		if P.seenOnRampAddress == nil {
+			return nil
+		}
+		return ccip.CloseOnRampReader(P.lggr, versionFinder, *P.seenSourceChainSelector, *P.seenDestChainSelector, *P.seenOnRampAddress, P.lp, P.client)
+	})
+
+	var multiErr error
+	for _, fn := range unregisterFuncs {
+		if err := fn(); err != nil {
+			multiErr = multierr.Append(multiErr, err)
+		}
+	}
+	return multiErr
 }
 
 func (P SrcCommitProvider) Ready() error {
@@ -131,7 +163,29 @@ func (P DstCommitProvider) Name() string {
 }
 
 func (P DstCommitProvider) Close() error {
-	return nil
+	versionFinder := ccip.NewEvmVersionFinder()
+
+	unregisterFuncs := make([]func() error, 0, 2)
+	unregisterFuncs = append(unregisterFuncs, func() error {
+		if P.seenCommitStoreAddress == nil {
+			return nil
+		}
+		return ccip.CloseCommitStoreReader(P.lggr, versionFinder, *P.seenCommitStoreAddress, P.client, P.lp)
+	})
+	unregisterFuncs = append(unregisterFuncs, func() error {
+		if P.seenOffRampAddress == nil {
+			return nil
+		}
+		return ccip.CloseOffRampReader(P.lggr, versionFinder, *P.seenOffRampAddress, P.client, P.lp, nil, big.NewInt(0))
+	})
+
+	var multiErr error
+	for _, fn := range unregisterFuncs {
+		if err := fn(); err != nil {
+			multiErr = multierr.Append(multiErr, err)
+		}
+	}
+	return multiErr
 }
 
 func (P DstCommitProvider) Ready() error {
@@ -192,12 +246,18 @@ func (P SrcCommitProvider) NewCommitStoreReader(ctx context.Context, commitStore
 }
 
 func (P DstCommitProvider) NewCommitStoreReader(ctx context.Context, commitStoreAddress cciptypes.Address) (commitStoreReader cciptypes.CommitStoreReader, err error) {
+	P.seenCommitStoreAddress = &commitStoreAddress
+
 	versionFinder := ccip.NewEvmVersionFinder()
 	commitStoreReader, err = NewIncompleteDestCommitStoreReader(P.lggr, versionFinder, commitStoreAddress, P.client, P.lp)
 	return
 }
 
 func (P SrcCommitProvider) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (onRampReader cciptypes.OnRampReader, err error) {
+	P.seenOnRampAddress = &onRampAddress
+	P.seenSourceChainSelector = &sourceChainSelector
+	P.seenDestChainSelector = &destChainSelector
+
 	versionFinder := ccip.NewEvmVersionFinder()
 	onRampReader, err = ccip.NewOnRampReader(P.lggr, versionFinder, sourceChainSelector, destChainSelector, onRampAddress, P.lp, P.client)
 	return

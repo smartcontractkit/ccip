@@ -203,7 +203,7 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 // are stored in the db. Those same filters are unregistered (i.e. deleted from the db) by the newly created providers
 // that are passed in from cleanupEVM, as while the providers have no knowledge of each other, they are created
 // on the same source and dest relayer.
-func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider) error {
+func UnregisterExecPluginLpFilters(srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider) error {
 	unregisterFuncs := []func() error{
 		func() error {
 			return srcProvider.Close()

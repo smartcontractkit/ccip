@@ -39,7 +39,7 @@ type SrcExecProvider struct {
 	usdcSrcMsgTransmitterAddr              common.Address
 
 	// these values are nil and are updated for Close()
-	seenOnRampAddress       *string
+	seenOnRampAddress       *cciptypes.Address
 	seenSourceChainSelector *uint64
 	seenDestChainSelector   *uint64
 }
@@ -166,7 +166,7 @@ func (s SrcExecProvider) NewOffRampReader(ctx context.Context, addr cciptypes.Ad
 }
 
 func (s SrcExecProvider) NewOnRampReader(ctx context.Context, onRampAddress cciptypes.Address, sourceChainSelector uint64, destChainSelector uint64) (onRampReader cciptypes.OnRampReader, err error) {
-	s.seenOnRampAddress = (*string)(&onRampAddress)
+	s.seenOnRampAddress = &onRampAddress
 
 	versionFinder := ccip.NewEvmVersionFinder()
 	onRampReader, err = ccip.NewOnRampReader(s.lggr, versionFinder, sourceChainSelector, destChainSelector, onRampAddress, s.lp, s.client)
