@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -13,12 +14,11 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
-
 	"github.com/jmoiron/sqlx"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -54,8 +54,11 @@ type ocr3Node struct {
 func setupNodeOCR3(
 	t *testing.T,
 	port int,
+	capabilitiesPort int,
 	p2pV2Bootstrappers []commontypes.BootstrapperLocator,
 	universes map[uint64]onchainUniverse,
+	homeChainUniverse homeChain,
+	capabilityEnabled bool,
 ) *ocr3Node {
 	// Do not want to load fixtures as they contain a dummy chainID.
 	cfg, db := heavyweight.FullTestDBNoFixturesV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
@@ -71,6 +74,14 @@ func setupNodeOCR3(
 		if len(p2pV2Bootstrappers) > 0 {
 			c.P2P.V2.DefaultBootstrappers = &p2pV2Bootstrappers
 		}
+
+		// Enable Capabilities, This is a pre-requisite for registrySyncer to work.
+		// Same values as P2P.V2 except for the listen address.
+		c.Capabilities.Peering.V2 = c.P2P.V2
+		c.Capabilities.Peering.V2.ListenAddresses = &[]string{fmt.Sprintf("127.0.0.1:%d", capabilitiesPort)}
+		c.Capabilities.ExternalRegistry.NetworkID = ptr(relay.NetworkEVM)
+		c.Capabilities.ExternalRegistry.ChainID = ptr(strconv.FormatUint(homeChainUniverse.chainID, 10))
+		c.Capabilities.ExternalRegistry.Address = ptr(homeChainUniverse.capabilityRegistry.Address().String())
 
 		// OCR configs
 		c.OCR.Enabled = ptr(false)
@@ -152,7 +163,6 @@ func setupNodeOCR3(
 	require.NoError(t, err)
 	require.Len(t, p2pIDs, 1)
 	peerID := p2pIDs[0].PeerID()
-
 	// create a transmitter for each chain
 	transmitters := make(map[uint64]common.Address)
 	for chainID, uni := range universes {
