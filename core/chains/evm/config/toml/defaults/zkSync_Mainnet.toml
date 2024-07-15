@@ -1,7 +1,7 @@
 ChainID = '324'
 ChainType = 'zksync'
-# 2400block ~ 20min concurrent with the l1_committed tag
-FinalityDepth = 2400  
+# 1200block ~ 20min concurrent with the l1_committed tag
+FinalityDepth = 1200  
 # block rate is ~2-5sec, so this ensures blocks are polled correctly
 LogPollInterval = '5s'
 # sufficient time for RPC to be labelled out of sync, since blockRate is pretty fast
@@ -25,4 +25,4 @@ BlockHistorySize = 200
 
 [HeadTracker]
 # tracks top N blocks to keep in heads database table. Should store atleast the same # of blocks as finalityDepth
-HistoryDepth = 2500
+HistoryDepth = 1500
