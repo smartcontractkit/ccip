@@ -3662,10 +3662,10 @@ Enabled = true
 
 [GasEstimator]
 Mode = 'BlockHistory'
-PriceDefault = '20 gwei'
-PriceMax = '18.446744073709551615 ether'
-PriceMin = '0'
-LimitDefault = 100000000
+PriceDefault = '25 mwei'
+PriceMax = '500 mwei'
+PriceMin = '25 mwei'
+LimitDefault = 2500000000
 LimitMax = 8000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
@@ -3724,7 +3724,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'zksync'
-FinalityDepth = 2400
+FinalityDepth = 1200
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '5s'
@@ -3755,10 +3755,10 @@ Enabled = true
 
 [GasEstimator]
 Mode = 'BlockHistory'
-PriceDefault = '20 gwei'
-PriceMax = '18.446744073709551615 ether'
-PriceMin = '0'
-LimitDefault = 100000000
+PriceDefault = '25 mwei'
+PriceMax = '500 mwei'
+PriceMin = '25 mwei'
+LimitDefault = 2500000000
 LimitMax = 8000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
@@ -3778,7 +3778,7 @@ CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
 [HeadTracker]
-HistoryDepth = 2500
+HistoryDepth = 1500
 MaxBufferSize = 3
 SamplingInterval = '1s'
 MaxAllowedFinalityDepth = 10000
