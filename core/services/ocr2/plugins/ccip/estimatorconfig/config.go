@@ -19,7 +19,6 @@ func NewFeeEstimatorConfigService() *FeeEstimatorConfigService {
 // must be called once for each instance.
 func (c *FeeEstimatorConfigService) SetOnRampReader(reader ccip.OnRampReader) {
 	c.onRampReader = reader
-	return
 }
 
 // GetDataAvailabilityConfig Returns dynamic config data availability parameters.
