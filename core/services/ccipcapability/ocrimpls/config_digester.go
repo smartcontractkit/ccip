@@ -17,8 +17,7 @@ func (c *configDigester) ConfigDigest(types.ContractConfig) (types.ConfigDigest,
 
 // ConfigDigestPrefix implements types.OffchainConfigDigester.
 func (c *configDigester) ConfigDigestPrefix() (types.ConfigDigestPrefix, error) {
-	// TODO: update libocr to fetch the role don prefix from the constants
-	return types.ConfigDigestPrefix(0x000a), nil
+	return types.ConfigDigestPrefixCCIPMultiRole, nil
 }
 
 var _ types.OffchainConfigDigester = (*configDigester)(nil)
