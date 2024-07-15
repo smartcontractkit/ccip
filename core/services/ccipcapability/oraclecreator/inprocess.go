@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
@@ -178,6 +179,11 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 
 		// Even though we only write to the dest chain, we need to create chain writers for all chains
 		// we know about in order to post gas prices on the dest.
+		var fromAddress common.Address
+		transmitter, ok := i.transmitters[types.NewRelayID(relay.NetworkEVM, chain.ID().String())]
+		if ok {
+			fromAddress = common.HexToAddress(transmitter[0])
+		}
 		cw, err2 := evm.NewChainWriterService(
 			i.lggr.Named("EVMChainWriterService").
 				Named(chain.ID().String()).
@@ -185,7 +191,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			chain.Client(),
 			chain.TxManager(),
 			chain.GasEstimator(),
-			evmrelaytypes.ChainWriterConfig{}, // TODO: pass in config
+			evmconfigs.ChainWriterConfigRaw(fromAddress, chain.Config().EVM().GasEstimator().PriceMaxKey(fromAddress)),
 		)
 		if err2 != nil {
 			return nil, fmt.Errorf("failed to create chain writer for chain %s: %w", chain.ID(), err)

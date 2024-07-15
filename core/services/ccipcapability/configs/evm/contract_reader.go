@@ -7,14 +7,19 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
 var (
-	onrampABI = evmtypes.MustGetABI(evm_2_evm_multi_onramp.EVM2EVMMultiOnRampABI)
+	onrampABI               = evmtypes.MustGetABI(evm_2_evm_multi_onramp.EVM2EVMMultiOnRampABI)
+	capabilitiesRegsitryABI = evmtypes.MustGetABI(kcr.CapabilitiesRegistryABI)
+	ccipConfigABI           = evmtypes.MustGetABI(ccip_config.CCIPConfigABI)
 )
 
 // MustSourceReaderConfig returns a ChainReaderConfig that can be used to read from the onramp.
@@ -125,6 +130,33 @@ func SourceReaderConfig() evmrelaytypes.ChainReaderConfig {
 					consts.MethodNameGetTokenTransferFeeConfig: {
 						ChainSpecificName: mustGetMethodName("getTokenTransferFeeConfig", onrampABI),
 						ReadType:          evmrelaytypes.Method,
+					},
+				},
+			},
+		},
+	}
+}
+
+// HomeChainReaderConfigRaw returns a ChainReaderConfig that can be used to read from the home chain.
+func HomeChainReaderConfigRaw() evmrelaytypes.ChainReaderConfig {
+	return evmrelaytypes.ChainReaderConfig{
+		Contracts: map[string]evmrelaytypes.ChainContractReader{
+			consts.ContractNameCapabilitiesRegistry: {
+				ContractABI: kcr.CapabilitiesRegistryABI,
+				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
+					consts.MethodNameGetCapability: {
+						ChainSpecificName: mustGetMethodName("getCapability", capabilitiesRegsitryABI),
+					},
+				},
+			},
+			consts.ContractNameCCIPConfig: {
+				ContractABI: ccip_config.CCIPConfigABI,
+				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
+					consts.MethodNameGetAllChainConfigs: {
+						ChainSpecificName: mustGetMethodName("getAllChainConfigs", ccipConfigABI),
+					},
+					consts.MethodNameGetOCRConfig: {
+						ChainSpecificName: mustGetMethodName("getOCRConfig", ccipConfigABI),
 					},
 				},
 			},

@@ -7,16 +7,17 @@ import (
 
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/common"
+	configsevm "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/configs/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/launcher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/oraclecreator"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -29,7 +30,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
-	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
 )
@@ -226,7 +226,13 @@ func (d *Delegate) getHomeChainContractReader(
 		return nil, fmt.Errorf("home chain relayer not found, chain id: %s, err: %w", homeChainRelayID.String(), err)
 	}
 
-	reader, err := evm.NewChainReaderService(context.Background(), d.lggr, homeChain.LogPoller(), homeChain.Client(), HomeChainReaderCRConfig())
+	reader, err := evm.NewChainReaderService(
+		context.Background(),
+		d.lggr,
+		homeChain.LogPoller(),
+		homeChain.Client(),
+		configsevm.HomeChainReaderConfigRaw(),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create home chain contract reader: %w", err)
 	}
@@ -243,7 +249,7 @@ func bindReader(reader types.ContractReader, capRegAddress, capabilityLabelledNa
 	err := reader.Bind(context.Background(), []types.BoundContract{
 		{
 			Address: capRegAddress,
-			Name:    "CapabilitiesRegistry",
+			Name:    consts.ContractNameCapabilitiesRegistry,
 		},
 	})
 	if err != nil {
@@ -256,7 +262,7 @@ func bindReader(reader types.ContractReader, capRegAddress, capabilityLabelledNa
 	}
 
 	var ccipCapabilityInfo kcr.CapabilitiesRegistryCapabilityInfo
-	err = reader.GetLatestValue(context.Background(), "CapabilitiesRegistry", "getCapability", map[string]any{
+	err = reader.GetLatestValue(context.Background(), consts.ContractNameCapabilitiesRegistry, consts.MethodNameGetCapability, map[string]any{
 		"hashedId": hid,
 	}, &ccipCapabilityInfo)
 	if err != nil {
@@ -267,7 +273,7 @@ func bindReader(reader types.ContractReader, capRegAddress, capabilityLabelledNa
 	err = reader.Bind(context.Background(), []types.BoundContract{
 		{
 			Address: ccipCapabilityInfo.ConfigurationContract.String(),
-			Name:    "CCIPCapabilityConfiguration",
+			Name:    consts.ContractNameCCIPConfig,
 		},
 	})
 	if err != nil {
@@ -275,30 +281,4 @@ func bindReader(reader types.ContractReader, capRegAddress, capabilityLabelledNa
 	}
 
 	return reader, nil
-}
-
-func HomeChainReaderCRConfig() evmrelaytypes.ChainReaderConfig {
-	return evmrelaytypes.ChainReaderConfig{
-		Contracts: map[string]evmrelaytypes.ChainContractReader{
-			"CapabilitiesRegistry": {
-				ContractABI: kcr.CapabilitiesRegistryABI,
-				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
-					"getCapability": {
-						ChainSpecificName: "getCapability",
-					},
-				},
-			},
-			"CCIPCapabilityConfiguration": {
-				ContractABI: ccip_config.CCIPConfigABI,
-				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
-					"getAllChainConfigs": {
-						ChainSpecificName: "getAllChainConfigs",
-					},
-					"getOCRConfig": {
-						ChainSpecificName: "getOCRConfig",
-					},
-				},
-			},
-		},
-	}
 }
