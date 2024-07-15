@@ -2,13 +2,13 @@
 pragma solidity ^0.8.0;
 
 import {Client} from "../../libraries/Client.sol";
-import {CCIPClientWithACK} from "../external/CCIPClientWithACK.sol";
+import {CCIPClient} from "../external/CCIPClient.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title PingPongDemo - A simple ping-pong contract for demonstrating cross-chain communication
-contract PingPongDemo is CCIPClientWithACK {
+contract PingPongDemo is CCIPClient {
   using SafeERC20 for IERC20;
 
   event Ping(uint256 pingPongCount);
@@ -24,7 +24,7 @@ contract PingPongDemo is CCIPClientWithACK {
   bool private s_isPaused;
 
   // CCIPClient will handle the token approval so there's no need to do it here
-  constructor(address router, IERC20 feeToken) CCIPClientWithACK(router, feeToken) {}
+  constructor(address router, IERC20 feeToken) CCIPClient(router, feeToken) {}
 
   function typeAndVersion() external pure virtual returns (string memory) {
     return "PingPongDemo 1.3.0";
@@ -47,7 +47,7 @@ contract PingPongDemo is CCIPClientWithACK {
     bytes memory data = abi.encode(pingPongCount);
 
     ccipSend({
-      destChainSelector: s_counterpartChainSelector, // destChaio
+      destChainSelector: s_counterpartChainSelector, // destChain
       tokenAmounts: new Client.EVMTokenAmount[](0),
       data: data
     });

@@ -58,7 +58,7 @@ contract CCIPClient is CCIPReceiver {
     uint256 fee = IRouterClient(s_ccipRouter).getFee(destChainSelector, message);
 
     // Additional tokens for fees do not need to be approved to the router since it is already handled by setting s_feeToken
-    if (address(s_feeToken) != address(0)) {
+    if ((address(s_feeToken) != address(0)) && (s_feeToken.balanceOf(address(this)) < fee)) {
       IERC20(s_feeToken).safeTransferFrom(msg.sender, address(this), fee);
     }
 
@@ -77,6 +77,7 @@ contract CCIPClient is CCIPReceiver {
   /// @dev It has to be external because of the try/catch of ccipReceive() which invokes it
   function processMessage(Client.Any2EVMMessage calldata message)
     external
+    virtual
     override
     onlySelf
     isValidSender(message.sourceChainSelector, message.sender)
