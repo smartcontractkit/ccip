@@ -198,14 +198,14 @@ func (d *Delegate) getTransmitterKeys(ctx context.Context, chains legacyevm.Lega
 	transmitterKeys := make(map[types.RelayID][]string)
 	for _, chain := range chains.Slice() {
 		relayID := types.NewRelayID(relay.NetworkEVM, chain.ID().String())
-		ethKeys, err2 := d.keystore.Eth().GetAll(ctx)
+		ethKeys, err2 := d.keystore.Eth().EnabledAddressesForChain(ctx, chain.ID())
 		if err2 != nil {
-			return nil, fmt.Errorf("error getting all eth keys: %w", err2)
+			return nil, fmt.Errorf("error getting enabled addresses for chain: %s %w", chain.ID().String(), err2)
 		}
 
 		transmitterKeys[relayID] = func() (r []string) {
 			for _, key := range ethKeys {
-				r = append(r, key.String())
+				r = append(r, key.Hex())
 			}
 			return
 		}()

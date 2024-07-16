@@ -13,6 +13,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 
+	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -45,7 +47,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 
 		apps = append(apps, node.app)
 		for chainID, transmitter := range node.transmitters {
-			transmitters[chainID] = append(transmitters[chainID], transmitter)
+			//transmitters[chainID] = append(transmitters[chainID], transmitter)
 			identity := confighelper2.OracleIdentityExtra{
 				OracleIdentity: confighelper2.OracleIdentity{
 					OnchainPublicKey:  node.keybundle.PublicKey(),
@@ -56,6 +58,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 				ConfigEncryptionPublicKey: node.keybundle.ConfigEncryptionPublicKey(),
 			}
 			oracles[chainID] = append(oracles[chainID], identity)
+			t.Logf("OCR3_TEST_TRANSMITTERS %+v", transmitters)
 		}
 		nodes = append(nodes, node)
 		peerID, err := p2pkey.MakePeerID(node.peerID)
@@ -105,9 +108,11 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	for _, uni := range universes {
 		// Add nodes and give them the capability
 		t.Log("AddingDON for universe: ", uni.chainID)
+		chainSelector, err := chainselectors.SelectorFromChainId(uni.chainID)
+		require.NoError(t, err)
 		homeChainUni.AddDON(t,
 			ccipCapabilityID,
-			uni.chainID,
+			chainSelector,
 			uni.offramp.Address().Bytes(),
 			1, // f
 			bootstrapP2PID,

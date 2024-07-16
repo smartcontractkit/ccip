@@ -222,11 +222,14 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 		return nil, fmt.Errorf("no chain writer found for dest chain selector %d, can't create contract transmitter",
 			config.Config.ChainSelector)
 	}
-	destFromAccount, ok := i.transmitters[destRelayID]
+	destsFromAccount, ok := i.transmitters[destRelayID]
 	if !ok {
 		return nil, fmt.Errorf("no transmitter found for dest relay ID %s, can't create contract transmitter", destRelayID)
 	}
 
+	i.lggr.Infow("IN_PROCESS transmitters", "destsFromAccount", destsFromAccount, "all transmitters", i.transmitters)
+
+	//TODO: Extract the correct transmitter address from the destsFromAccount
 	var factory ocr3types.ReportingPluginFactory[[]byte]
 	var transmitter ocr3types.ContractTransmitter[[]byte]
 	if config.Config.PluginType == uint8(cctypes.PluginTypeCCIPCommit) {
@@ -243,7 +246,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			chainWriters,
 		)
 		transmitter = ocrimpls.NewCommitContractTransmitter[[]byte](destChainWriter,
-			ocrtypes.Account(destFromAccount[0]),
+			ocrtypes.Account(destsFromAccount[0]),
 			hexutil.Encode(config.Config.OfframpAddress), // TODO: this works for evm only, how about non-evm?
 		)
 	} else if config.Config.PluginType == uint8(cctypes.PluginTypeCCIPExec) {
@@ -260,7 +263,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			chainWriters,
 		)
 		transmitter = ocrimpls.NewExecContractTransmitter[[]byte](destChainWriter,
-			ocrtypes.Account(destFromAccount[0]),
+			ocrtypes.Account(destsFromAccount[0]),
 			hexutil.Encode(config.Config.OfframpAddress), // TODO: this works for evm only, how about non-evm?
 		)
 	} else {
