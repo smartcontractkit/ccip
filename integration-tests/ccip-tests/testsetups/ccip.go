@@ -938,17 +938,9 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) e
 	destToSourcesList := make(map[string][]string)
 	// create a map to hold the unique destination with list of sources
 	for _, n := range o.Cfg.NetworkPairs {
-		if _, ok := destToSourcesList[n.NetworkB.Name]; ok {
-			destToSourcesList[n.NetworkB.Name] = append(destToSourcesList[n.NetworkB.Name], n.NetworkA.Name)
-		} else {
-			destToSourcesList[n.NetworkB.Name] = []string{n.NetworkA.Name}
-		}
+		destToSourcesList[n.NetworkB.Name] = append(destToSourcesList[n.NetworkB.Name], n.NetworkA.Name)
 		if pointer.GetBool(o.Cfg.TestGroupInput.BiDirectionalLane) {
-			if _, ok := destToSourcesList[n.NetworkA.Name]; ok {
-				destToSourcesList[n.NetworkA.Name] = append(destToSourcesList[n.NetworkA.Name], n.NetworkB.Name)
-			} else {
-				destToSourcesList[n.NetworkA.Name] = []string{n.NetworkB.Name}
-			}
+			destToSourcesList[n.NetworkA.Name] = append(destToSourcesList[n.NetworkA.Name], n.NetworkB.Name)
 		}
 	}
 	lggr.Debug().Interface("list", destToSourcesList).Msg("Dest to Source")
@@ -1000,13 +992,13 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) e
 			Int("Leader lanes count", len(o.Cfg.LeaderLanes)).
 			Msg("Checked Gas Update transactions count doesn't match")
 		return fmt.Errorf("checked Gas Update transactions count doesn't match")
-	} else {
-		lggr.Info().
-			Int("Tx hashes", len(transactions)).
-			Int("Tx hashes", len(transactionsBySource)).
-			Int("Leader lanes count", len(o.Cfg.LeaderLanes)).
-			Msg("Checked Gas Update transactions count matches")
 	}
+	lggr.Info().
+		Int("Tx hashes", len(transactions)).
+		Int("Tx hashes", len(transactionsBySource)).
+		Int("Leader lanes count", len(o.Cfg.LeaderLanes)).
+		Msg("Checked Gas Update transactions count matches")
+
 	return nil
 }
 
