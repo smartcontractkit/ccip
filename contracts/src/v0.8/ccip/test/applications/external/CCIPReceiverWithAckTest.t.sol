@@ -150,7 +150,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
     );
 
     // Check that message status is failed
-    assertEq(s_receiver.getMessageStatus(messageId), 1);
+    assertTrue(s_receiver.isFailedMessage(messageId), "Message should be marked as failed");
   }
 
   function test_modifyFeeToken_Success() public {

@@ -20,6 +20,7 @@ contract CCIPClient is CCIPReceiver {
   event MessageSent(bytes32 messageId);
   event FeeTokenUpdated(address oldFeeToken, address newFeeToken);
 
+  /// @dev A check for the zero-address is not explicitly performed since it is included in the CCIPBase parent constructor
   constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
     s_feeToken = feeToken;
 
@@ -47,15 +48,16 @@ contract CCIPClient is CCIPReceiver {
 
     uint256 fee = IRouterClient(s_ccipRouter).getFee(destChainSelector, message);
 
-    // Additional tokens for fees do not need to be approved to the router since it is already handled by setting s_feeToken
-    // Fee transfers need first, that way balanceOf(address(this)) does not conflict with any tokens sent in tokenAmounts
-    // to support fee-token pre-funding
+    // To support pre-funding, if the contract already posesses enough tokens to pay the fee, then a transferFrom is
+    // not necesarry. This branch must be performed before transfering tokens in tokenAmounts[], since in the case
+    // where tokenAmounts[] contains the fee token, then balanceOf may double count tokens improperly and cause
+    // unexpected behavior.
     if ((address(s_feeToken) != address(0)) && (s_feeToken.balanceOf(address(this)) < fee)) {
       IERC20(s_feeToken).safeTransferFrom(msg.sender, address(this), fee);
     }
 
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
-      // Transfer the tokens to pay for tokens in tokenAmounts
+      // Transfer the tokens specified in TokenAmounts[] so that it can be forwarded to the router
       IERC20(tokenAmounts[i].token).safeTransferFrom(msg.sender, address(this), tokenAmounts[i].amount);
 
       // Do not approve the tokens if it is the feeToken, otherwise the approval amount may overflow
@@ -74,17 +76,6 @@ contract CCIPClient is CCIPReceiver {
 
     return messageId;
   }
-
-  /// @notice Contains arbitrary application-logic for incoming CCIP messages.
-  /// @dev It has to be external because of the try/catch of ccipReceive() which invokes it
-  function processMessage(Client.Any2EVMMessage calldata message)
-    external
-    virtual
-    override
-    onlySelf
-    isValidSender(message.sourceChainSelector, message.sender)
-    isValidChain(message.sourceChainSelector)
-  {}
 
   function updateFeeToken(address token) external onlyOwner {
     // If the current fee token is not-native, zero out the allowance to the router for safety

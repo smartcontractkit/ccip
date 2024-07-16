@@ -93,16 +93,17 @@ contract CCIPReceiverWithACK is CCIPReceiver {
 
     // message type is a concept with ClientWithACK
     if (payload.messageType == MessageType.OUTGOING) {
-      // Insert processing workflow here.
+      _processIncomingMessage(message);
 
       // If the message was outgoing on the source chain, then send an ack response.
       _sendAck(message);
+      return;
     } else if (payload.messageType == MessageType.ACK) {
       // Decode message into the message header and the messageId to ensure the message is encoded correctly
       (string memory messageHeader, bytes32 messageId) = abi.decode(payload.data, (string, bytes32));
 
       // Ensure Ack Message contains proper message header. Must abi.encode() before hashing since its of the string type
-      if (keccak256(abi.encode(messageHeader)) != keccak256(abi.encode(ACK_MESSAGE_HEADER))) {
+      if (keccak256(bytes(messageHeader)) != keccak256(bytes(ACK_MESSAGE_HEADER))) {
         revert InvalidAckMessageHeader();
       }
 
@@ -116,15 +117,16 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     }
   }
 
+  /// @notice Contains the arbitrary logic for processing incoming messages from an authorized sender & source-chain
+  function _processIncomingMessage(Client.Any2EVMMessage calldata incomingMessage) internal virtual {}
+
   /// @notice Sends the acknowledgement message back through CCIP to original sender contract
   function _sendAck(Client.Any2EVMMessage calldata incomingMessage) internal {
-    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
-
     // Build the outgoing ACK message, with no tokens, with data being the concatenation of the acknowledgement header and incoming-messageId
     Client.EVM2AnyMessage memory outgoingMessage = Client.EVM2AnyMessage({
       receiver: incomingMessage.sender,
       data: abi.encode(ACK_MESSAGE_HEADER, incomingMessage.messageId),
-      tokenAmounts: tokenAmounts,
+      tokenAmounts: new Client.EVMTokenAmount[](0),
       extraArgs: s_chainConfigs[incomingMessage.sourceChainSelector].extraArgsBytes,
       feeToken: address(s_feeToken)
     });

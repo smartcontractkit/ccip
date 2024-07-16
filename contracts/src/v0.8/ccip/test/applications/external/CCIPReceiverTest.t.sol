@@ -129,7 +129,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     assertEq(failedMessage.destTokenAmounts[0].amount, amount);
 
     // Check that message status is failed
-    assertEq(s_receiver.getMessageStatus(messageId), 1);
+    assertTrue(s_receiver.isFailedMessage(messageId), "Message should be marked as failed");
 
     uint256 tokenBalanceBefore = IERC20(token).balanceOf(OWNER);
 
@@ -182,7 +182,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     assertEq(failedMessage.destTokenAmounts[0].amount, amount);
 
     // Check that message status is failed
-    assertEq(s_receiver.getMessageStatus(messageId), 1);
+    assertTrue(s_receiver.isFailedMessage(messageId), "Message should be marked as failed");
 
     vm.startPrank(OWNER);
 
@@ -198,7 +198,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     emit CCIPReceiver.MessageRecovered(messageId);
 
     s_receiver.retryFailedMessage(messageId);
-    assertEq(s_receiver.getMessageStatus(messageId), 0);
+    assertFalse(s_receiver.isFailedMessage(messageId), "Message should be marked as resolved");
   }
 
   function test_HappyPath_Success() public {
@@ -327,7 +327,7 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
 
     vm.startPrank(OWNER);
 
-    s_receiver.withdrawNativeToken(payable(OWNER), amount);
+    s_receiver.withdrawTokens(address(0), payable(OWNER), amount);
 
     assertEq(OWNER.balance, balanceBefore + amount);
   }

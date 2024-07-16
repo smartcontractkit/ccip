@@ -24,7 +24,7 @@ contract PingPongDemo is CCIPClient {
   constructor(address router, IERC20 feeToken) CCIPClient(router, feeToken) {}
 
   function typeAndVersion() external pure virtual returns (string memory) {
-    return "PingPongDemo 1.3.0";
+    return "PingPongDemo 1.6.0";
   }
 
   function startPingPong() external onlyOwner {
@@ -43,11 +43,7 @@ contract PingPongDemo is CCIPClient {
 
     bytes memory data = abi.encode(pingPongCount);
 
-    ccipSend({
-      destChainSelector: s_counterpartChainSelector, // destChain
-      tokenAmounts: new Client.EVMTokenAmount[](0),
-      data: data
-    });
+    ccipSend({destChainSelector: s_counterpartChainSelector, tokenAmounts: new Client.EVMTokenAmount[](0), data: data});
   }
 
   /// @notice This function the entrypoint for this contract to process messages.
@@ -61,9 +57,8 @@ contract PingPongDemo is CCIPClient {
     onlySelf
     isValidSender(message.sourceChainSelector, message.sender)
   {
-    uint256 pingPongCount = abi.decode(message.data, (uint256));
     if (!s_isPaused) {
-      _respond(pingPongCount + 1);
+      _respond(abi.decode(message.data, (uint256)) + 1);
     }
   }
 
@@ -72,6 +67,8 @@ contract PingPongDemo is CCIPClient {
   // ================================================================
 
   function setCounterpart(uint64 counterpartChainSelector, address counterpartAddress) external onlyOwner {
+    if (counterpartAddress == address(0) || counterpartChainSelector == 0) revert ZeroAddressNotAllowed();
+
     s_counterpartChainSelector = counterpartChainSelector;
     s_counterpartAddress = counterpartAddress;
 
@@ -80,16 +77,6 @@ contract PingPongDemo is CCIPClient {
 
     // Approve the counterpart Chain selector under validChain
     s_chainConfigs[counterpartChainSelector].recipient = abi.encode(counterpartAddress);
-  }
-
-  function setCounterpartChainSelector(uint64 counterpartChainSelector) external onlyOwner {
-    s_counterpartChainSelector = counterpartChainSelector;
-  }
-
-  function setCounterpartAddress(address counterpartAddress) external onlyOwner {
-    s_counterpartAddress = counterpartAddress;
-
-    s_chainConfigs[s_counterpartChainSelector].recipient = abi.encode(counterpartAddress);
   }
 
   function setPaused(bool pause) external onlyOwner {

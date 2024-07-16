@@ -12,7 +12,7 @@ import {Address} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/ut
 /// @dev This contract is abstract, but does not have any functions which must be implemented by a child.
 abstract contract CCIPBase is OwnerIsCreator {
   using SafeERC20 for IERC20;
-  using Address for address;
+  using Address for address payable;
 
   error ZeroAddressNotAllowed();
   error InvalidRouter(address router);
@@ -24,8 +24,10 @@ abstract contract CCIPBase is OwnerIsCreator {
   event TokensWithdrawnByOwner(address indexed token, address indexed to, uint256 amount);
 
   // Parameters are indexed to simplify indexing of cross-chain dapps where contracts may be deployed with the same address.
-  // Since the updateApprovedSenders() function should be used sparingly by the contract owner, the additional gas cost should be negligible. If this function is needed to be used constantly, or with a large number of
-  // contracts, then an alternative and more gas-efficient method should be implemented instead, e.g. with merkle trees or indexing the parameters can be removed.
+  // Since the updateApprovedSenders() function should be used sparingly by the contract owner, the additional gas cost
+  // should be negligible. If this function is needed to be used constantly, or with a large number of
+  // contracts, then an alternative and more gas-efficient method should be implemented instead, e.g. with merkle trees
+  // or removing the indexed parameters
   event ApprovedSenderAdded(uint64 indexed destChainSelector, bytes indexed recipient);
   event ApprovedSenderRemoved(uint64 indexed destChainSelector, bytes indexed recipient);
 
@@ -108,24 +110,13 @@ abstract contract CCIPBase is OwnerIsCreator {
     return s_chainConfigs[sourceChainSelector].approvedSender[senderAddr];
   }
 
-  // ================================================================
+  // ===============================================================
   // │                  Fee Token Management                       │
   // ===============================================================
 
   /// @notice Accepts incoming native-tokens to support prefunding in native fee token.
   /// @dev All the example applications accept prefunding. This function should be removed if prefunding in native fee token is not required.
   receive() external payable {}
-
-  /// @notice Allow the owner to recover any native-tokens sent to this contract out of error, or to withdraw any native-tokens which were used for pre-funding if the fee-token is switched away from native-tokens.
-  /// @dev Function should not be used to recover tokens from failed messages, abandonFailedMessage() should be used instead
-  /// @param to A payable address to send the recovered tokens to
-  /// @param amount the amount of native tokens to recover, denominated in wei
-  function withdrawNativeToken(address payable to, uint256 amount) external onlyOwner {
-    Address.sendValue(to, amount);
-
-    // Use the same withdrawal event signature as withdrawTokens() but use address(0) to denote native-tokens.
-    emit TokensWithdrawnByOwner(address(0), to, amount);
-  }
 
   /// @notice Allow the owner to recover any ERC-20 tokens sent to this contract out of error or withdraw any fee-tokens which were sent as a source of fee-token pre-funding
   /// @dev This should NOT be used for recovering tokens from a failed message. Token recoveries can happen only if
@@ -134,7 +125,11 @@ abstract contract CCIPBase is OwnerIsCreator {
   /// @param to A payable address to send the recovered tokens to
   /// @param amount the amount of native tokens to recover, denominated in wei  function withdrawTokens(address token, address to, uint256 amount) external onlyOwner {
   function withdrawTokens(address token, address to, uint256 amount) external onlyOwner {
-    IERC20(token).safeTransfer(to, amount);
+    if (token == address(0)) {
+      payable(to).sendValue(amount);
+    } else {
+      IERC20(token).safeTransfer(to, amount);
+    }
 
     emit TokensWithdrawnByOwner(token, to, amount);
   }
@@ -160,21 +155,23 @@ abstract contract CCIPBase is OwnerIsCreator {
   /// @notice Enable a remote-chain to send and receive messages to/from this contract via CCIP
   function applyChainUpdates(ChainUpdate[] calldata chains) external onlyOwner {
     for (uint256 i = 0; i < chains.length; ++i) {
-      if (!chains[i].allowed) {
-        delete s_chainConfigs[chains[i].chainSelector].recipient;
-        emit ChainRemoved(chains[i].chainSelector);
+      ChainUpdate memory chain = chains[i];
+
+      if (!chain.allowed) {
+        delete s_chainConfigs[chain.chainSelector].recipient;
+        emit ChainRemoved(chain.chainSelector);
       } else {
         // The existence of a stored recipient is used to denote a chain being enabled, so the length here cannot be zero
-        if (chains[i].recipient.length == 0) revert ZeroAddressNotAllowed();
+        if (chain.recipient.length == 0) revert ZeroAddressNotAllowed();
 
-        ChainConfig storage currentConfig = s_chainConfigs[chains[i].chainSelector];
+        ChainConfig storage currentConfig = s_chainConfigs[chain.chainSelector];
 
-        currentConfig.recipient = chains[i].recipient;
+        currentConfig.recipient = chain.recipient;
 
         // Set any additional args such as enabling out-of-order execution or manual gas-limit
-        if (chains[i].extraArgsBytes.length != 0) currentConfig.extraArgsBytes = chains[i].extraArgsBytes;
+        currentConfig.extraArgsBytes = chain.extraArgsBytes;
 
-        emit ChainAdded(chains[i].chainSelector, chains[i].recipient, chains[i].extraArgsBytes);
+        emit ChainAdded(chain.chainSelector, chain.recipient, chain.extraArgsBytes);
       }
     }
   }
@@ -182,8 +179,7 @@ abstract contract CCIPBase is OwnerIsCreator {
   /// @notice Reverts if the specified chainSelector is not approved to send/receive messages to/from this contract
   /// @param chainSelector the CCIP specific chain selector for a given remote-chain.
   modifier isValidChain(uint64 chainSelector) {
-    // Must be storage and not memory because the struct contains a nested mapping which is not capable of being copied to memory
-    ChainConfig storage currentConfig = s_chainConfigs[chainSelector];
+    ChainConfig storage currentConfig = s_chainConfigs[chainSelector]; // Must be storage because the nested mapping cannot be copied to memory
     if (currentConfig.recipient.length == 0) revert InvalidChain(chainSelector);
     _;
   }

@@ -9,7 +9,7 @@ import {CCIPBase} from "./CCIPBase.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/// @notice Example of a client which supports EVM/non-EVM chains
+/// @notice Example of a client which supports sending messages to EVM/non-EVM chains
 /// @dev If chain specific logic is required for different chain families (e.g. particular
 /// decoding the bytes sender for authorization checks), it may be required to point to a helper
 /// authorization contract unless all chain families are known up front.
@@ -25,9 +25,6 @@ import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/
 contract CCIPSender is CCIPBase {
   using SafeERC20 for IERC20;
 
-  error InvalidConfig();
-  error InsufficientNativeFeeTokenAmount();
-
   event MessageSent(bytes32 messageId);
   event MessageReceived(bytes32 messageId);
 
@@ -36,8 +33,8 @@ contract CCIPSender is CCIPBase {
   /// @notice sends a message through CCIP to the router
   function ccipSend(
     uint64 destChainSelector,
-    Client.EVMTokenAmount[] calldata tokenAmounts,
-    bytes calldata data,
+    Client.EVMTokenAmount[] memory tokenAmounts,
+    bytes memory data,
     address feeToken
   ) public payable isValidChain(destChainSelector) returns (bytes32 messageId) {
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({

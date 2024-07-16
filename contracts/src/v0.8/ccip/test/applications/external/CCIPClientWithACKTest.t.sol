@@ -74,7 +74,7 @@ contract CCIPClientWithACKTest is EVM2EVMOnRampSetup {
     );
 
     // Check that message status is failed
-    assertEq(s_sender.getMessageStatus(messageId), 1);
+    assertTrue(s_sender.isFailedMessage(messageId), "Message Should be marked as failed");
   }
 
   function test_ccipReceiveAndSendAck_Success() public {

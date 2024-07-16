@@ -94,25 +94,6 @@ contract PingPong_example_ccipReceive is PingPongDappSetup {
 }
 
 contract PingPong_example_plumbing is PingPongDappSetup {
-  function test_Fuzz_CounterPartChainSelector_Success(uint64 chainSelector) public {
-    s_pingPong.setCounterpartChainSelector(chainSelector);
-
-    assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
-  }
-
-  function test_Fuzz_CounterPartAddress_Success(address counterpartAddress) public {
-    s_pingPong.setCounterpartAddress(counterpartAddress);
-
-    assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
-  }
-
-  function test_Fuzz_CounterPartAddress_Success(uint64 chainSelector, address counterpartAddress) public {
-    s_pingPong.setCounterpart(chainSelector, counterpartAddress);
-
-    assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
-    assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
-  }
-
   function test_Pausing_Success() public {
     assertFalse(s_pingPong.isPaused());
 
@@ -122,6 +103,6 @@ contract PingPong_example_plumbing is PingPongDappSetup {
   }
 
   function test_typeAndVersion() public view {
-    assertEq(s_pingPong.typeAndVersion(), "PingPongDemo 1.3.0");
+    assertEq(s_pingPong.typeAndVersion(), "PingPongDemo 1.6.0");
   }
 }
