@@ -578,11 +578,10 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr *ze
 		ccipModule.gasUpdateWatcherMu.Unlock()
 		lggr.Info().
 			Uint64("chainSelector", destChainSelector).
-			Str("source_chain", ccipModule.ChainClient.GetNetworkName()).
 			Uint64("dest_chain", destChain).
 			Str("price_registry", ccipModule.PriceRegistry.Address()).
 			Str("tx hash", raw.TxHash.Hex()).
-			Msgf("UsdPerUnitGasUpdated event received for dest chain %d source chain %s",
+			Msgf("UsdPerUnitGasUpdated event received for dest chain: %d, source chain: %s",
 				destChain, ccipModule.ChainClient.GetNetworkName())
 		return nil
 	}

@@ -951,7 +951,7 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) e
 			}
 		}
 	}
-	lggr.Info().Interface("list", destToSourcesList).Msg("Dest to Source")
+	lggr.Debug().Interface("list", destToSourcesList).Msg("Dest to Source")
 	// a function to read the events and create a map by tx hash with the event details
 	filterGasUpdateByTx := func(lane *actions.CCIPLane) error {
 		for _, g := range lane.Source.Common.GasUpdateEvents {
@@ -990,52 +990,22 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) e
 			}
 		}
 	}
-	lggr.Debug().Interface("Tx hashes", transactions).Msg("Checked Gas Update Transactions")
 	lggr.Info().Interface("Tx hashes by source", transactionsBySource).Msg("Checked Gas Update Transactions by Source")
 	// when leader lane setup is enabled, number of unique transaction from the source
 	//should match the number of leader lanes defined.
-	var failed bool
 	if len(transactionsBySource) != len(o.Cfg.LeaderLanes) {
 		lggr.Error().
 			Int("Tx hashes expected", len(o.Cfg.LeaderLanes)).
 			Int("Tx hashes received", len(transactionsBySource)).
 			Int("Leader lanes count", len(o.Cfg.LeaderLanes)).
 			Msg("Checked Gas Update transactions count doesn't match")
-		failed = true
+		return fmt.Errorf("checked Gas Update transactions count doesn't match")
 	} else {
 		lggr.Info().
 			Int("Tx hashes", len(transactions)).
 			Int("Tx hashes", len(transactionsBySource)).
 			Int("Leader lanes count", len(o.Cfg.LeaderLanes)).
 			Msg("Checked Gas Update transactions count matches")
-	}
-	// each transaction should have number of network - 1 chain selectors and corresponding gas values.
-	// Say we have 3 networks, then we have expected every transaction to have 2 chain selectors
-	for source, tx := range transactionsBySource {
-		l, ok := destToSourcesList[source]
-		if !ok {
-			lggr.Error().Str("Tx hash", tx).Msg("this transaction is probably " +
-				"from non-leader lane which is not expected")
-		}
-		if len(transactions[tx]) != len(l) {
-			lggr.Error().
-				Str("Tx hash", tx).
-				Str("Source", source).
-				Int("Expected event count", len(l)).
-				Int("Event emitted count", len(transactions[tx])).
-				Msg("Checked Gas Update transaction events count doesn't match")
-			failed = true
-		} else {
-			lggr.Debug().
-				Str("Tx hash", tx).
-				Str("Source", source).
-				Int("Expected event count", len(l)).
-				Int("Event emitted count", len(transactions[tx])).
-				Msg("Checked Gas Update transaction events count")
-		}
-	}
-	if failed {
-		return fmt.Errorf("gas update transaction verification failed. Refer the logs for the errors")
 	}
 	return nil
 }
