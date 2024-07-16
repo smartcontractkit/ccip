@@ -126,7 +126,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 	hcr := ccipreaderpkg.NewHomeChainReader(
 		homeChainContractReader,
 		d.lggr.Named("HomeChainReader"),
-		12*time.Second,
+		100*time.Millisecond,
 	)
 
 	oracleCreator := oraclecreator.New(

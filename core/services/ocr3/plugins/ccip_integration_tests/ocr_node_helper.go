@@ -80,8 +80,9 @@ func setupNodeOCR3(
 
 		// Enable Capabilities, This is a pre-requisite for registrySyncer to work.
 		// Same values as P2P.V2 except for the listen address.
-		c.Capabilities.Peering.V2 = c.P2P.V2
-		c.Capabilities.Peering.V2.ListenAddresses = &[]string{fmt.Sprintf("127.0.0.1:%d", capabilitiesPort)}
+		//c.Capabilities.Peering.V2.Enabled = ptr(true)
+		//c.Capabilities.Peering.V2 = c.P2P.V2
+		//c.Capabilities.Peering.V2.ListenAddresses = &[]string{fmt.Sprintf("127.0.0.1:%d", capabilitiesPort)}
 		c.Capabilities.ExternalRegistry.NetworkID = ptr(relay.NetworkEVM)
 		c.Capabilities.ExternalRegistry.ChainID = ptr(strconv.FormatUint(homeChainUniverse.chainID, 10))
 		c.Capabilities.ExternalRegistry.Address = ptr(homeChainUniverse.capabilityRegistry.Address().String())

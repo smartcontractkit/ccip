@@ -317,6 +317,26 @@ func (h *homeChain) AddNodes(
 	h.backend.Commit()
 }
 
+func AddChainConfig(
+	t *testing.T,
+	h homeChain,
+	chainSelector uint64,
+	p2pIDs [][32]byte,
+	f uint8,
+) ccip_config.CCIPConfigTypesChainConfigInfo {
+	// Need to sort, otherwise _checkIsValidUniqueSubset onChain will fail
+	sortP2PIDS(p2pIDs)
+	// First Add ChainConfig that includes all p2pIDs as readers
+	chainConfig := integrationhelpers.SetupConfigInfo(chainSelector, p2pIDs, f, []byte(strconv.FormatUint(chainSelector, 10)))
+	inputConfig := []ccip_config.CCIPConfigTypesChainConfigInfo{
+		chainConfig,
+	}
+	_, err := h.ccipConfig.ApplyChainConfigUpdates(h.owner, nil, inputConfig)
+	require.NoError(t, err)
+	h.backend.Commit()
+	return chainConfig
+}
+
 func (h *homeChain) AddDON(
 	t *testing.T,
 	ccipCapabilityID [32]byte,
@@ -327,17 +347,6 @@ func (h *homeChain) AddDON(
 	p2pIDs [][32]byte,
 	oracles []confighelper2.OracleIdentityExtra,
 ) {
-	// Need to sort, otherwise _checkIsValidUniqueSubset onChain will fail
-	sortP2PIDS(p2pIDs)
-	// First Add ChainConfig that includes all p2pIDs as readers
-	chainConfig := integrationhelpers.SetupConfigInfo(chainSelector, p2pIDs, integrationhelpers.FChainA, []byte(strconv.FormatUint(chainSelector, 10)))
-	inputConfig := []ccip_config.CCIPConfigTypesChainConfigInfo{
-		chainConfig,
-	}
-	_, err := h.ccipConfig.ApplyChainConfigUpdates(h.owner, nil, inputConfig)
-	require.NoError(t, err)
-	h.backend.Commit()
-
 	// Get OCR3 Config from helper
 	var schedule []int
 	for range oracles {

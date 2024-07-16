@@ -26,11 +26,10 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	numNodes := 4
 	t.Log("creating ocr3 nodes")
 	var (
-		oracles      = make(map[uint64][]confighelper2.OracleIdentityExtra)
-		transmitters = make(map[uint64][]common.Address)
-		apps         []chainlink.Application
-		nodes        []*ocr3Node
-		p2pIDs       [][32]byte
+		oracles = make(map[uint64][]confighelper2.OracleIdentityExtra)
+		apps    []chainlink.Application
+		nodes   []*ocr3Node
+		p2pIDs  [][32]byte
 
 		// The bootstrap node will be the first node (index 0)
 		bootstrapPort  int
@@ -56,7 +55,6 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 				ConfigEncryptionPublicKey: node.keybundle.ConfigEncryptionPublicKey(),
 			}
 			oracles[chainID] = append(oracles[chainID], identity)
-			t.Logf("OCR3_TEST_TRANSMITTERS %+v", transmitters)
 		}
 		nodes = append(nodes, node)
 		peerID, err := p2pkey.MakePeerID(node.peerID)
@@ -81,6 +79,27 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	commitBlocksBackground(t, universes, tick)
 
 	ctx := testutils.Context(t)
+
+	ccipCapabilityID, err := homeChainUni.capabilityRegistry.GetHashedCapabilityId(&bind.CallOpts{
+		Context: ctx,
+	}, CapabilityLabelledName, CapabilityVersion)
+	require.NoError(t, err, "failed to get hashed capability id for ccip")
+	require.NotEqual(t, [32]byte{}, ccipCapabilityID, "ccip capability id is empty")
+
+	// Need to Add nodes and assign capabilities to them before creating DONS
+
+	homeChainUni.AddNodes(t, p2pIDs, [][32]byte{ccipCapabilityID})
+
+	// Add homechain configs
+	for _, uni := range universes {
+		AddChainConfig(t, homeChainUni, getSelector(uni.chainID), p2pIDs, 1)
+	}
+
+	cfgs, err3 := homeChainUni.ccipConfig.GetAllChainConfigs(&bind.CallOpts{})
+	require.NoError(t, err3)
+	t.Logf("homechain_configs %+v", cfgs)
+	require.Len(t, cfgs, numChains)
+
 	t.Log("creating ocr3 jobs")
 	for i := 0; i < len(nodes); i++ {
 		err := nodes[i].app.Start(ctx)
@@ -94,14 +113,6 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		require.NoErrorf(t, tApp.AddJobV2(ctx, &jb), "Wasn't able to create ccip job for node %d", i)
 	}
 
-	ccipCapabilityID, err := homeChainUni.capabilityRegistry.GetHashedCapabilityId(&bind.CallOpts{
-		Context: ctx,
-	}, CapabilityLabelledName, CapabilityVersion)
-	require.NoError(t, err, "failed to get hashed capability id for ccip")
-	require.NotEqual(t, [32]byte{}, ccipCapabilityID, "ccip capability id is empty")
-
-	// Need to Add nodes and assign capabilities to them before creating DONS
-	homeChainUni.AddNodes(t, p2pIDs, [][32]byte{ccipCapabilityID})
 	// Create a DON for each chain
 	for _, uni := range universes {
 		// Add nodes and give them the capability
