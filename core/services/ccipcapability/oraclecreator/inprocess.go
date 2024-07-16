@@ -177,7 +177,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			chainReaderConfig,
 		)
 		if err2 != nil {
-			return nil, fmt.Errorf("failed to create contract reader for chain %s: %w", chain.ID(), err)
+			return nil, fmt.Errorf("failed to create contract reader for chain %s: %w", chain.ID(), err2)
 		}
 
 		if chain.ID().Uint64() == destChainID {

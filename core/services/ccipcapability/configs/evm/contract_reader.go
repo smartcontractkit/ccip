@@ -54,7 +54,7 @@ func DestReaderConfig() evmrelaytypes.ChainReaderConfig {
 				ContractABI: evm_2_evm_multi_offramp.EVM2EVMMultiOffRampABI,
 				ContractPollingFilter: evmrelaytypes.ContractPollingFilter{
 					GenericEventNames: []string{
-						mustGetEventName(consts.EventNameExecutionStateChanged, offrampABI),
+						//mustGetEventName(consts.EventNameExecutionStateChanged, offrampABI),
 						mustGetEventName(consts.EventNameCommitReportAccepted, offrampABI),
 					},
 				},
@@ -87,6 +87,14 @@ func DestReaderConfig() evmrelaytypes.ChainReaderConfig {
 						ChainSpecificName: mustGetMethodName("getSourceChainConfig", offrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
+					consts.EventNameCommitReportAccepted: {
+						ChainSpecificName: mustGetEventName(consts.EventNameCommitReportAccepted, offrampABI),
+						ReadType:          evmrelaytypes.Event,
+					},
+					//consts.EventNameExecutionStateChanged: {
+					//	ChainSpecificName: mustGetEventName(consts.EventNameExecutionStateChanged, offrampABI),
+					//	ReadType:          evmrelaytypes.Event,
+					//},
 				},
 			},
 		},
@@ -130,6 +138,10 @@ func SourceReaderConfig() evmrelaytypes.ChainReaderConfig {
 					consts.MethodNameGetTokenTransferFeeConfig: {
 						ChainSpecificName: mustGetMethodName("getTokenTransferFeeConfig", onrampABI),
 						ReadType:          evmrelaytypes.Method,
+					},
+					consts.EventNameCCIPSendRequested: {
+						ChainSpecificName: mustGetEventName(consts.EventNameCCIPSendRequested, onrampABI),
+						ReadType:          evmrelaytypes.Event,
 					},
 				},
 			},
