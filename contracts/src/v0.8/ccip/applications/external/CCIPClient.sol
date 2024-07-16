@@ -64,7 +64,7 @@ contract CCIPClient is CCIPReceiver {
       }
     }
 
-    // messageId is only generated in the on-ramp, and therefore cannot be calcualated head of time.
+    // messageId is only generated in the on-ramp, and therefore cannot be calculated head of time.
     // This necessitates breaking CEI but since the router is a trusted contract, any risks are negligible.
     messageId = IRouterClient(s_ccipRouter).ccipSend{value: address(s_feeToken) == address(0) ? fee : 0}(
       destChainSelector, message

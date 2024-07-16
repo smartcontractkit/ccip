@@ -7,12 +7,13 @@ import {CCIPReceiver} from "./CCIPReceiver.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-
 import {EnumerableMap} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableMap.sol";
 
 /// @title CCIPReceiverWithACK
-/// @notice Acts as a CCIP receiver, but upon receiving an incoming message, attempts to send a response back to the sender with an ACK packet indicating they received and processed the initial correspondence correctly.
-/// @dev Messages received by this contract must be of special formatting in which any arbitrary data is first wrapped inside a MessagePayload struct, and must be processed first to ensure conformity.
+/// @notice Acts as a CCIP receiver, but upon receiving an incoming message, attempts to send a response back to the
+/// sender with an ACK packet indicating they received and processed the initial request correctly.
+/// @dev Messages received by this contract must be of special formatting in which any arbitrary data is first wrapped
+/// inside a MessagePayload struct, and must be processed first to ensure conformity.
 contract CCIPReceiverWithACK is CCIPReceiver {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.Bytes32ToUintMap;
@@ -130,10 +131,10 @@ contract CCIPReceiverWithACK is CCIPReceiver {
 
     uint256 feeAmount = IRouterClient(s_ccipRouter).getFee(incomingMessage.sourceChainSelector, outgoingMessage);
 
-    bytes32 ACKmessageId = IRouterClient(s_ccipRouter).ccipSend{
+    bytes32 ACKMessageId = IRouterClient(s_ccipRouter).ccipSend{
       value: address(s_feeToken) == address(0) ? feeAmount : 0
     }(incomingMessage.sourceChainSelector, outgoingMessage);
 
-    emit MessageSent(incomingMessage.messageId, ACKmessageId);
+    emit MessageSent(incomingMessage.messageId, ACKMessageId);
   }
 }

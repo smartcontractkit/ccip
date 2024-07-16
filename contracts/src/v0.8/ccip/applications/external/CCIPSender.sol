@@ -21,7 +21,7 @@ import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/
 /// change if you introduce upgradeability. An immutable dapp building on top of CCIP
 /// like the example below will inherit the trust properties of CCIP (i.e. the oracle network).
 /// @dev The receiver's are encoded offchain and passed as direct arguments to permit supporting
-/// new chain family receivers (e.g. a solana encoded receiver address) without upgrading.
+/// new chain family receivers (e.g. a Solana encoded receiver address) without upgrading.
 contract CCIPSender is CCIPBase {
   using SafeERC20 for IERC20;
 

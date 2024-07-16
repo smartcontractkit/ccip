@@ -23,7 +23,7 @@ abstract contract CCIPBase is OwnerIsCreator {
   event CCIPRouterModified(address indexed oldRouter, address indexed newRouter);
   event TokensWithdrawnByOwner(address indexed token, address indexed to, uint256 amount);
 
-  // Parameters are indexed to simplyify indexing of cross-chain dapps where contracts may be deployed with the same address.
+  // Parameters are indexed to simplify indexing of cross-chain dapps where contracts may be deployed with the same address.
   // Since the updateApprovedSenders() function should be used sparingly by the contract owner, the additional gas cost should be negligible. If this function is needed to be used constantly, or with a large number of
   // contracts, then an alternative and more gas-efficient method should be implemented instead, e.g. with merkle trees or indexing the parameters can be removed.
   event ApprovedSenderAdded(uint64 indexed destChainSelector, bytes indexed recipient);
@@ -33,7 +33,7 @@ abstract contract CCIPBase is OwnerIsCreator {
   event ChainRemoved(uint64 indexed removeChainSelector);
 
   struct ApprovedSenderUpdate {
-    uint64 destChainSelector; // Chainselector for a source chain that is allowed to call this dapp
+    uint64 destChainSelector; // ChainSelector for a source chain that is allowed to call this dapp
     bytes sender; //             The sender address on source chain that is allowed to call, ABI encoded in the case of a remote EVM chain
   }
 
@@ -128,7 +128,7 @@ abstract contract CCIPBase is OwnerIsCreator {
   }
 
   /// @notice Allow the owner to recover any ERC-20 tokens sent to this contract out of error or withdraw any fee-tokens which were sent as a source of fee-token pre-funding
-  /// @dev This should NOT be used for recoverying tokens from a failed message. Token recoveries can happen only if
+  /// @dev This should NOT be used for recovering tokens from a failed message. Token recoveries can happen only if
   /// the failed message is guaranteed to not succeed upon retry, otherwise this can lead to double spend.
   /// For implementation of token recovery, see inheriting contracts.
   /// @param to A payable address to send the recovered tokens to

@@ -10,7 +10,7 @@ import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/
 
 /// @title CCIPClientWithACK
 /// @notice This contract implements logic for sending and receiving CCIP Messages, as well as responding to incoming messages with an ACK-response pattern. It utilizes CCIPReceiver's defensive patterns by default.
-/// @dev ccipSend functionality has been inherited from CCIPClient.sol, and _sendACK() from CCIPReceiverWithACK, so only processMessage() must be overridden to enable full functionality for processing incoming messages for ACK's
+/// @dev ccipSend functionality has been inherited from CCIPClient.sol, and _sendACK() from CCIPReceiverWithACK, so only processMessage() must be overridden to enable full functionality for processing incoming messages for ACKs
 contract CCIPClientWithACK is CCIPReceiverWithACK {
   using SafeERC20 for IERC20;
 

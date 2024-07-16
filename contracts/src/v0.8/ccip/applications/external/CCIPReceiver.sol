@@ -26,12 +26,12 @@ contract CCIPReceiver is CCIPBase {
   enum ErrorCode {
     RESOLVED, // RESOLVED is the default status for any incoming message, unless execution fails and it is marked as FAILED.
     FAILED, // FAILED messages are messages which reverted during execution of processMessage() as part of the ccipReceive() try catch loop.
-    ABANDONED // ABANDONED messages are ones which cannot be properly processed, but any sent tokens are recoverable, and can only be triggered by the contract owner.
-      // Only a message that was previously marked as FAILED can be abandoned.
+    ABANDONED // ABANDONED messages are ones which cannot be properly processed, but any sent tokens are recoverable and
+      // can only be triggered by the contract owner. Only a message that was previously marked as FAILED can be abandoned.
 
   }
 
-  // The message contents of failed messages are stored here.
+  // Failed messages are stored here.
   mapping(bytes32 messageId => Client.Any2EVMMessage contents) internal s_messageContents;
 
   // Contains failed messages and their state.
@@ -86,7 +86,7 @@ contract CCIPReceiver is CCIPBase {
 
   // ================================================================
   // │                  Failed Message Processing                   |
-  // ================== ==============================================
+  // ================================================================
 
   /// @notice Executes a message that failed initial delivery, but with different logic specifically for re-execution.
   /// @dev Since the function invoked _retryFailedMessage(), which is marked onlyOwner, this may only be called by the Owner as well.
@@ -95,14 +95,13 @@ contract CCIPReceiver is CCIPBase {
   function retryFailedMessage(bytes32 messageId) external {
     if (s_failedMessages.get(messageId) != uint256(ErrorCode.FAILED)) revert MessageNotFailed(messageId);
 
-    // Set the error code to 0 to disallow reentry and retry the same failed message
-    // multiple times.
+    // Set the error code to 0 to disallow reentry and retry the same failed message multiple times.
     s_failedMessages.set(messageId, uint256(ErrorCode.RESOLVED));
 
     // Allow developer to implement arbitrary functionality on retried messages, such as just releasing the associated tokens
     Client.Any2EVMMessage memory message = s_messageContents[messageId];
 
-    // Allow the user override the implementation, since different workflow may be desired for retrying a merssage
+    // Allow the user override the implementation, since different workflow may be desired for retrying a message
     _retryFailedMessage(message);
 
     emit MessageRecovered(messageId);
