@@ -1,4 +1,4 @@
-package ccip_integration_tests
+package integrationhelpers
 
 import (
 	"context"
@@ -293,4 +293,15 @@ func (t *TestUniverse) AddDONToRegistry(
 	}, false, false, f)
 	require.NoError(t.TestingT, err)
 	t.Backend.Commit()
+}
+
+func SetupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) ccip_config.CCIPConfigTypesChainConfigInfo {
+	return ccip_config.CCIPConfigTypesChainConfigInfo{
+		ChainSelector: chainSelector,
+		ChainConfig: ccip_config.CCIPConfigTypesChainConfig{
+			Readers: readers,
+			FChain:  fChain,
+			Config:  cfg,
+		},
+	}
 }

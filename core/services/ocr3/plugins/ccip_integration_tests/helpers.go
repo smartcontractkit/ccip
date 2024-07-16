@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/link_token"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip_integration_tests/integrationhelpers"
 
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
@@ -329,7 +330,7 @@ func (h *homeChain) AddDON(
 	// Need to sort, otherwise _checkIsValidUniqueSubset onChain will fail
 	sortP2PIDS(p2pIDs)
 	// First Add ChainConfig that includes all p2pIDs as readers
-	chainConfig := SetupConfigInfo(chainSelector, p2pIDs, FChainA, []byte(strconv.FormatUint(chainSelector, 10)))
+	chainConfig := integrationhelpers.SetupConfigInfo(chainSelector, p2pIDs, integrationhelpers.FChainA, []byte(strconv.FormatUint(chainSelector, 10)))
 	inputConfig := []ccip_config.CCIPConfigTypesChainConfigInfo{
 		chainConfig,
 	}
@@ -476,17 +477,6 @@ func setupUniverseBasics(t *testing.T, uni onchainUniverse) {
 	_, err = uni.nonceManager.ApplyAuthorizedCallerUpdates(owner, authorizedCallersAuthorizedCallerArgs)
 	require.NoError(t, err)
 	uni.backend.Commit()
-}
-
-func SetupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) ccip_config.CCIPConfigTypesChainConfigInfo {
-	return ccip_config.CCIPConfigTypesChainConfigInfo{
-		ChainSelector: chainSelector,
-		ChainConfig: ccip_config.CCIPConfigTypesChainConfig{
-			Readers: readers,
-			FChain:  fChain,
-			Config:  cfg,
-		},
-	}
 }
 
 // As we can't change router contract. The contract was expecting onRamp and offRamp per lane and not per chain
