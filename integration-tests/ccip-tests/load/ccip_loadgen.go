@@ -267,6 +267,9 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		return res
 	}
 
+	// the msg is no longer needed, so we can clear it to avoid holding extra data during load
+	msg = router.ClientEVM2AnyMessage{}
+
 	txConfirmationTime := time.Now().UTC()
 	lggr = lggr.With().Str("Msg Tx", sendTx.Hash().String()).Logger()
 
