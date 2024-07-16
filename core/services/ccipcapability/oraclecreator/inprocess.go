@@ -71,6 +71,7 @@ func New(
 	lggr logger.Logger,
 	monitoringEndpointGen telemetry.MonitoringEndpointGenerator,
 	bootstrapperLocators []commontypes.BootstrapperLocator,
+	homeChainReader ccipreaderpkg.HomeChain,
 ) cctypes.OracleCreator {
 	return &inprocessOracleCreator{
 		ocrKeyBundles:         ocrKeyBundles,
@@ -85,6 +86,7 @@ func New(
 		lggr:                  lggr,
 		monitoringEndpointGen: monitoringEndpointGen,
 		bootstrapperLocators:  bootstrapperLocators,
+		homeChainReader:       homeChainReader,
 	}
 }
 

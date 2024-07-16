@@ -116,6 +116,19 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 	// since all queries are scoped by config digest.
 	ocrDB := ocr2.NewDB(d.ds, spec.ID, 0, d.lggr)
 
+	homeChainContractReader, err := d.getHomeChainContractReader(d.chains,
+		spec.CCIPSpec.CapabilityLabelledName,
+		spec.CCIPSpec.CapabilityVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get home chain contract reader: %w", err)
+	}
+
+	hcr := ccipreaderpkg.NewHomeChainReader(
+		homeChainContractReader,
+		d.lggr.Named("HomeChainReader"),
+		12*time.Second,
+	)
+
 	oracleCreator := oraclecreator.New(
 		ocrKeys,
 		transmitterKeys,
@@ -129,19 +142,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 		d.lggr,
 		d.monitoringEndpointGen,
 		bootstrapperLocators,
-	)
-
-	homeChainContractReader, err := d.getHomeChainContractReader(d.chains,
-		spec.CCIPSpec.CapabilityLabelledName,
-		spec.CCIPSpec.CapabilityVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get home chain contract reader: %w", err)
-	}
-
-	hcr := ccipreaderpkg.NewHomeChainReader(
-		homeChainContractReader,
-		d.lggr.Named("HomeChainReader"),
-		12*time.Second,
+		hcr,
 	)
 
 	capLauncher := launcher.New(
