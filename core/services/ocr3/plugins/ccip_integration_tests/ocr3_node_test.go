@@ -177,12 +177,16 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 				replayBlock = endBlock
 			}
 		}
+		replayBlocks[chainID] = replayBlock
 	}
 
 	// replay the log poller on all the chains so that the logs are in the db.
 	// otherwise the plugins won't pick them up.
+	// TODO: this is happening too early, we need to wait for the chain readers to get their config
+	// and register the LP filters before this has any effect.
 	for _, node := range nodes {
 		for chainID, replayBlock := range replayBlocks {
+			t.Logf("Replaying logs for chain %d from block %d", chainID, replayBlock)
 			require.NoError(t, node.app.ReplayFromBlock(big.NewInt(int64(chainID)), replayBlock, false), "failed to replay logs")
 		}
 	}
