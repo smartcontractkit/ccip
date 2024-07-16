@@ -169,7 +169,7 @@ abstract contract TokenPool is IPoolV1, OwnerIsCreator {
   /// - if the source pool is valid
   /// - rate limit status
   /// @param releaseOrMintIn The input to validate.
-  /// @dev This function should always be called before executing a lock or burn. Not doing so would allow
+  /// @dev This function should always be called before executing a release or mint. Not doing so would allow
   /// for various exploits.
   function _validateReleaseOrMint(Pool.ReleaseOrMintInV1 memory releaseOrMintIn) internal {
     if (!isSupportedToken(releaseOrMintIn.localToken)) revert InvalidToken(releaseOrMintIn.localToken);
