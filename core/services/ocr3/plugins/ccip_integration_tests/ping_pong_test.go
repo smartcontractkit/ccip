@@ -83,7 +83,7 @@ func initializePingPongContracts(
 		for chainToConnect, pingPong := range pingPongs[chainID] {
 			_, err := pingPong.SetCounterpart(
 				universe.owner,
-				chainUniverses[chainToConnect].chainID,
+				getSelector(chainUniverses[chainToConnect].chainID),
 				// This is the address of the ping pong contract on the other chain
 				pingPongs[chainToConnect][chainID].Address(),
 			)

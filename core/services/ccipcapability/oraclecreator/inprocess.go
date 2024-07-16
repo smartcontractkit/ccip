@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocr3 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -177,6 +178,20 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 		)
 		if err2 != nil {
 			return nil, fmt.Errorf("failed to create contract reader for chain %s: %w", chain.ID(), err)
+		}
+
+		if chain.ID().Uint64() == destChainID {
+			// bind the chain reader to the dest chain's offramp.
+			offrampAddressHex := common.BytesToAddress(config.Config.OfframpAddress).Hex()
+			err3 := cr.Bind(context.Background(), []types.BoundContract{
+				{
+					Address: offrampAddressHex,
+					Name:    consts.ContractNameOffRamp,
+				},
+			})
+			if err3 != nil {
+				return nil, fmt.Errorf("failed to bind chain reader for dest chain %s's offramp at %s: %w", chain.ID(), offrampAddressHex, err3)
+			}
 		}
 
 		// Even though we only write to the dest chain, we need to create chain writers for all chains

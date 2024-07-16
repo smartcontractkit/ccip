@@ -13,8 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 
-	chainselectors "github.com/smartcontractkit/chain-selectors"
-
 	"github.com/smartcontractkit/libocr/commontypes"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -108,8 +106,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	for _, uni := range universes {
 		// Add nodes and give them the capability
 		t.Log("AddingDON for universe: ", uni.chainID)
-		chainSelector, err := chainselectors.SelectorFromChainId(uni.chainID)
-		require.NoError(t, err)
+		chainSelector := getSelector(uni.chainID)
 		homeChainUni.AddDON(t,
 			ccipCapabilityID,
 			chainSelector,
@@ -125,17 +122,17 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	for chainID, universe := range universes {
 		for otherChain, pingPong := range pingPongs[chainID] {
 			t.Log("PingPong From: ", chainID, " To: ", otherChain)
-			_, err := pingPong.StartPingPong(universe.owner)
-			require.NoError(t, err)
+			_, err2 := pingPong.StartPingPong(universe.owner)
+			require.NoError(t, err2)
 			universe.backend.Commit()
 
-			logIter, err := universe.onramp.FilterCCIPSendRequested(&bind.FilterOpts{Start: 0}, nil)
-			require.NoError(t, err)
+			logIter, err3 := universe.onramp.FilterCCIPSendRequested(&bind.FilterOpts{Start: 0}, nil)
+			require.NoError(t, err3)
 			// Iterate until latest event
 			for logIter.Next() {
 			}
 			log := logIter.Event
-			require.Equal(t, otherChain, log.DestChainSelector)
+			require.Equal(t, getSelector(otherChain), log.DestChainSelector)
 			require.Equal(t, pingPong.Address(), log.Message.Sender)
 			chainPingPongAddr := pingPongs[otherChain][chainID].Address().Bytes()
 			// With chain agnostic addresses we need to pad the address to the correct length if the receiver is zero prefixed

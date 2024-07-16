@@ -127,7 +127,7 @@ func createUniverses(
 			backend,
 			evm_2_evm_multi_onramp.EVM2EVMMultiOnRampStaticConfig{
 				LinkToken:          linkToken.Address(),
-				ChainSelector:      chainID,
+				ChainSelector:      getSelector(chainID),
 				RmnProxy:           rmnProxy.Address(),
 				MaxFeeJuelsPerMsg:  big.NewInt(1e18),
 				NonceManager:       nonceManager.Address(),
@@ -168,7 +168,7 @@ func createUniverses(
 			owner,
 			backend,
 			evm_2_evm_multi_offramp.EVM2EVMMultiOffRampStaticConfig{
-				ChainSelector:      chainID,
+				ChainSelector:      getSelector(chainID),
 				RmnProxy:           rmnProxy.Address(),
 				TokenAdminRegistry: tokenAdminRegistry.Address(),
 				NonceManager:       nonceManager.Address(),
@@ -493,11 +493,11 @@ func wireRouter(t *testing.T, uni onchainUniverse, universes map[uint64]onchainU
 			continue
 		}
 		routerOnrampUpdates = append(routerOnrampUpdates, router.RouterOnRamp{
-			DestChainSelector: remoteChainID,
+			DestChainSelector: getSelector(remoteChainID),
 			OnRamp:            uni.onramp.Address(),
 		})
 		routerOfframpUpdates = append(routerOfframpUpdates, router.RouterOffRamp{
-			SourceChainSelector: remoteChainID,
+			SourceChainSelector: getSelector(remoteChainID),
 			OffRamp:             uni.offramp.Address(),
 		})
 	}
@@ -515,7 +515,7 @@ func wireOnRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchainU
 			continue
 		}
 		onrampDestChainConfigArgs = append(onrampDestChainConfigArgs, evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
-			DestChainSelector: remoteChainID,
+			DestChainSelector: getSelector(remoteChainID),
 			DynamicConfig:     defaultOnRampDynamicConfig(t),
 		})
 	}
@@ -533,7 +533,7 @@ func wireOffRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchain
 			continue
 		}
 		offrampSourceChainConfigArgs = append(offrampSourceChainConfigArgs, evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
-			SourceChainSelector: remoteChainID, // for each destination chain, add a source chain config
+			SourceChainSelector: getSelector(remoteChainID), // for each destination chain, add a source chain config
 			IsEnabled:           true,
 			OnRamp:              remoteUniverse.onramp.Address().Bytes(),
 		})
@@ -541,6 +541,14 @@ func wireOffRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchain
 	_, err := uni.offramp.ApplySourceChainConfigUpdates(owner, offrampSourceChainConfigArgs)
 	require.NoErrorf(t, err, "failed to apply source chain config updates on offramp on chain id %d", uni.chainID)
 	uni.backend.Commit()
+}
+
+func getSelector(chainID uint64) uint64 {
+	selector, err := chainsel.SelectorFromChainId(chainID)
+	if err != nil {
+		panic(err)
+	}
+	return selector
 }
 
 // initRemoteChainsGasPrices sets the gas prices for all chains except the local chain in the local price registry
@@ -552,7 +560,7 @@ func initRemoteChainsGasPrices(t *testing.T, uni onchainUniverse, universes map[
 		}
 		gasPriceUpdates = append(gasPriceUpdates,
 			price_registry.InternalGasPriceUpdate{
-				DestChainSelector: remoteChainID,
+				DestChainSelector: getSelector(remoteChainID),
 				UsdPerUnitGas:     big.NewInt(2e12),
 			},
 		)
