@@ -47,7 +47,7 @@ type registrySyncer struct {
 var _ services.Service = &registrySyncer{}
 
 var (
-	defaultTickInterval = 12 * time.Second
+	defaultTickInterval = 100 * time.Millisecond
 )
 
 // New instantiates a new RegistrySyncer

@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/consul/sdk/freeport"
-
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
@@ -115,4 +115,43 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 			oracles[uni.chainID],
 		)
 	}
+
+	pingPongs := initializePingPongContracts(t, universes)
+	for chainID, universe := range universes {
+		for otherChain, pingPong := range pingPongs[chainID] {
+			t.Log("PingPong From: ", chainID, " To: ", otherChain)
+			_, err := pingPong.StartPingPong(universe.owner)
+			require.NoError(t, err)
+			universe.backend.Commit()
+
+			logIter, err := universe.onramp.FilterCCIPSendRequested(&bind.FilterOpts{Start: 0}, nil)
+			require.NoError(t, err)
+			// Iterate until latest event
+			for logIter.Next() {
+			}
+			log := logIter.Event
+			require.Equal(t, otherChain, log.DestChainSelector)
+			require.Equal(t, pingPong.Address(), log.Message.Sender)
+			chainPingPongAddr := pingPongs[otherChain][chainID].Address().Bytes()
+			// With chain agnostic addresses we need to pad the address to the correct length if the receiver is zero prefixed
+			paddedAddr := common.LeftPadBytes(chainPingPongAddr, len(log.Message.Receiver))
+			require.Equal(t, paddedAddr, log.Message.Receiver)
+			sink := make(chan *evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReportAccepted)
+			subscipriton, err := universe.offramp.WatchCommitReportAccepted(&bind.WatchOpts{}, sink)
+			require.NoError(t, err)
+
+			for {
+				select {
+				case <-time.After(5 * time.Second):
+					t.Log("Timed out waiting for commit report")
+				case <-subscipriton.Err():
+					t.Log("Error waiting for commit report")
+				case report := <-sink:
+					t.Log("Received commit report: ", report)
+					break
+				}
+			}
+		}
+	}
+
 }
