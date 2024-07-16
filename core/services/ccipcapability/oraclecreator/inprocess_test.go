@@ -115,6 +115,7 @@ func TestOracleCreator_CreateBootstrap(t *testing.T) {
 		logger.TestLogger(t),
 		&mockEndpointGen{},
 		[]commontypes.BootstrapperLocator{},
+		nil,
 	)
 
 	chainSelector := chainsel.GETH_TESTNET.Selector

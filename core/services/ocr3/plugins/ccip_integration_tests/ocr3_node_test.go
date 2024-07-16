@@ -2,6 +2,7 @@ package ccip_integration_tests
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 	"time"
 
@@ -74,7 +75,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	}
 
 	// Start committing periodically in the background for all the chains
-	tick := time.NewTicker(100 * time.Millisecond)
+	tick := time.NewTicker(900 * time.Millisecond)
 	defer tick.Stop()
 	commitBlocksBackground(t, universes, tick)
 
@@ -100,6 +101,23 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	t.Logf("homechain_configs %+v", cfgs)
 	require.Len(t, cfgs, numChains)
 
+	// Create a DON for each chain
+	for _, uni := range universes {
+		// Add nodes and give them the capability
+		t.Log("AddingDON for universe: ", uni.chainID)
+		chainSelector := getSelector(uni.chainID)
+		homeChainUni.AddDON(
+			t,
+			ccipCapabilityID,
+			chainSelector,
+			uni,
+			1, // f
+			bootstrapP2PID,
+			p2pIDs,
+			oracles[uni.chainID],
+		)
+	}
+
 	t.Log("creating ocr3 jobs")
 	for i := 0; i < len(nodes); i++ {
 		err := nodes[i].app.Start(ctx)
@@ -113,58 +131,86 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		require.NoErrorf(t, tApp.AddJobV2(ctx, &jb), "Wasn't able to create ccip job for node %d", i)
 	}
 
-	// Create a DON for each chain
-	for _, uni := range universes {
-		// Add nodes and give them the capability
-		t.Log("AddingDON for universe: ", uni.chainID)
-		chainSelector := getSelector(uni.chainID)
-		homeChainUni.AddDON(t,
-			ccipCapabilityID,
-			chainSelector,
-			uni.offramp.Address().Bytes(),
-			1, // f
-			bootstrapP2PID,
-			p2pIDs,
-			oracles[uni.chainID],
-		)
-	}
-
+	var messageIDs map[uint64] /* sourceChain */ map[uint64] /* destChain */ [32]byte = make(map[uint64]map[uint64][32]byte)
+	var replayBlocks map[uint64] /* chainID */ uint64 = make(map[uint64]uint64)
 	pingPongs := initializePingPongContracts(t, universes)
-	for chainID, universe := range universes {
+	for chainID, uni := range universes {
+		var replayBlock uint64
 		for otherChain, pingPong := range pingPongs[chainID] {
 			t.Log("PingPong From: ", chainID, " To: ", otherChain)
-			_, err2 := pingPong.StartPingPong(universe.owner)
-			require.NoError(t, err2)
-			universe.backend.Commit()
 
-			logIter, err3 := universe.onramp.FilterCCIPSendRequested(&bind.FilterOpts{Start: 0}, nil)
+			uni.backend.Commit()
+
+			_, err2 := pingPong.StartPingPong(uni.owner)
+			require.NoError(t, err2)
+			uni.backend.Commit()
+
+			endBlock := uni.backend.Blockchain().CurrentBlock().Number.Uint64()
+			logIter, err3 := uni.onramp.FilterCCIPSendRequested(&bind.FilterOpts{
+				Start: endBlock - 1,
+				End:   &endBlock,
+			}, []uint64{getSelector(otherChain)})
 			require.NoError(t, err3)
 			// Iterate until latest event
+			var count int
 			for logIter.Next() {
+				count++
 			}
+			require.Equal(t, 1, count, "expected 1 CCIPSendRequested log only")
+
 			log := logIter.Event
 			require.Equal(t, getSelector(otherChain), log.DestChainSelector)
 			require.Equal(t, pingPong.Address(), log.Message.Sender)
 			chainPingPongAddr := pingPongs[otherChain][chainID].Address().Bytes()
-			// With chain agnostic addresses we need to pad the address to the correct length if the receiver is zero prefixed
+
+			// Receiver address is abi-encoded if destination is EVM.
 			paddedAddr := common.LeftPadBytes(chainPingPongAddr, len(log.Message.Receiver))
 			require.Equal(t, paddedAddr, log.Message.Receiver)
-			sink := make(chan *evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReportAccepted)
-			subscipriton, err := universe.offramp.WatchCommitReportAccepted(&bind.WatchOpts{}, sink)
-			require.NoError(t, err)
+			_, ok := messageIDs[chainID]
+			if !ok {
+				messageIDs[chainID] = make(map[uint64][32]byte)
+			}
+			messageIDs[chainID][otherChain] = log.Message.Header.MessageId
 
-			for {
-				select {
-				case <-time.After(5 * time.Second):
-					t.Log("Timed out waiting for commit report")
-				case <-subscipriton.Err():
-					t.Log("Error waiting for commit report")
-				case report := <-sink:
-					t.Log("Received commit report: ", report)
-					break
-				}
+			// replay block should be the earliest block that has a ccip message.
+			if replayBlock == 0 {
+				replayBlock = endBlock
 			}
 		}
 	}
 
+	// replay the log poller on all the chains so that the logs are in the db.
+	// otherwise the plugins won't pick them up.
+	for _, node := range nodes {
+		for chainID, replayBlock := range replayBlocks {
+			require.NoError(t, node.app.ReplayFromBlock(big.NewInt(int64(chainID)), replayBlock, false), "failed to replay logs")
+		}
+	}
+
+	for _, uni := range universes {
+		waitForCommit(t, uni)
+	}
+}
+
+func waitForCommit(t *testing.T, uni onchainUniverse) {
+	sink := make(chan *evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReportAccepted)
+	subscipriton, err := uni.offramp.WatchCommitReportAccepted(&bind.WatchOpts{}, sink)
+	require.NoError(t, err)
+
+	for {
+		select {
+		case <-time.After(5 * time.Second):
+			t.Log("Timed out waiting for commit report")
+		case <-subscipriton.Err():
+			t.Log("Error waiting for commit report")
+		case report := <-sink:
+			t.Logf("Received commit report: %+v", report)
+			if len(report.Report.MerkleRoots) > 0 {
+				t.Log("Received commit report with merkle roots")
+			} else {
+				t.Log("Received commit report without merkle roots")
+			}
+			return
+		}
+	}
 }

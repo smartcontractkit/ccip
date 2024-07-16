@@ -341,7 +341,7 @@ func (h *homeChain) AddDON(
 	t *testing.T,
 	ccipCapabilityID [32]byte,
 	chainSelector uint64,
-	OfframpAddress []byte,
+	uni onchainUniverse,
 	f uint8,
 	bootstrapP2PID [32]byte,
 	p2pIDs [][32]byte,
@@ -396,7 +396,7 @@ func (h *homeChain) AddDON(
 			ChainSelector:         chainSelector,
 			F:                     f,
 			OffchainConfigVersion: offchainConfigVersion,
-			OfframpAddress:        OfframpAddress,
+			OfframpAddress:        uni.offramp.Address().Bytes(),
 			BootstrapP2PIds:       [][32]byte{bootstrapP2PID},
 			P2pIds:                p2pIDs,
 			Signers:               signersBytes,
@@ -411,6 +411,9 @@ func (h *homeChain) AddDON(
 	// Trim first four bytes to remove function selector.
 	encodedConfigs := encodedCall[4:]
 
+	// commit so that we have an empty block to filter events from
+	h.backend.Commit()
+
 	_, err = h.capabilityRegistry.AddDON(h.owner, p2pIDs, []kcr.CapabilitiesRegistryCapabilityConfiguration{
 		{
 			CapabilityId: ccipCapabilityID,
@@ -419,6 +422,70 @@ func (h *homeChain) AddDON(
 	}, false, false, f)
 	require.NoError(t, err)
 	h.backend.Commit()
+
+	endBlock := h.backend.Blockchain().CurrentBlock().Number.Uint64()
+	iter, err := h.capabilityRegistry.FilterConfigSet(&bind.FilterOpts{
+		Start: h.backend.Blockchain().CurrentBlock().Number.Uint64() - 1,
+		End:   &endBlock,
+	})
+	require.NoError(t, err, "failed to filter config set events")
+	var donID uint32
+	for iter.Next() {
+		donID = iter.Event.DonId
+		break
+	}
+	require.NotZero(t, donID, "failed to get donID from config set event")
+
+	var signerAddresses []common.Address
+	for _, signer := range signers {
+		signerAddresses = append(signerAddresses, common.BytesToAddress(signer))
+	}
+
+	var transmitterAddresses []common.Address
+	for _, transmitter := range transmitters {
+		transmitterAddresses = append(transmitterAddresses, common.HexToAddress(string(transmitter)))
+	}
+
+	// get the config digest from the ccip config contract and set config on the offramp.
+	var offrampOCR3Configs []evm_2_evm_multi_offramp.MultiOCR3BaseOCRConfigArgs
+	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
+		ocrConfig, err := h.ccipConfig.GetOCRConfig(&bind.CallOpts{
+			Context: testutils.Context(t),
+		}, donID, uint8(pluginType))
+		require.NoError(t, err, "failed to get OCR3 config from ccip config contract")
+		require.Len(t, ocrConfig, 1, "expected exactly one OCR3 config")
+		offrampOCR3Configs = append(offrampOCR3Configs, evm_2_evm_multi_offramp.MultiOCR3BaseOCRConfigArgs{
+			ConfigDigest:                   ocrConfig[0].ConfigDigest,
+			OcrPluginType:                  uint8(pluginType),
+			F:                              f,
+			IsSignatureVerificationEnabled: pluginType == cctypes.PluginTypeCCIPCommit,
+			Signers:                        signerAddresses,
+			Transmitters:                   transmitterAddresses,
+		})
+	}
+
+	uni.backend.Commit()
+
+	_, err = uni.offramp.SetOCR3Configs(uni.owner, offrampOCR3Configs)
+	require.NoError(t, err, "failed to set ocr3 configs on offramp")
+	uni.backend.Commit()
+
+	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
+		ocrConfig, err := uni.offramp.LatestConfigDetails(&bind.CallOpts{
+			Context: testutils.Context(t),
+		}, uint8(pluginType))
+		require.NoError(t, err, "failed to get latest commit OCR3 config")
+		require.Equalf(t, offrampOCR3Configs[pluginType].ConfigDigest, ocrConfig.ConfigInfo.ConfigDigest, "%s OCR3 config digest mismatch", pluginType.String())
+		require.Equalf(t, offrampOCR3Configs[pluginType].F, ocrConfig.ConfigInfo.F, "%s OCR3 config F mismatch", pluginType.String())
+		require.Equalf(t, offrampOCR3Configs[pluginType].IsSignatureVerificationEnabled, ocrConfig.ConfigInfo.IsSignatureVerificationEnabled, "%s OCR3 config signature verification mismatch", pluginType.String())
+		if pluginType == cctypes.PluginTypeCCIPCommit {
+			// only commit will set signers, exec doesn't need them.
+			require.Equalf(t, offrampOCR3Configs[pluginType].Signers, ocrConfig.Signers, "%s OCR3 config signers mismatch", pluginType.String())
+		}
+		require.Equalf(t, offrampOCR3Configs[pluginType].Transmitters, ocrConfig.Transmitters, "%s OCR3 config transmitters mismatch", pluginType.String())
+	}
+
+	t.Logf("set ocr3 config on the offramp, signers: %+v, transmitters: %+v", signerAddresses, transmitterAddresses)
 }
 
 func connectUniverses(
@@ -471,6 +538,14 @@ func setupUniverseBasics(t *testing.T, uni onchainUniverse) {
 		TokenPriceUpdates: tokenPriceUpdates,
 	})
 	require.NoErrorf(t, err, "failed to apply price registry updates on chain id %d", uni.chainID)
+	uni.backend.Commit()
+
+	_, err = uni.priceRegistry.ApplyAuthorizedCallerUpdates(owner, price_registry.AuthorizedCallersAuthorizedCallerArgs{
+		AddedCallers: []common.Address{
+			uni.offramp.Address(),
+		},
+	})
+	require.NoError(t, err, "failed to authorize offramp on price registry")
 	uni.backend.Commit()
 
 	//=============================================================================

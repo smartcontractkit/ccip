@@ -228,7 +228,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	if !ok {
 		return nil, fmt.Errorf("no OCR key bundle found for chain family %s, forgot to create one?", destChainFamily)
 	}
-	onchainKeyring := ocrcommon.NewOCR3OnchainKeyringAdapter(keybundle)
+	onchainKeyring := ocrimpls.NewOnchainKeyring[[]byte](keybundle, i.lggr)
 
 	// build the contract transmitter
 	// assume that we are using the first account in the keybundle as the from account
