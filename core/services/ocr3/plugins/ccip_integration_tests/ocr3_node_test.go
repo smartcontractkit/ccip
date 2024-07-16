@@ -38,10 +38,10 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		bootstrappers  []commontypes.BootstrapperLocator
 	)
 
-	// Need double the ports, one for p2pV and another for 2capabilities peering v2
-	ports := freeport.GetN(t, numNodes*2)
+	ports := freeport.GetN(t, numNodes)
+	capabilitiesPorts := freeport.GetN(t, numNodes)
 	for i := 0; i < numNodes; i++ {
-		node := setupNodeOCR3(t, ports[i], ports[i+1], bootstrappers, universes, homeChainUni, i > 0)
+		node := setupNodeOCR3(t, ports[i], capabilitiesPorts[i], bootstrappers, universes, homeChainUni)
 
 		apps = append(apps, node.app)
 		for chainID, transmitter := range node.transmitters {

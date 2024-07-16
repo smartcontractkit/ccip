@@ -15,6 +15,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/jmoiron/sqlx"
+	"go.uber.org/zap/zapcore"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
@@ -38,7 +40,6 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
 )
 
 type ocr3Node struct {
@@ -58,7 +59,6 @@ func setupNodeOCR3(
 	p2pV2Bootstrappers []commontypes.BootstrapperLocator,
 	universes map[uint64]onchainUniverse,
 	homeChainUniverse homeChain,
-	capabilityEnabled bool,
 ) *ocr3Node {
 	// Do not want to load fixtures as they contain a dummy chainID.
 	cfg, db := heavyweight.FullTestDBNoFixturesV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
