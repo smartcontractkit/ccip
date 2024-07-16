@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {PingPongDemo} from "../../applications/PingPongDemo.sol";
-import {Client} from "../../libraries/Client.sol";
-import "../onRamp/EVM2EVMOnRampSetup.t.sol";
+import {PingPongDemo} from "../../../applications/internal/PingPongDemo.sol";
+import {Client} from "../../../libraries/Client.sol";
+import "../../onRamp/EVM2EVMOnRampSetup.t.sol";
 
 // setup
 contract PingPongDappSetup is EVM2EVMOnRampSetup {
@@ -23,10 +23,12 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
 
     // Fund the contract with LINK tokens
     s_feeToken.transfer(address(s_pingPong), fundingAmount);
+
+    IERC20(s_feeToken).approve(address(s_pingPong), type(uint256).max);
   }
 }
 
-contract PingPong_startPingPong is PingPongDappSetup {
+contract PingPong_example_startPingPong is PingPongDappSetup {
   function test_StartPingPong_Success() public {
     uint256 pingPongNumber = 1;
     bytes memory data = abi.encode(pingPongNumber);
@@ -68,7 +70,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
   }
 }
 
-contract PingPong_ccipReceive is PingPongDappSetup {
+contract PingPong_example_ccipReceive is PingPongDappSetup {
   function test_CcipReceive_Success() public {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
@@ -91,31 +93,16 @@ contract PingPong_ccipReceive is PingPongDappSetup {
   }
 }
 
-contract PingPong_plumbing is PingPongDappSetup {
-  function test_Fuzz_CounterPartChainSelector_Success(uint64 chainSelector) public {
-    s_pingPong.setCounterpartChainSelector(chainSelector);
-
-    assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
-  }
-
-  function test_Fuzz_CounterPartAddress_Success(address counterpartAddress) public {
-    s_pingPong.setCounterpartAddress(counterpartAddress);
-
-    assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
-  }
-
-  function test_Fuzz_CounterPartAddress_Success(uint64 chainSelector, address counterpartAddress) public {
-    s_pingPong.setCounterpart(chainSelector, counterpartAddress);
-
-    assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
-    assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
-  }
-
+contract PingPong_example_plumbing is PingPongDappSetup {
   function test_Pausing_Success() public {
     assertFalse(s_pingPong.isPaused());
 
     s_pingPong.setPaused(true);
 
     assertTrue(s_pingPong.isPaused());
+  }
+
+  function test_typeAndVersion() public view {
+    assertEq(s_pingPong.typeAndVersion(), "PingPongDemo 1.6.0");
   }
 }
