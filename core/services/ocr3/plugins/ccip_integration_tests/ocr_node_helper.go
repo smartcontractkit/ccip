@@ -15,6 +15,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/jmoiron/sqlx"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/validate"
+	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -291,4 +294,26 @@ func commitBlocksBackground(t *testing.T, universes map[uint64]onchainUniverse, 
 		tickCancel()
 		wg.Wait()
 	})
+}
+
+// p2pKeyID: nodes p2p id
+// ocrKeyBundleID: nodes ocr key bundle id
+func mustGetJobSpec(t *testing.T, bootstrapP2PID p2pkey.PeerID, bootstrapPort int, p2pKeyID string, ocrKeyBundleID string) job.Job {
+	specArgs := validate.SpecArgs{
+		P2PV2Bootstrappers: []string{
+			fmt.Sprintf("%s@127.0.0.1:%d", bootstrapP2PID.Raw(), bootstrapPort),
+		},
+		CapabilityVersion:      CapabilityVersion,
+		CapabilityLabelledName: CapabilityLabelledName,
+		OCRKeyBundleIDs: map[string]string{
+			relay.NetworkEVM: ocrKeyBundleID,
+		},
+		P2PKeyID:     p2pKeyID,
+		PluginConfig: map[string]any{},
+	}
+	specToml, err := validate.NewCCIPSpecToml(specArgs)
+	require.NoError(t, err)
+	jb, err := validate.ValidatedCCIPSpec(specToml)
+	require.NoError(t, err)
+	return jb
 }

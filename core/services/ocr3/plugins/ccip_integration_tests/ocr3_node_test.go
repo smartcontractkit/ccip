@@ -88,7 +88,9 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		t.Cleanup(func() {
 			require.NoError(t, tApp.Stop())
 		})
-		//TODO: Create Jobs and add them to the app
+
+		jb := mustGetJobSpec(t, bootstrapP2PID, bootstrapPort, nodes[i].peerID, nodes[i].keybundle.ID())
+		require.NoErrorf(t, tApp.AddJobV2(ctx, &jb), "Wasn't able to create ccip job for node %d", i)
 	}
 
 	ccipCapabilityID, err := homeChainUni.capabilityRegistry.GetHashedCapabilityId(&bind.CallOpts{
