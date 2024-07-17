@@ -467,10 +467,10 @@ func (h *homeChain) AddDON(
 	// get the config digest from the ccip config contract and set config on the offramp.
 	var offrampOCR3Configs []evm_2_evm_multi_offramp.MultiOCR3BaseOCRConfigArgs
 	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
-		ocrConfig, err := h.ccipConfig.GetOCRConfig(&bind.CallOpts{
+		ocrConfig, err1 := h.ccipConfig.GetOCRConfig(&bind.CallOpts{
 			Context: testutils.Context(t),
 		}, donID, uint8(pluginType))
-		require.NoError(t, err, "failed to get OCR3 config from ccip config contract")
+		require.NoError(t, err1, "failed to get OCR3 config from ccip config contract")
 		require.Len(t, ocrConfig, 1, "expected exactly one OCR3 config")
 		offrampOCR3Configs = append(offrampOCR3Configs, evm_2_evm_multi_offramp.MultiOCR3BaseOCRConfigArgs{
 			ConfigDigest:                   ocrConfig[0].ConfigDigest,

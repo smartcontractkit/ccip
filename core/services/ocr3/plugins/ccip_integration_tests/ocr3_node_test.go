@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/consul/sdk/freeport"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
@@ -44,15 +45,14 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 
 		apps = append(apps, node.app)
 		for chainID, transmitter := range node.transmitters {
-			//transmitters[chainID] = append(transmitters[chainID], transmitter)
 			identity := confighelper2.OracleIdentityExtra{
 				OracleIdentity: confighelper2.OracleIdentity{
-					OnchainPublicKey:  node.keybundle.PublicKey(),
+					OnchainPublicKey:  node.keybundle.PublicKey(), // Different for each chain
 					TransmitAccount:   ocrtypes.Account(transmitter.Hex()),
-					OffchainPublicKey: node.keybundle.OffchainPublicKey(),
+					OffchainPublicKey: node.keybundle.OffchainPublicKey(), // Same for each family
 					PeerID:            node.peerID,
 				},
-				ConfigEncryptionPublicKey: node.keybundle.ConfigEncryptionPublicKey(),
+				ConfigEncryptionPublicKey: node.keybundle.ConfigEncryptionPublicKey(), // Different for each chain
 			}
 			oracles[chainID] = append(oracles[chainID], identity)
 		}
@@ -87,7 +87,6 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	require.NotEqual(t, [32]byte{}, ccipCapabilityID, "ccip capability id is empty")
 
 	// Need to Add nodes and assign capabilities to them before creating DONS
-
 	homeChainUni.AddNodes(t, p2pIDs, [][32]byte{ccipCapabilityID})
 
 	// Add homechain configs
@@ -119,8 +118,8 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 
 	t.Log("creating ocr3 jobs")
 	for i := 0; i < len(nodes); i++ {
-		err := nodes[i].app.Start(ctx)
-		require.NoError(t, err)
+		err1 := nodes[i].app.Start(ctx)
+		require.NoError(t, err1)
 		tApp := apps[i]
 		t.Cleanup(func() {
 			require.NoError(t, tApp.Stop())
@@ -130,16 +129,18 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		require.NoErrorf(t, tApp.AddJobV2(ctx, &jb), "Wasn't able to create ccip job for node %d", i)
 	}
 
-	var messageIDs map[uint64] /* sourceChain */ map[uint64] /* destChain */ [32]byte = make(map[uint64]map[uint64][32]byte)
-	var replayBlocks map[uint64] /* chainID */ uint64 = make(map[uint64]uint64)
+	// sourceChain map[uint64],  destChain [32]byte
+	var messageIDs = make(map[uint64]map[uint64][32]byte)
+	// map[uint64] chainID, blocks
+	var replayBlocks = make(map[uint64]uint64)
 	pingPongs := initializePingPongContracts(t, universes)
 	for chainID, uni := range universes {
 		var replayBlock uint64
 		for otherChain, pingPong := range pingPongs[chainID] {
 			t.Log("PingPong From: ", chainID, " To: ", otherChain)
 
-			dcc, err := uni.onramp.GetDestChainConfig(&bind.CallOpts{}, getSelector(otherChain))
-			require.NoError(t, err)
+			dcc, err1 := uni.onramp.GetDestChainConfig(&bind.CallOpts{}, getSelector(otherChain))
+			require.NoError(t, err1)
 			prevSeqNr := dcc.SequenceNumber
 
 			uni.backend.Commit()
@@ -188,10 +189,6 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		}
 		replayBlocks[chainID] = replayBlock
 	}
-
-	// HACK: wait for the oracles to come up.
-	// Need some data driven way to do this.
-	// time.Sleep(30 * time.Second)
 
 	// replay the log poller on all the chains so that the logs are in the db.
 	// otherwise the plugins won't pick them up.

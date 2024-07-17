@@ -54,7 +54,7 @@ func DestReaderConfig() evmrelaytypes.ChainReaderConfig {
 				ContractABI: evm_2_evm_multi_offramp.EVM2EVMMultiOffRampABI,
 				ContractPollingFilter: evmrelaytypes.ContractPollingFilter{
 					GenericEventNames: []string{
-						//mustGetEventName(consts.EventNameExecutionStateChanged, offrampABI),
+						mustGetEventName(consts.EventNameExecutionStateChanged, offrampABI),
 						mustGetEventName(consts.EventNameCommitReportAccepted, offrampABI),
 					},
 				},
@@ -91,10 +91,10 @@ func DestReaderConfig() evmrelaytypes.ChainReaderConfig {
 						ChainSpecificName: mustGetEventName(consts.EventNameCommitReportAccepted, offrampABI),
 						ReadType:          evmrelaytypes.Event,
 					},
-					//consts.EventNameExecutionStateChanged: {
-					//	ChainSpecificName: mustGetEventName(consts.EventNameExecutionStateChanged, offrampABI),
-					//	ReadType:          evmrelaytypes.Event,
-					//},
+					consts.EventNameExecutionStateChanged: {
+						ChainSpecificName: mustGetEventName(consts.EventNameExecutionStateChanged, offrampABI),
+						ReadType:          evmrelaytypes.Event,
+					},
 				},
 			},
 		},

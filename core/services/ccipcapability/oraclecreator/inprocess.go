@@ -9,8 +9,11 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocr3 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -218,7 +221,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			evmconfigs.ChainWriterConfigRaw(fromAddress, chain.Config().EVM().GasEstimator().PriceMaxKey(fromAddress)),
 		)
 		if err2 != nil {
-			return nil, fmt.Errorf("failed to create chain writer for chain %s: %w", chain.ID(), err)
+			return nil, fmt.Errorf("failed to create chain writer for chain %s: %w", chain.ID(), err2)
 		}
 
 		// TODO: figure out shutdown.

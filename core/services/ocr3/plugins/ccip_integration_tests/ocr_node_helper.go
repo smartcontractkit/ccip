@@ -15,10 +15,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/jmoiron/sqlx"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
@@ -43,7 +43,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/plugins"
 
 	"github.com/smartcontractkit/libocr/commontypes"
+
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 )
 
 type ocr3Node struct {
@@ -90,7 +92,6 @@ func setupNodeOCR3(
 		c.OCR2.ContractPollInterval = config.MustNewDuration(5 * time.Second)
 
 		c.Log.Level = ptr(configv2.LogLevel(zapcore.InfoLevel))
-		// c.Database.LogQueries = ptr(true)
 
 		var chains v2toml.EVMConfigs
 		for chainID := range universes {
