@@ -210,22 +210,14 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 	var externalPeerWrapper p2ptypes.PeerWrapper
 	var getLocalNode func(ctx context.Context) (pkgcapabilities.Node, error)
 	var capabilityRegistrySyncer registrysyncer.Syncer
-	if cfg.Capabilities().Peering().Enabled() {
-		externalPeer := externalp2p.NewExternalPeerWrapper(keyStore.P2P(), cfg.Capabilities().Peering(), opts.DS, globalLogger)
-		signer := externalPeer
-		externalPeerWrapper = externalPeer
 
-		srvcs = append(srvcs, externalPeerWrapper)
-
-		dispatcher := remote.NewDispatcher(externalPeerWrapper, signer, opts.CapabilitiesRegistry, globalLogger)
-
+	if cfg.Capabilities().ExternalRegistry().Address() != "" {
 		rid := cfg.Capabilities().ExternalRegistry().RelayID()
 		registryAddress := cfg.Capabilities().ExternalRegistry().Address()
 		relayer, err := relayerChainInterops.Get(rid)
 		if err != nil {
 			return nil, fmt.Errorf("could not fetch relayer %s configured for capabilities registry: %w", rid, err)
 		}
-
 		registrySyncer, err := registrysyncer.New(
 			globalLogger,
 			relayer,
@@ -235,18 +227,32 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			return nil, fmt.Errorf("could not configure syncer: %w", err)
 		}
 
+		capabilityRegistrySyncer = registrySyncer
+		srvcs = append(srvcs, capabilityRegistrySyncer)
+	}
+
+	if cfg.Capabilities().Peering().Enabled() {
+		if capabilityRegistrySyncer == nil {
+			return nil, errors.Errorf("peering enabled but no capability registry found")
+		}
+		externalPeer := externalp2p.NewExternalPeerWrapper(keyStore.P2P(), cfg.Capabilities().Peering(), opts.DS, globalLogger)
+		signer := externalPeer
+		externalPeerWrapper = externalPeer
+
+		srvcs = append(srvcs, externalPeerWrapper)
+
+		dispatcher := remote.NewDispatcher(externalPeerWrapper, signer, opts.CapabilitiesRegistry, globalLogger)
+
 		wfLauncher := capabilities.NewLauncher(
 			globalLogger,
 			externalPeerWrapper,
 			dispatcher,
 			opts.CapabilitiesRegistry,
 		)
-		registrySyncer.AddLauncher(wfLauncher)
 
-		capabilityRegistrySyncer = registrySyncer
-
+		capabilityRegistrySyncer.AddLauncher(wfLauncher)
 		getLocalNode = wfLauncher.LocalNode
-		srvcs = append(srvcs, dispatcher, wfLauncher, registrySyncer)
+		srvcs = append(srvcs, dispatcher, wfLauncher)
 	}
 
 	// LOOPs can be created as options, in the  case of LOOP relayers, or

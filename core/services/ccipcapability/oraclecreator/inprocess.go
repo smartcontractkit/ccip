@@ -9,7 +9,11 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocr3 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -71,6 +75,7 @@ func New(
 	lggr logger.Logger,
 	monitoringEndpointGen telemetry.MonitoringEndpointGenerator,
 	bootstrapperLocators []commontypes.BootstrapperLocator,
+	homeChainReader ccipreaderpkg.HomeChain,
 ) cctypes.OracleCreator {
 	return &inprocessOracleCreator{
 		ocrKeyBundles:         ocrKeyBundles,
@@ -85,6 +90,7 @@ func New(
 		lggr:                  lggr,
 		monitoringEndpointGen: monitoringEndpointGen,
 		bootstrapperLocators:  bootstrapperLocators,
+		homeChainReader:       homeChainReader,
 	}
 }
 
@@ -177,6 +183,27 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			return nil, fmt.Errorf("failed to create contract reader for chain %s: %w", chain.ID(), err2)
 		}
 
+		if chain.ID().Uint64() == destChainID {
+			// bind the chain reader to the dest chain's offramp.
+			offrampAddressHex := common.BytesToAddress(config.Config.OfframpAddress).Hex()
+			err3 := cr.Bind(context.Background(), []types.BoundContract{
+				{
+					Address: offrampAddressHex,
+					Name:    consts.ContractNameOffRamp,
+				},
+			})
+			if err3 != nil {
+				return nil, fmt.Errorf("failed to bind chain reader for dest chain %s's offramp at %s: %w", chain.ID(), offrampAddressHex, err3)
+			}
+		}
+
+		// TODO: figure out shutdown.
+		// maybe from the plugin directly?
+		err2 = cr.Start(context.Background())
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to start contract reader for chain %s: %w", chain.ID(), err2)
+		}
+
 		// Even though we only write to the dest chain, we need to create chain writers for all chains
 		// we know about in order to post gas prices on the dest.
 		var fromAddress common.Address
@@ -197,6 +224,13 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			return nil, fmt.Errorf("failed to create chain writer for chain %s: %w", chain.ID(), err2)
 		}
 
+		// TODO: figure out shutdown.
+		// maybe from the plugin directly?
+		err2 = cw.Start(context.Background())
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to start chain writer for chain %s: %w", chain.ID(), err2)
+		}
+
 		chainSelector, ok := chainsel.EvmChainIdToChainSelector()[chain.ID().Uint64()]
 		if !ok {
 			return nil, fmt.Errorf("failed to get chain selector from chain ID %s", chain.ID())
@@ -211,7 +245,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	if !ok {
 		return nil, fmt.Errorf("no OCR key bundle found for chain family %s, forgot to create one?", destChainFamily)
 	}
-	onchainKeyring := ocrcommon.NewOCR3OnchainKeyringAdapter(keybundle)
+	onchainKeyring := ocrimpls.NewOnchainKeyring[[]byte](keybundle, i.lggr)
 
 	// build the contract transmitter
 	// assume that we are using the first account in the keybundle as the from account
@@ -222,11 +256,12 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 		return nil, fmt.Errorf("no chain writer found for dest chain selector %d, can't create contract transmitter",
 			config.Config.ChainSelector)
 	}
-	destFromAccount, ok := i.transmitters[destRelayID]
+	destFromAccounts, ok := i.transmitters[destRelayID]
 	if !ok {
 		return nil, fmt.Errorf("no transmitter found for dest relay ID %s, can't create contract transmitter", destRelayID)
 	}
 
+	//TODO: Extract the correct transmitter address from the destsFromAccount
 	var factory ocr3types.ReportingPluginFactory[[]byte]
 	var transmitter ocr3types.ContractTransmitter[[]byte]
 	if config.Config.PluginType == uint8(cctypes.PluginTypeCCIPCommit) {
@@ -243,7 +278,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			chainWriters,
 		)
 		transmitter = ocrimpls.NewCommitContractTransmitter[[]byte](destChainWriter,
-			ocrtypes.Account(destFromAccount[0]),
+			ocrtypes.Account(destFromAccounts[0]),
 			hexutil.Encode(config.Config.OfframpAddress), // TODO: this works for evm only, how about non-evm?
 		)
 	} else if config.Config.PluginType == uint8(cctypes.PluginTypeCCIPExec) {
@@ -260,7 +295,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			chainWriters,
 		)
 		transmitter = ocrimpls.NewExecContractTransmitter[[]byte](destChainWriter,
-			ocrtypes.Account(destFromAccount[0]),
+			ocrtypes.Account(destFromAccounts[0]),
 			hexutil.Encode(config.Config.OfframpAddress), // TODO: this works for evm only, how about non-evm?
 		)
 	} else {

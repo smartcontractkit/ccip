@@ -87,6 +87,14 @@ func DestReaderConfig() evmrelaytypes.ChainReaderConfig {
 						ChainSpecificName: mustGetMethodName("getSourceChainConfig", offrampABI),
 						ReadType:          evmrelaytypes.Method,
 					},
+					consts.EventNameCommitReportAccepted: {
+						ChainSpecificName: mustGetEventName(consts.EventNameCommitReportAccepted, offrampABI),
+						ReadType:          evmrelaytypes.Event,
+					},
+					consts.EventNameExecutionStateChanged: {
+						ChainSpecificName: mustGetEventName(consts.EventNameExecutionStateChanged, offrampABI),
+						ReadType:          evmrelaytypes.Event,
+					},
 				},
 			},
 		},
@@ -130,6 +138,15 @@ func SourceReaderConfig() evmrelaytypes.ChainReaderConfig {
 					consts.MethodNameGetTokenTransferFeeConfig: {
 						ChainSpecificName: mustGetMethodName("getTokenTransferFeeConfig", onrampABI),
 						ReadType:          evmrelaytypes.Method,
+					},
+					consts.EventNameCCIPSendRequested: {
+						ChainSpecificName: mustGetEventName(consts.EventNameCCIPSendRequested, onrampABI),
+						ReadType:          evmrelaytypes.Event,
+						EventDefinitions: &evmrelaytypes.EventDefinitions{
+							GenericDataWordNames: map[string]uint8{
+								consts.EventAttributeSequenceNumber: 5,
+							},
+						},
 					},
 				},
 			},
