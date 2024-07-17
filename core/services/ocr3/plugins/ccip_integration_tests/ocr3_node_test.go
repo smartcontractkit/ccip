@@ -191,7 +191,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 
 	// HACK: wait for the oracles to come up.
 	// Need some data driven way to do this.
-	// time.Sleep(30 * time.Second)
+	time.Sleep(30 * time.Second)
 
 	// replay the log poller on all the chains so that the logs are in the db.
 	// otherwise the plugins won't pick them up.
