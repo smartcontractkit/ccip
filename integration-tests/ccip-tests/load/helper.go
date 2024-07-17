@@ -365,15 +365,23 @@ func (l *LoadArgs) AddToRunnerGroup(gen *wasp.Generator) {
 	})
 }
 
-func (l *LoadArgs) Wait() {
+func (l *LoadArgs) WaitForLoadStart() {
 	l.lggr.Info().Msg("Waiting for load to start on all lanes")
 	// wait for load runner to start
 	l.LoadStarterWg.Wait()
-	l.lggr.Info().Msg("Waiting for load to finish on all lanes")
+	l.lggr.Info().Msg("Load started on all lanes")
+}
+
+func (l *LoadArgs) WaitForLoadToFinish() {
 	// wait for load runner to finish
 	err := l.RunnerWg.Wait()
 	require.NoError(l.t, err, "load run is failed")
 	l.lggr.Info().Msg("Load finished on all lanes")
+}
+
+func (l *LoadArgs) Wait() {
+	l.WaitForLoadStart()
+	l.WaitForLoadToFinish()
 }
 
 func (l *LoadArgs) ApplyChaos() {

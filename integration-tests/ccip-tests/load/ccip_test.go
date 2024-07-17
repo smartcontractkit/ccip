@@ -84,6 +84,7 @@ func TestLoadCCIPStableRPSReorgsBelowFinality(t *testing.T) {
 	})
 	rs := setupReorgSuite(t, testArgs)
 	testArgs.TriggerLoadByLane()
+	testArgs.WaitForLoadStart()
 	rs.RunReorgBelowFinalityThreshold(1 * time.Minute)
 	testArgs.TriggerLoadByLane()
 	testArgs.Wait()
