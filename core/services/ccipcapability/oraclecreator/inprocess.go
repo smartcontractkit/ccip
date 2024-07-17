@@ -194,6 +194,13 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			}
 		}
 
+		// TODO: figure out shutdown.
+		// maybe from the plugin directly?
+		err2 = cr.Start(context.Background())
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to start contract reader for chain %s: %w", chain.ID(), err2)
+		}
+
 		// Even though we only write to the dest chain, we need to create chain writers for all chains
 		// we know about in order to post gas prices on the dest.
 		var fromAddress common.Address
@@ -212,6 +219,13 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 		)
 		if err2 != nil {
 			return nil, fmt.Errorf("failed to create chain writer for chain %s: %w", chain.ID(), err)
+		}
+
+		// TODO: figure out shutdown.
+		// maybe from the plugin directly?
+		err2 = cw.Start(context.Background())
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to start chain writer for chain %s: %w", chain.ID(), err2)
 		}
 
 		chainSelector, ok := chainsel.EvmChainIdToChainSelector()[chain.ID().Uint64()]

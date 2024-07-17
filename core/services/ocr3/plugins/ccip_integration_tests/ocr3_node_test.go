@@ -191,7 +191,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 
 	// HACK: wait for the oracles to come up.
 	// Need some data driven way to do this.
-	time.Sleep(30 * time.Second)
+	// time.Sleep(30 * time.Second)
 
 	// replay the log poller on all the chains so that the logs are in the db.
 	// otherwise the plugins won't pick them up.
@@ -217,15 +217,14 @@ func waitForCommit(t *testing.T, uni onchainUniverse) {
 	for {
 		select {
 		case <-time.After(5 * time.Second):
-			t.Log("Timed out waiting for commit report")
-		case <-subscipriton.Err():
-			t.Log("Error waiting for commit report")
+			t.Logf("Waiting for commit report on chain id %d (selector %d)", uni.chainID, getSelector(uni.chainID))
+		case subErr := <-subscipriton.Err():
+			t.Fatalf("Subscription error: %+v", subErr)
 		case report := <-sink:
-			t.Logf("Received commit report: %+v", report)
 			if len(report.Report.MerkleRoots) > 0 {
-				t.Log("Received commit report with merkle roots")
+				t.Logf("Received commit report with merkle roots: %+v", report)
 			} else {
-				t.Log("s")
+				t.Logf("Received commit report without merkle roots: %+v", report)
 			}
 			return
 		}
