@@ -30,6 +30,18 @@ var (
 	_ = abi.ConvertType
 )
 
+type CCIPBaseApprovedSenderUpdate struct {
+	DestChainSelector uint64
+	Sender            []byte
+}
+
+type CCIPBaseChainUpdate struct {
+	ChainSelector  uint64
+	Allowed        bool
+	Recipient      []byte
+	ExtraArgsBytes []byte
+}
+
 type ClientAny2EVMMessage struct {
 	MessageId           [32]byte
 	SourceChainSelector uint64
@@ -44,8 +56,8 @@ type ClientEVMTokenAmount struct {
 }
 
 var SelfFundedPingPongMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"router\",\"type\":\"address\"},{\"internalType\":\"contractIERC20\",\"name\":\"feeToken\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"roundTripsBeforeFunding\",\"type\":\"uint8\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"router\",\"type\":\"address\"}],\"name\":\"InvalidRouter\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"countIncrBeforeFunding\",\"type\":\"uint8\"}],\"name\":\"CountIncrBeforeFundingSet\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Funded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"pingPongCount\",\"type\":\"uint256\"}],\"name\":\"Ping\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"pingPongCount\",\"type\":\"uint256\"}],\"name\":\"Pong\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"internalType\":\"structClient.EVMTokenAmount[]\",\"name\":\"destTokenAmounts\",\"type\":\"tuple[]\"}],\"internalType\":\"structClient.Any2EVMMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"pingPongCount\",\"type\":\"uint256\"}],\"name\":\"fundPingPong\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCountIncrBeforeFunding\",\"outputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCounterpartAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCounterpartChainSelector\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getFeeToken\",\"outputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getRouter\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"isPaused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"countIncrBeforeFunding\",\"type\":\"uint8\"}],\"name\":\"setCountIncrBeforeFunding\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"counterpartChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"counterpartAddress\",\"type\":\"address\"}],\"name\":\"setCounterpart\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setCounterpartAddress\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"chainSelector\",\"type\":\"uint64\"}],\"name\":\"setCounterpartChainSelector\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"pause\",\"type\":\"bool\"}],\"name\":\"setPaused\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"startPingPong\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"typeAndVersion\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
-	Bin: "0x60a06040523480156200001157600080fd5b506040516200182238038062001822833981016040819052620000349162000291565b828233806000846001600160a01b0381166200006b576040516335fdcccd60e21b8152600060048201526024015b60405180910390fd5b6001600160a01b039081166080528216620000c95760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f0000000000000000604482015260640162000062565b600080546001600160a01b0319166001600160a01b0384811691909117909155811615620000fc57620000fc81620001cd565b50506002805460ff60a01b1916905550600380546001600160a01b0319166001600160a01b0383811691821790925560405163095ea7b360e01b8152918416600483015260001960248301529063095ea7b3906044016020604051808303816000875af115801562000172573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190620001989190620002ea565b505050806002620001aa919062000315565b600360146101000a81548160ff021916908360ff16021790555050505062000347565b336001600160a01b03821603620002275760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c66000000000000000000604482015260640162000062565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b6001600160a01b03811681146200028e57600080fd5b50565b600080600060608486031215620002a757600080fd5b8351620002b48162000278565b6020850151909350620002c78162000278565b604085015190925060ff81168114620002df57600080fd5b809150509250925092565b600060208284031215620002fd57600080fd5b815180151581146200030e57600080fd5b9392505050565b60ff81811683821602908116908181146200034057634e487b7160e01b600052601160045260246000fd5b5092915050565b6080516114aa62000378600039600081816102970152818161063f0152818161072c0152610c2201526114aa6000f3fe608060405234801561001057600080fd5b50600436106101515760003560e01c80638f491cba116100cd578063bee518a411610081578063e6c725f511610066578063e6c725f51461034d578063ef686d8e1461037d578063f2fde38b1461039057600080fd5b8063bee518a4146102f1578063ca709a251461032f57600080fd5b8063b0f479a1116100b2578063b0f479a114610295578063b187bd26146102bb578063b5a11011146102de57600080fd5b80638f491cba1461026f5780639d2aede51461028257600080fd5b80632874d8bf1161012457806379ba50971161010957806379ba50971461023657806385572ffb1461023e5780638da5cb5b1461025157600080fd5b80632874d8bf146101ef5780632b6e5d63146101f757600080fd5b806301ffc9a71461015657806316c38b3c1461017e578063181f5a77146101935780631892b906146101dc575b600080fd5b610169610164366004610e24565b6103a3565b60405190151581526020015b60405180910390f35b61019161018c366004610e6d565b61043c565b005b6101cf6040518060400160405280601881526020017f53656c6646756e64656450696e67506f6e6720312e322e30000000000000000081525081565b6040516101759190610ef3565b6101916101ea366004610f23565b61048e565b6101916104e9565b60025473ffffffffffffffffffffffffffffffffffffffff165b60405173ffffffffffffffffffffffffffffffffffffffff9091168152602001610175565b610191610525565b61019161024c366004610f3e565b610627565b60005473ffffffffffffffffffffffffffffffffffffffff16610211565b61019161027d366004610f79565b6106ac565b610191610290366004610fb4565b61088b565b7f0000000000000000000000000000000000000000000000000000000000000000610211565b60025474010000000000000000000000000000000000000000900460ff16610169565b6101916102ec366004610fd1565b6108da565b60015474010000000000000000000000000000000000000000900467ffffffffffffffff1660405167ffffffffffffffff9091168152602001610175565b60035473ffffffffffffffffffffffffffffffffffffffff16610211565b60035474010000000000000000000000000000000000000000900460ff1660405160ff9091168152602001610175565b61019161038b366004611008565b61097c565b61019161039e366004610fb4565b610a04565b60007fffffffff0000000000000000000000000000000000000000000000000000000082167f85572ffb00000000000000000000000000000000000000000000000000000000148061043657507fffffffff0000000000000000000000000000000000000000000000000000000082167f01ffc9a700000000000000000000000000000000000000000000000000000000145b92915050565b610444610a15565b6002805491151574010000000000000000000000000000000000000000027fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff909216919091179055565b610496610a15565b6001805467ffffffffffffffff90921674010000000000000000000000000000000000000000027fffffffff0000000000000000ffffffffffffffffffffffffffffffffffffffff909216919091179055565b6104f1610a15565b600280547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff1690556105236001610a96565b565b60015473ffffffffffffffffffffffffffffffffffffffff1633146105ab576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e65720000000000000000000060448201526064015b60405180910390fd5b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b3373ffffffffffffffffffffffffffffffffffffffff7f00000000000000000000000000000000000000000000000000000000000000001614610698576040517fd7f733340000000000000000000000000000000000000000000000000000000081523360048201526024016105a2565b6106a96106a482611230565b610cd9565b50565b60035474010000000000000000000000000000000000000000900460ff1615806106f2575060035474010000000000000000000000000000000000000000900460ff1681105b156106fa5750565b6003546001906107259074010000000000000000000000000000000000000000900460ff16836112dd565b116106a9577f00000000000000000000000000000000000000000000000000000000000000006001546040517fa8d87a3b0000000000000000000000000000000000000000000000000000000081527401000000000000000000000000000000000000000090910467ffffffffffffffff16600482015273ffffffffffffffffffffffffffffffffffffffff919091169063a8d87a3b90602401602060405180830381865afa1580156107dc573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906108009190611318565b73ffffffffffffffffffffffffffffffffffffffff1663eff7cc486040518163ffffffff1660e01b8152600401600060405180830381600087803b15801561084757600080fd5b505af115801561085b573d6000803e3d6000fd5b50506040517f302777af5d26fab9dd5120c5f1307c65193ebc51daf33244ada4365fab10602c925060009150a150565b610893610a15565b600280547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff92909216919091179055565b6108e2610a15565b6001805467ffffffffffffffff90931674010000000000000000000000000000000000000000027fffffffff0000000000000000ffffffffffffffffffffffffffffffffffffffff909316929092179091556002805473ffffffffffffffffffffffffffffffffffffffff9092167fffffffffffffffffffffffff0000000000000000000000000000000000000000909216919091179055565b610984610a15565b600380547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff167401000000000000000000000000000000000000000060ff8416908102919091179091556040519081527f4768dbf8645b24c54f2887651545d24f748c0d0d1d4c689eb810fb19f0befcf39060200160405180910390a150565b610a0c610a15565b6106a981610d2f565b60005473ffffffffffffffffffffffffffffffffffffffff163314610523576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e65720000000000000000000060448201526064016105a2565b80600116600103610ad9576040518181527f48257dc961b6f792c2b78a080dacfed693b660960a702de21cee364e20270e2f9060200160405180910390a1610b0d565b6040518181527f58b69f57828e6962d216502094c54f6562f3bf082ba758966c3454f9e37b15259060200160405180910390a15b610b16816106ac565b6040805160a0810190915260025473ffffffffffffffffffffffffffffffffffffffff1660c08201526000908060e08101604051602081830303815290604052815260200183604051602001610b6e91815260200190565b604080517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe081840301815291905281526020016000604051908082528060200260200182016040528015610be857816020015b6040805180820190915260008082526020820152815260200190600190039081610bc15790505b50815260035473ffffffffffffffffffffffffffffffffffffffff16602080830191909152604080519182018152600082529091015290507f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff166396f4e9f9600160149054906101000a900467ffffffffffffffff16836040518363ffffffff1660e01b8152600401610c91929190611335565b6020604051808303816000875af1158015610cb0573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610cd4919061144a565b505050565b60008160600151806020019051810190610cf3919061144a565b60025490915074010000000000000000000000000000000000000000900460ff16610d2b57610d2b610d26826001611463565b610a96565b5050565b3373ffffffffffffffffffffffffffffffffffffffff821603610dae576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c6600000000000000000060448201526064016105a2565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b600060208284031215610e3657600080fd5b81357fffffffff0000000000000000000000000000000000000000000000000000000081168114610e6657600080fd5b9392505050565b600060208284031215610e7f57600080fd5b81358015158114610e6657600080fd5b6000815180845260005b81811015610eb557602081850181015186830182015201610e99565b5060006020828601015260207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f83011685010191505092915050565b602081526000610e666020830184610e8f565b803567ffffffffffffffff81168114610f1e57600080fd5b919050565b600060208284031215610f3557600080fd5b610e6682610f06565b600060208284031215610f5057600080fd5b813567ffffffffffffffff811115610f6757600080fd5b820160a08185031215610e6657600080fd5b600060208284031215610f8b57600080fd5b5035919050565b73ffffffffffffffffffffffffffffffffffffffff811681146106a957600080fd5b600060208284031215610fc657600080fd5b8135610e6681610f92565b60008060408385031215610fe457600080fd5b610fed83610f06565b91506020830135610ffd81610f92565b809150509250929050565b60006020828403121561101a57600080fd5b813560ff81168114610e6657600080fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040805190810167ffffffffffffffff8111828210171561107d5761107d61102b565b60405290565b60405160a0810167ffffffffffffffff8111828210171561107d5761107d61102b565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016810167ffffffffffffffff811182821017156110ed576110ed61102b565b604052919050565b600082601f83011261110657600080fd5b813567ffffffffffffffff8111156111205761112061102b565b61115160207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f840116016110a6565b81815284602083860101111561116657600080fd5b816020850160208301376000918101602001919091529392505050565b600082601f83011261119457600080fd5b8135602067ffffffffffffffff8211156111b0576111b061102b565b6111be818360051b016110a6565b82815260069290921b840181019181810190868411156111dd57600080fd5b8286015b8481101561122557604081890312156111fa5760008081fd5b61120261105a565b813561120d81610f92565b815281850135858201528352918301916040016111e1565b509695505050505050565b600060a0823603121561124257600080fd5b61124a611083565b8235815261125a60208401610f06565b6020820152604083013567ffffffffffffffff8082111561127a57600080fd5b611286368387016110f5565b6040840152606085013591508082111561129f57600080fd5b6112ab368387016110f5565b606084015260808501359150808211156112c457600080fd5b506112d136828601611183565b60808301525092915050565b600082611313577f4e487b7100000000000000000000000000000000000000000000000000000000600052601260045260246000fd5b500690565b60006020828403121561132a57600080fd5b8151610e6681610f92565b6000604067ffffffffffffffff851683526020604081850152845160a0604086015261136460e0860182610e8f565b9050818601517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc08087840301606088015261139f8383610e8f565b6040890151888203830160808a01528051808352908601945060009350908501905b80841015611400578451805173ffffffffffffffffffffffffffffffffffffffff168352860151868301529385019360019390930192908601906113c1565b50606089015173ffffffffffffffffffffffffffffffffffffffff1660a08901526080890151888203830160c08a0152955061143c8187610e8f565b9a9950505050505050505050565b60006020828403121561145c57600080fd5b5051919050565b80820180821115610436577f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fdfea164736f6c6343000818000a",
+	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"router\",\"type\":\"address\"},{\"internalType\":\"contractIERC20\",\"name\":\"feeToken\",\"type\":\"address\"},{\"internalType\":\"uint8\",\"name\":\"roundTripsBeforeFunding\",\"type\":\"uint8\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"chainSelector\",\"type\":\"uint64\"}],\"name\":\"InvalidChain\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"recipient\",\"type\":\"bytes\"}],\"name\":\"InvalidRecipient\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"router\",\"type\":\"address\"}],\"name\":\"InvalidRouter\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"}],\"name\":\"InvalidSender\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"}],\"name\":\"MessageNotFailed\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"OnlySelf\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ZeroAddressNotAllowed\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"indexed\":true,\"internalType\":\"bytes\",\"name\":\"recipient\",\"type\":\"bytes\"}],\"name\":\"ApprovedSenderAdded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"indexed\":true,\"internalType\":\"bytes\",\"name\":\"recipient\",\"type\":\"bytes\"}],\"name\":\"ApprovedSenderRemoved\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"oldRouter\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newRouter\",\"type\":\"address\"}],\"name\":\"CCIPRouterModified\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"remoteChainSelector\",\"type\":\"uint64\"},{\"indexed\":true,\"internalType\":\"bytes\",\"name\":\"recipient\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"extraArgsBytes\",\"type\":\"bytes\"}],\"name\":\"ChainAdded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"removeChainSelector\",\"type\":\"uint64\"}],\"name\":\"ChainRemoved\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"countIncrBeforeFunding\",\"type\":\"uint8\"}],\"name\":\"CountIncrBeforeFundingSet\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"oldFeeToken\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newFeeToken\",\"type\":\"address\"}],\"name\":\"FeeTokenUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"Funded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"tokenReceiver\",\"type\":\"address\"}],\"name\":\"MessageAbandoned\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"reason\",\"type\":\"bytes\"}],\"name\":\"MessageFailed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"}],\"name\":\"MessageRecovered\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"}],\"name\":\"MessageSent\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"}],\"name\":\"MessageSucceeded\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"pingPongCount\",\"type\":\"uint256\"}],\"name\":\"Ping\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"pingPongCount\",\"type\":\"uint256\"}],\"name\":\"Pong\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"usePreFunding\",\"type\":\"bool\"}],\"name\":\"PreFundingStateUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"TokensWithdrawnByOwner\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"address\",\"name\":\"receiver\",\"type\":\"address\"}],\"name\":\"abandonFailedMessage\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"acceptOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"chainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bool\",\"name\":\"allowed\",\"type\":\"bool\"},{\"internalType\":\"bytes\",\"name\":\"recipient\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"extraArgsBytes\",\"type\":\"bytes\"}],\"internalType\":\"structCCIPBase.ChainUpdate[]\",\"name\":\"chains\",\"type\":\"tuple[]\"}],\"name\":\"applyChainUpdates\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"internalType\":\"structClient.EVMTokenAmount[]\",\"name\":\"destTokenAmounts\",\"type\":\"tuple[]\"}],\"internalType\":\"structClient.Any2EVMMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"internalType\":\"structClient.EVMTokenAmount[]\",\"name\":\"tokenAmounts\",\"type\":\"tuple[]\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"ccipSend\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"}],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"pingPongCount\",\"type\":\"uint256\"}],\"name\":\"fundPingPong\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCountIncrBeforeFunding\",\"outputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCounterpartAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCounterpartChainSelector\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"}],\"name\":\"getMessageContents\",\"outputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"internalType\":\"structClient.EVMTokenAmount[]\",\"name\":\"destTokenAmounts\",\"type\":\"tuple[]\"}],\"internalType\":\"structClient.Any2EVMMessage\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getRouter\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"senderAddr\",\"type\":\"bytes\"}],\"name\":\"isApprovedSender\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"}],\"name\":\"isFailedMessage\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"isPaused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"internalType\":\"structClient.EVMTokenAmount[]\",\"name\":\"destTokenAmounts\",\"type\":\"tuple[]\"}],\"internalType\":\"structClient.Any2EVMMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"processMessage\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"}],\"name\":\"retryFailedMessage\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"}],\"name\":\"s_chainConfigs\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"recipient\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"extraArgsBytes\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"s_feeToken\",\"outputs\":[{\"internalType\":\"contractIERC20\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"s_shouldUsePreFunding\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"countIncrBeforeFunding\",\"type\":\"uint8\"}],\"name\":\"setCountIncrBeforeFunding\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"counterpartChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"counterpartAddress\",\"type\":\"address\"}],\"name\":\"setCounterpart\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"pause\",\"type\":\"bool\"}],\"name\":\"setPaused\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"startPingPong\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"typeAndVersion\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"}],\"internalType\":\"structCCIPBase.ApprovedSenderUpdate[]\",\"name\":\"adds\",\"type\":\"tuple[]\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"}],\"internalType\":\"structCCIPBase.ApprovedSenderUpdate[]\",\"name\":\"removes\",\"type\":\"tuple[]\"}],\"name\":\"updateApprovedSenders\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"updateFeeToken\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"usePreFunding\",\"type\":\"bool\"}],\"name\":\"updatePreFundingStatus\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"newRouter\",\"type\":\"address\"}],\"name\":\"updateRouter\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"withdrawTokens\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}]",
+	Bin: "0x60806040523480156200001157600080fd5b5060405162004ef638038062004ef6833981016040819052620000349162000616565b82828181600182803380600081620000935760405162461bcd60e51b815260206004820152601860248201527f43616e6e6f7420736574206f776e657220746f207a65726f000000000000000060448201526064015b60405180910390fd5b600080546001600160a01b0319166001600160a01b0384811691909117909155811615620000c657620000c6816200018e565b5050506001600160a01b038116620000f1576040516342bcdf7f60e11b815260040160405180910390fd5b600280546001600160a01b0319166001600160a01b03928316179055600780549185166001600160a81b03199092168217600160a01b85151502179055159050620001575760025460075462000157916001600160a01b03918216911660001962000239565b50505050508060026200016b91906200066f565b600860156101000a81548160ff021916908360ff1602179055505050506200075f565b336001600160a01b03821603620001e85760405162461bcd60e51b815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c6600000000000000000060448201526064016200008a565b600180546001600160a01b0319166001600160a01b0383811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b801580620002b75750604051636eb1769f60e11b81523060048201526001600160a01b03838116602483015284169063dd62ed3e90604401602060405180830381865afa1580156200028f573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190620002b59190620006a1565b155b6200032b5760405162461bcd60e51b815260206004820152603660248201527f5361666545524332303a20617070726f76652066726f6d206e6f6e2d7a65726f60448201527f20746f206e6f6e2d7a65726f20616c6c6f77616e63650000000000000000000060648201526084016200008a565b604080516001600160a01b038416602482015260448082018490528251808303909101815260649091019091526020810180516001600160e01b0390811663095ea7b360e01b17909152620003839185916200038816565b505050565b6040805180820190915260208082527f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c656490820152600090620003d7906001600160a01b03851690849062000459565b805190915015620003835780806020019051810190620003f89190620006bb565b620003835760405162461bcd60e51b815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e6044820152691bdd081cdd58d8d9595960b21b60648201526084016200008a565b60606200046a848460008562000472565b949350505050565b606082471015620004d55760405162461bcd60e51b815260206004820152602660248201527f416464726573733a20696e73756666696369656e742062616c616e636520666f6044820152651c8818d85b1b60d21b60648201526084016200008a565b600080866001600160a01b03168587604051620004f391906200070c565b60006040518083038185875af1925050503d806000811462000532576040519150601f19603f3d011682016040523d82523d6000602084013e62000537565b606091505b5090925090506200054b8783838762000556565b979650505050505050565b60608315620005ca578251600003620005c2576001600160a01b0385163b620005c25760405162461bcd60e51b815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e747261637400000060448201526064016200008a565b50816200046a565b6200046a8383815115620005e15781518083602001fd5b8060405162461bcd60e51b81526004016200008a91906200072a565b6001600160a01b03811681146200061357600080fd5b50565b6000806000606084860312156200062c57600080fd5b83516200063981620005fd565b60208501519093506200064c81620005fd565b604085015190925060ff811681146200066457600080fd5b809150509250925092565b60ff81811683821602908116908181146200069a57634e487b7160e01b600052601160045260246000fd5b5092915050565b600060208284031215620006b457600080fd5b5051919050565b600060208284031215620006ce57600080fd5b81518015158114620006df57600080fd5b9392505050565b60005b8381101562000703578181015183820152602001620006e9565b50506000910152565b6000825162000720818460208701620006e6565b9190910192915050565b60208152600082518060208401526200074b816040850160208701620006e6565b601f01601f19169190910160400192915050565b614787806200076f6000396000f3fe6080604052600436106101dc5760003560e01c80639fe74e2611610102578063cf6730f811610095578063ec4a9a2611610064578063ec4a9a2614610637578063ef686d8e14610669578063f2fde38b14610689578063ff2deec3146106a957600080fd5b8063cf6730f814610598578063e4ca8754146105b8578063e6c725f5146105d8578063e89b44851461061657600080fd5b8063bee518a4116100d1578063bee518a4146104ec578063c25da3fe14610538578063c851cc3214610558578063c89245d51461057857600080fd5b80639fe74e2614610451578063b0f479a114610471578063b187bd261461049c578063b5a11011146104cc57600080fd5b80635e35359e1161017a5780638462a2b9116101495780638462a2b9146103c657806385572ffb146103e65780638da5cb5b146104065780638f491cba1461043157600080fd5b80635e35359e146103445780636939cd97146103645780636d62d6331461039157806379ba5097146103b157600080fd5b8063181f5a77116101b6578063181f5a771461025f5780632874d8bf146102b55780632b6e5d63146102ca57806335f170ef1461031657600080fd5b80630a9094dc146101e85780630e958d6b1461021d57806316c38b3c1461023d57600080fd5b366101e357005b600080fd5b3480156101f457600080fd5b5061020861020336600461359a565b6106d6565b60405190151581526020015b60405180910390f35b34801561022957600080fd5b506102086102383660046135c9565b6106e9565b34801561024957600080fd5b5061025d61025836600461365c565b610734565b005b34801561026b57600080fd5b506102a86040518060400160405280601881526020017f53656c6646756e64656450696e67506f6e6720312e362e30000000000000000081525081565b60405161021491906136e7565b3480156102c157600080fd5b5061025d610786565b3480156102d657600080fd5b5060085473ffffffffffffffffffffffffffffffffffffffff165b60405173ffffffffffffffffffffffffffffffffffffffff9091168152602001610214565b34801561032257600080fd5b506103366103313660046136fa565b6107c2565b604051610214929190613717565b34801561035057600080fd5b5061025d61035f366004613767565b6108ee565b34801561037057600080fd5b5061038461037f36600461359a565b6109c3565b6040516102149190613805565b34801561039d57600080fd5b5061025d6103ac366004613899565b610bce565b3480156103bd57600080fd5b5061025d610de5565b3480156103d257600080fd5b5061025d6103e1366004613915565b610ee2565b3480156103f257600080fd5b5061025d610401366004613981565b611223565b34801561041257600080fd5b5060005473ffffffffffffffffffffffffffffffffffffffff166102f1565b34801561043d57600080fd5b5061025d61044c36600461359a565b61142c565b34801561045d57600080fd5b5061025d61046c3660046139bc565b611608565b34801561047d57600080fd5b5060025473ffffffffffffffffffffffffffffffffffffffff166102f1565b3480156104a857600080fd5b5060085474010000000000000000000000000000000000000000900460ff16610208565b3480156104d857600080fd5b5061025d6104e73660046139fe565b6117bc565b3480156104f857600080fd5b506007547501000000000000000000000000000000000000000000900467ffffffffffffffff1660405167ffffffffffffffff9091168152602001610214565b34801561054457600080fd5b5061025d61055336600461365c565b6119c5565b34801561056457600080fd5b5061025d610573366004613a2c565b611a51565b34801561058457600080fd5b5061025d610593366004613a2c565b611b1d565b3480156105a457600080fd5b5061025d6105b3366004613981565b611c87565b3480156105c457600080fd5b5061025d6105d336600461359a565b611e12565b3480156105e457600080fd5b506008547501000000000000000000000000000000000000000000900460ff1660405160ff9091168152602001610214565b610629610624366004613b7e565b6120e0565b604051908152602001610214565b34801561064357600080fd5b506007546102089074010000000000000000000000000000000000000000900460ff1681565b34801561067557600080fd5b5061025d610684366004613c8b565b61268e565b34801561069557600080fd5b5061025d6106a4366004613a2c565b612711565b3480156106b557600080fd5b506007546102f19073ffffffffffffffffffffffffffffffffffffffff1681565b60006106e3600583612722565b92915050565b67ffffffffffffffff831660009081526003602052604080822090516002909101906107189085908590613cae565b9081526040519081900360200190205460ff1690509392505050565b61073c61273d565b6008805491151574010000000000000000000000000000000000000000027fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff909216919091179055565b61078e61273d565b600880547fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff1690556107c060016127be565b565b6003602052600090815260409020805481906107dd90613cbe565b80601f016020809104026020016040519081016040528092919081815260200182805461080990613cbe565b80156108565780601f1061082b57610100808354040283529160200191610856565b820191906000526020600020905b81548152906001019060200180831161083957829003601f168201915b50505050509080600101805461086b90613cbe565b80601f016020809104026020016040519081016040528092919081815260200182805461089790613cbe565b80156108e45780601f106108b9576101008083540402835291602001916108e4565b820191906000526020600020905b8154815290600101906020018083116108c757829003601f168201915b5050505050905082565b6108f661273d565b73ffffffffffffffffffffffffffffffffffffffff83166109365761093173ffffffffffffffffffffffffffffffffffffffff8316826129fa565b610957565b61095773ffffffffffffffffffffffffffffffffffffffff84168383612b54565b8173ffffffffffffffffffffffffffffffffffffffff168373ffffffffffffffffffffffffffffffffffffffff167f6832d9be2410a86571981e1e60fd4c1f9ea2a1034d6102a2b7d6c5e480adf02e836040516109b691815260200190565b60405180910390a3505050565b6040805160a08082018352600080835260208084018290526060848601819052808501819052608085015285825260048152908490208451928301855280548352600181015467ffffffffffffffff1691830191909152600281018054939492939192840191610a3290613cbe565b80601f0160208091040260200160405190810160405280929190818152602001828054610a5e90613cbe565b8015610aab5780601f10610a8057610100808354040283529160200191610aab565b820191906000526020600020905b815481529060010190602001808311610a8e57829003601f168201915b50505050508152602001600382018054610ac490613cbe565b80601f0160208091040260200160405190810160405280929190818152602001828054610af090613cbe565b8015610b3d5780601f10610b1257610100808354040283529160200191610b3d565b820191906000526020600020905b815481529060010190602001808311610b2057829003601f168201915b5050505050815260200160048201805480602002602001604051908101604052809291908181526020016000905b82821015610bc05760008481526020908190206040805180820190915260028502909101805473ffffffffffffffffffffffffffffffffffffffff168252600190810154828401529083529092019101610b6b565b505050915250909392505050565b610bd661273d565b610be1600583612722565b610c1f576040517fb6e78260000000000000000000000000000000000000000000000000000000008152600481018390526024015b60405180910390fd5b600082815260046020818152604080842090920180548351818402810184019094528084529091849084015b82821015610ca05760008481526020908190206040805180820190915260028502909101805473ffffffffffffffffffffffffffffffffffffffff168252600190810154828401529083529092019101610c4b565b50505060008581526004602052604081208181556001810180547fffffffffffffffffffffffffffffffffffffffffffffffff00000000000000001690559293509050610cf060028301826134e8565b610cfe6003830160006134e8565b610d0c600483016000613522565b50610d1a9050600584612c28565b5060005b8151811015610d9457610d8c83838381518110610d3d57610d3d613d11565b602002602001015160200151848481518110610d5b57610d5b613d11565b60200260200101516000015173ffffffffffffffffffffffffffffffffffffffff16612b549092919063ffffffff16565b600101610d1e565b5060405173ffffffffffffffffffffffffffffffffffffffff8316815283907fd5038100bd3dc9631d3c3f4f61a3e53e9d466f40c47af9897292c7b35e32a9579060200160405180910390a2505050565b60015473ffffffffffffffffffffffffffffffffffffffff163314610e66576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4d7573742062652070726f706f736564206f776e6572000000000000000000006044820152606401610c16565b60008054337fffffffffffffffffffffffff00000000000000000000000000000000000000008083168217845560018054909116905560405173ffffffffffffffffffffffffffffffffffffffff90921692909183917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a350565b610eea61273d565b60005b8181101561107d5760036000848484818110610f0b57610f0b613d11565b9050602002810190610f1d9190613d40565b610f2b9060208101906136fa565b67ffffffffffffffff1667ffffffffffffffff168152602001908152602001600020600201838383818110610f6257610f62613d11565b9050602002810190610f749190613d40565b610f82906020810190613d7e565b604051610f90929190613cae565b90815260405190819003602001902080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00169055828282818110610fd757610fd7613d11565b9050602002810190610fe99190613d40565b610ff7906020810190613d7e565b604051611005929190613cae565b604051809103902083838381811061101f5761101f613d11565b90506020028101906110319190613d40565b61103f9060208101906136fa565b67ffffffffffffffff167f021290bab0d93f4d9a243bd430e45dd4bc8238451e9abbba6fab4463677dfce960405160405180910390a3600101610eed565b5060005b8381101561121c576001600360008787858181106110a1576110a1613d11565b90506020028101906110b39190613d40565b6110c19060208101906136fa565b67ffffffffffffffff1667ffffffffffffffff1681526020019081526020016000206002018686848181106110f8576110f8613d11565b905060200281019061110a9190613d40565b611118906020810190613d7e565b604051611126929190613cae565b90815260405190819003602001902080549115157fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0090921691909117905584848281811061117657611176613d11565b90506020028101906111889190613d40565b611196906020810190613d7e565b6040516111a4929190613cae565b60405180910390208585838181106111be576111be613d11565b90506020028101906111d09190613d40565b6111de9060208101906136fa565b67ffffffffffffffff167f72d9f73bb7cb11065e15df29d61e803a0eba356d509a7025a6f51ebdea07f9e760405160405180910390a3600101611081565b5050505050565b60025473ffffffffffffffffffffffffffffffffffffffff163314611276576040517fd7f73334000000000000000000000000000000000000000000000000000000008152336004820152602401610c16565b61128660408201602083016136fa565b67ffffffffffffffff81166000908152600360205260409020805481906112ac90613cbe565b90506000036112f3576040517fd79f2ea400000000000000000000000000000000000000000000000000000000815267ffffffffffffffff83166004820152602401610c16565b6040517fcf6730f8000000000000000000000000000000000000000000000000000000008152309063cf6730f89061132f908690600401613ee5565b600060405180830381600087803b15801561134957600080fd5b505af192505050801561135a575060015b6113fa573d808015611388576040519150601f19603f3d011682016040523d82523d6000602084013e61138d565b606091505b5061139a60058535612c34565b508335600090815260046020526040902084906113b782826142bf565b50506040518435907f55bc02a9ef6f146737edeeb425738006f67f077e7138de3bf84a15bde1a5b56f906113ec9084906136e7565b60405180910390a250505050565b6040518335907fdf6958669026659bac75ba986685e11a7d271284989f565f2802522663e9a70f90600090a25b505050565b6008547501000000000000000000000000000000000000000000900460ff16158061147457506008547501000000000000000000000000000000000000000000900460ff1681105b1561147c5750565b6008546001906114a8907501000000000000000000000000000000000000000000900460ff16836143b9565b116116055760025473ffffffffffffffffffffffffffffffffffffffff166007546040517fa8d87a3b000000000000000000000000000000000000000000000000000000008152750100000000000000000000000000000000000000000090910467ffffffffffffffff16600482015273ffffffffffffffffffffffffffffffffffffffff919091169063a8d87a3b90602401602060405180830381865afa158015611558573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061157c91906143f4565b73ffffffffffffffffffffffffffffffffffffffff1663eff7cc486040518163ffffffff1660e01b8152600401600060405180830381600087803b1580156115c357600080fd5b505af11580156115d7573d6000803e3d6000fd5b50506040517f302777af5d26fab9dd5120c5f1307c65193ebc51daf33244ada4365fab10602c925060009150a15b50565b61161061273d565b60005b8181101561142757600083838381811061162f5761162f613d11565b90506020028101906116419190614411565b61164a90614445565b905080602001516116b557805167ffffffffffffffff166000908152600360205260408120611678916134e8565b805160405167ffffffffffffffff909116907f5204aec90a3c794d8e90fded8b46ae9c7c552803e7e832e0c1d358396d85991690600090a26117b3565b8060400151516000036116f4576040517f8579befe00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b604080820151825167ffffffffffffffff1660009081526003602052919091209061171f90826144f6565b506060810151815167ffffffffffffffff1660009081526003602052604090206001019061174d90826144f6565b5080604001516040516117609190614610565b6040518091039020816000015167ffffffffffffffff167f1ced5bcae649ed29cebfa0010298ad6794bf3822e8cb754a6eee5353a9a8721283606001516040516117aa91906136e7565b60405180910390a35b50600101611613565b6117c461273d565b73ffffffffffffffffffffffffffffffffffffffff811615806117ef575067ffffffffffffffff8216155b15611826576040517f8579befe00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b600780547fffffff0000000000000000ffffffffffffffffffffffffffffffffffffffffff16750100000000000000000000000000000000000000000067ffffffffffffffff851690810291909117909155600880547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff841690811790915560009182526003602090815260409283902083519182019290925260019260029092019101604080517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08184030181529082905261191891614610565b908152604080516020928190038301812080547fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00169415159490941790935573ffffffffffffffffffffffffffffffffffffffff84169183019190915201604080517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe081840301815291815267ffffffffffffffff841660009081526003602052209061142790826144f6565b6119cd61273d565b6007805482151574010000000000000000000000000000000000000000027fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff9091161790556040517f4d54de233ba89f204d426874c47f1dc6afc1c2debc1a9eb0fc6ff9d149530d2b90611a4690831515815260200190565b60405180910390a150565b611a5961273d565b73ffffffffffffffffffffffffffffffffffffffff8116611aa6576040517f8579befe00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b6002805473ffffffffffffffffffffffffffffffffffffffff8381167fffffffffffffffffffffffff0000000000000000000000000000000000000000831681179093556040519116919082907f3672b589036f39ac008505b790fcb05d484d70b65680ec64c089a3c173fdc4c890600090a35050565b611b2561273d565b60075473ffffffffffffffffffffffffffffffffffffffff1615611b8657611b86611b6560025473ffffffffffffffffffffffffffffffffffffffff1690565b60075473ffffffffffffffffffffffffffffffffffffffff16906000612c40565b6007805473ffffffffffffffffffffffffffffffffffffffff8381167fffffffffffffffffffffffff000000000000000000000000000000000000000083168117909355169015611c3357611c33611bf360025473ffffffffffffffffffffffffffffffffffffffff1690565b60075473ffffffffffffffffffffffffffffffffffffffff16907fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff612dc2565b6040805173ffffffffffffffffffffffffffffffffffffffff8084168252841660208201527f91a03e1d689caf891fe531c01e290f7b718f9c6a3af6726d6d837d2b7bd82e67910160405180910390a15050565b333014611cc0576040517f14d4a4e800000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b611cd060408201602083016136fa565b611cdd6040830183613d7e565b8080601f016020809104026020016040519081016040528093929190818152602001838380828437600092018290525067ffffffffffffffff861681526003602052604090208054909350611d3492509050613cbe565b15905080611d8a5750600360008367ffffffffffffffff1667ffffffffffffffff16815260200190815260200160002060020181604051611d759190614610565b9081526040519081900360200190205460ff16155b15611dc357806040517f5075bb38000000000000000000000000000000000000000000000000000000008152600401610c1691906136e7565b60085474010000000000000000000000000000000000000000900460ff1661142757611427611df56060850185613d7e565b810190611e02919061359a565b611e0d906001614622565b6127be565b611e1d600582612722565b611e56576040517fb6e7826000000000000000000000000000000000000000000000000000000000815260048101829052602401610c16565b6000818152600460209081526040808320815160a08101835281548152600182015467ffffffffffffffff16938101939093526002810180549192840191611e9d90613cbe565b80601f0160208091040260200160405190810160405280929190818152602001828054611ec990613cbe565b8015611f165780601f10611eeb57610100808354040283529160200191611f16565b820191906000526020600020905b815481529060010190602001808311611ef957829003601f168201915b50505050508152602001600382018054611f2f90613cbe565b80601f0160208091040260200160405190810160405280929190818152602001828054611f5b90613cbe565b8015611fa85780601f10611f7d57610100808354040283529160200191611fa8565b820191906000526020600020905b815481529060010190602001808311611f8b57829003601f168201915b5050505050815260200160048201805480602002602001604051908101604052809291908181526020016000905b8282101561202b5760008481526020908190206040805180820190915260028502909101805473ffffffffffffffffffffffffffffffffffffffff168252600190810154828401529083529092019101611fd6565b5050509152505060008381526004602052604081208181556001810180547fffffffffffffffffffffffffffffffffffffffffffffffff000000000000000016905591925061207d60028301826134e8565b61208b6003830160006134e8565b612099600483016000613522565b506120a79050600583612c28565b506120b181612ec6565b60405182907fef3bf8c64bc480286c4f3503b870ceb23e648d2d902e31fb7bb46680da6de8ad90600090a25050565b67ffffffffffffffff831660009081526003602052604081208054859190819061210990613cbe565b9050600003612150576040517fd79f2ea400000000000000000000000000000000000000000000000000000000815267ffffffffffffffff83166004820152602401610c16565b6040805160a08101825267ffffffffffffffff881660009081526003602052918220805482919061218090613cbe565b80601f01602080910402602001604051908101604052809291908181526020018280546121ac90613cbe565b80156121f95780601f106121ce576101008083540402835291602001916121f9565b820191906000526020600020905b8154815290600101906020018083116121dc57829003601f168201915b5050509183525050602080820188905260408083018a905260075473ffffffffffffffffffffffffffffffffffffffff16606084015267ffffffffffffffff8b16600090815260039092529020600101805460809092019161225a90613cbe565b80601f016020809104026020016040519081016040528092919081815260200182805461228690613cbe565b80156122d35780601f106122a8576101008083540402835291602001916122d3565b820191906000526020600020905b8154815290600101906020018083116122b657829003601f168201915b5050509190925250506002546040517f20487ded00000000000000000000000000000000000000000000000000000000815291925060009173ffffffffffffffffffffffffffffffffffffffff909116906320487ded9061233a908b908690600401614635565b602060405180830381865afa158015612357573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061237b9190614702565b60075490915073ffffffffffffffffffffffffffffffffffffffff161580159061243457506007546040517f70a08231000000000000000000000000000000000000000000000000000000008152306004820152829173ffffffffffffffffffffffffffffffffffffffff16906370a0823190602401602060405180830381865afa15801561240e573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906124329190614702565b105b1561245e5760075461245e9073ffffffffffffffffffffffffffffffffffffffff16333084612f38565b60005b87518110156125b1576124d133308a848151811061248157612481613d11565b6020026020010151602001518b858151811061249f5761249f613d11565b60200260200101516000015173ffffffffffffffffffffffffffffffffffffffff16612f38909392919063ffffffff16565b600754885173ffffffffffffffffffffffffffffffffffffffff9091169089908390811061250157612501613d11565b60200260200101516000015173ffffffffffffffffffffffffffffffffffffffff16146125a95760025488516125a99173ffffffffffffffffffffffffffffffffffffffff16908a908490811061255a5761255a613d11565b6020026020010151602001518a848151811061257857612578613d11565b60200260200101516000015173ffffffffffffffffffffffffffffffffffffffff16612c409092919063ffffffff16565b600101612461565b5060025460075473ffffffffffffffffffffffffffffffffffffffff918216916396f4e9f99116156125e45760006125e6565b825b8a856040518463ffffffff1660e01b8152600401612605929190614635565b60206040518083038185885af1158015612623573d6000803e3d6000fd5b50505050506040513d601f19601f820116820180604052508101906126489190614702565b94507f54791b38f3859327992a1ca0590ad3c0f08feba98d1a4f56ab0dca74d203392a8560405161267b91815260200190565b60405180910390a1505050509392505050565b61269661273d565b600880547fffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffffff16750100000000000000000000000000000000000000000060ff8416908102919091179091556040519081527f4768dbf8645b24c54f2887651545d24f748c0d0d1d4c689eb810fb19f0befcf390602001611a46565b61271961273d565b61160581612f96565b600081815260018301602052604081205415155b9392505050565b60005473ffffffffffffffffffffffffffffffffffffffff1633146107c0576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601660248201527f4f6e6c792063616c6c61626c65206279206f776e6572000000000000000000006044820152606401610c16565b80600116600103612801576040518181527f48257dc961b6f792c2b78a080dacfed693b660960a702de21cee364e20270e2f9060200160405180910390a1612835565b6040518181527f58b69f57828e6962d216502094c54f6562f3bf082ba758966c3454f9e37b15259060200160405180910390a15b61283e8161142c565b6040805160a0810190915260085473ffffffffffffffffffffffffffffffffffffffff1660c08201526000908060e0810160405160208183030381529060405281526020018360405160200161289691815260200190565b604080517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08184030181529190528152602001600060405190808252806020026020018201604052801561291057816020015b60408051808201909152600080825260208201528152602001906001900390816128e95790505b50815260075473ffffffffffffffffffffffffffffffffffffffff166020808301919091526040805191820181526000825290910152905061296760025473ffffffffffffffffffffffffffffffffffffffff1690565b73ffffffffffffffffffffffffffffffffffffffff166396f4e9f9600760159054906101000a900467ffffffffffffffff16836040518363ffffffff1660e01b81526004016129b7929190614635565b6020604051808303816000875af11580156129d6573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906114279190614702565b80471015612a64576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601d60248201527f416464726573733a20696e73756666696369656e742062616c616e63650000006044820152606401610c16565b60008273ffffffffffffffffffffffffffffffffffffffff168260405160006040518083038185875af1925050503d8060008114612abe576040519150601f19603f3d011682016040523d82523d6000602084013e612ac3565b606091505b5050905080611427576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152603a60248201527f416464726573733a20756e61626c6520746f2073656e642076616c75652c207260448201527f6563697069656e74206d617920686176652072657665727465640000000000006064820152608401610c16565b60405173ffffffffffffffffffffffffffffffffffffffff83166024820152604481018290526114279084907fa9059cbb00000000000000000000000000000000000000000000000000000000906064015b604080517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08184030181529190526020810180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff167fffffffff000000000000000000000000000000000000000000000000000000009093169290921790915261308b565b60006127368383613197565b6000612736838361328a565b801580612ce057506040517fdd62ed3e00000000000000000000000000000000000000000000000000000000815230600482015273ffffffffffffffffffffffffffffffffffffffff838116602483015284169063dd62ed3e90604401602060405180830381865afa158015612cba573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190612cde9190614702565b155b612d6c576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152603660248201527f5361666545524332303a20617070726f76652066726f6d206e6f6e2d7a65726f60448201527f20746f206e6f6e2d7a65726f20616c6c6f77616e6365000000000000000000006064820152608401610c16565b60405173ffffffffffffffffffffffffffffffffffffffff83166024820152604481018290526114279084907f095ea7b30000000000000000000000000000000000000000000000000000000090606401612ba6565b6040517fdd62ed3e00000000000000000000000000000000000000000000000000000000815230600482015273ffffffffffffffffffffffffffffffffffffffff8381166024830152600091839186169063dd62ed3e90604401602060405180830381865afa158015612e39573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190612e5d9190614702565b612e679190614622565b60405173ffffffffffffffffffffffffffffffffffffffff8516602482015260448101829052909150612ec09085907f095ea7b30000000000000000000000000000000000000000000000000000000090606401612ba6565b50505050565b612ece61273d565b6040517fcf6730f8000000000000000000000000000000000000000000000000000000008152309063cf6730f890612f0a908490600401613805565b600060405180830381600087803b158015612f2457600080fd5b505af115801561121c573d6000803e3d6000fd5b60405173ffffffffffffffffffffffffffffffffffffffff80851660248301528316604482015260648101829052612ec09085907f23b872dd0000000000000000000000000000000000000000000000000000000090608401612ba6565b3373ffffffffffffffffffffffffffffffffffffffff821603613015576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f43616e6e6f74207472616e7366657220746f2073656c660000000000000000006044820152606401610c16565b600180547fffffffffffffffffffffffff00000000000000000000000000000000000000001673ffffffffffffffffffffffffffffffffffffffff83811691821790925560008054604051929316917fed8889f560326eb138920d842192f0eb3dd22b4f139c87a2c57538e05bae12789190a350565b60006130ed826040518060400160405280602081526020017f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c65648152508573ffffffffffffffffffffffffffffffffffffffff166132d99092919063ffffffff16565b805190915015611427578080602001905181019061310b919061471b565b611427576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e60448201527f6f742073756363656564000000000000000000000000000000000000000000006064820152608401610c16565b600081815260018301602052604081205480156132805760006131bb600183614738565b85549091506000906131cf90600190614738565b90508181146132345760008660000182815481106131ef576131ef613d11565b906000526020600020015490508087600001848154811061321257613212613d11565b6000918252602080832090910192909255918252600188019052604090208390555b85548690806132455761324561474b565b6001900381819060005260206000200160009055905585600101600086815260200190815260200160002060009055600193505050506106e3565b60009150506106e3565b60008181526001830160205260408120546132d1575081546001818101845560008481526020808220909301849055845484825282860190935260409020919091556106e3565b5060006106e3565b60606132e884846000856132f0565b949350505050565b606082471015613382576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152602660248201527f416464726573733a20696e73756666696369656e742062616c616e636520666f60448201527f722063616c6c00000000000000000000000000000000000000000000000000006064820152608401610c16565b6000808673ffffffffffffffffffffffffffffffffffffffff1685876040516133ab9190614610565b60006040518083038185875af1925050503d80600081146133e8576040519150601f19603f3d011682016040523d82523d6000602084013e6133ed565b606091505b50915091506133fe87838387613409565b979650505050505050565b6060831561349f5782516000036134985773ffffffffffffffffffffffffffffffffffffffff85163b613498576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e74726163740000006044820152606401610c16565b50816132e8565b6132e883838151156134b45781518083602001fd5b806040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610c1691906136e7565b5080546134f490613cbe565b6000825580601f10613504575050565b601f0160209004906000526020600020908101906116059190613543565b5080546000825560020290600052602060002090810190611605919061355c565b5b808211156135585760008155600101613544565b5090565b5b808211156135585780547fffffffffffffffffffffffff00000000000000000000000000000000000000001681556000600182015560020161355d565b6000602082840312156135ac57600080fd5b5035919050565b67ffffffffffffffff8116811461160557600080fd5b6000806000604084860312156135de57600080fd5b83356135e9816135b3565b9250602084013567ffffffffffffffff8082111561360657600080fd5b818601915086601f83011261361a57600080fd5b81358181111561362957600080fd5b87602082850101111561363b57600080fd5b6020830194508093505050509250925092565b801515811461160557600080fd5b60006020828403121561366e57600080fd5b81356127368161364e565b60005b8381101561369457818101518382015260200161367c565b50506000910152565b600081518084526136b5816020860160208601613679565b601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0169290920160200192915050565b602081526000612736602083018461369d565b60006020828403121561370c57600080fd5b8135612736816135b3565b60408152600061372a604083018561369d565b828103602084015261373c818561369d565b95945050505050565b73ffffffffffffffffffffffffffffffffffffffff8116811461160557600080fd5b60008060006060848603121561377c57600080fd5b833561378781613745565b9250602084013561379781613745565b929592945050506040919091013590565b60008151808452602080850194506020840160005b838110156137fa578151805173ffffffffffffffffffffffffffffffffffffffff16885283015183880152604090960195908201906001016137bd565b509495945050505050565b602081528151602082015267ffffffffffffffff60208301511660408201526000604083015160a0606084015261383f60c084018261369d565b905060608401517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08085840301608086015261387b838361369d565b925060808601519150808584030160a08601525061373c82826137a8565b600080604083850312156138ac57600080fd5b8235915060208301356138be81613745565b809150509250929050565b60008083601f8401126138db57600080fd5b50813567ffffffffffffffff8111156138f357600080fd5b6020830191508360208260051b850101111561390e57600080fd5b9250929050565b6000806000806040858703121561392b57600080fd5b843567ffffffffffffffff8082111561394357600080fd5b61394f888389016138c9565b9096509450602087013591508082111561396857600080fd5b50613975878288016138c9565b95989497509550505050565b60006020828403121561399357600080fd5b813567ffffffffffffffff8111156139aa57600080fd5b820160a0818503121561273657600080fd5b600080602083850312156139cf57600080fd5b823567ffffffffffffffff8111156139e657600080fd5b6139f2858286016138c9565b90969095509350505050565b60008060408385031215613a1157600080fd5b8235613a1c816135b3565b915060208301356138be81613745565b600060208284031215613a3e57600080fd5b813561273681613745565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040805190810167ffffffffffffffff81118282101715613a9b57613a9b613a49565b60405290565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016810167ffffffffffffffff81118282101715613ae857613ae8613a49565b604052919050565b600082601f830112613b0157600080fd5b813567ffffffffffffffff811115613b1b57613b1b613a49565b613b4c60207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f84011601613aa1565b818152846020838601011115613b6157600080fd5b816020850160208301376000918101602001919091529392505050565b600080600060608486031215613b9357600080fd5b8335613b9e816135b3565b925060208481013567ffffffffffffffff80821115613bbc57600080fd5b818701915087601f830112613bd057600080fd5b813581811115613be257613be2613a49565b613bf0848260051b01613aa1565b81815260069190911b8301840190848101908a831115613c0f57600080fd5b938501935b82851015613c5b576040858c031215613c2d5760008081fd5b613c35613a78565b8535613c4081613745565b81528587013587820152825260409094019390850190613c14565b965050506040870135925080831115613c7357600080fd5b5050613c8186828701613af0565b9150509250925092565b600060208284031215613c9d57600080fd5b813560ff8116811461273657600080fd5b8183823760009101908152919050565b600181811c90821680613cd257607f821691505b602082108103613d0b577f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b50919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b600082357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc1833603018112613d7457600080fd5b9190910192915050565b60008083357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1843603018112613db357600080fd5b83018035915067ffffffffffffffff821115613dce57600080fd5b60200191503681900382131561390e57600080fd5b60008083357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1843603018112613e1857600080fd5b830160208101925035905067ffffffffffffffff811115613e3857600080fd5b80360382131561390e57600080fd5b8183528181602085013750600060208284010152600060207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f840116840101905092915050565b8183526000602080850194508260005b858110156137fa578135613eb381613745565b73ffffffffffffffffffffffffffffffffffffffff168752818301358388015260409687019690910190600101613ea0565b602081528135602082015260006020830135613f00816135b3565b67ffffffffffffffff8082166040850152613f1e6040860186613de3565b925060a06060860152613f3560c086018483613e47565b925050613f456060860186613de3565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe080878603016080880152613f7b858385613e47565b9450608088013592507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1883603018312613fb457600080fd5b60209288019283019235915083821115613fcd57600080fd5b8160061b3603831315613fdf57600080fd5b8685030160a08701526133fe848284613e90565b601f821115611427576000816000526020600020601f850160051c8101602086101561401c5750805b601f850160051c820191505b8181101561403b57828155600101614028565b505050505050565b67ffffffffffffffff83111561405b5761405b613a49565b61406f836140698354613cbe565b83613ff3565b6000601f8411600181146140c1576000851561408b5750838201355b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600387901b1c1916600186901b17835561121c565b6000838152602090207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0861690835b8281101561411057868501358255602094850194600190920191016140f0565b508682101561414b577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff60f88860031b161c19848701351681555b505060018560011b0183555050505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b813561419781613745565b73ffffffffffffffffffffffffffffffffffffffff81167fffffffffffffffffffffffff000000000000000000000000000000000000000083541617825550602082013560018201555050565b680100000000000000008311156141fd576141fd613a49565b80548382558084101561428a5760017f7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff808316831461423e5761423e61415d565b808616861461424f5761424f61415d565b5060008360005260206000208360011b81018760011b820191505b8082101561428557828255828483015560028201915061426a565b505050505b5060008181526020812083915b8581101561403b576142a9838361418c565b6040929092019160029190910190600101614297565b813581556001810160208301356142d5816135b3565b67ffffffffffffffff8082167fffffffffffffffffffffffffffffffffffffffffffffffff00000000000000008454161783556143156040860186613d7e565b93509150614327838360028701614043565b6143346060860186613d7e565b93509150614346838360038701614043565b608085013592507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe185360301831261437d57600080fd5b91840191823591508082111561439257600080fd5b506020820191508060061b36038213156143ab57600080fd5b612ec08183600486016141e4565b6000826143ef577f4e487b7100000000000000000000000000000000000000000000000000000000600052601260045260246000fd5b500690565b60006020828403121561440657600080fd5b815161273681613745565b600082357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff81833603018112613d7457600080fd5b60006080823603121561445757600080fd5b6040516080810167ffffffffffffffff828210818311171561447b5761447b613a49565b816040528435915061448c826135b3565b90825260208401359061449e8261364e565b81602084015260408501359150808211156144b857600080fd5b6144c436838701613af0565b604084015260608501359150808211156144dd57600080fd5b506144ea36828601613af0565b60608301525092915050565b815167ffffffffffffffff81111561451057614510613a49565b6145248161451e8454613cbe565b84613ff3565b602080601f83116001811461457757600084156145415750858301515b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600386901b1c1916600185901b17855561403b565b6000858152602081207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08616915b828110156145c4578886015182559484019460019091019084016145a5565b508582101561460057878501517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600388901b60f8161c191681555b5050505050600190811b01905550565b60008251613d74818460208701613679565b808201808211156106e3576106e361415d565b67ffffffffffffffff83168152604060208201526000825160a0604084015261466160e084018261369d565b905060208401517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc08085840301606086015261469d838361369d565b925060408601519150808584030160808601526146ba83836137a8565b925073ffffffffffffffffffffffffffffffffffffffff60608701511660a086015260808601519150808584030160c0860152506146f8828261369d565b9695505050505050565b60006020828403121561471457600080fd5b5051919050565b60006020828403121561472d57600080fd5b81516127368161364e565b818103818111156106e3576106e361415d565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603160045260246000fdfea164736f6c6343000818000a",
 }
 
 var SelfFundedPingPongABI = SelfFundedPingPongMetaData.ABI
@@ -250,26 +262,26 @@ func (_SelfFundedPingPong *SelfFundedPingPongCallerSession) GetCounterpartChainS
 	return _SelfFundedPingPong.Contract.GetCounterpartChainSelector(&_SelfFundedPingPong.CallOpts)
 }
 
-func (_SelfFundedPingPong *SelfFundedPingPongCaller) GetFeeToken(opts *bind.CallOpts) (common.Address, error) {
+func (_SelfFundedPingPong *SelfFundedPingPongCaller) GetMessageContents(opts *bind.CallOpts, messageId [32]byte) (ClientAny2EVMMessage, error) {
 	var out []interface{}
-	err := _SelfFundedPingPong.contract.Call(opts, &out, "getFeeToken")
+	err := _SelfFundedPingPong.contract.Call(opts, &out, "getMessageContents", messageId)
 
 	if err != nil {
-		return *new(common.Address), err
+		return *new(ClientAny2EVMMessage), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+	out0 := *abi.ConvertType(out[0], new(ClientAny2EVMMessage)).(*ClientAny2EVMMessage)
 
 	return out0, err
 
 }
 
-func (_SelfFundedPingPong *SelfFundedPingPongSession) GetFeeToken() (common.Address, error) {
-	return _SelfFundedPingPong.Contract.GetFeeToken(&_SelfFundedPingPong.CallOpts)
+func (_SelfFundedPingPong *SelfFundedPingPongSession) GetMessageContents(messageId [32]byte) (ClientAny2EVMMessage, error) {
+	return _SelfFundedPingPong.Contract.GetMessageContents(&_SelfFundedPingPong.CallOpts, messageId)
 }
 
-func (_SelfFundedPingPong *SelfFundedPingPongCallerSession) GetFeeToken() (common.Address, error) {
-	return _SelfFundedPingPong.Contract.GetFeeToken(&_SelfFundedPingPong.CallOpts)
+func (_SelfFundedPingPong *SelfFundedPingPongCallerSession) GetMessageContents(messageId [32]byte) (ClientAny2EVMMessage, error) {
+	return _SelfFundedPingPong.Contract.GetMessageContents(&_SelfFundedPingPong.CallOpts, messageId)
 }
 
 func (_SelfFundedPingPong *SelfFundedPingPongCaller) GetRouter(opts *bind.CallOpts) (common.Address, error) {
@@ -292,6 +304,50 @@ func (_SelfFundedPingPong *SelfFundedPingPongSession) GetRouter() (common.Addres
 
 func (_SelfFundedPingPong *SelfFundedPingPongCallerSession) GetRouter() (common.Address, error) {
 	return _SelfFundedPingPong.Contract.GetRouter(&_SelfFundedPingPong.CallOpts)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongCaller) IsApprovedSender(opts *bind.CallOpts, sourceChainSelector uint64, senderAddr []byte) (bool, error) {
+	var out []interface{}
+	err := _SelfFundedPingPong.contract.Call(opts, &out, "isApprovedSender", sourceChainSelector, senderAddr)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) IsApprovedSender(sourceChainSelector uint64, senderAddr []byte) (bool, error) {
+	return _SelfFundedPingPong.Contract.IsApprovedSender(&_SelfFundedPingPong.CallOpts, sourceChainSelector, senderAddr)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongCallerSession) IsApprovedSender(sourceChainSelector uint64, senderAddr []byte) (bool, error) {
+	return _SelfFundedPingPong.Contract.IsApprovedSender(&_SelfFundedPingPong.CallOpts, sourceChainSelector, senderAddr)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongCaller) IsFailedMessage(opts *bind.CallOpts, messageId [32]byte) (bool, error) {
+	var out []interface{}
+	err := _SelfFundedPingPong.contract.Call(opts, &out, "isFailedMessage", messageId)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) IsFailedMessage(messageId [32]byte) (bool, error) {
+	return _SelfFundedPingPong.Contract.IsFailedMessage(&_SelfFundedPingPong.CallOpts, messageId)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongCallerSession) IsFailedMessage(messageId [32]byte) (bool, error) {
+	return _SelfFundedPingPong.Contract.IsFailedMessage(&_SelfFundedPingPong.CallOpts, messageId)
 }
 
 func (_SelfFundedPingPong *SelfFundedPingPongCaller) IsPaused(opts *bind.CallOpts) (bool, error) {
@@ -338,9 +394,61 @@ func (_SelfFundedPingPong *SelfFundedPingPongCallerSession) Owner() (common.Addr
 	return _SelfFundedPingPong.Contract.Owner(&_SelfFundedPingPong.CallOpts)
 }
 
-func (_SelfFundedPingPong *SelfFundedPingPongCaller) SupportsInterface(opts *bind.CallOpts, interfaceId [4]byte) (bool, error) {
+func (_SelfFundedPingPong *SelfFundedPingPongCaller) SChainConfigs(opts *bind.CallOpts, destChainSelector uint64) (SChainConfigs,
+
+	error) {
 	var out []interface{}
-	err := _SelfFundedPingPong.contract.Call(opts, &out, "supportsInterface", interfaceId)
+	err := _SelfFundedPingPong.contract.Call(opts, &out, "s_chainConfigs", destChainSelector)
+
+	outstruct := new(SChainConfigs)
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.Recipient = *abi.ConvertType(out[0], new([]byte)).(*[]byte)
+	outstruct.ExtraArgsBytes = *abi.ConvertType(out[1], new([]byte)).(*[]byte)
+
+	return *outstruct, err
+
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) SChainConfigs(destChainSelector uint64) (SChainConfigs,
+
+	error) {
+	return _SelfFundedPingPong.Contract.SChainConfigs(&_SelfFundedPingPong.CallOpts, destChainSelector)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongCallerSession) SChainConfigs(destChainSelector uint64) (SChainConfigs,
+
+	error) {
+	return _SelfFundedPingPong.Contract.SChainConfigs(&_SelfFundedPingPong.CallOpts, destChainSelector)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongCaller) SFeeToken(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _SelfFundedPingPong.contract.Call(opts, &out, "s_feeToken")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) SFeeToken() (common.Address, error) {
+	return _SelfFundedPingPong.Contract.SFeeToken(&_SelfFundedPingPong.CallOpts)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongCallerSession) SFeeToken() (common.Address, error) {
+	return _SelfFundedPingPong.Contract.SFeeToken(&_SelfFundedPingPong.CallOpts)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongCaller) SShouldUsePreFunding(opts *bind.CallOpts) (bool, error) {
+	var out []interface{}
+	err := _SelfFundedPingPong.contract.Call(opts, &out, "s_shouldUsePreFunding")
 
 	if err != nil {
 		return *new(bool), err
@@ -352,12 +460,12 @@ func (_SelfFundedPingPong *SelfFundedPingPongCaller) SupportsInterface(opts *bin
 
 }
 
-func (_SelfFundedPingPong *SelfFundedPingPongSession) SupportsInterface(interfaceId [4]byte) (bool, error) {
-	return _SelfFundedPingPong.Contract.SupportsInterface(&_SelfFundedPingPong.CallOpts, interfaceId)
+func (_SelfFundedPingPong *SelfFundedPingPongSession) SShouldUsePreFunding() (bool, error) {
+	return _SelfFundedPingPong.Contract.SShouldUsePreFunding(&_SelfFundedPingPong.CallOpts)
 }
 
-func (_SelfFundedPingPong *SelfFundedPingPongCallerSession) SupportsInterface(interfaceId [4]byte) (bool, error) {
-	return _SelfFundedPingPong.Contract.SupportsInterface(&_SelfFundedPingPong.CallOpts, interfaceId)
+func (_SelfFundedPingPong *SelfFundedPingPongCallerSession) SShouldUsePreFunding() (bool, error) {
+	return _SelfFundedPingPong.Contract.SShouldUsePreFunding(&_SelfFundedPingPong.CallOpts)
 }
 
 func (_SelfFundedPingPong *SelfFundedPingPongCaller) TypeAndVersion(opts *bind.CallOpts) (string, error) {
@@ -382,6 +490,18 @@ func (_SelfFundedPingPong *SelfFundedPingPongCallerSession) TypeAndVersion() (st
 	return _SelfFundedPingPong.Contract.TypeAndVersion(&_SelfFundedPingPong.CallOpts)
 }
 
+func (_SelfFundedPingPong *SelfFundedPingPongTransactor) AbandonFailedMessage(opts *bind.TransactOpts, messageId [32]byte, receiver common.Address) (*types.Transaction, error) {
+	return _SelfFundedPingPong.contract.Transact(opts, "abandonFailedMessage", messageId, receiver)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) AbandonFailedMessage(messageId [32]byte, receiver common.Address) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.AbandonFailedMessage(&_SelfFundedPingPong.TransactOpts, messageId, receiver)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) AbandonFailedMessage(messageId [32]byte, receiver common.Address) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.AbandonFailedMessage(&_SelfFundedPingPong.TransactOpts, messageId, receiver)
+}
+
 func (_SelfFundedPingPong *SelfFundedPingPongTransactor) AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
 	return _SelfFundedPingPong.contract.Transact(opts, "acceptOwnership")
 }
@@ -392,6 +512,18 @@ func (_SelfFundedPingPong *SelfFundedPingPongSession) AcceptOwnership() (*types.
 
 func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) AcceptOwnership() (*types.Transaction, error) {
 	return _SelfFundedPingPong.Contract.AcceptOwnership(&_SelfFundedPingPong.TransactOpts)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactor) ApplyChainUpdates(opts *bind.TransactOpts, chains []CCIPBaseChainUpdate) (*types.Transaction, error) {
+	return _SelfFundedPingPong.contract.Transact(opts, "applyChainUpdates", chains)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) ApplyChainUpdates(chains []CCIPBaseChainUpdate) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.ApplyChainUpdates(&_SelfFundedPingPong.TransactOpts, chains)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) ApplyChainUpdates(chains []CCIPBaseChainUpdate) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.ApplyChainUpdates(&_SelfFundedPingPong.TransactOpts, chains)
 }
 
 func (_SelfFundedPingPong *SelfFundedPingPongTransactor) CcipReceive(opts *bind.TransactOpts, message ClientAny2EVMMessage) (*types.Transaction, error) {
@@ -406,6 +538,18 @@ func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) CcipReceive(mess
 	return _SelfFundedPingPong.Contract.CcipReceive(&_SelfFundedPingPong.TransactOpts, message)
 }
 
+func (_SelfFundedPingPong *SelfFundedPingPongTransactor) CcipSend(opts *bind.TransactOpts, destChainSelector uint64, tokenAmounts []ClientEVMTokenAmount, data []byte) (*types.Transaction, error) {
+	return _SelfFundedPingPong.contract.Transact(opts, "ccipSend", destChainSelector, tokenAmounts, data)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) CcipSend(destChainSelector uint64, tokenAmounts []ClientEVMTokenAmount, data []byte) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.CcipSend(&_SelfFundedPingPong.TransactOpts, destChainSelector, tokenAmounts, data)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) CcipSend(destChainSelector uint64, tokenAmounts []ClientEVMTokenAmount, data []byte) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.CcipSend(&_SelfFundedPingPong.TransactOpts, destChainSelector, tokenAmounts, data)
+}
+
 func (_SelfFundedPingPong *SelfFundedPingPongTransactor) FundPingPong(opts *bind.TransactOpts, pingPongCount *big.Int) (*types.Transaction, error) {
 	return _SelfFundedPingPong.contract.Transact(opts, "fundPingPong", pingPongCount)
 }
@@ -416,6 +560,30 @@ func (_SelfFundedPingPong *SelfFundedPingPongSession) FundPingPong(pingPongCount
 
 func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) FundPingPong(pingPongCount *big.Int) (*types.Transaction, error) {
 	return _SelfFundedPingPong.Contract.FundPingPong(&_SelfFundedPingPong.TransactOpts, pingPongCount)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactor) ProcessMessage(opts *bind.TransactOpts, message ClientAny2EVMMessage) (*types.Transaction, error) {
+	return _SelfFundedPingPong.contract.Transact(opts, "processMessage", message)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) ProcessMessage(message ClientAny2EVMMessage) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.ProcessMessage(&_SelfFundedPingPong.TransactOpts, message)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) ProcessMessage(message ClientAny2EVMMessage) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.ProcessMessage(&_SelfFundedPingPong.TransactOpts, message)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactor) RetryFailedMessage(opts *bind.TransactOpts, messageId [32]byte) (*types.Transaction, error) {
+	return _SelfFundedPingPong.contract.Transact(opts, "retryFailedMessage", messageId)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) RetryFailedMessage(messageId [32]byte) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.RetryFailedMessage(&_SelfFundedPingPong.TransactOpts, messageId)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) RetryFailedMessage(messageId [32]byte) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.RetryFailedMessage(&_SelfFundedPingPong.TransactOpts, messageId)
 }
 
 func (_SelfFundedPingPong *SelfFundedPingPongTransactor) SetCountIncrBeforeFunding(opts *bind.TransactOpts, countIncrBeforeFunding uint8) (*types.Transaction, error) {
@@ -440,30 +608,6 @@ func (_SelfFundedPingPong *SelfFundedPingPongSession) SetCounterpart(counterpart
 
 func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) SetCounterpart(counterpartChainSelector uint64, counterpartAddress common.Address) (*types.Transaction, error) {
 	return _SelfFundedPingPong.Contract.SetCounterpart(&_SelfFundedPingPong.TransactOpts, counterpartChainSelector, counterpartAddress)
-}
-
-func (_SelfFundedPingPong *SelfFundedPingPongTransactor) SetCounterpartAddress(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
-	return _SelfFundedPingPong.contract.Transact(opts, "setCounterpartAddress", addr)
-}
-
-func (_SelfFundedPingPong *SelfFundedPingPongSession) SetCounterpartAddress(addr common.Address) (*types.Transaction, error) {
-	return _SelfFundedPingPong.Contract.SetCounterpartAddress(&_SelfFundedPingPong.TransactOpts, addr)
-}
-
-func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) SetCounterpartAddress(addr common.Address) (*types.Transaction, error) {
-	return _SelfFundedPingPong.Contract.SetCounterpartAddress(&_SelfFundedPingPong.TransactOpts, addr)
-}
-
-func (_SelfFundedPingPong *SelfFundedPingPongTransactor) SetCounterpartChainSelector(opts *bind.TransactOpts, chainSelector uint64) (*types.Transaction, error) {
-	return _SelfFundedPingPong.contract.Transact(opts, "setCounterpartChainSelector", chainSelector)
-}
-
-func (_SelfFundedPingPong *SelfFundedPingPongSession) SetCounterpartChainSelector(chainSelector uint64) (*types.Transaction, error) {
-	return _SelfFundedPingPong.Contract.SetCounterpartChainSelector(&_SelfFundedPingPong.TransactOpts, chainSelector)
-}
-
-func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) SetCounterpartChainSelector(chainSelector uint64) (*types.Transaction, error) {
-	return _SelfFundedPingPong.Contract.SetCounterpartChainSelector(&_SelfFundedPingPong.TransactOpts, chainSelector)
 }
 
 func (_SelfFundedPingPong *SelfFundedPingPongTransactor) SetPaused(opts *bind.TransactOpts, pause bool) (*types.Transaction, error) {
@@ -500,6 +644,750 @@ func (_SelfFundedPingPong *SelfFundedPingPongSession) TransferOwnership(to commo
 
 func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) TransferOwnership(to common.Address) (*types.Transaction, error) {
 	return _SelfFundedPingPong.Contract.TransferOwnership(&_SelfFundedPingPong.TransactOpts, to)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactor) UpdateApprovedSenders(opts *bind.TransactOpts, adds []CCIPBaseApprovedSenderUpdate, removes []CCIPBaseApprovedSenderUpdate) (*types.Transaction, error) {
+	return _SelfFundedPingPong.contract.Transact(opts, "updateApprovedSenders", adds, removes)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) UpdateApprovedSenders(adds []CCIPBaseApprovedSenderUpdate, removes []CCIPBaseApprovedSenderUpdate) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.UpdateApprovedSenders(&_SelfFundedPingPong.TransactOpts, adds, removes)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) UpdateApprovedSenders(adds []CCIPBaseApprovedSenderUpdate, removes []CCIPBaseApprovedSenderUpdate) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.UpdateApprovedSenders(&_SelfFundedPingPong.TransactOpts, adds, removes)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactor) UpdateFeeToken(opts *bind.TransactOpts, token common.Address) (*types.Transaction, error) {
+	return _SelfFundedPingPong.contract.Transact(opts, "updateFeeToken", token)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) UpdateFeeToken(token common.Address) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.UpdateFeeToken(&_SelfFundedPingPong.TransactOpts, token)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) UpdateFeeToken(token common.Address) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.UpdateFeeToken(&_SelfFundedPingPong.TransactOpts, token)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactor) UpdatePreFundingStatus(opts *bind.TransactOpts, usePreFunding bool) (*types.Transaction, error) {
+	return _SelfFundedPingPong.contract.Transact(opts, "updatePreFundingStatus", usePreFunding)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) UpdatePreFundingStatus(usePreFunding bool) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.UpdatePreFundingStatus(&_SelfFundedPingPong.TransactOpts, usePreFunding)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) UpdatePreFundingStatus(usePreFunding bool) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.UpdatePreFundingStatus(&_SelfFundedPingPong.TransactOpts, usePreFunding)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactor) UpdateRouter(opts *bind.TransactOpts, newRouter common.Address) (*types.Transaction, error) {
+	return _SelfFundedPingPong.contract.Transact(opts, "updateRouter", newRouter)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) UpdateRouter(newRouter common.Address) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.UpdateRouter(&_SelfFundedPingPong.TransactOpts, newRouter)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) UpdateRouter(newRouter common.Address) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.UpdateRouter(&_SelfFundedPingPong.TransactOpts, newRouter)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactor) WithdrawTokens(opts *bind.TransactOpts, token common.Address, to common.Address, amount *big.Int) (*types.Transaction, error) {
+	return _SelfFundedPingPong.contract.Transact(opts, "withdrawTokens", token, to, amount)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) WithdrawTokens(token common.Address, to common.Address, amount *big.Int) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.WithdrawTokens(&_SelfFundedPingPong.TransactOpts, token, to, amount)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) WithdrawTokens(token common.Address, to common.Address, amount *big.Int) (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.WithdrawTokens(&_SelfFundedPingPong.TransactOpts, token, to, amount)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactor) Receive(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _SelfFundedPingPong.contract.RawTransact(opts, nil)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongSession) Receive() (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.Receive(&_SelfFundedPingPong.TransactOpts)
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongTransactorSession) Receive() (*types.Transaction, error) {
+	return _SelfFundedPingPong.Contract.Receive(&_SelfFundedPingPong.TransactOpts)
+}
+
+type SelfFundedPingPongApprovedSenderAddedIterator struct {
+	Event *SelfFundedPingPongApprovedSenderAdded
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *SelfFundedPingPongApprovedSenderAddedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SelfFundedPingPongApprovedSenderAdded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(SelfFundedPingPongApprovedSenderAdded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *SelfFundedPingPongApprovedSenderAddedIterator) Error() error {
+	return it.fail
+}
+
+func (it *SelfFundedPingPongApprovedSenderAddedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type SelfFundedPingPongApprovedSenderAdded struct {
+	DestChainSelector uint64
+	Recipient         common.Hash
+	Raw               types.Log
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) FilterApprovedSenderAdded(opts *bind.FilterOpts, destChainSelector []uint64, recipient [][]byte) (*SelfFundedPingPongApprovedSenderAddedIterator, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+	var recipientRule []interface{}
+	for _, recipientItem := range recipient {
+		recipientRule = append(recipientRule, recipientItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.FilterLogs(opts, "ApprovedSenderAdded", destChainSelectorRule, recipientRule)
+	if err != nil {
+		return nil, err
+	}
+	return &SelfFundedPingPongApprovedSenderAddedIterator{contract: _SelfFundedPingPong.contract, event: "ApprovedSenderAdded", logs: logs, sub: sub}, nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) WatchApprovedSenderAdded(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongApprovedSenderAdded, destChainSelector []uint64, recipient [][]byte) (event.Subscription, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+	var recipientRule []interface{}
+	for _, recipientItem := range recipient {
+		recipientRule = append(recipientRule, recipientItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.WatchLogs(opts, "ApprovedSenderAdded", destChainSelectorRule, recipientRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(SelfFundedPingPongApprovedSenderAdded)
+				if err := _SelfFundedPingPong.contract.UnpackLog(event, "ApprovedSenderAdded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParseApprovedSenderAdded(log types.Log) (*SelfFundedPingPongApprovedSenderAdded, error) {
+	event := new(SelfFundedPingPongApprovedSenderAdded)
+	if err := _SelfFundedPingPong.contract.UnpackLog(event, "ApprovedSenderAdded", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type SelfFundedPingPongApprovedSenderRemovedIterator struct {
+	Event *SelfFundedPingPongApprovedSenderRemoved
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *SelfFundedPingPongApprovedSenderRemovedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SelfFundedPingPongApprovedSenderRemoved)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(SelfFundedPingPongApprovedSenderRemoved)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *SelfFundedPingPongApprovedSenderRemovedIterator) Error() error {
+	return it.fail
+}
+
+func (it *SelfFundedPingPongApprovedSenderRemovedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type SelfFundedPingPongApprovedSenderRemoved struct {
+	DestChainSelector uint64
+	Recipient         common.Hash
+	Raw               types.Log
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) FilterApprovedSenderRemoved(opts *bind.FilterOpts, destChainSelector []uint64, recipient [][]byte) (*SelfFundedPingPongApprovedSenderRemovedIterator, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+	var recipientRule []interface{}
+	for _, recipientItem := range recipient {
+		recipientRule = append(recipientRule, recipientItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.FilterLogs(opts, "ApprovedSenderRemoved", destChainSelectorRule, recipientRule)
+	if err != nil {
+		return nil, err
+	}
+	return &SelfFundedPingPongApprovedSenderRemovedIterator{contract: _SelfFundedPingPong.contract, event: "ApprovedSenderRemoved", logs: logs, sub: sub}, nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) WatchApprovedSenderRemoved(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongApprovedSenderRemoved, destChainSelector []uint64, recipient [][]byte) (event.Subscription, error) {
+
+	var destChainSelectorRule []interface{}
+	for _, destChainSelectorItem := range destChainSelector {
+		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
+	}
+	var recipientRule []interface{}
+	for _, recipientItem := range recipient {
+		recipientRule = append(recipientRule, recipientItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.WatchLogs(opts, "ApprovedSenderRemoved", destChainSelectorRule, recipientRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(SelfFundedPingPongApprovedSenderRemoved)
+				if err := _SelfFundedPingPong.contract.UnpackLog(event, "ApprovedSenderRemoved", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParseApprovedSenderRemoved(log types.Log) (*SelfFundedPingPongApprovedSenderRemoved, error) {
+	event := new(SelfFundedPingPongApprovedSenderRemoved)
+	if err := _SelfFundedPingPong.contract.UnpackLog(event, "ApprovedSenderRemoved", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type SelfFundedPingPongCCIPRouterModifiedIterator struct {
+	Event *SelfFundedPingPongCCIPRouterModified
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *SelfFundedPingPongCCIPRouterModifiedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SelfFundedPingPongCCIPRouterModified)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(SelfFundedPingPongCCIPRouterModified)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *SelfFundedPingPongCCIPRouterModifiedIterator) Error() error {
+	return it.fail
+}
+
+func (it *SelfFundedPingPongCCIPRouterModifiedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type SelfFundedPingPongCCIPRouterModified struct {
+	OldRouter common.Address
+	NewRouter common.Address
+	Raw       types.Log
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) FilterCCIPRouterModified(opts *bind.FilterOpts, oldRouter []common.Address, newRouter []common.Address) (*SelfFundedPingPongCCIPRouterModifiedIterator, error) {
+
+	var oldRouterRule []interface{}
+	for _, oldRouterItem := range oldRouter {
+		oldRouterRule = append(oldRouterRule, oldRouterItem)
+	}
+	var newRouterRule []interface{}
+	for _, newRouterItem := range newRouter {
+		newRouterRule = append(newRouterRule, newRouterItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.FilterLogs(opts, "CCIPRouterModified", oldRouterRule, newRouterRule)
+	if err != nil {
+		return nil, err
+	}
+	return &SelfFundedPingPongCCIPRouterModifiedIterator{contract: _SelfFundedPingPong.contract, event: "CCIPRouterModified", logs: logs, sub: sub}, nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) WatchCCIPRouterModified(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongCCIPRouterModified, oldRouter []common.Address, newRouter []common.Address) (event.Subscription, error) {
+
+	var oldRouterRule []interface{}
+	for _, oldRouterItem := range oldRouter {
+		oldRouterRule = append(oldRouterRule, oldRouterItem)
+	}
+	var newRouterRule []interface{}
+	for _, newRouterItem := range newRouter {
+		newRouterRule = append(newRouterRule, newRouterItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.WatchLogs(opts, "CCIPRouterModified", oldRouterRule, newRouterRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(SelfFundedPingPongCCIPRouterModified)
+				if err := _SelfFundedPingPong.contract.UnpackLog(event, "CCIPRouterModified", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParseCCIPRouterModified(log types.Log) (*SelfFundedPingPongCCIPRouterModified, error) {
+	event := new(SelfFundedPingPongCCIPRouterModified)
+	if err := _SelfFundedPingPong.contract.UnpackLog(event, "CCIPRouterModified", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type SelfFundedPingPongChainAddedIterator struct {
+	Event *SelfFundedPingPongChainAdded
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *SelfFundedPingPongChainAddedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SelfFundedPingPongChainAdded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(SelfFundedPingPongChainAdded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *SelfFundedPingPongChainAddedIterator) Error() error {
+	return it.fail
+}
+
+func (it *SelfFundedPingPongChainAddedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type SelfFundedPingPongChainAdded struct {
+	RemoteChainSelector uint64
+	Recipient           common.Hash
+	ExtraArgsBytes      []byte
+	Raw                 types.Log
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) FilterChainAdded(opts *bind.FilterOpts, remoteChainSelector []uint64, recipient [][]byte) (*SelfFundedPingPongChainAddedIterator, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+	var recipientRule []interface{}
+	for _, recipientItem := range recipient {
+		recipientRule = append(recipientRule, recipientItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.FilterLogs(opts, "ChainAdded", remoteChainSelectorRule, recipientRule)
+	if err != nil {
+		return nil, err
+	}
+	return &SelfFundedPingPongChainAddedIterator{contract: _SelfFundedPingPong.contract, event: "ChainAdded", logs: logs, sub: sub}, nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) WatchChainAdded(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongChainAdded, remoteChainSelector []uint64, recipient [][]byte) (event.Subscription, error) {
+
+	var remoteChainSelectorRule []interface{}
+	for _, remoteChainSelectorItem := range remoteChainSelector {
+		remoteChainSelectorRule = append(remoteChainSelectorRule, remoteChainSelectorItem)
+	}
+	var recipientRule []interface{}
+	for _, recipientItem := range recipient {
+		recipientRule = append(recipientRule, recipientItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.WatchLogs(opts, "ChainAdded", remoteChainSelectorRule, recipientRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(SelfFundedPingPongChainAdded)
+				if err := _SelfFundedPingPong.contract.UnpackLog(event, "ChainAdded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParseChainAdded(log types.Log) (*SelfFundedPingPongChainAdded, error) {
+	event := new(SelfFundedPingPongChainAdded)
+	if err := _SelfFundedPingPong.contract.UnpackLog(event, "ChainAdded", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type SelfFundedPingPongChainRemovedIterator struct {
+	Event *SelfFundedPingPongChainRemoved
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *SelfFundedPingPongChainRemovedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SelfFundedPingPongChainRemoved)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(SelfFundedPingPongChainRemoved)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *SelfFundedPingPongChainRemovedIterator) Error() error {
+	return it.fail
+}
+
+func (it *SelfFundedPingPongChainRemovedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type SelfFundedPingPongChainRemoved struct {
+	RemoveChainSelector uint64
+	Raw                 types.Log
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) FilterChainRemoved(opts *bind.FilterOpts, removeChainSelector []uint64) (*SelfFundedPingPongChainRemovedIterator, error) {
+
+	var removeChainSelectorRule []interface{}
+	for _, removeChainSelectorItem := range removeChainSelector {
+		removeChainSelectorRule = append(removeChainSelectorRule, removeChainSelectorItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.FilterLogs(opts, "ChainRemoved", removeChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return &SelfFundedPingPongChainRemovedIterator{contract: _SelfFundedPingPong.contract, event: "ChainRemoved", logs: logs, sub: sub}, nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) WatchChainRemoved(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongChainRemoved, removeChainSelector []uint64) (event.Subscription, error) {
+
+	var removeChainSelectorRule []interface{}
+	for _, removeChainSelectorItem := range removeChainSelector {
+		removeChainSelectorRule = append(removeChainSelectorRule, removeChainSelectorItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.WatchLogs(opts, "ChainRemoved", removeChainSelectorRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(SelfFundedPingPongChainRemoved)
+				if err := _SelfFundedPingPong.contract.UnpackLog(event, "ChainRemoved", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParseChainRemoved(log types.Log) (*SelfFundedPingPongChainRemoved, error) {
+	event := new(SelfFundedPingPongChainRemoved)
+	if err := _SelfFundedPingPong.contract.UnpackLog(event, "ChainRemoved", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
 }
 
 type SelfFundedPingPongCountIncrBeforeFundingSetIterator struct {
@@ -619,6 +1507,124 @@ func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParseCountIncrBeforeFundi
 	return event, nil
 }
 
+type SelfFundedPingPongFeeTokenUpdatedIterator struct {
+	Event *SelfFundedPingPongFeeTokenUpdated
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *SelfFundedPingPongFeeTokenUpdatedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SelfFundedPingPongFeeTokenUpdated)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(SelfFundedPingPongFeeTokenUpdated)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *SelfFundedPingPongFeeTokenUpdatedIterator) Error() error {
+	return it.fail
+}
+
+func (it *SelfFundedPingPongFeeTokenUpdatedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type SelfFundedPingPongFeeTokenUpdated struct {
+	OldFeeToken common.Address
+	NewFeeToken common.Address
+	Raw         types.Log
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) FilterFeeTokenUpdated(opts *bind.FilterOpts) (*SelfFundedPingPongFeeTokenUpdatedIterator, error) {
+
+	logs, sub, err := _SelfFundedPingPong.contract.FilterLogs(opts, "FeeTokenUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return &SelfFundedPingPongFeeTokenUpdatedIterator{contract: _SelfFundedPingPong.contract, event: "FeeTokenUpdated", logs: logs, sub: sub}, nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) WatchFeeTokenUpdated(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongFeeTokenUpdated) (event.Subscription, error) {
+
+	logs, sub, err := _SelfFundedPingPong.contract.WatchLogs(opts, "FeeTokenUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(SelfFundedPingPongFeeTokenUpdated)
+				if err := _SelfFundedPingPong.contract.UnpackLog(event, "FeeTokenUpdated", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParseFeeTokenUpdated(log types.Log) (*SelfFundedPingPongFeeTokenUpdated, error) {
+	event := new(SelfFundedPingPongFeeTokenUpdated)
+	if err := _SelfFundedPingPong.contract.UnpackLog(event, "FeeTokenUpdated", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
 type SelfFundedPingPongFundedIterator struct {
 	Event *SelfFundedPingPongFunded
 
@@ -729,6 +1735,633 @@ func (_SelfFundedPingPong *SelfFundedPingPongFilterer) WatchFunded(opts *bind.Wa
 func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParseFunded(log types.Log) (*SelfFundedPingPongFunded, error) {
 	event := new(SelfFundedPingPongFunded)
 	if err := _SelfFundedPingPong.contract.UnpackLog(event, "Funded", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type SelfFundedPingPongMessageAbandonedIterator struct {
+	Event *SelfFundedPingPongMessageAbandoned
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *SelfFundedPingPongMessageAbandonedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SelfFundedPingPongMessageAbandoned)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(SelfFundedPingPongMessageAbandoned)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *SelfFundedPingPongMessageAbandonedIterator) Error() error {
+	return it.fail
+}
+
+func (it *SelfFundedPingPongMessageAbandonedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type SelfFundedPingPongMessageAbandoned struct {
+	MessageId     [32]byte
+	TokenReceiver common.Address
+	Raw           types.Log
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) FilterMessageAbandoned(opts *bind.FilterOpts, messageId [][32]byte) (*SelfFundedPingPongMessageAbandonedIterator, error) {
+
+	var messageIdRule []interface{}
+	for _, messageIdItem := range messageId {
+		messageIdRule = append(messageIdRule, messageIdItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.FilterLogs(opts, "MessageAbandoned", messageIdRule)
+	if err != nil {
+		return nil, err
+	}
+	return &SelfFundedPingPongMessageAbandonedIterator{contract: _SelfFundedPingPong.contract, event: "MessageAbandoned", logs: logs, sub: sub}, nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) WatchMessageAbandoned(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongMessageAbandoned, messageId [][32]byte) (event.Subscription, error) {
+
+	var messageIdRule []interface{}
+	for _, messageIdItem := range messageId {
+		messageIdRule = append(messageIdRule, messageIdItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.WatchLogs(opts, "MessageAbandoned", messageIdRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(SelfFundedPingPongMessageAbandoned)
+				if err := _SelfFundedPingPong.contract.UnpackLog(event, "MessageAbandoned", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParseMessageAbandoned(log types.Log) (*SelfFundedPingPongMessageAbandoned, error) {
+	event := new(SelfFundedPingPongMessageAbandoned)
+	if err := _SelfFundedPingPong.contract.UnpackLog(event, "MessageAbandoned", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type SelfFundedPingPongMessageFailedIterator struct {
+	Event *SelfFundedPingPongMessageFailed
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *SelfFundedPingPongMessageFailedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SelfFundedPingPongMessageFailed)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(SelfFundedPingPongMessageFailed)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *SelfFundedPingPongMessageFailedIterator) Error() error {
+	return it.fail
+}
+
+func (it *SelfFundedPingPongMessageFailedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type SelfFundedPingPongMessageFailed struct {
+	MessageId [32]byte
+	Reason    []byte
+	Raw       types.Log
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) FilterMessageFailed(opts *bind.FilterOpts, messageId [][32]byte) (*SelfFundedPingPongMessageFailedIterator, error) {
+
+	var messageIdRule []interface{}
+	for _, messageIdItem := range messageId {
+		messageIdRule = append(messageIdRule, messageIdItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.FilterLogs(opts, "MessageFailed", messageIdRule)
+	if err != nil {
+		return nil, err
+	}
+	return &SelfFundedPingPongMessageFailedIterator{contract: _SelfFundedPingPong.contract, event: "MessageFailed", logs: logs, sub: sub}, nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) WatchMessageFailed(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongMessageFailed, messageId [][32]byte) (event.Subscription, error) {
+
+	var messageIdRule []interface{}
+	for _, messageIdItem := range messageId {
+		messageIdRule = append(messageIdRule, messageIdItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.WatchLogs(opts, "MessageFailed", messageIdRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(SelfFundedPingPongMessageFailed)
+				if err := _SelfFundedPingPong.contract.UnpackLog(event, "MessageFailed", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParseMessageFailed(log types.Log) (*SelfFundedPingPongMessageFailed, error) {
+	event := new(SelfFundedPingPongMessageFailed)
+	if err := _SelfFundedPingPong.contract.UnpackLog(event, "MessageFailed", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type SelfFundedPingPongMessageRecoveredIterator struct {
+	Event *SelfFundedPingPongMessageRecovered
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *SelfFundedPingPongMessageRecoveredIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SelfFundedPingPongMessageRecovered)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(SelfFundedPingPongMessageRecovered)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *SelfFundedPingPongMessageRecoveredIterator) Error() error {
+	return it.fail
+}
+
+func (it *SelfFundedPingPongMessageRecoveredIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type SelfFundedPingPongMessageRecovered struct {
+	MessageId [32]byte
+	Raw       types.Log
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) FilterMessageRecovered(opts *bind.FilterOpts, messageId [][32]byte) (*SelfFundedPingPongMessageRecoveredIterator, error) {
+
+	var messageIdRule []interface{}
+	for _, messageIdItem := range messageId {
+		messageIdRule = append(messageIdRule, messageIdItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.FilterLogs(opts, "MessageRecovered", messageIdRule)
+	if err != nil {
+		return nil, err
+	}
+	return &SelfFundedPingPongMessageRecoveredIterator{contract: _SelfFundedPingPong.contract, event: "MessageRecovered", logs: logs, sub: sub}, nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) WatchMessageRecovered(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongMessageRecovered, messageId [][32]byte) (event.Subscription, error) {
+
+	var messageIdRule []interface{}
+	for _, messageIdItem := range messageId {
+		messageIdRule = append(messageIdRule, messageIdItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.WatchLogs(opts, "MessageRecovered", messageIdRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(SelfFundedPingPongMessageRecovered)
+				if err := _SelfFundedPingPong.contract.UnpackLog(event, "MessageRecovered", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParseMessageRecovered(log types.Log) (*SelfFundedPingPongMessageRecovered, error) {
+	event := new(SelfFundedPingPongMessageRecovered)
+	if err := _SelfFundedPingPong.contract.UnpackLog(event, "MessageRecovered", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type SelfFundedPingPongMessageSentIterator struct {
+	Event *SelfFundedPingPongMessageSent
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *SelfFundedPingPongMessageSentIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SelfFundedPingPongMessageSent)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(SelfFundedPingPongMessageSent)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *SelfFundedPingPongMessageSentIterator) Error() error {
+	return it.fail
+}
+
+func (it *SelfFundedPingPongMessageSentIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type SelfFundedPingPongMessageSent struct {
+	MessageId [32]byte
+	Raw       types.Log
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) FilterMessageSent(opts *bind.FilterOpts) (*SelfFundedPingPongMessageSentIterator, error) {
+
+	logs, sub, err := _SelfFundedPingPong.contract.FilterLogs(opts, "MessageSent")
+	if err != nil {
+		return nil, err
+	}
+	return &SelfFundedPingPongMessageSentIterator{contract: _SelfFundedPingPong.contract, event: "MessageSent", logs: logs, sub: sub}, nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) WatchMessageSent(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongMessageSent) (event.Subscription, error) {
+
+	logs, sub, err := _SelfFundedPingPong.contract.WatchLogs(opts, "MessageSent")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(SelfFundedPingPongMessageSent)
+				if err := _SelfFundedPingPong.contract.UnpackLog(event, "MessageSent", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParseMessageSent(log types.Log) (*SelfFundedPingPongMessageSent, error) {
+	event := new(SelfFundedPingPongMessageSent)
+	if err := _SelfFundedPingPong.contract.UnpackLog(event, "MessageSent", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type SelfFundedPingPongMessageSucceededIterator struct {
+	Event *SelfFundedPingPongMessageSucceeded
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *SelfFundedPingPongMessageSucceededIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SelfFundedPingPongMessageSucceeded)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(SelfFundedPingPongMessageSucceeded)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *SelfFundedPingPongMessageSucceededIterator) Error() error {
+	return it.fail
+}
+
+func (it *SelfFundedPingPongMessageSucceededIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type SelfFundedPingPongMessageSucceeded struct {
+	MessageId [32]byte
+	Raw       types.Log
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) FilterMessageSucceeded(opts *bind.FilterOpts, messageId [][32]byte) (*SelfFundedPingPongMessageSucceededIterator, error) {
+
+	var messageIdRule []interface{}
+	for _, messageIdItem := range messageId {
+		messageIdRule = append(messageIdRule, messageIdItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.FilterLogs(opts, "MessageSucceeded", messageIdRule)
+	if err != nil {
+		return nil, err
+	}
+	return &SelfFundedPingPongMessageSucceededIterator{contract: _SelfFundedPingPong.contract, event: "MessageSucceeded", logs: logs, sub: sub}, nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) WatchMessageSucceeded(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongMessageSucceeded, messageId [][32]byte) (event.Subscription, error) {
+
+	var messageIdRule []interface{}
+	for _, messageIdItem := range messageId {
+		messageIdRule = append(messageIdRule, messageIdItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.WatchLogs(opts, "MessageSucceeded", messageIdRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(SelfFundedPingPongMessageSucceeded)
+				if err := _SelfFundedPingPong.contract.UnpackLog(event, "MessageSucceeded", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParseMessageSucceeded(log types.Log) (*SelfFundedPingPongMessageSucceeded, error) {
+	event := new(SelfFundedPingPongMessageSucceeded)
+	if err := _SelfFundedPingPong.contract.UnpackLog(event, "MessageSucceeded", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -1241,12 +2874,293 @@ func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParsePong(log types.Log) 
 	return event, nil
 }
 
+type SelfFundedPingPongPreFundingStateUpdatedIterator struct {
+	Event *SelfFundedPingPongPreFundingStateUpdated
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *SelfFundedPingPongPreFundingStateUpdatedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SelfFundedPingPongPreFundingStateUpdated)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(SelfFundedPingPongPreFundingStateUpdated)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *SelfFundedPingPongPreFundingStateUpdatedIterator) Error() error {
+	return it.fail
+}
+
+func (it *SelfFundedPingPongPreFundingStateUpdatedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type SelfFundedPingPongPreFundingStateUpdated struct {
+	UsePreFunding bool
+	Raw           types.Log
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) FilterPreFundingStateUpdated(opts *bind.FilterOpts) (*SelfFundedPingPongPreFundingStateUpdatedIterator, error) {
+
+	logs, sub, err := _SelfFundedPingPong.contract.FilterLogs(opts, "PreFundingStateUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return &SelfFundedPingPongPreFundingStateUpdatedIterator{contract: _SelfFundedPingPong.contract, event: "PreFundingStateUpdated", logs: logs, sub: sub}, nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) WatchPreFundingStateUpdated(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongPreFundingStateUpdated) (event.Subscription, error) {
+
+	logs, sub, err := _SelfFundedPingPong.contract.WatchLogs(opts, "PreFundingStateUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(SelfFundedPingPongPreFundingStateUpdated)
+				if err := _SelfFundedPingPong.contract.UnpackLog(event, "PreFundingStateUpdated", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParsePreFundingStateUpdated(log types.Log) (*SelfFundedPingPongPreFundingStateUpdated, error) {
+	event := new(SelfFundedPingPongPreFundingStateUpdated)
+	if err := _SelfFundedPingPong.contract.UnpackLog(event, "PreFundingStateUpdated", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type SelfFundedPingPongTokensWithdrawnByOwnerIterator struct {
+	Event *SelfFundedPingPongTokensWithdrawnByOwner
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *SelfFundedPingPongTokensWithdrawnByOwnerIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(SelfFundedPingPongTokensWithdrawnByOwner)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(SelfFundedPingPongTokensWithdrawnByOwner)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *SelfFundedPingPongTokensWithdrawnByOwnerIterator) Error() error {
+	return it.fail
+}
+
+func (it *SelfFundedPingPongTokensWithdrawnByOwnerIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type SelfFundedPingPongTokensWithdrawnByOwner struct {
+	Token  common.Address
+	To     common.Address
+	Amount *big.Int
+	Raw    types.Log
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) FilterTokensWithdrawnByOwner(opts *bind.FilterOpts, token []common.Address, to []common.Address) (*SelfFundedPingPongTokensWithdrawnByOwnerIterator, error) {
+
+	var tokenRule []interface{}
+	for _, tokenItem := range token {
+		tokenRule = append(tokenRule, tokenItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.FilterLogs(opts, "TokensWithdrawnByOwner", tokenRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return &SelfFundedPingPongTokensWithdrawnByOwnerIterator{contract: _SelfFundedPingPong.contract, event: "TokensWithdrawnByOwner", logs: logs, sub: sub}, nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) WatchTokensWithdrawnByOwner(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongTokensWithdrawnByOwner, token []common.Address, to []common.Address) (event.Subscription, error) {
+
+	var tokenRule []interface{}
+	for _, tokenItem := range token {
+		tokenRule = append(tokenRule, tokenItem)
+	}
+	var toRule []interface{}
+	for _, toItem := range to {
+		toRule = append(toRule, toItem)
+	}
+
+	logs, sub, err := _SelfFundedPingPong.contract.WatchLogs(opts, "TokensWithdrawnByOwner", tokenRule, toRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(SelfFundedPingPongTokensWithdrawnByOwner)
+				if err := _SelfFundedPingPong.contract.UnpackLog(event, "TokensWithdrawnByOwner", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_SelfFundedPingPong *SelfFundedPingPongFilterer) ParseTokensWithdrawnByOwner(log types.Log) (*SelfFundedPingPongTokensWithdrawnByOwner, error) {
+	event := new(SelfFundedPingPongTokensWithdrawnByOwner)
+	if err := _SelfFundedPingPong.contract.UnpackLog(event, "TokensWithdrawnByOwner", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type SChainConfigs struct {
+	Recipient      []byte
+	ExtraArgsBytes []byte
+}
+
 func (_SelfFundedPingPong *SelfFundedPingPong) ParseLog(log types.Log) (generated.AbigenLog, error) {
 	switch log.Topics[0] {
+	case _SelfFundedPingPong.abi.Events["ApprovedSenderAdded"].ID:
+		return _SelfFundedPingPong.ParseApprovedSenderAdded(log)
+	case _SelfFundedPingPong.abi.Events["ApprovedSenderRemoved"].ID:
+		return _SelfFundedPingPong.ParseApprovedSenderRemoved(log)
+	case _SelfFundedPingPong.abi.Events["CCIPRouterModified"].ID:
+		return _SelfFundedPingPong.ParseCCIPRouterModified(log)
+	case _SelfFundedPingPong.abi.Events["ChainAdded"].ID:
+		return _SelfFundedPingPong.ParseChainAdded(log)
+	case _SelfFundedPingPong.abi.Events["ChainRemoved"].ID:
+		return _SelfFundedPingPong.ParseChainRemoved(log)
 	case _SelfFundedPingPong.abi.Events["CountIncrBeforeFundingSet"].ID:
 		return _SelfFundedPingPong.ParseCountIncrBeforeFundingSet(log)
+	case _SelfFundedPingPong.abi.Events["FeeTokenUpdated"].ID:
+		return _SelfFundedPingPong.ParseFeeTokenUpdated(log)
 	case _SelfFundedPingPong.abi.Events["Funded"].ID:
 		return _SelfFundedPingPong.ParseFunded(log)
+	case _SelfFundedPingPong.abi.Events["MessageAbandoned"].ID:
+		return _SelfFundedPingPong.ParseMessageAbandoned(log)
+	case _SelfFundedPingPong.abi.Events["MessageFailed"].ID:
+		return _SelfFundedPingPong.ParseMessageFailed(log)
+	case _SelfFundedPingPong.abi.Events["MessageRecovered"].ID:
+		return _SelfFundedPingPong.ParseMessageRecovered(log)
+	case _SelfFundedPingPong.abi.Events["MessageSent"].ID:
+		return _SelfFundedPingPong.ParseMessageSent(log)
+	case _SelfFundedPingPong.abi.Events["MessageSucceeded"].ID:
+		return _SelfFundedPingPong.ParseMessageSucceeded(log)
 	case _SelfFundedPingPong.abi.Events["OwnershipTransferRequested"].ID:
 		return _SelfFundedPingPong.ParseOwnershipTransferRequested(log)
 	case _SelfFundedPingPong.abi.Events["OwnershipTransferred"].ID:
@@ -1255,18 +3169,66 @@ func (_SelfFundedPingPong *SelfFundedPingPong) ParseLog(log types.Log) (generate
 		return _SelfFundedPingPong.ParsePing(log)
 	case _SelfFundedPingPong.abi.Events["Pong"].ID:
 		return _SelfFundedPingPong.ParsePong(log)
+	case _SelfFundedPingPong.abi.Events["PreFundingStateUpdated"].ID:
+		return _SelfFundedPingPong.ParsePreFundingStateUpdated(log)
+	case _SelfFundedPingPong.abi.Events["TokensWithdrawnByOwner"].ID:
+		return _SelfFundedPingPong.ParseTokensWithdrawnByOwner(log)
 
 	default:
 		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
 	}
 }
 
+func (SelfFundedPingPongApprovedSenderAdded) Topic() common.Hash {
+	return common.HexToHash("0x72d9f73bb7cb11065e15df29d61e803a0eba356d509a7025a6f51ebdea07f9e7")
+}
+
+func (SelfFundedPingPongApprovedSenderRemoved) Topic() common.Hash {
+	return common.HexToHash("0x021290bab0d93f4d9a243bd430e45dd4bc8238451e9abbba6fab4463677dfce9")
+}
+
+func (SelfFundedPingPongCCIPRouterModified) Topic() common.Hash {
+	return common.HexToHash("0x3672b589036f39ac008505b790fcb05d484d70b65680ec64c089a3c173fdc4c8")
+}
+
+func (SelfFundedPingPongChainAdded) Topic() common.Hash {
+	return common.HexToHash("0x1ced5bcae649ed29cebfa0010298ad6794bf3822e8cb754a6eee5353a9a87212")
+}
+
+func (SelfFundedPingPongChainRemoved) Topic() common.Hash {
+	return common.HexToHash("0x5204aec90a3c794d8e90fded8b46ae9c7c552803e7e832e0c1d358396d859916")
+}
+
 func (SelfFundedPingPongCountIncrBeforeFundingSet) Topic() common.Hash {
 	return common.HexToHash("0x4768dbf8645b24c54f2887651545d24f748c0d0d1d4c689eb810fb19f0befcf3")
 }
 
+func (SelfFundedPingPongFeeTokenUpdated) Topic() common.Hash {
+	return common.HexToHash("0x91a03e1d689caf891fe531c01e290f7b718f9c6a3af6726d6d837d2b7bd82e67")
+}
+
 func (SelfFundedPingPongFunded) Topic() common.Hash {
 	return common.HexToHash("0x302777af5d26fab9dd5120c5f1307c65193ebc51daf33244ada4365fab10602c")
+}
+
+func (SelfFundedPingPongMessageAbandoned) Topic() common.Hash {
+	return common.HexToHash("0xd5038100bd3dc9631d3c3f4f61a3e53e9d466f40c47af9897292c7b35e32a957")
+}
+
+func (SelfFundedPingPongMessageFailed) Topic() common.Hash {
+	return common.HexToHash("0x55bc02a9ef6f146737edeeb425738006f67f077e7138de3bf84a15bde1a5b56f")
+}
+
+func (SelfFundedPingPongMessageRecovered) Topic() common.Hash {
+	return common.HexToHash("0xef3bf8c64bc480286c4f3503b870ceb23e648d2d902e31fb7bb46680da6de8ad")
+}
+
+func (SelfFundedPingPongMessageSent) Topic() common.Hash {
+	return common.HexToHash("0x54791b38f3859327992a1ca0590ad3c0f08feba98d1a4f56ab0dca74d203392a")
+}
+
+func (SelfFundedPingPongMessageSucceeded) Topic() common.Hash {
+	return common.HexToHash("0xdf6958669026659bac75ba986685e11a7d271284989f565f2802522663e9a70f")
 }
 
 func (SelfFundedPingPongOwnershipTransferRequested) Topic() common.Hash {
@@ -1285,6 +3247,14 @@ func (SelfFundedPingPongPong) Topic() common.Hash {
 	return common.HexToHash("0x58b69f57828e6962d216502094c54f6562f3bf082ba758966c3454f9e37b1525")
 }
 
+func (SelfFundedPingPongPreFundingStateUpdated) Topic() common.Hash {
+	return common.HexToHash("0x4d54de233ba89f204d426874c47f1dc6afc1c2debc1a9eb0fc6ff9d149530d2b")
+}
+
+func (SelfFundedPingPongTokensWithdrawnByOwner) Topic() common.Hash {
+	return common.HexToHash("0x6832d9be2410a86571981e1e60fd4c1f9ea2a1034d6102a2b7d6c5e480adf02e")
+}
+
 func (_SelfFundedPingPong *SelfFundedPingPong) Address() common.Address {
 	return _SelfFundedPingPong.address
 }
@@ -1296,31 +3266,47 @@ type SelfFundedPingPongInterface interface {
 
 	GetCounterpartChainSelector(opts *bind.CallOpts) (uint64, error)
 
-	GetFeeToken(opts *bind.CallOpts) (common.Address, error)
+	GetMessageContents(opts *bind.CallOpts, messageId [32]byte) (ClientAny2EVMMessage, error)
 
 	GetRouter(opts *bind.CallOpts) (common.Address, error)
+
+	IsApprovedSender(opts *bind.CallOpts, sourceChainSelector uint64, senderAddr []byte) (bool, error)
+
+	IsFailedMessage(opts *bind.CallOpts, messageId [32]byte) (bool, error)
 
 	IsPaused(opts *bind.CallOpts) (bool, error)
 
 	Owner(opts *bind.CallOpts) (common.Address, error)
 
-	SupportsInterface(opts *bind.CallOpts, interfaceId [4]byte) (bool, error)
+	SChainConfigs(opts *bind.CallOpts, destChainSelector uint64) (SChainConfigs,
+
+		error)
+
+	SFeeToken(opts *bind.CallOpts) (common.Address, error)
+
+	SShouldUsePreFunding(opts *bind.CallOpts) (bool, error)
 
 	TypeAndVersion(opts *bind.CallOpts) (string, error)
 
+	AbandonFailedMessage(opts *bind.TransactOpts, messageId [32]byte, receiver common.Address) (*types.Transaction, error)
+
 	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
+
+	ApplyChainUpdates(opts *bind.TransactOpts, chains []CCIPBaseChainUpdate) (*types.Transaction, error)
 
 	CcipReceive(opts *bind.TransactOpts, message ClientAny2EVMMessage) (*types.Transaction, error)
 
+	CcipSend(opts *bind.TransactOpts, destChainSelector uint64, tokenAmounts []ClientEVMTokenAmount, data []byte) (*types.Transaction, error)
+
 	FundPingPong(opts *bind.TransactOpts, pingPongCount *big.Int) (*types.Transaction, error)
+
+	ProcessMessage(opts *bind.TransactOpts, message ClientAny2EVMMessage) (*types.Transaction, error)
+
+	RetryFailedMessage(opts *bind.TransactOpts, messageId [32]byte) (*types.Transaction, error)
 
 	SetCountIncrBeforeFunding(opts *bind.TransactOpts, countIncrBeforeFunding uint8) (*types.Transaction, error)
 
 	SetCounterpart(opts *bind.TransactOpts, counterpartChainSelector uint64, counterpartAddress common.Address) (*types.Transaction, error)
-
-	SetCounterpartAddress(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error)
-
-	SetCounterpartChainSelector(opts *bind.TransactOpts, chainSelector uint64) (*types.Transaction, error)
 
 	SetPaused(opts *bind.TransactOpts, pause bool) (*types.Transaction, error)
 
@@ -1328,17 +3314,95 @@ type SelfFundedPingPongInterface interface {
 
 	TransferOwnership(opts *bind.TransactOpts, to common.Address) (*types.Transaction, error)
 
+	UpdateApprovedSenders(opts *bind.TransactOpts, adds []CCIPBaseApprovedSenderUpdate, removes []CCIPBaseApprovedSenderUpdate) (*types.Transaction, error)
+
+	UpdateFeeToken(opts *bind.TransactOpts, token common.Address) (*types.Transaction, error)
+
+	UpdatePreFundingStatus(opts *bind.TransactOpts, usePreFunding bool) (*types.Transaction, error)
+
+	UpdateRouter(opts *bind.TransactOpts, newRouter common.Address) (*types.Transaction, error)
+
+	WithdrawTokens(opts *bind.TransactOpts, token common.Address, to common.Address, amount *big.Int) (*types.Transaction, error)
+
+	Receive(opts *bind.TransactOpts) (*types.Transaction, error)
+
+	FilterApprovedSenderAdded(opts *bind.FilterOpts, destChainSelector []uint64, recipient [][]byte) (*SelfFundedPingPongApprovedSenderAddedIterator, error)
+
+	WatchApprovedSenderAdded(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongApprovedSenderAdded, destChainSelector []uint64, recipient [][]byte) (event.Subscription, error)
+
+	ParseApprovedSenderAdded(log types.Log) (*SelfFundedPingPongApprovedSenderAdded, error)
+
+	FilterApprovedSenderRemoved(opts *bind.FilterOpts, destChainSelector []uint64, recipient [][]byte) (*SelfFundedPingPongApprovedSenderRemovedIterator, error)
+
+	WatchApprovedSenderRemoved(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongApprovedSenderRemoved, destChainSelector []uint64, recipient [][]byte) (event.Subscription, error)
+
+	ParseApprovedSenderRemoved(log types.Log) (*SelfFundedPingPongApprovedSenderRemoved, error)
+
+	FilterCCIPRouterModified(opts *bind.FilterOpts, oldRouter []common.Address, newRouter []common.Address) (*SelfFundedPingPongCCIPRouterModifiedIterator, error)
+
+	WatchCCIPRouterModified(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongCCIPRouterModified, oldRouter []common.Address, newRouter []common.Address) (event.Subscription, error)
+
+	ParseCCIPRouterModified(log types.Log) (*SelfFundedPingPongCCIPRouterModified, error)
+
+	FilterChainAdded(opts *bind.FilterOpts, remoteChainSelector []uint64, recipient [][]byte) (*SelfFundedPingPongChainAddedIterator, error)
+
+	WatchChainAdded(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongChainAdded, remoteChainSelector []uint64, recipient [][]byte) (event.Subscription, error)
+
+	ParseChainAdded(log types.Log) (*SelfFundedPingPongChainAdded, error)
+
+	FilterChainRemoved(opts *bind.FilterOpts, removeChainSelector []uint64) (*SelfFundedPingPongChainRemovedIterator, error)
+
+	WatchChainRemoved(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongChainRemoved, removeChainSelector []uint64) (event.Subscription, error)
+
+	ParseChainRemoved(log types.Log) (*SelfFundedPingPongChainRemoved, error)
+
 	FilterCountIncrBeforeFundingSet(opts *bind.FilterOpts) (*SelfFundedPingPongCountIncrBeforeFundingSetIterator, error)
 
 	WatchCountIncrBeforeFundingSet(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongCountIncrBeforeFundingSet) (event.Subscription, error)
 
 	ParseCountIncrBeforeFundingSet(log types.Log) (*SelfFundedPingPongCountIncrBeforeFundingSet, error)
 
+	FilterFeeTokenUpdated(opts *bind.FilterOpts) (*SelfFundedPingPongFeeTokenUpdatedIterator, error)
+
+	WatchFeeTokenUpdated(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongFeeTokenUpdated) (event.Subscription, error)
+
+	ParseFeeTokenUpdated(log types.Log) (*SelfFundedPingPongFeeTokenUpdated, error)
+
 	FilterFunded(opts *bind.FilterOpts) (*SelfFundedPingPongFundedIterator, error)
 
 	WatchFunded(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongFunded) (event.Subscription, error)
 
 	ParseFunded(log types.Log) (*SelfFundedPingPongFunded, error)
+
+	FilterMessageAbandoned(opts *bind.FilterOpts, messageId [][32]byte) (*SelfFundedPingPongMessageAbandonedIterator, error)
+
+	WatchMessageAbandoned(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongMessageAbandoned, messageId [][32]byte) (event.Subscription, error)
+
+	ParseMessageAbandoned(log types.Log) (*SelfFundedPingPongMessageAbandoned, error)
+
+	FilterMessageFailed(opts *bind.FilterOpts, messageId [][32]byte) (*SelfFundedPingPongMessageFailedIterator, error)
+
+	WatchMessageFailed(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongMessageFailed, messageId [][32]byte) (event.Subscription, error)
+
+	ParseMessageFailed(log types.Log) (*SelfFundedPingPongMessageFailed, error)
+
+	FilterMessageRecovered(opts *bind.FilterOpts, messageId [][32]byte) (*SelfFundedPingPongMessageRecoveredIterator, error)
+
+	WatchMessageRecovered(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongMessageRecovered, messageId [][32]byte) (event.Subscription, error)
+
+	ParseMessageRecovered(log types.Log) (*SelfFundedPingPongMessageRecovered, error)
+
+	FilterMessageSent(opts *bind.FilterOpts) (*SelfFundedPingPongMessageSentIterator, error)
+
+	WatchMessageSent(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongMessageSent) (event.Subscription, error)
+
+	ParseMessageSent(log types.Log) (*SelfFundedPingPongMessageSent, error)
+
+	FilterMessageSucceeded(opts *bind.FilterOpts, messageId [][32]byte) (*SelfFundedPingPongMessageSucceededIterator, error)
+
+	WatchMessageSucceeded(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongMessageSucceeded, messageId [][32]byte) (event.Subscription, error)
+
+	ParseMessageSucceeded(log types.Log) (*SelfFundedPingPongMessageSucceeded, error)
 
 	FilterOwnershipTransferRequested(opts *bind.FilterOpts, from []common.Address, to []common.Address) (*SelfFundedPingPongOwnershipTransferRequestedIterator, error)
 
@@ -1363,6 +3427,18 @@ type SelfFundedPingPongInterface interface {
 	WatchPong(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongPong) (event.Subscription, error)
 
 	ParsePong(log types.Log) (*SelfFundedPingPongPong, error)
+
+	FilterPreFundingStateUpdated(opts *bind.FilterOpts) (*SelfFundedPingPongPreFundingStateUpdatedIterator, error)
+
+	WatchPreFundingStateUpdated(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongPreFundingStateUpdated) (event.Subscription, error)
+
+	ParsePreFundingStateUpdated(log types.Log) (*SelfFundedPingPongPreFundingStateUpdated, error)
+
+	FilterTokensWithdrawnByOwner(opts *bind.FilterOpts, token []common.Address, to []common.Address) (*SelfFundedPingPongTokensWithdrawnByOwnerIterator, error)
+
+	WatchTokensWithdrawnByOwner(opts *bind.WatchOpts, sink chan<- *SelfFundedPingPongTokensWithdrawnByOwner, token []common.Address, to []common.Address) (event.Subscription, error)
+
+	ParseTokensWithdrawnByOwner(log types.Log) (*SelfFundedPingPongTokensWithdrawnByOwner, error)
 
 	ParseLog(log types.Log) (generated.AbigenLog, error)
 
