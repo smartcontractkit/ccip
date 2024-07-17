@@ -975,8 +975,6 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter query.KeyFilter, limitA
 		return nil, err
 	}
 
-	o.lggr.Infow("TEST: log poller query from chain reader", "query", qs, "args", args, "key", filter.Key)
-
 	values, err := args.toArgs()
 	if err != nil {
 		return nil, err

@@ -76,10 +76,6 @@ func TestHomeChainReader(t *testing.T) {
 	require.NoError(t, err)
 	delete(expectedChainConfigs, cciptypes.ChainSelector(integrationhelpers.ChainC))
 	require.Equal(t, expectedChainConfigs, configs)
-	//================================Close HomeChain Reader===============================
-	//require.NoError(t, homeChain.Close())
-	//require.NoError(t, uni.LogPoller.Close())
-	t.Logf("homchain reader successfully closed")
 }
 
 func toPeerIDs(readers [][32]byte) mapset.Set[libocrtypes.PeerID] {

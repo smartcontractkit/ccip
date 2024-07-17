@@ -251,8 +251,8 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		)
 
 		capabilityRegistrySyncer.AddLauncher(wfLauncher)
-		srvcs = append(srvcs, dispatcher, wfLauncher)
 		getLocalNode = wfLauncher.LocalNode
+		srvcs = append(srvcs, dispatcher, wfLauncher)
 	}
 
 	// LOOPs can be created as options, in the  case of LOOP relayers, or
