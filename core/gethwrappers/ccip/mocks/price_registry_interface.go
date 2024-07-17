@@ -878,36 +878,6 @@ func (_m *PriceRegistryInterface) GetPremiumMultiplierWeiPerEth(opts *bind.CallO
 	return r0, r1
 }
 
-// GetStalenessThreshold provides a mock function with given fields: opts
-func (_m *PriceRegistryInterface) GetStalenessThreshold(opts *bind.CallOpts) (*big.Int, error) {
-	ret := _m.Called(opts)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetStalenessThreshold")
-	}
-
-	var r0 *big.Int
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) (*big.Int, error)); ok {
-		return rf(opts)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) *big.Int); ok {
-		r0 = rf(opts)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*big.Int)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
-		r1 = rf(opts)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetStaticConfig provides a mock function with given fields: opts
 func (_m *PriceRegistryInterface) GetStaticConfig(opts *bind.CallOpts) (price_registry.PriceRegistryStaticConfig, error) {
 	ret := _m.Called(opts)
