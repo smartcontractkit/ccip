@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"strconv"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -13,7 +12,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"go.uber.org/multierr"
 
-	chainselectors "github.com/smartcontractkit/chain-selectors"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -24,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
@@ -226,63 +223,4 @@ func UnregisterExecPluginLpFilters(srcProvider types.CCIPExecProvider, dstProvid
 // Only MessageIDs will be populated in the TxMeta.
 func ExecReportToEthTxMeta(ctx context.Context, typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
 	return factory.ExecReportToEthTxMeta(ctx, typ, ver)
-}
-
-type jobSpecParams struct {
-	pluginConfig  ccipconfig.ExecPluginJobSpecConfig
-	offRampConfig cciptypes.OffRampStaticConfig
-	offRampReader ccipdata.OffRampReader
-	sourceChain   legacyevm.Chain
-	destChain     legacyevm.Chain
-}
-
-func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, registerFilters bool) (*jobSpecParams, error) {
-	if jb.OCR2OracleSpec == nil {
-		return nil, fmt.Errorf("spec is nil")
-	}
-	spec := jb.OCR2OracleSpec
-	var pluginConfig ccipconfig.ExecPluginJobSpecConfig
-	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	destChain, _, err := ccipconfig.GetChainFromSpec(spec, chainSet)
-	if err != nil {
-		return nil, err
-	}
-
-	versionFinder := factory.NewEvmVersionFinder()
-	offRampAddress := ccipcalc.HexToAddress(spec.ContractID)
-	offRampReader, err := factory.NewOffRampReader(lggr, versionFinder, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), destChain.Config().EVM().GasEstimator().PriceMax().ToInt(), registerFilters)
-	if err != nil {
-		return nil, fmt.Errorf("create offRampReader: %w", err)
-	}
-
-	offRampConfig, err := offRampReader.GetStaticConfig(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("get offRamp static config: %w", err)
-	}
-
-	chainID, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	sourceChain, err := chainSet.Get(strconv.FormatUint(chainID, 10))
-	if err != nil {
-		return nil, fmt.Errorf("open source chain: %w", err)
-	}
-
-	return &jobSpecParams{
-		pluginConfig:  pluginConfig,
-		offRampConfig: offRampConfig,
-		offRampReader: offRampReader,
-		sourceChain:   sourceChain,
-		destChain:     destChain,
-	}, nil
-}
-
-func jobIDToString(id int32) string {
-	return fmt.Sprintf("job_%d", id)
 }
