@@ -105,7 +105,7 @@ func (_m *PriceRegistryInterface) ApplyAuthorizedCallerUpdates(opts *bind.Transa
 }
 
 // ApplyDestChainConfigUpdates provides a mock function with given fields: opts, destChainConfigArgs
-func (_m *PriceRegistryInterface) ApplyDestChainConfigUpdates(opts *bind.TransactOpts, destChainConfigArgs []price_registry.PriceRegistryDestChainDynamicConfigArgs) (*types.Transaction, error) {
+func (_m *PriceRegistryInterface) ApplyDestChainConfigUpdates(opts *bind.TransactOpts, destChainConfigArgs []price_registry.PriceRegistryDestChainConfigArgs) (*types.Transaction, error) {
 	ret := _m.Called(opts, destChainConfigArgs)
 
 	if len(ret) == 0 {
@@ -114,10 +114,10 @@ func (_m *PriceRegistryInterface) ApplyDestChainConfigUpdates(opts *bind.Transac
 
 	var r0 *types.Transaction
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []price_registry.PriceRegistryDestChainDynamicConfigArgs) (*types.Transaction, error)); ok {
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []price_registry.PriceRegistryDestChainConfigArgs) (*types.Transaction, error)); ok {
 		return rf(opts, destChainConfigArgs)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []price_registry.PriceRegistryDestChainDynamicConfigArgs) *types.Transaction); ok {
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []price_registry.PriceRegistryDestChainConfigArgs) *types.Transaction); ok {
 		r0 = rf(opts, destChainConfigArgs)
 	} else {
 		if ret.Get(0) != nil {
@@ -125,7 +125,7 @@ func (_m *PriceRegistryInterface) ApplyDestChainConfigUpdates(opts *bind.Transac
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []price_registry.PriceRegistryDestChainDynamicConfigArgs) error); ok {
+	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []price_registry.PriceRegistryDestChainConfigArgs) error); ok {
 		r1 = rf(opts, destChainConfigArgs)
 	} else {
 		r1 = ret.Error(1)
@@ -344,24 +344,24 @@ func (_m *PriceRegistryInterface) FilterDestChainAdded(opts *bind.FilterOpts, de
 	return r0, r1
 }
 
-// FilterDestChainDynamicConfigUpdated provides a mock function with given fields: opts, destChainSelector
-func (_m *PriceRegistryInterface) FilterDestChainDynamicConfigUpdated(opts *bind.FilterOpts, destChainSelector []uint64) (*price_registry.PriceRegistryDestChainDynamicConfigUpdatedIterator, error) {
+// FilterDestChainConfigUpdated provides a mock function with given fields: opts, destChainSelector
+func (_m *PriceRegistryInterface) FilterDestChainConfigUpdated(opts *bind.FilterOpts, destChainSelector []uint64) (*price_registry.PriceRegistryDestChainConfigUpdatedIterator, error) {
 	ret := _m.Called(opts, destChainSelector)
 
 	if len(ret) == 0 {
-		panic("no return value specified for FilterDestChainDynamicConfigUpdated")
+		panic("no return value specified for FilterDestChainConfigUpdated")
 	}
 
-	var r0 *price_registry.PriceRegistryDestChainDynamicConfigUpdatedIterator
+	var r0 *price_registry.PriceRegistryDestChainConfigUpdatedIterator
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []uint64) (*price_registry.PriceRegistryDestChainDynamicConfigUpdatedIterator, error)); ok {
+	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []uint64) (*price_registry.PriceRegistryDestChainConfigUpdatedIterator, error)); ok {
 		return rf(opts, destChainSelector)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []uint64) *price_registry.PriceRegistryDestChainDynamicConfigUpdatedIterator); ok {
+	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []uint64) *price_registry.PriceRegistryDestChainConfigUpdatedIterator); ok {
 		r0 = rf(opts, destChainSelector)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*price_registry.PriceRegistryDestChainDynamicConfigUpdatedIterator)
+			r0 = ret.Get(0).(*price_registry.PriceRegistryDestChainConfigUpdatedIterator)
 		}
 	}
 
@@ -764,23 +764,23 @@ func (_m *PriceRegistryInterface) GetAllAuthorizedCallers(opts *bind.CallOpts) (
 	return r0, r1
 }
 
-// GetDestChainDynamicConfig provides a mock function with given fields: opts, destChainSelector
-func (_m *PriceRegistryInterface) GetDestChainDynamicConfig(opts *bind.CallOpts, destChainSelector uint64) (price_registry.PriceRegistryDestChainDynamicConfig, error) {
+// GetDestChainConfig provides a mock function with given fields: opts, destChainSelector
+func (_m *PriceRegistryInterface) GetDestChainConfig(opts *bind.CallOpts, destChainSelector uint64) (price_registry.PriceRegistryDestChainConfig, error) {
 	ret := _m.Called(opts, destChainSelector)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetDestChainDynamicConfig")
+		panic("no return value specified for GetDestChainConfig")
 	}
 
-	var r0 price_registry.PriceRegistryDestChainDynamicConfig
+	var r0 price_registry.PriceRegistryDestChainConfig
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, uint64) (price_registry.PriceRegistryDestChainDynamicConfig, error)); ok {
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, uint64) (price_registry.PriceRegistryDestChainConfig, error)); ok {
 		return rf(opts, destChainSelector)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, uint64) price_registry.PriceRegistryDestChainDynamicConfig); ok {
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, uint64) price_registry.PriceRegistryDestChainConfig); ok {
 		r0 = rf(opts, destChainSelector)
 	} else {
-		r0 = ret.Get(0).(price_registry.PriceRegistryDestChainDynamicConfig)
+		r0 = ret.Get(0).(price_registry.PriceRegistryDestChainConfig)
 	}
 
 	if rf, ok := ret.Get(1).(func(*bind.CallOpts, uint64) error); ok {
@@ -1256,24 +1256,24 @@ func (_m *PriceRegistryInterface) ParseDestChainAdded(log types.Log) (*price_reg
 	return r0, r1
 }
 
-// ParseDestChainDynamicConfigUpdated provides a mock function with given fields: log
-func (_m *PriceRegistryInterface) ParseDestChainDynamicConfigUpdated(log types.Log) (*price_registry.PriceRegistryDestChainDynamicConfigUpdated, error) {
+// ParseDestChainConfigUpdated provides a mock function with given fields: log
+func (_m *PriceRegistryInterface) ParseDestChainConfigUpdated(log types.Log) (*price_registry.PriceRegistryDestChainConfigUpdated, error) {
 	ret := _m.Called(log)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ParseDestChainDynamicConfigUpdated")
+		panic("no return value specified for ParseDestChainConfigUpdated")
 	}
 
-	var r0 *price_registry.PriceRegistryDestChainDynamicConfigUpdated
+	var r0 *price_registry.PriceRegistryDestChainConfigUpdated
 	var r1 error
-	if rf, ok := ret.Get(0).(func(types.Log) (*price_registry.PriceRegistryDestChainDynamicConfigUpdated, error)); ok {
+	if rf, ok := ret.Get(0).(func(types.Log) (*price_registry.PriceRegistryDestChainConfigUpdated, error)); ok {
 		return rf(log)
 	}
-	if rf, ok := ret.Get(0).(func(types.Log) *price_registry.PriceRegistryDestChainDynamicConfigUpdated); ok {
+	if rf, ok := ret.Get(0).(func(types.Log) *price_registry.PriceRegistryDestChainConfigUpdated); ok {
 		r0 = rf(log)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*price_registry.PriceRegistryDestChainDynamicConfigUpdated)
+			r0 = ret.Get(0).(*price_registry.PriceRegistryDestChainConfigUpdated)
 		}
 	}
 
@@ -1884,20 +1884,20 @@ func (_m *PriceRegistryInterface) WatchDestChainAdded(opts *bind.WatchOpts, sink
 	return r0, r1
 }
 
-// WatchDestChainDynamicConfigUpdated provides a mock function with given fields: opts, sink, destChainSelector
-func (_m *PriceRegistryInterface) WatchDestChainDynamicConfigUpdated(opts *bind.WatchOpts, sink chan<- *price_registry.PriceRegistryDestChainDynamicConfigUpdated, destChainSelector []uint64) (event.Subscription, error) {
+// WatchDestChainConfigUpdated provides a mock function with given fields: opts, sink, destChainSelector
+func (_m *PriceRegistryInterface) WatchDestChainConfigUpdated(opts *bind.WatchOpts, sink chan<- *price_registry.PriceRegistryDestChainConfigUpdated, destChainSelector []uint64) (event.Subscription, error) {
 	ret := _m.Called(opts, sink, destChainSelector)
 
 	if len(ret) == 0 {
-		panic("no return value specified for WatchDestChainDynamicConfigUpdated")
+		panic("no return value specified for WatchDestChainConfigUpdated")
 	}
 
 	var r0 event.Subscription
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryDestChainDynamicConfigUpdated, []uint64) (event.Subscription, error)); ok {
+	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryDestChainConfigUpdated, []uint64) (event.Subscription, error)); ok {
 		return rf(opts, sink, destChainSelector)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryDestChainDynamicConfigUpdated, []uint64) event.Subscription); ok {
+	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryDestChainConfigUpdated, []uint64) event.Subscription); ok {
 		r0 = rf(opts, sink, destChainSelector)
 	} else {
 		if ret.Get(0) != nil {
@@ -1905,7 +1905,7 @@ func (_m *PriceRegistryInterface) WatchDestChainDynamicConfigUpdated(opts *bind.
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryDestChainDynamicConfigUpdated, []uint64) error); ok {
+	if rf, ok := ret.Get(1).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryDestChainConfigUpdated, []uint64) error); ok {
 		r1 = rf(opts, sink, destChainSelector)
 	} else {
 		r1 = ret.Error(1)

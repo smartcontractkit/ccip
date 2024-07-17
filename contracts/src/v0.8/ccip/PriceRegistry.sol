@@ -448,7 +448,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     Client.EVM2AnyMessage calldata message
   ) external view returns (uint256 feeTokenAmount) {
     // Verify that the config is present (a 0 family chain selector impleis an unconfigured dest chain)
-    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+    DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
 
     if (!destChainConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
 
