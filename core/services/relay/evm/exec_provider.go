@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/usdc"
 )
 
@@ -42,7 +43,7 @@ type SrcExecProvider struct {
 	usdcAttestationAPIIntervalMilliseconds int
 	usdcSrcMsgTransmitterAddr              common.Address
 
-	feeEstimatorConfig types.FeeEstimatorConfigProvider
+	feeEstimatorConfig estimatorconfig.FeeEstimatorConfigProvider
 
 	// these values are nil and are updated for Close()
 	seenOnRampAddress       *cciptypes.Address
@@ -63,7 +64,7 @@ func NewSrcExecProvider(
 	usdcAttestationAPITimeoutSeconds int,
 	usdcAttestationAPIIntervalMilliseconds int,
 	usdcSrcMsgTransmitterAddr common.Address,
-	feeEstimatorConfig types.FeeEstimatorConfigProvider,
+	feeEstimatorConfig estimatorconfig.FeeEstimatorConfigProvider,
 ) (commontypes.CCIPExecProvider, error) {
 	var usdcReader *ccip.USDCReaderImpl
 	var err error
@@ -246,7 +247,7 @@ type DstExecProvider struct {
 	configWatcher       *configWatcher
 	gasEstimator        gas.EvmFeeEstimator
 	maxGasPrice         big.Int
-	feeEstimatorConfig  types.FeeEstimatorConfigProvider
+	feeEstimatorConfig  estimatorconfig.FeeEstimatorConfigProvider
 	txm                 txmgr.TxManager
 	offRampAddress      cciptypes.Address
 
@@ -264,7 +265,7 @@ func NewDstExecProvider(
 	configWatcher *configWatcher,
 	gasEstimator gas.EvmFeeEstimator,
 	maxGasPrice big.Int,
-	feeEstimatorConfig types.FeeEstimatorConfigProvider,
+	feeEstimatorConfig estimatorconfig.FeeEstimatorConfigProvider,
 	txm txmgr.TxManager,
 	offRampAddress cciptypes.Address,
 ) (commontypes.CCIPExecProvider, error) {

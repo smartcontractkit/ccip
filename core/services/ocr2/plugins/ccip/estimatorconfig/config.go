@@ -7,6 +7,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 )
 
+type FeeEstimatorConfigProvider interface {
+	SetOnRampReader(reader ccip.OnRampReader)
+	GetDataAvailabilityConfig(ctx context.Context) (destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64, err error)
+}
+
 type FeeEstimatorConfigService struct {
 	onRampReader ccip.OnRampReader
 }

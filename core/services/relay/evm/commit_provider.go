@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
 )
 
 var _ commontypes.CCIPCommitProvider = (*SrcCommitProvider)(nil)
@@ -32,7 +33,7 @@ type SrcCommitProvider struct {
 	lp          logpoller.LogPoller
 	estimator   gas.EvmFeeEstimator
 	maxGasPrice *big.Int
-	feeEstimatorConfig types.FeeEstimatorConfigProvider
+	feeEstimatorConfig estimatorconfig.FeeEstimatorConfigProvider
 
 	// these values will be lazily initialized
 	seenOnRampAddress       *cciptypes.Address
@@ -47,7 +48,7 @@ func NewSrcCommitProvider(
 	lp logpoller.LogPoller,
 	srcEstimator gas.EvmFeeEstimator,
 	maxGasPrice *big.Int,
-	feeEstimatorConfig types.FeeEstimatorConfigProvider,
+	feeEstimatorConfig estimatorconfig.FeeEstimatorConfigProvider,
 ) commontypes.CCIPCommitProvider {
 	return &SrcCommitProvider{
 		lggr:               lggr,
@@ -70,7 +71,7 @@ type DstCommitProvider struct {
 	configWatcher       *configWatcher
 	gasEstimator        gas.EvmFeeEstimator
 	maxGasPrice         big.Int
-	feeEstimatorConfig  types.FeeEstimatorConfigProvider
+	feeEstimatorConfig  estimatorconfig.FeeEstimatorConfigProvider
 
 	// these values will be lazily initialized
 	seenCommitStoreAddress *cciptypes.Address
@@ -87,7 +88,7 @@ func NewDstCommitProvider(
 	maxGasPrice big.Int,
 	contractTransmitter contractTransmitter,
 	configWatcher *configWatcher,
-	feeEstimatorConfig types.FeeEstimatorConfigProvider,
+	feeEstimatorConfig estimatorconfig.FeeEstimatorConfigProvider,
 ) commontypes.CCIPCommitProvider {
 	return &DstCommitProvider{
 		lggr:                lggr,
