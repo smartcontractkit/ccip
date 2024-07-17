@@ -21,6 +21,8 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
   using RateLimiter for RateLimiter.TokenBucket;
   using USDPriceWith18Decimals for uint224;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToBytes32Map;
+  using EnumerableMapAddresses for EnumerableMapAddresses.AddressToBytesMap;
+
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error PriceNotFoundForToken(address token);
@@ -28,7 +30,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
 
   event RateLimiterConfigUpdated(uint64 indexed remoteChainSelector, bool isOutboundLane, RateLimiter.Config config);
   event PriceRegistrySet(address newPriceRegistry);
-  event TokenAggregateRateLimitAdded(uint64 remoteChainSelector, bytes32 remoteToken, address localToken);
+  event TokenAggregateRateLimitAdded(uint64 remoteChainSelector, bytes remoteToken, address localToken);
   event TokenAggregateRateLimitRemoved(uint64 remoteChainSelector, address localToken);
 
   /// @notice RemoteRateLimitToken struct containing the local token address with the chain selector
@@ -41,7 +43,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
   /// @notice RateLimitToken struct containing both the local and remote token addresses
   struct RateLimitTokenArgs {
     LocalRateLimitToken localTokenArgs; // Local token update args scoped to one remote chain
-    bytes32 remoteToken; // Token on the remote chain (for OnRamp - dest, of OffRamp - source)
+    bytes remoteToken; // Token on the remote chain (for OnRamp - dest, of OffRamp - source)
   }
 
   /// @notice Update args for a single rate limiter config update
@@ -59,7 +61,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
 
   /// @dev Tokens that should be included in Aggregate Rate Limiting (from local chain (this chain) -> remote),
   /// grouped per-remote chain.
-  mapping(uint64 remoteChainSelector => EnumerableMapAddresses.AddressToBytes32Map tokensLocalToRemote) internal
+  mapping(uint64 remoteChainSelector => EnumerableMapAddresses.AddressToBytesMap tokensLocalToRemote) internal
     s_rateLimitedTokensLocalToRemote;
 
   /// @notice The address of the PriceRegistry used to query token values for ratelimiting
@@ -198,15 +200,15 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
   function getAllRateLimitTokens(uint64 remoteChainSelector)
     external
     view
-    returns (address[] memory localTokens, bytes32[] memory remoteTokens)
+    returns (address[] memory localTokens, bytes[] memory remoteTokens)
   {
     uint256 tokenCount = s_rateLimitedTokensLocalToRemote[remoteChainSelector].length();
 
     localTokens = new address[](tokenCount);
-    remoteTokens = new bytes32[](tokenCount);
+    remoteTokens = new bytes[](tokenCount);
 
     for (uint256 i = 0; i < tokenCount; ++i) {
-      (address localToken, bytes32 remoteToken) = s_rateLimitedTokensLocalToRemote[remoteChainSelector].at(i);
+      (address localToken, bytes memory remoteToken) = s_rateLimitedTokensLocalToRemote[remoteChainSelector].at(i);
       localTokens[i] = localToken;
       remoteTokens[i] = remoteToken;
     }
@@ -231,10 +233,10 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
 
     for (uint256 i = 0; i < adds.length; ++i) {
       LocalRateLimitToken memory localTokenArgs = adds[i].localTokenArgs;
-      bytes32 remoteToken = adds[i].remoteToken;
+      bytes memory remoteToken = adds[i].remoteToken;
       address localToken = localTokenArgs.localToken;
 
-      if (localToken == address(0) || remoteToken == bytes32("")) {
+      if (localToken == address(0) || keccak256(abi.encodePacked(remoteToken)) == keccak256(abi.encodePacked(address(0)))) {
         revert ZeroAddressNotAllowed();
       }
 

@@ -482,14 +482,14 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
         remoteChainSelector: CHAIN_SELECTOR_1,
         localToken: s_destTokens[0]
       }),
-      remoteToken: bytes32(bytes20(s_sourceTokens[0]))
+      remoteToken: abi.encodePacked(s_sourceTokens[0])
     });
     adds[1] = MultiAggregateRateLimiter.RateLimitTokenArgs({
       localTokenArgs: MultiAggregateRateLimiter.LocalRateLimitToken({
         remoteChainSelector: CHAIN_SELECTOR_1,
         localToken: s_destTokens[1]
       }),
-      remoteToken: bytes32(bytes20(s_sourceTokens[1]))
+      remoteToken: abi.encodePacked(s_sourceTokens[1])
     });
 
     for (uint256 i = 0; i < adds.length; ++i) {
@@ -501,7 +501,7 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
 
     s_rateLimiter.updateRateLimitTokens(new MultiAggregateRateLimiter.LocalRateLimitToken[](0), adds);
 
-    (address[] memory localTokens, bytes32[] memory remoteTokens) =
+    (address[] memory localTokens, bytes[] memory remoteTokens) =
       s_rateLimiter.getAllRateLimitTokens(CHAIN_SELECTOR_1);
 
     assertEq(localTokens.length, adds.length);
@@ -520,14 +520,14 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
         remoteChainSelector: CHAIN_SELECTOR_1,
         localToken: s_destTokens[0]
       }),
-      remoteToken: bytes32(bytes20(s_sourceTokens[0]))
+      remoteToken: abi.encodePacked(s_sourceTokens[0])
     });
     adds[1] = MultiAggregateRateLimiter.RateLimitTokenArgs({
       localTokenArgs: MultiAggregateRateLimiter.LocalRateLimitToken({
         remoteChainSelector: CHAIN_SELECTOR_2,
         localToken: s_destTokens[1]
       }),
-      remoteToken: bytes32(bytes20(s_sourceTokens[1]))
+      remoteToken: abi.encodePacked(s_sourceTokens[1])
     });
 
     for (uint256 i = 0; i < adds.length; ++i) {
@@ -539,7 +539,7 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
 
     s_rateLimiter.updateRateLimitTokens(new MultiAggregateRateLimiter.LocalRateLimitToken[](0), adds);
 
-    (address[] memory localTokensChain1, bytes32[] memory remoteTokensChain1) =
+    (address[] memory localTokensChain1, bytes[] memory remoteTokensChain1) =
       s_rateLimiter.getAllRateLimitTokens(CHAIN_SELECTOR_1);
 
     assertEq(localTokensChain1.length, 1);
@@ -547,7 +547,7 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
     assertEq(localTokensChain1[0], adds[0].localTokenArgs.localToken);
     assertEq(remoteTokensChain1[0], adds[0].remoteToken);
 
-    (address[] memory localTokensChain2, bytes32[] memory remoteTokensChain2) =
+    (address[] memory localTokensChain2, bytes[] memory remoteTokensChain2) =
       s_rateLimiter.getAllRateLimitTokens(CHAIN_SELECTOR_2);
 
     assertEq(localTokensChain2.length, 1);
@@ -563,14 +563,14 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
         remoteChainSelector: CHAIN_SELECTOR_1,
         localToken: s_destTokens[0]
       }),
-      remoteToken: bytes32(bytes20(s_sourceTokens[0]))
+      remoteToken: abi.encodePacked(s_sourceTokens[0])
     });
     adds[1] = MultiAggregateRateLimiter.RateLimitTokenArgs({
       localTokenArgs: MultiAggregateRateLimiter.LocalRateLimitToken({
         remoteChainSelector: CHAIN_SELECTOR_1,
         localToken: s_destTokens[1]
       }),
-      remoteToken: bytes32(bytes20(s_sourceTokens[1]))
+      remoteToken: abi.encodePacked(s_sourceTokens[1])
     });
 
     MultiAggregateRateLimiter.LocalRateLimitToken[] memory removes =
@@ -593,7 +593,7 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
 
     s_rateLimiter.updateRateLimitTokens(removes, new MultiAggregateRateLimiter.RateLimitTokenArgs[](0));
 
-    (address[] memory localTokens, bytes32[] memory remoteTokens) =
+    (address[] memory localTokens, bytes[] memory remoteTokens) =
       s_rateLimiter.getAllRateLimitTokens(CHAIN_SELECTOR_1);
 
     assertEq(1, remoteTokens.length);
@@ -620,7 +620,7 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
     assertEq(logEntries.length, 0);
 
-    (address[] memory localTokens, bytes32[] memory remoteTokens) =
+    (address[] memory localTokens, bytes[] memory remoteTokens) =
       s_rateLimiter.getAllRateLimitTokens(CHAIN_SELECTOR_1);
 
     assertEq(localTokens.length, 0);
@@ -636,7 +636,7 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
         remoteChainSelector: CHAIN_SELECTOR_1,
         localToken: s_destTokens[0]
       }),
-      remoteToken: bytes32(bytes20(address(0)))
+      remoteToken: abi.encodePacked(address(0))
     });
 
     vm.expectRevert(AuthorizedCallers.ZeroAddressNotAllowed.selector);
@@ -650,7 +650,7 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
         remoteChainSelector: CHAIN_SELECTOR_1,
         localToken: address(0)
       }),
-      remoteToken: bytes32(bytes20(s_destTokens[0]))
+      remoteToken: abi.encodePacked(s_destTokens[0])
     });
 
     vm.expectRevert(AuthorizedCallers.ZeroAddressNotAllowed.selector);
@@ -681,7 +681,7 @@ contract MultiAggregateRateLimiter_onInboundMessage is MultiAggregateRateLimiter
           remoteChainSelector: CHAIN_SELECTOR_1,
           localToken: s_destTokens[i]
         }),
-        remoteToken: bytes32(bytes20(s_sourceTokens[i]))
+        remoteToken: abi.encodePacked(s_sourceTokens[i])
       });
 
       Internal.PriceUpdates memory priceUpdates =
@@ -771,7 +771,7 @@ contract MultiAggregateRateLimiter_onInboundMessage is MultiAggregateRateLimiter
           localToken: s_destTokens[i]
         }),
         // Create a remote token address that is different from CHAIN_SELECTOR_1
-        remoteToken: bytes32(uint256(uint160(s_sourceTokens[i])) + type(uint160).max + 1)
+        remoteToken: abi.encodePacked(uint256(uint160(s_sourceTokens[i])) + type(uint160).max + 1)
       });
     }
     s_rateLimiter.updateRateLimitTokens(new MultiAggregateRateLimiter.LocalRateLimitToken[](0), tokensToAdd);
@@ -819,9 +819,8 @@ contract MultiAggregateRateLimiter_onInboundMessage is MultiAggregateRateLimiter
         remoteChainSelector: CHAIN_SELECTOR_2,
         localToken: s_destTokens[0]
       }),
-      // Create a remote token address that is different from CHAIN_SELECTOR_1
-      remoteToken: bytes32(uint256(uint160(s_sourceTokens[0])) + type(uint160).max + 1)
-    });
+    // Create a remote token address that is different from CHAIN_SELECTOR_1
+    remoteToken: abi.encodePacked(uint256(uint160(s_sourceTokens[0])) + type(uint160).max + 1)    });
     s_rateLimiter.updateRateLimitTokens(new MultiAggregateRateLimiter.LocalRateLimitToken[](0), tokensToAdd);
 
     vm.startPrank(MOCK_OFFRAMP);
@@ -917,7 +916,7 @@ contract MultiAggregateRateLimiter_onOutboundMessage is MultiAggregateRateLimite
           remoteChainSelector: CHAIN_SELECTOR_1,
           localToken: s_sourceTokens[i]
         }),
-        remoteToken: bytes32(bytes20(s_destTokenBySourceToken[s_sourceTokens[i]]))
+        remoteToken: abi.encodePacked(bytes20(s_destTokenBySourceToken[s_sourceTokens[i]]))
       });
 
       Internal.PriceUpdates memory priceUpdates =
@@ -1005,7 +1004,7 @@ contract MultiAggregateRateLimiter_onOutboundMessage is MultiAggregateRateLimite
           localToken: s_sourceTokens[i]
         }),
         // Create a remote token address that is different from CHAIN_SELECTOR_1
-        remoteToken: bytes32(uint256(uint160(s_destTokenBySourceToken[s_sourceTokens[i]])) + type(uint160).max + 1)
+        remoteToken: abi.encodePacked(uint256(uint160(s_destTokenBySourceToken[s_sourceTokens[i]])) + type(uint160).max + 1)
       });
     }
     s_rateLimiter.updateRateLimitTokens(new MultiAggregateRateLimiter.LocalRateLimitToken[](0), tokensToAdd);
@@ -1054,7 +1053,7 @@ contract MultiAggregateRateLimiter_onOutboundMessage is MultiAggregateRateLimite
         localToken: s_sourceTokens[0]
       }),
       // Create a remote token address that is different from CHAIN_SELECTOR_1
-      remoteToken: bytes32(uint256(uint160(s_destTokenBySourceToken[s_sourceTokens[0]])) + type(uint160).max + 1)
+      remoteToken: abi.encodePacked(uint256(uint160(s_destTokenBySourceToken[s_sourceTokens[0]])) + type(uint160).max + 1)
     });
     s_rateLimiter.updateRateLimitTokens(new MultiAggregateRateLimiter.LocalRateLimitToken[](0), tokensToAdd);
 
