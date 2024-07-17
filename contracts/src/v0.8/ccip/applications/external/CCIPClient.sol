@@ -19,14 +19,13 @@ contract CCIPClient is CCIPReceiver {
 
   event MessageSent(bytes32 messageId);
   event FeeTokenUpdated(address oldFeeToken, address newFeeToken);
-  event PreFundingStateUpdated(bool usePreFunding);
 
-  bool public s_shouldUsePreFunding;
+  bool public immutable i_isPreFunded;
 
   /// @dev A check for the zero-address is not explicitly performed since it is included in the CCIPBase parent constructor
   constructor(address router, IERC20 feeToken, bool usePreFunding) CCIPReceiver(router) {
     s_feeToken = feeToken;
-    s_shouldUsePreFunding = usePreFunding;
+    i_isPreFunded = usePreFunding;
 
     if (address(feeToken) != address(0)) {
       IERC20(s_feeToken).safeApprove(s_ccipRouter, type(uint256).max);
@@ -54,11 +53,7 @@ contract CCIPClient is CCIPReceiver {
 
     uint256 fee = IRouterClient(s_ccipRouter).getFee(destChainSelector, message);
 
-    // To support pre-funding, if the contract already posesses enough tokens to pay the fee, then a transferFrom is
-    // not necessary. This branch must be performed before transfering tokens in tokenAmounts[], since in the case
-    // where tokenAmounts[] contains the fee token, then balanceOf may double count tokens improperly and cause
-    // unexpected behavior.
-    if ((address(s_feeToken) != address(0)) && (s_feeToken.balanceOf(address(this)) < fee)) {
+    if (!i_isPreFunded && address(s_feeToken) != address(0)) {
       IERC20(s_feeToken).safeTransferFrom(msg.sender, address(this), fee);
     }
 
@@ -98,11 +93,5 @@ contract CCIPClient is CCIPReceiver {
     }
 
     emit FeeTokenUpdated(oldFeeToken, token);
-  }
-
-  function updatePreFundingStatus(bool usePreFunding) external onlyOwner {
-    s_shouldUsePreFunding = usePreFunding;
-
-    emit PreFundingStateUpdated(usePreFunding);
   }
 }

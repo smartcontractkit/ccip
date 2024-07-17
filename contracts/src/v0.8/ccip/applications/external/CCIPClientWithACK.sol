@@ -18,12 +18,10 @@ contract CCIPClientWithACK is CCIPReceiverWithACK {
 
   error CannotAcknowledgeUnsentMessage(bytes32);
 
-  event PreFundingStateUpdated(bool usePreFunding);
-
-  bool public s_shouldUsePreFunding;
+  bool public immutable i_isPreFunded;
 
   constructor(address router, IERC20 feeToken, bool usePreFunding) CCIPReceiverWithACK(router, feeToken) {
-    s_shouldUsePreFunding = usePreFunding;
+    i_isPreFunded = usePreFunding;
   }
 
   /// @notice sends a message through CCIP to the router
@@ -58,7 +56,7 @@ contract CCIPClientWithACK is CCIPReceiverWithACK {
 
     uint256 fee = IRouterClient(s_ccipRouter).getFee(destChainSelector, message);
 
-    if (!s_shouldUsePreFunding) {
+    if (!i_isPreFunded && address(s_feeToken) != address(0)) {
       IERC20(s_feeToken).safeTransferFrom(msg.sender, address(this), fee);
     }
 
@@ -71,11 +69,5 @@ contract CCIPClientWithACK is CCIPReceiverWithACK {
     emit MessageSent(messageId, bytes32(0));
 
     return messageId;
-  }
-
-  function updatePreFundingStatus(bool usePreFunding) external onlyOwner {
-    s_shouldUsePreFunding = usePreFunding;
-
-    emit PreFundingStateUpdated(usePreFunding);
   }
 }
