@@ -127,28 +127,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     uint256 feeTokenAmount,
     address originalSender
   ) external returns (bytes32) {
-    // TODO: inline generateNewMessage
-    Internal.EVM2AnyRampMessage memory newMessage =
-      _generateNewMessage(destChainSelector, message, feeTokenAmount, originalSender);
-
-    // Emit message request
-    // This must happen after any pool events as some tokens (e.g. USDC) emit events that we expect to precede this
-    // event in the offchain code.
-    emit CCIPSendRequested(destChainSelector, newMessage);
-    return newMessage.header.messageId;
-  }
-
-  /// @notice Helper function to relieve stack pressure from `forwardFromRouter`
-  /// @param destChainSelector The destination chain selector
-  /// @param message Message struct to send
-  /// @param feeTokenAmount Amount of fee tokens for payment
-  /// @param originalSender The original initiator of the CCIP request
-  function _generateNewMessage(
-    uint64 destChainSelector,
-    Client.EVM2AnyMessage calldata message,
-    uint256 feeTokenAmount,
-    address originalSender
-  ) internal returns (Internal.EVM2AnyRampMessage memory) {
     // NOTE: assumes the message has already been validated through the getFee call
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
@@ -166,7 +144,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     // Validate the message with various checks
     uint256 numberOfTokens = message.tokenAmounts.length;
 
-    Internal.EVM2AnyRampMessage memory rampMessage = Internal.EVM2AnyRampMessage({
+    Internal.EVM2AnyRampMessage memory newMessage = Internal.EVM2AnyRampMessage({
       header: Internal.RampMessageHeader({
         // Should be generated after the message is complete
         messageId: "",
@@ -188,33 +166,37 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     // Lock the tokens as last step. TokenPools may not always be trusted.
     // There should be no state changes after external call to TokenPools.
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      rampMessage.tokenAmounts[i] =
+      newMessage.tokenAmounts[i] =
         _lockOrBurnSingleToken(message.tokenAmounts[i], destChainSelector, message.receiver, originalSender);
     }
 
     (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) =
-      IPriceRegistry(s_dynamicConfig.priceRegistry).getValidatedRampMessageParams(rampMessage, message.tokenAmounts);
+      IPriceRegistry(s_dynamicConfig.priceRegistry).getValidatedRampMessageParams(newMessage, message.tokenAmounts);
     emit FeePaid(message.feeToken, msgFeeJuels);
 
     if (!isOutOfOrderExecution) {
       // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
       // may block ordered message nonces, which is not what we want.
-      rampMessage.header.nonce =
+      newMessage.header.nonce =
         INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender);
     }
 
     // Override extraArgs with latest version
-    rampMessage.extraArgs = convertedExtraArgs;
+    newMessage.extraArgs = convertedExtraArgs;
 
     // Hash only after all fields have been set
-    rampMessage.header.messageId = Internal._hash(
-      rampMessage,
+    newMessage.header.messageId = Internal._hash(
+      newMessage,
       // Metadata hash preimage to ensure global uniqueness, ensuring 2 identical messages sent to 2 different
       // lanes will have a distinct hash.
       keccak256(abi.encode(Internal.EVM_2_ANY_MESSAGE_HASH, i_chainSelector, destChainSelector, address(this)))
     );
 
-    return rampMessage;
+    // Emit message request
+    // This must happen after any pool events as some tokens (e.g. USDC) emit events that we expect to precede this
+    // event in the offchain code.
+    emit CCIPSendRequested(destChainSelector, newMessage);
+    return newMessage.header.messageId;
   }
 
   /// @notice Uses a pool to lock or burn a token

@@ -39,7 +39,6 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   error ChainNotSupported(uint64 chain);
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
   error DataFeedValueOutOfUint224Range();
-  error NotAFeeToken(address token);
   error InvalidDestBytesOverhead(address token, uint32 destBytesOverhead);
   error MessageGasLimitTooHigh();
   error DestinationChainNotEnabled(uint64 destChainSelector);
@@ -458,9 +457,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
     uint64 premiumMultiplierWeiPerEth = s_premiumMultiplierWeiPerEth[message.feeToken];
 
-    // premiumMultiplierWeiPerEth should never be 0 so it can be used as an isEnabled flag
-    if (premiumMultiplierWeiPerEth == 0) revert NotAFeeToken(message.feeToken);
-
+    // The below call asserts that feeToken is a supported token
     (uint224 feeTokenPrice, uint224 packedGasPrice) = getTokenAndGasPrices(message.feeToken, destChainSelector);
 
     // Calculate premiumFee in USD with 18 decimals precision first.

@@ -506,41 +506,6 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     vm.expectRevert(abi.encodeWithSelector(PriceRegistry.SourceTokenDataTooLarge.selector, sourceETH));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
-
-  function test_InvalidEVMAddressDestToken_Revert() public {
-    address sourceETH = s_sourceTokens[1];
-    vm.stopPrank();
-    vm.startPrank(OWNER);
-
-    MaybeRevertingBurnMintTokenPool newPool = new MaybeRevertingBurnMintTokenPool(
-      BurnMintERC677(sourceETH), new address[](0), address(s_mockRMN), address(s_sourceRouter)
-    );
-    BurnMintERC677(sourceETH).grantMintAndBurnRoles(address(newPool));
-    deal(address(sourceETH), address(newPool), type(uint256).max);
-
-    // Add TokenPool to OnRamp
-    s_tokenAdminRegistry.setPool(sourceETH, address(newPool));
-
-    bytes memory nonEvmAddress = abi.encode(type(uint208).max);
-
-    // Allow chain in TokenPool
-    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
-    chainUpdates[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: DEST_CHAIN_SELECTOR,
-      remotePoolAddress: abi.encode(s_destTokenPool),
-      remoteTokenAddress: nonEvmAddress,
-      allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
-    });
-    newPool.applyChainUpdates(chainUpdates);
-
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(address(sourceETH), 1000);
-
-    vm.startPrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, nonEvmAddress));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
-  }
 }
 
 contract EVM2EVMMultiOnRamp_getSupportedTokens is EVM2EVMMultiOnRampSetup {
@@ -608,29 +573,6 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRampSetup {
     message.extraArgs = "";
 
     vm.expectRevert(PriceRegistry.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
-    s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
-  }
-
-  function test_Fuzz_EnforceOutOfOrder(bool enforce, bool allowOutOfOrderExecution) public {
-    // Update dynamic config to enforce allowOutOfOrderExecution = defaultVal.
-    vm.stopPrank();
-    vm.startPrank(OWNER);
-
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigArgs =
-      _generatePriceRegistryDestChainDynamicConfigArgs();
-    destChainConfigArgs[0].dynamicConfig.enforceOutOfOrder = enforce;
-    s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
-
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = abi.encodeWithSelector(
-      Client.EVM_EXTRA_ARGS_V2_TAG,
-      Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT * 2, allowOutOfOrderExecution: allowOutOfOrderExecution})
-    );
-
-    // If enforcement is on, only true should be allowed.
-    if (enforce && !allowOutOfOrderExecution) {
-      vm.expectRevert(PriceRegistry.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
-    }
     s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
   }
 }

@@ -30,8 +30,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
   MessageInterceptorHelper internal s_outboundMessageValidator;
   address[] internal s_offRamps;
   NonceManager internal s_outboundNonceManager;
-  address internal s_destTokenPool = makeAddr("destTokenPool");
-  address internal s_destToken = makeAddr("destToken");
 
   function setUp() public virtual override(TokenSetup, PriceRegistryFeeSetup) {
     TokenSetup.setUp();
@@ -90,59 +88,6 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
       s_metadataHash,
       s_tokenAdminRegistry
     );
-  }
-
-  function _messageToEvent(
-    Client.EVM2AnyMessage memory message,
-    uint64 sourceChainSelector,
-    uint64 destChainSelector,
-    uint64 seqNum,
-    uint64 nonce,
-    uint256 feeTokenAmount,
-    address originalSender,
-    bytes32 metadataHash,
-    TokenAdminRegistry tokenAdminRegistry
-  ) internal view returns (Internal.EVM2AnyRampMessage memory) {
-    Client.EVMExtraArgsV2 memory extraArgs =
-      s_priceRegistry.parseEVMExtraArgsFromBytes(message.extraArgs, destChainSelector);
-
-    Internal.EVM2AnyRampMessage memory messageEvent = Internal.EVM2AnyRampMessage({
-      header: Internal.RampMessageHeader({
-        messageId: "",
-        sourceChainSelector: sourceChainSelector,
-        destChainSelector: destChainSelector,
-        sequenceNumber: seqNum,
-        nonce: extraArgs.allowOutOfOrderExecution ? 0 : nonce
-      }),
-      sender: originalSender,
-      data: message.data,
-      receiver: message.receiver,
-      extraArgs: abi.encode(extraArgs),
-      feeToken: message.feeToken,
-      feeTokenAmount: feeTokenAmount,
-      tokenAmounts: new Internal.RampTokenAmount[](message.tokenAmounts.length)
-    });
-
-    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-      messageEvent.tokenAmounts[i] = _getSourceTokenData(message.tokenAmounts[i], tokenAdminRegistry);
-    }
-
-    messageEvent.header.messageId = Internal._hash(messageEvent, metadataHash);
-    return messageEvent;
-  }
-
-  function _getSourceTokenData(
-    Client.EVMTokenAmount memory tokenAmount,
-    TokenAdminRegistry tokenAdminRegistry
-  ) internal view returns (Internal.RampTokenAmount memory) {
-    address destToken = s_destTokenBySourceToken[tokenAmount.token];
-
-    return Internal.RampTokenAmount({
-      sourcePoolAddress: abi.encode(tokenAdminRegistry.getTokenConfig(tokenAmount.token).tokenPool),
-      destTokenAddress: abi.encode(destToken),
-      extraData: "",
-      amount: tokenAmount.amount
-    });
   }
 
   function _generateDynamicMultiOnRampConfig(
