@@ -37,7 +37,7 @@ func TestPingPong(t *testing.T) {
 			for logIter.Next() {
 			}
 			log := logIter.Event
-			require.Equal(t, otherChain, log.DestChainSelector)
+			require.Equal(t, getSelector(otherChain), log.DestChainSelector)
 			require.Equal(t, pingPong.Address(), log.Message.Sender)
 			chainPingPongAddr := pingPongs[otherChain][chainID].Address().Bytes()
 			// With chain agnostic addresses we need to pad the address to the correct length if the receiver is zero prefixed
