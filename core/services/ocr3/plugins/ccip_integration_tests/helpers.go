@@ -209,6 +209,24 @@ func createUniverses(
 	// Once we have all chains created and contracts deployed, we can set up the initial configurations and wire chains together
 	connectUniverses(t, universes)
 
+	// print out all contract addresses for debugging purposes
+	for chainID, uni := range universes {
+		t.Logf("Chain ID: %d\n Chain Selector: %d\n LinkToken: %s\n WETH: %s\n Router: %s\n RMNProxy: %s\n RMN: %s\n OnRamp: %s\n OffRamp: %s\n PriceRegistry: %s\n TokenAdminRegistry: %s\n NonceManager: %s\n",
+			chainID,
+			getSelector(chainID),
+			uni.linkToken.Address().Hex(),
+			uni.weth.Address().Hex(),
+			uni.router.Address().Hex(),
+			uni.rmnProxy.Address().Hex(),
+			uni.rmn.Address().Hex(),
+			uni.onramp.Address().Hex(),
+			uni.offramp.Address().Hex(),
+			uni.priceRegistry.Address().Hex(),
+			uni.tokenAdminRegistry.Address().Hex(),
+			uni.nonceManager.Address().Hex(),
+		)
+	}
+
 	return homeChainUniverse, universes
 }
 

@@ -138,6 +138,10 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		for otherChain, pingPong := range pingPongs[chainID] {
 			t.Log("PingPong From: ", chainID, " To: ", otherChain)
 
+			dcc, err := uni.onramp.GetDestChainConfig(&bind.CallOpts{}, getSelector(otherChain))
+			require.NoError(t, err)
+			prevSeqNr := dcc.SequenceNumber
+
 			uni.backend.Commit()
 
 			_, err2 := pingPong.StartPingPong(uni.owner)
@@ -165,6 +169,12 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 			// Receiver address is abi-encoded if destination is EVM.
 			paddedAddr := common.LeftPadBytes(chainPingPongAddr, len(log.Message.Receiver))
 			require.Equal(t, paddedAddr, log.Message.Receiver)
+
+			// check that sequence number is bumped in the onramp.
+			dcc, err = uni.onramp.GetDestChainConfig(&bind.CallOpts{}, log.DestChainSelector)
+			require.NoError(t, err)
+			require.Equalf(t, dcc.SequenceNumber, prevSeqNr+1, "sequence number not bumped for dest chain selector %d", log.DestChainSelector)
+
 			_, ok := messageIDs[chainID]
 			if !ok {
 				messageIDs[chainID] = make(map[uint64][32]byte)
@@ -178,6 +188,10 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		}
 		replayBlocks[chainID] = replayBlock
 	}
+
+	// HACK: wait for the oracles to come up.
+	// Need some data driven way to do this.
+	time.Sleep(30 * time.Second)
 
 	// replay the log poller on all the chains so that the logs are in the db.
 	// otherwise the plugins won't pick them up.

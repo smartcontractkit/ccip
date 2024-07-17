@@ -284,6 +284,8 @@ func (lp *logPoller) RegisterFilter(ctx context.Context, filter Filter) error {
 	if err := lp.orm.InsertFilter(ctx, filter); err != nil {
 		return pkgerrors.Wrap(err, "error inserting filter")
 	}
+	lp.lggr.Infow("registered filter", "filterName", filter.Name, "filter", filter)
+
 	lp.filters[filter.Name] = filter
 	lp.filterDirty = true
 	return nil

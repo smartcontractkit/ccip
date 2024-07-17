@@ -30,6 +30,7 @@ import (
 	v2toml "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
 	evmutils "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
+	configv2 "github.com/smartcontractkit/chainlink/v2/core/config/toml"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -87,6 +88,9 @@ func setupNodeOCR3(
 		c.OCR.DefaultTransactionQueueDepth = ptr(uint32(200))
 		c.OCR2.Enabled = ptr(true)
 		c.OCR2.ContractPollInterval = config.MustNewDuration(5 * time.Second)
+
+		c.Log.Level = ptr(configv2.LogLevel(zapcore.InfoLevel))
+		// c.Database.LogQueries = ptr(true)
 
 		var chains v2toml.EVMConfigs
 		for chainID := range universes {
