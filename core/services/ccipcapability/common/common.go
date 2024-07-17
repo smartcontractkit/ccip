@@ -26,7 +26,7 @@ func HashedCapabilityID(capabilityLabelledName, capabilityVersion string) (r [32
 func MustHashedCapabilityID(capabilityLabelledName, capabilityVersion string) [32]byte {
 	r, err := HashedCapabilityID(capabilityLabelledName, capabilityVersion)
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("failed to hash capability id (labelled name: %s, version: %s): %w", capabilityLabelledName, capabilityVersion, err))
 	}
 	return r
 }

@@ -40,13 +40,13 @@ func ChainWriterConfigRaw(fromAddress common.Address, maxGasPrice *assets.Wei) e
 					consts.MethodCommit: {
 						ChainSpecificName: mustGetMethodName("commit", offrampABI),
 						FromAddress:       fromAddress,
-						// TODO: probably need to fetch this from home chain config?
+						// TODO: inject this into the method, should be fetched from the OCR config.
 						GasLimit: 500_000,
 					},
 					consts.MethodExecute: {
 						ChainSpecificName: mustGetMethodName("execute", offrampABI),
 						FromAddress:       fromAddress,
-						// TODO: probably need to fetch this from home chain config?
+						// TODO: inject this into the method, should be fetched from the OCR config.
 						GasLimit: 6_500_000,
 					},
 				},
@@ -57,6 +57,7 @@ func ChainWriterConfigRaw(fromAddress common.Address, maxGasPrice *assets.Wei) e
 	}
 }
 
+// mustGetMethodName panics if the method name is not found in the provided ABI.
 func mustGetMethodName(name string, tabi abi.ABI) (methodName string) {
 	m, ok := tabi.Methods[name]
 	if !ok {
