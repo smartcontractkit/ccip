@@ -39,9 +39,8 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	)
 
 	ports := freeport.GetN(t, numNodes)
-	capabilitiesPorts := freeport.GetN(t, numNodes)
 	for i := 0; i < numNodes; i++ {
-		node := setupNodeOCR3(t, ports[i], capabilitiesPorts[i], bootstrappers, universes, homeChainUni)
+		node := setupNodeOCR3(t, ports[i], bootstrappers, universes, homeChainUni)
 
 		apps = append(apps, node.app)
 		for chainID, transmitter := range node.transmitters {
@@ -212,7 +211,7 @@ func waitForCommit(t *testing.T, uni onchainUniverse) {
 			if len(report.Report.MerkleRoots) > 0 {
 				t.Log("Received commit report with merkle roots")
 			} else {
-				t.Log("Received commit report without merkle roots")
+				t.Log("s")
 			}
 			return
 		}
