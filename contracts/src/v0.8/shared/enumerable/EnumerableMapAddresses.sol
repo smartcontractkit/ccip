@@ -154,8 +154,8 @@ library EnumerableMapAddresses {
    * @param value The value to set for the key
    * @return bool indicating whether the key was added to the map
    */
-  function set(AddressToBytesMap storage map, address key, bytes memory value) internal returns (bool) {
-    return map._inner.set(bytes32(uint256(uint160(key))), value);
+  function _set(AddressToBytesMap storage map, address key, bytes memory value) internal returns (bool) {
+    return map._inner._set(bytes32(uint256(uint160(key))), value);
   }
 
   /**
@@ -164,8 +164,8 @@ library EnumerableMapAddresses {
    * @param key The key to remove the value for
    * @return bool indicating whether the key was removed from the map
    */
-  function remove(AddressToBytesMap storage map, address key) internal returns (bool) {
-    return map._inner.remove(bytes32(uint256(uint160(key))));
+  function _remove(AddressToBytesMap storage map, address key) internal returns (bool) {
+    return map._inner._remove(bytes32(uint256(uint160(key))));
   }
 
   /**
@@ -174,8 +174,8 @@ library EnumerableMapAddresses {
    * @param key The key to check for presence in the map
    * @return bool indicating whether the key is in the map
    */
-  function contains(AddressToBytesMap storage map, address key) internal view returns (bool) {
-    return map._inner.contains(bytes32(uint256(uint160(key))));
+  function _contains(AddressToBytesMap storage map, address key) internal view returns (bool) {
+    return map._inner._contains(bytes32(uint256(uint160(key))));
   }
 
   /**
@@ -183,8 +183,8 @@ library EnumerableMapAddresses {
    * @param map The map to check the length of
    * @return uint256 indicating the number of elements in the map
    */
-  function length(AddressToBytesMap storage map) internal view returns (uint256) {
-    return map._inner.length();
+  function _length(AddressToBytesMap storage map) internal view returns (uint256) {
+    return map._inner._length();
   }
 
   /**
@@ -194,8 +194,8 @@ library EnumerableMapAddresses {
    * @return address The key of the element at the specified index
    * @return bytes The value of the element at the specified index
    */
-  function at(AddressToBytesMap storage map, uint256 index) internal view returns (address, bytes memory) {
-    (bytes32 key, bytes memory value) = map._inner.at(index);
+  function _at(AddressToBytesMap storage map, uint256 index) internal view returns (address, bytes memory) {
+    (bytes32 key, bytes memory value) = map._inner._at(index);
     return (address(uint160(uint256(key))), value);
   }
 
@@ -206,8 +206,8 @@ library EnumerableMapAddresses {
    * @return bool indicating whether the key was in the map
    * @return bytes The value associated with the key
    */
-  function tryGet(AddressToBytesMap storage map, address key) internal view returns (bool, bytes memory) {
-    return map._inner.tryGet(bytes32(uint256(uint160(key))));
+  function _tryGet(AddressToBytesMap storage map, address key) internal view returns (bool, bytes memory) {
+    return map._inner._tryGet(bytes32(uint256(uint160(key))));
   }
 
   /**
@@ -217,22 +217,7 @@ library EnumerableMapAddresses {
    * @return bytes The value associated with the key
    */
   // solhint-disable-next-line chainlink-solidity/prefix-internal-functions-with-underscore
-  function get(AddressToBytesMap storage map, address key) internal view returns (bytes memory) {
-    return map._inner.get(bytes32(uint256(uint160(key))));
-  }
-
-  /**
-   * @dev Returns the value associated with `key`. If the key is not in the map, it reverts with the provided `errorMessage`.
-   * @param map The map to retrieve the value from
-   * @param key The key to retrieve the value for
-   * @param errorMessage The error message to use if the key is not in the map
-   * @return bytes The value associated with the key
-   */
-  function get(
-    AddressToBytesMap storage map,
-    address key,
-    string memory errorMessage
-  ) internal view returns (bytes memory) {
-    return map._inner.get(bytes32(uint256(uint160(key))), errorMessage);
+  function _get(AddressToBytesMap storage map, address key) internal view returns (bytes memory) {
+    return map._inner._get(bytes32(uint256(uint160(key))));
   }
 }

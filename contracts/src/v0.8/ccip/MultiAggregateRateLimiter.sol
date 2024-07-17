@@ -104,7 +104,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
     if (tokenBucket.isEnabled) {
       uint256 value;
       for (uint256 i = 0; i < tokenAmounts.length; ++i) {
-        if (s_rateLimitedTokensLocalToRemote[remoteChainSelector].contains(tokenAmounts[i].token)) {
+        if (s_rateLimitedTokensLocalToRemote[remoteChainSelector]._contains(tokenAmounts[i].token)) {
           value += _getTokenValue(tokenAmounts[i]);
         }
       }
@@ -202,13 +202,13 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
     view
     returns (address[] memory localTokens, bytes[] memory remoteTokens)
   {
-    uint256 tokenCount = s_rateLimitedTokensLocalToRemote[remoteChainSelector].length();
+    uint256 tokenCount = s_rateLimitedTokensLocalToRemote[remoteChainSelector]._length();
 
     localTokens = new address[](tokenCount);
     remoteTokens = new bytes[](tokenCount);
 
     for (uint256 i = 0; i < tokenCount; ++i) {
-      (address localToken, bytes memory remoteToken) = s_rateLimitedTokensLocalToRemote[remoteChainSelector].at(i);
+      (address localToken, bytes memory remoteToken) = s_rateLimitedTokensLocalToRemote[remoteChainSelector]._at(i);
       localTokens[i] = localToken;
       remoteTokens[i] = remoteToken;
     }
@@ -226,7 +226,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
       address localToken = removes[i].localToken;
       uint64 remoteChainSelector = removes[i].remoteChainSelector;
 
-      if (s_rateLimitedTokensLocalToRemote[remoteChainSelector].remove(localToken)) {
+      if (s_rateLimitedTokensLocalToRemote[remoteChainSelector]._remove(localToken)) {
         emit TokenAggregateRateLimitRemoved(remoteChainSelector, localToken);
       }
     }
@@ -236,13 +236,15 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
       bytes memory remoteToken = adds[i].remoteToken;
       address localToken = localTokenArgs.localToken;
 
-      if (localToken == address(0) || keccak256(abi.encodePacked(remoteToken)) == keccak256(abi.encodePacked(address(0)))) {
+      if (
+        localToken == address(0) || keccak256(abi.encodePacked(remoteToken)) == keccak256(abi.encodePacked(address(0)))
+      ) {
         revert ZeroAddressNotAllowed();
       }
 
       uint64 remoteChainSelector = localTokenArgs.remoteChainSelector;
 
-      if (s_rateLimitedTokensLocalToRemote[remoteChainSelector].set(localToken, remoteToken)) {
+      if (s_rateLimitedTokensLocalToRemote[remoteChainSelector]._set(localToken, remoteToken)) {
         emit TokenAggregateRateLimitAdded(remoteChainSelector, remoteToken, localToken);
       }
     }
