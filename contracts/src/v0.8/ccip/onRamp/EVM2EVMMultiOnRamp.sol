@@ -163,15 +163,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       tokenAmounts: new Internal.RampTokenAmount[](numberOfTokens) // should be populated after generation
     });
 
-    // Lock the tokens as last step. TokenPools may not always be trusted.
-    // There should be no state changes after external call to TokenPools.
-    for (uint256 i = 0; i < numberOfTokens; ++i) {
-      newMessage.tokenAmounts[i] =
-        _lockOrBurnSingleToken(message.tokenAmounts[i], destChainSelector, message.receiver, originalSender);
-    }
-
     (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) =
-      IPriceRegistry(s_dynamicConfig.priceRegistry).getValidatedRampMessageParams(newMessage, message.tokenAmounts);
+      IPriceRegistry(s_dynamicConfig.priceRegistry).getValidatedRampMessageParams(newMessage);
     emit FeePaid(message.feeToken, msgFeeJuels);
 
     if (!isOutOfOrderExecution) {
@@ -180,6 +173,18 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       newMessage.header.nonce =
         INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender);
     }
+
+    // Lock the tokens as last step. TokenPools may not always be trusted.
+    // There should be no state changes after external call to TokenPools.
+    for (uint256 i = 0; i < numberOfTokens; ++i) {
+      newMessage.tokenAmounts[i] =
+        _lockOrBurnSingleToken(message.tokenAmounts[i], destChainSelector, message.receiver, originalSender);
+    }
+
+    // Validate pool return data after it is populated (view function - no state changes)
+    IPriceRegistry(s_dynamicConfig.priceRegistry).validatePoolReturnData(
+      destChainSelector, newMessage.tokenAmounts, message.tokenAmounts
+    );
 
     // Override extraArgs with latest version
     newMessage.extraArgs = convertedExtraArgs;

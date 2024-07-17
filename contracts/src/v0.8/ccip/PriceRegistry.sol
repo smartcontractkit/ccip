@@ -776,31 +776,11 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   }
 
   /// @inheritdoc IPriceRegistry
-  /// @dev precondition - message.tokenAmounts and sourceTokenAmounts lengths must be equal
-  function getValidatedRampMessageParams(
-    Internal.EVM2AnyRampMessage calldata message,
-    Client.EVMTokenAmount[] calldata sourceTokenAmounts
-  ) external view returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) {
-    uint64 destChainSelector = message.header.destChainSelector;
-    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
-
-    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-      address sourceToken = sourceTokenAmounts[i].token;
-
-      // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the
-      // extraData. This prevents gas bomb attacks on the NOPs. As destBytesOverhead accounts for both
-      // extraData and offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
-      uint256 destPoolDataLength = message.tokenAmounts[i].extraData.length;
-      if (
-        destPoolDataLength > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
-          && destPoolDataLength > s_tokenTransferFeeConfig[destChainSelector][sourceToken].destBytesOverhead
-      ) {
-        revert SourceTokenDataTooLarge(sourceToken);
-      }
-
-      _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.tokenAmounts[i].destTokenAddress);
-    }
-
+  function getValidatedRampMessageParams(Internal.EVM2AnyRampMessage calldata message)
+    external
+    view
+    returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs)
+  {
     // Convert feeToken to link if not already in link
     if (message.feeToken == i_linkToken) {
       msgFeeJuels = message.feeTokenAmount;
@@ -810,13 +790,41 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
     if (msgFeeJuels > i_maxFeeJuelsPerMsg) revert MessageFeeTooHigh(msgFeeJuels, i_maxFeeJuelsPerMsg);
 
+    uint64 defaultTxGasLimit = s_destChainConfigs[message.header.destChainSelector].defaultTxGasLimit;
     // NOTE: when supporting non-EVM chains, revisit this and parse non-EVM args.
     // We can parse unvalidated args since getValidatedRampMessageParams is called after getFee (which will already validate the params)
     Client.EVMExtraArgsV2 memory extraArgs =
-      _parseUnvalidatedEVMExtraArgsFromBytes(message.extraArgs, destChainConfig.defaultTxGasLimit);
+      _parseUnvalidatedEVMExtraArgsFromBytes(message.extraArgs, defaultTxGasLimit);
     isOutOfOrderExecution = extraArgs.allowOutOfOrderExecution;
 
     return (msgFeeJuels, isOutOfOrderExecution, abi.encode(extraArgs));
+  }
+
+  /// @inheritdoc IPriceRegistry
+  /// @dev precondition - rampTokenAmounts and sourceTokenAmounts lengths must be equal
+  function validatePoolReturnData(
+    uint64 destChainSelector,
+    Internal.RampTokenAmount[] calldata rampTokenAmounts,
+    Client.EVMTokenAmount[] calldata sourceTokenAmounts
+  ) external view {
+    bytes4 chainFamilySelector = s_destChainConfigs[destChainSelector].chainFamilySelector;
+
+    for (uint256 i = 0; i < rampTokenAmounts.length; ++i) {
+      address sourceToken = sourceTokenAmounts[i].token;
+
+      // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the
+      // extraData. This prevents gas bomb attacks on the NOPs. As destBytesOverhead accounts for both
+      // extraData and offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
+      uint256 destPoolDataLength = rampTokenAmounts[i].extraData.length;
+      if (
+        destPoolDataLength > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
+          && destPoolDataLength > s_tokenTransferFeeConfig[destChainSelector][sourceToken].destBytesOverhead
+      ) {
+        revert SourceTokenDataTooLarge(sourceToken);
+      }
+
+      _validateDestFamilyAddress(chainFamilySelector, rampTokenAmounts[i].destTokenAddress);
+    }
   }
 
   /// @notice Returns the configured config for the dest chain selector

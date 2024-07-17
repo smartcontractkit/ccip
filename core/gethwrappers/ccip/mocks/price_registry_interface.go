@@ -1078,9 +1078,9 @@ func (_m *PriceRegistryInterface) GetValidatedFee(opts *bind.CallOpts, destChain
 	return r0, r1
 }
 
-// GetValidatedRampMessageParams provides a mock function with given fields: opts, message, sourceTokenAmounts
-func (_m *PriceRegistryInterface) GetValidatedRampMessageParams(opts *bind.CallOpts, message price_registry.InternalEVM2AnyRampMessage, sourceTokenAmounts []price_registry.ClientEVMTokenAmount) (price_registry.GetValidatedRampMessageParams, error) {
-	ret := _m.Called(opts, message, sourceTokenAmounts)
+// GetValidatedRampMessageParams provides a mock function with given fields: opts, message
+func (_m *PriceRegistryInterface) GetValidatedRampMessageParams(opts *bind.CallOpts, message price_registry.InternalEVM2AnyRampMessage) (price_registry.GetValidatedRampMessageParams, error) {
+	ret := _m.Called(opts, message)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetValidatedRampMessageParams")
@@ -1088,17 +1088,17 @@ func (_m *PriceRegistryInterface) GetValidatedRampMessageParams(opts *bind.CallO
 
 	var r0 price_registry.GetValidatedRampMessageParams
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, price_registry.InternalEVM2AnyRampMessage, []price_registry.ClientEVMTokenAmount) (price_registry.GetValidatedRampMessageParams, error)); ok {
-		return rf(opts, message, sourceTokenAmounts)
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, price_registry.InternalEVM2AnyRampMessage) (price_registry.GetValidatedRampMessageParams, error)); ok {
+		return rf(opts, message)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, price_registry.InternalEVM2AnyRampMessage, []price_registry.ClientEVMTokenAmount) price_registry.GetValidatedRampMessageParams); ok {
-		r0 = rf(opts, message, sourceTokenAmounts)
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, price_registry.InternalEVM2AnyRampMessage) price_registry.GetValidatedRampMessageParams); ok {
+		r0 = rf(opts, message)
 	} else {
 		r0 = ret.Get(0).(price_registry.GetValidatedRampMessageParams)
 	}
 
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts, price_registry.InternalEVM2AnyRampMessage, []price_registry.ClientEVMTokenAmount) error); ok {
-		r1 = rf(opts, message, sourceTokenAmounts)
+	if rf, ok := ret.Get(1).(func(*bind.CallOpts, price_registry.InternalEVM2AnyRampMessage) error); ok {
+		r1 = rf(opts, message)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1792,6 +1792,24 @@ func (_m *PriceRegistryInterface) UpdateTokenPriceFeeds(opts *bind.TransactOpts,
 	}
 
 	return r0, r1
+}
+
+// ValidatePoolReturnData provides a mock function with given fields: opts, destChainSelector, rampTokenAmounts, sourceTokenAmounts
+func (_m *PriceRegistryInterface) ValidatePoolReturnData(opts *bind.CallOpts, destChainSelector uint64, rampTokenAmounts []price_registry.InternalRampTokenAmount, sourceTokenAmounts []price_registry.ClientEVMTokenAmount) error {
+	ret := _m.Called(opts, destChainSelector, rampTokenAmounts, sourceTokenAmounts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ValidatePoolReturnData")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, uint64, []price_registry.InternalRampTokenAmount, []price_registry.ClientEVMTokenAmount) error); ok {
+		r0 = rf(opts, destChainSelector, rampTokenAmounts, sourceTokenAmounts)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // WatchAuthorizedCallerAdded provides a mock function with given fields: opts, sink

@@ -82,14 +82,23 @@ interface IPriceRegistry {
     Client.EVM2AnyMessage calldata message
   ) external view returns (uint256 feeTokenAmount);
 
-  /// @notice Validates the message that is emitted from an OnRamp, and returns the converted message fee in juels
+  /// @notice Validates the message that is emitted from an OnRamp, and returns the extracted args and message fee in juels
   /// @param message OnRamp message to validate
-  /// @param sourceTokenAmounts Source token amounts that match the message tokenAmounts
   /// @return msgFeeJuels message fee in juels
   /// @return isOutOfOrderExecution true if the message should be executed out of order
   /// @return convertedExtraArgs extra args converted to the latest family-specific args version
-  function getValidatedRampMessageParams(
-    Internal.EVM2AnyRampMessage memory message,
-    Client.EVMTokenAmount[] memory sourceTokenAmounts
-  ) external view returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs);
+  function getValidatedRampMessageParams(Internal.EVM2AnyRampMessage memory message)
+    external
+    view
+    returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs);
+
+  /// @notice Validates pool return data
+  /// @param destChainSelector Destination chain selector to which the token amounts are sent to
+  /// @param rampTokenAmounts Token amounts with populated pool return data
+  /// @param sourceTokenAmounts Token amounts originally sent in a Client.EVM2AnyMessage message
+  function validatePoolReturnData(
+    uint64 destChainSelector,
+    Internal.RampTokenAmount[] calldata rampTokenAmounts,
+    Client.EVMTokenAmount[] calldata sourceTokenAmounts
+  ) external view;
 }
