@@ -164,12 +164,10 @@ abstract contract CCIPBase is OwnerIsCreator {
         // The existence of a stored recipient is used to denote a chain being enabled, so the length here cannot be zero
         if (chain.recipient.length == 0) revert ZeroAddressNotAllowed();
 
-        ChainConfig storage currentConfig = s_chainConfigs[chain.chainSelector];
-
-        currentConfig.recipient = chain.recipient;
+        s_chainConfigs[chain.chainSelector].recipient = chain.recipient;
 
         // Set any additional args such as enabling out-of-order execution or manual gas-limit
-        currentConfig.extraArgsBytes = chain.extraArgsBytes;
+        s_chainConfigs[chain.chainSelector].extraArgsBytes = chain.extraArgsBytes;
 
         emit ChainAdded(chain.chainSelector, chain.recipient, chain.extraArgsBytes);
       }

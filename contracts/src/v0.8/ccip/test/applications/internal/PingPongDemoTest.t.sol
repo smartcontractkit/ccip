@@ -103,6 +103,6 @@ contract PingPong_example_plumbing is PingPongDappSetup {
   }
 
   function test_typeAndVersion() public view {
-    assertEq(s_pingPong.typeAndVersion(), "PingPongDemo 1.6.0");
+    assertEq(s_pingPong.typeAndVersion(), "PingPongDemo 1.6.0-dev");
   }
 }

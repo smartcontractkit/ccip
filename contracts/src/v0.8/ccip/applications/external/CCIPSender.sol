@@ -10,18 +10,19 @@ import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice Example of a client which supports sending messages to EVM/non-EVM chains
-/// @dev If chain specific logic is required for different chain families (e.g. particular
-/// decoding the bytes sender for authorization checks), it may be required to point to a helper
-/// authorization contract unless all chain families are known up front.
-/// @dev If contract does not implement IAny2EVMMessageReceiver and IERC165,
-/// and tokens are sent to it, ccipReceive will not be called but tokens will be transferred.
-/// @dev If the client is upgradeable you have significantly more flexibility and
-/// can avoid storage based options like the below contract uses. However it's
-/// worth carefully considering how the trust assumptions of your client dapp will
-/// change if you introduce upgradeability. An immutable dapp building on top of CCIP
-/// like the example below will inherit the trust properties of CCIP (i.e. the oracle network).
-/// @dev The receiver's are encoded offchain and passed as direct arguments to permit supporting
-/// new chain family receivers (e.g. a Solana encoded receiver address) without upgrading.
+/// @dev If chain specific logic is required for different chain families (e.g. particular decoding the bytes sender
+/// for authorization checks), it may be required to point to a helper authorization contract unless all chain families
+/// are known up front.
+/// @dev If contract does not implement IAny2EVMMessageReceiver and IERC165, and tokens are sent to it, ccipReceive
+/// will not be called but tokens will be transferred.
+/// @dev If the client is upgradeable you have significantly more flexibility and can avoid storage based options like
+/// the below contract uses. However it's worth carefully considering how the trust assumptions of your client dapp
+/// will change if you introduce upgradeability. An immutable dapp building on top of CCIP like the example below will
+/// inherit the trust properties of CCIP (i.e. the oracle network).
+/// @dev The receiver's are encoded offchain and passed as direct arguments to permit supporting new chain family
+/// receivers (e.g. a Solana encoded receiver address) without upgrading.
+/// @dev The ccipSend function does not support pre-funding message-fees, and must acquire fee-tokens from the
+/// user before the call to the router is made
 contract CCIPSender is CCIPBase {
   using SafeERC20 for IERC20;
 

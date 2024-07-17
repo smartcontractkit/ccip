@@ -46,7 +46,7 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     MessageType messageType; // Denotes whether the incoming message is being received for the first time, or is an acknowledgement that the initial outgoing correspondence was successfully received.
   }
 
-  string public constant ACK_MESSAGE_HEADER = "MESSAGE_ACKNOWLEDGED_";
+  bytes32 public constant ACK_MESSAGE_HEADER = keccak256("MESSAGE_ACKNOWLEDGED_");
 
   // Current feeToken
   IERC20 public s_feeToken;
@@ -100,10 +100,10 @@ contract CCIPReceiverWithACK is CCIPReceiver {
       return;
     } else if (payload.messageType == MessageType.ACK) {
       // Decode message into the message header and the messageId to ensure the message is encoded correctly
-      (string memory messageHeader, bytes32 messageId) = abi.decode(payload.data, (string, bytes32));
+      (bytes32 messageHeader, bytes32 messageId) = abi.decode(payload.data, (bytes32, bytes32));
 
       // Ensure Ack Message contains proper message header. Must abi.encode() before hashing since its of the string type
-      if (keccak256(bytes(messageHeader)) != keccak256(bytes(ACK_MESSAGE_HEADER))) {
+      if (messageHeader != ACK_MESSAGE_HEADER) {
         revert InvalidAckMessageHeader();
       }
 

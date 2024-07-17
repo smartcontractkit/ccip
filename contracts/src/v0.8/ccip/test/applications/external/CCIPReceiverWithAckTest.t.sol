@@ -43,7 +43,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
 
   function test_ccipReceive_and_respond_with_ack_Success() public {
     bytes32 messageId = keccak256("messageId");
-    bytes32 ackMessageId = 0x37ddbb21a51d4e07877b0de816905ea806b958e7607d951d307030631db076bd;
+    bytes32 ackMessageId = 0x07d90483b3ed7831c5402af6402e21ba3740a15e9d0837f7c7effb1cbffb39f7;
     address token = address(s_sourceFeeToken);
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
@@ -71,7 +71,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
 
     uint256 receiverBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(address(s_receiver));
 
-    vm.expectEmit();
+    vm.expectEmit(false, true, false, false);
     emit MessageSent(messageId, ackMessageId);
 
     s_receiver.ccipReceive(

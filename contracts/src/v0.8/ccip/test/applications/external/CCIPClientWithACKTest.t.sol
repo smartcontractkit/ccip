@@ -26,7 +26,7 @@ contract CCIPClientWithACKTest is EVM2EVMOnRampSetup {
   function setUp() public virtual override {
     EVM2EVMOnRampSetup.setUp();
 
-    s_sender = new CCIPClientWithACK(address(s_sourceRouter), IERC20(s_sourceFeeToken));
+    s_sender = new CCIPClientWithACK(address(s_sourceRouter), IERC20(s_sourceFeeToken), false);
 
     CCIPBase.ChainUpdate[] memory chainUpdates = new CCIPBase.ChainUpdate[](1);
     chainUpdates[0] = CCIPBase.ChainUpdate({
@@ -79,7 +79,7 @@ contract CCIPClientWithACKTest is EVM2EVMOnRampSetup {
 
   function test_ccipReceiveAndSendAck_Success() public {
     bytes32 messageId = keccak256("messageId");
-    bytes32 ackMessageId = 0x37ddbb21a51d4e07877b0de816905ea806b958e7607d951d307030631db076bd;
+    bytes32 ackMessageId = 0x07d90483b3ed7831c5402af6402e21ba3740a15e9d0837f7c7effb1cbffb39f7;
     address token = address(s_sourceFeeToken);
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
@@ -107,7 +107,7 @@ contract CCIPClientWithACKTest is EVM2EVMOnRampSetup {
 
     uint256 receiverBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(address(s_sender));
 
-    vm.expectEmit();
+    vm.expectEmit(true, true, false, false);
     emit MessageSent(messageId, ackMessageId);
 
     s_sender.ccipReceive(
@@ -219,5 +219,43 @@ contract CCIPClientWithACKTest is EVM2EVMOnRampSetup {
     // Assert that tokens were transfered for bridging + fees
     assertEq(IERC20(token).balanceOf(OWNER), tokenBalanceBefore - amount);
     assertEq(IERC20(s_sourceFeeToken).balanceOf(OWNER), feeTokenBalanceBefore - feeTokenAmount);
+  }
+
+  function test_send_with_preFundedFeeTokens_Success() public {
+    // Update pre-funding state
+    s_sender.updatePreFundingStatus(true);
+
+    assertTrue(s_sender.s_shouldUsePreFunding(), "Pre funding should be enabled instead of disabled");
+
+    // Deal fee tokens to the contract to pre-fund the message execution
+    deal(address(s_sourceFeeToken), address(s_sender), 1e24);
+
+    address token = s_sourceTokens[1];
+    uint256 amount = 111333333777;
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+    destTokenAmounts[0] = Client.EVMTokenAmount({token: token, amount: amount});
+
+    // Make sure we give the receiver contract enough tokens like CCIP would.
+    IERC20(token).approve(address(s_sender), type(uint256).max);
+    IERC20(s_sourceFeeToken).approve(address(s_sender), type(uint256).max);
+    deal(token, address(this), 1e24);
+
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+      receiver: abi.encode(address(s_sender)),
+      data: "",
+      tokenAmounts: destTokenAmounts,
+      feeToken: s_sourceFeeToken,
+      extraArgs: ""
+    });
+
+    uint256 feeTokenAmount = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
+    uint256 tokenBalanceBefore = IERC20(token).balanceOf(OWNER);
+    uint256 feeTokenBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(address(s_sender));
+
+    s_sender.ccipSend({destChainSelector: DEST_CHAIN_SELECTOR, tokenAmounts: destTokenAmounts, data: ""});
+
+    // Assert that tokens were transfered for bridging + fees
+    assertEq(IERC20(token).balanceOf(OWNER), tokenBalanceBefore - amount);
+    assertEq(IERC20(s_sourceFeeToken).balanceOf(address(s_sender)), feeTokenBalanceBefore - feeTokenAmount);
   }
 }

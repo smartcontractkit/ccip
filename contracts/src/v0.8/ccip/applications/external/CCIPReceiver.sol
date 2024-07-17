@@ -10,7 +10,8 @@ import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v4.8.3/contra
 
 /// @title CCIPReceiver
 /// @notice This contract is capable of receiving incoming messages from the CCIP Router.
-/// @dev This contract implements various "defensive" measures to enhance security and efficiency. These include the ability to implement custom-retry logic and ownership-based token-recovery functions.
+/// @dev This contract implements various "defensive" measures to enhance security and efficiency. These include the
+/// ability to implement custom-retry logic and ownership-based token-recovery functions.
 contract CCIPReceiver is CCIPBase {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.Bytes32Set;
@@ -79,13 +80,14 @@ contract CCIPReceiver is CCIPBase {
   // ================================================================
 
   /// @notice Executes a message that failed initial delivery, but with different logic specifically for re-execution.
-  /// @dev Since the function invoked _retryFailedMessage(), which is marked onlyOwner, this may only be called by the Owner as well.
-  /// Function will revert if the messageId was not already stored as having failed its initial execution
+  /// @dev Since the function invoked _retryFailedMessage(), which is marked onlyOwner, this may only be called by the
+  ///Owner as well. Function will revert if the messageId was not already stored as having failed its initial execution
   /// @param messageId the unique ID of the CCIP-message which failed initial-execution.
   function retryFailedMessage(bytes32 messageId) external {
     if (!s_failedMessages.contains(messageId)) revert MessageNotFailed(messageId);
 
-    // Allow developer to implement arbitrary functionality on retried messages, such as just releasing the associated tokens
+    // Allow developer to implement arbitrary functionality on retried messages, such as just releasing the associated
+    // tokens
     Client.Any2EVMMessage memory message = s_messageContents[messageId];
 
     // Set remove the message from storage to disallow reentry and retry the same failed message multiple times.

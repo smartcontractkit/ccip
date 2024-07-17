@@ -21,10 +21,10 @@ contract PingPongDemo is CCIPClient {
   bool private s_isPaused;
 
   // CCIPClient will handle the token approval so there's no need to do it here
-  constructor(address router, IERC20 feeToken) CCIPClient(router, feeToken) {}
+  constructor(address router, IERC20 feeToken) CCIPClient(router, feeToken, true) {}
 
   function typeAndVersion() external pure virtual returns (string memory) {
-    return "PingPongDemo 1.6.0";
+    return "PingPongDemo 1.6.0-dev";
   }
 
   function startPingPong() external onlyOwner {
