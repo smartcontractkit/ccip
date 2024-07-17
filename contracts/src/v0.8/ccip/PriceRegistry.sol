@@ -64,11 +64,11 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   );
   event TokenTransferFeeConfigDeleted(uint64 indexed destChainSelector, address indexed token);
   event PremiumMultiplierWeiPerEthUpdated(address indexed token, uint64 premiumMultiplierWeiPerEth);
-  event DestChainDynamicConfigUpdated(uint64 indexed destChainSelector, DestChainDynamicConfig dynamicConfig);
-  event DestChainAdded(uint64 indexed destChainSelector, DestChainDynamicConfig dynamicConfig);
+  event DestChainConfigUpdated(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
+  event DestChainAdded(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
 
-  /// @dev Struct to hold the dynamic fee & validation configs for a destination chain
-  struct DestChainDynamicConfig {
+  /// @dev Struct to hold the fee & validation configs for a destination chain
+  struct DestChainConfig {
     bool isEnabled; // ──────────────────────────╮ Whether this destination chain is enabled
     uint16 maxNumberOfTokensPerMsg; //           │ Maximum number of distinct ERC20 token transferred per message
     uint32 maxDataBytes; //                      │ Maximum payload data size in bytes
@@ -89,13 +89,13 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     bytes4 chainFamilySelector; // ──────────────╯ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
   }
 
-  /// @dev Struct to hold the dynamic configs and its destination chain selector
+  /// @dev Struct to hold the configs and its destination chain selector
   /// Same as DestChainConfig but with the destChainSelector so that an array of these
-  /// can be passed in the constructor and the applyDestChainDynamicConfigUpdates function
+  /// can be passed in the constructor and the applyDestChainConfigUpdates function
   //solhint-disable gas-struct-packing
-  struct DestChainDynamicConfigArgs {
+  struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector
-    DestChainDynamicConfig dynamicConfig; // Dynamic config to update for the chain selector
+    DestChainConfig destChainConfig; // Config to update for the chain selector
   }
 
   /// @dev Struct to hold the transfer fee configuration for token transfers
@@ -167,7 +167,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   mapping(address token => uint64 premiumMultiplierWeiPerEth) internal s_premiumMultiplierWeiPerEth;
 
   /// @dev The destination chain specific fee configs
-  mapping(uint64 destChainSelector => DestChainDynamicConfig destChainDynamicConfig) internal s_destChainDynamicConfigs;
+  mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfigs;
 
   /// @dev The token transfer fee config that can be set by the owner or fee admin
   mapping(uint64 destChainSelector => mapping(address token => TokenTransferFeeConfig tranferFeeConfig)) internal
@@ -192,7 +192,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     TokenPriceFeedUpdate[] memory tokenPriceFeeds,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
-    DestChainDynamicConfigArgs[] memory destChainConfigArgs
+    DestChainConfigArgs[] memory destChainConfigArgs
   ) AuthorizedCallers(priceUpdaters) {
     if (
       staticConfig.linkToken == address(0) || staticConfig.maxFeeJuelsPerMsg == 0
@@ -448,12 +448,12 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     Client.EVM2AnyMessage calldata message
   ) external view returns (uint256 feeTokenAmount) {
     // Verify that the config is present (a 0 family chain selector impleis an unconfigured dest chain)
-    DestChainDynamicConfig storage destChainDynamicConfig = s_destChainDynamicConfigs[destChainSelector];
+    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
 
-    if (!destChainDynamicConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
+    if (!destChainConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
 
     uint256 numberOfTokens = message.tokenAmounts.length;
-    _validateMessage(destChainDynamicConfig, message.data.length, numberOfTokens, message.receiver);
+    _validateMessage(destChainConfig, message.data.length, numberOfTokens, message.receiver);
 
     uint64 premiumMultiplierWeiPerEth = s_premiumMultiplierWeiPerEth[message.feeToken];
 
@@ -468,12 +468,11 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     uint32 tokenTransferGas = 0;
     uint32 tokenTransferBytesOverhead = 0;
     if (numberOfTokens > 0) {
-      (premiumFee, tokenTransferGas, tokenTransferBytesOverhead) = _getTokenTransferCost(
-        destChainDynamicConfig, destChainSelector, message.feeToken, feeTokenPrice, message.tokenAmounts
-      );
+      (premiumFee, tokenTransferGas, tokenTransferBytesOverhead) =
+        _getTokenTransferCost(destChainConfig, destChainSelector, message.feeToken, feeTokenPrice, message.tokenAmounts);
     } else {
       // Convert USD cents with 2 decimals to 18 decimals.
-      premiumFee = uint256(destChainDynamicConfig.networkFeeUSDCents) * 1e16;
+      premiumFee = uint256(destChainConfig.networkFeeUSDCents) * 1e16;
     }
 
     // Calculate data availability cost in USD with 36 decimals. Data availability cost exists on rollups that need to post
@@ -482,9 +481,9 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
     // Only calculate data availability cost if data availability multiplier is non-zero.
     // The multiplier should be set to 0 if destination chain does not charge data availability cost.
-    if (destChainDynamicConfig.destDataAvailabilityMultiplierBps > 0) {
+    if (destChainConfig.destDataAvailabilityMultiplierBps > 0) {
       dataAvailabilityCost = _getDataAvailabilityCost(
-        destChainDynamicConfig,
+        destChainConfig,
         // Parse the data availability gas price stored in the higher-order 112 bits of the encoded gas price.
         uint112(packedGasPrice >> Internal.GAS_PRICE_BITS),
         message.data.length,
@@ -500,13 +499,13 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
     // NOTE: when supporting non-EVM chains, revisit how generic this fee logic can be
 
-    uint256 executionGasCost = destChainDynamicConfig.destGasOverhead
-      + (message.data.length * destChainDynamicConfig.destGasPerPayloadByte) + tokenTransferGas;
+    uint256 executionGasCost =
+      destChainConfig.destGasOverhead + (message.data.length * destChainConfig.destGasPerPayloadByte) + tokenTransferGas;
 
     // NOTE: when supporting non-EVM chains, revisit this and parse non-EVM args
-    executionGasCost += _parseEVMExtraArgsFromBytes(message.extraArgs, destChainDynamicConfig).gasLimit;
+    executionGasCost += _parseEVMExtraArgsFromBytes(message.extraArgs, destChainConfig).gasLimit;
 
-    uint256 executionCost = uint112(packedGasPrice) * executionGasCost * destChainDynamicConfig.gasMultiplierWeiPerEth;
+    uint256 executionCost = uint112(packedGasPrice) * executionGasCost * destChainConfig.gasMultiplierWeiPerEth;
 
     // Calculate number of fee tokens to charge.
     // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
@@ -550,7 +549,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   /// @dev Assumes that tokenAmounts are validated to be listed tokens elsewhere.
   /// @dev Splitting one token transfer into multiple transfers is discouraged,
   /// as it will result in a transferFee equal or greater than the same amount aggregated/de-duped.
-  /// @param destChainDynamicConfig the dynamic config configured for the destination chain selector.
+  /// @param destChainConfig the config configured for the destination chain selector.
   /// @param destChainSelector the destination chain selector.
   /// @param feeToken address of the feeToken.
   /// @param feeTokenPrice price of feeToken in USD with 18 decimals.
@@ -559,7 +558,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   /// @return tokenTransferGas total execution gas of the token transfers.
   /// @return tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
   function _getTokenTransferCost(
-    DestChainDynamicConfig memory destChainDynamicConfig,
+    DestChainConfig memory destChainConfig,
     uint64 destChainSelector,
     address feeToken,
     uint224 feeTokenPrice,
@@ -573,9 +572,9 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
       // If the token has no specific overrides configured, we use the global defaults.
       if (!transferFeeConfig.isEnabled) {
-        tokenTransferFeeUSDWei += uint256(destChainDynamicConfig.defaultTokenFeeUSDCents) * 1e16;
-        tokenTransferGas += destChainDynamicConfig.defaultTokenDestGasOverhead;
-        tokenTransferBytesOverhead += destChainDynamicConfig.defaultTokenDestBytesOverhead;
+        tokenTransferFeeUSDWei += uint256(destChainConfig.defaultTokenFeeUSDCents) * 1e16;
+        tokenTransferGas += destChainConfig.defaultTokenDestGasOverhead;
+        tokenTransferBytesOverhead += destChainConfig.defaultTokenDestBytesOverhead;
         continue;
       }
 
@@ -620,14 +619,14 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
   /// @notice Returns the estimated data availability cost of the message.
   /// @dev To save on gas, we use a single destGasPerDataAvailabilityByte value for both zero and non-zero bytes.
-  /// @param destChainDynamicConfig the dynamic config configured for the destination chain selector.
+  /// @param destChainConfig the config configured for the destination chain selector.
   /// @param dataAvailabilityGasPrice USD per data availability gas in 18 decimals.
   /// @param messageDataLength length of the data field in the message.
   /// @param numberOfTokens number of distinct token transfers in the message.
   /// @param tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
   /// @return dataAvailabilityCostUSD36Decimal total data availability cost in USD with 36 decimals.
   function _getDataAvailabilityCost(
-    DestChainDynamicConfig memory destChainDynamicConfig,
+    DestChainConfig memory destChainConfig,
     uint112 dataAvailabilityGasPrice,
     uint256 messageDataLength,
     uint256 numberOfTokens,
@@ -640,13 +639,12 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
     // destDataAvailabilityOverheadGas is a separate config value for flexibility to be updated independently of message cost.
     // Its value is determined by CCIP lane implementation, e.g. the overhead data posted for OCR.
-    uint256 dataAvailabilityGas = (dataAvailabilityLengthBytes * destChainDynamicConfig.destGasPerDataAvailabilityByte)
-      + destChainDynamicConfig.destDataAvailabilityOverheadGas;
+    uint256 dataAvailabilityGas = (dataAvailabilityLengthBytes * destChainConfig.destGasPerDataAvailabilityByte)
+      + destChainConfig.destDataAvailabilityOverheadGas;
 
     // dataAvailabilityGasPrice is in 18 decimals, destDataAvailabilityMultiplierBps is in 4 decimals
     // We pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
-    return ((dataAvailabilityGas * dataAvailabilityGasPrice) * destChainDynamicConfig.destDataAvailabilityMultiplierBps)
-      * 1e14;
+    return ((dataAvailabilityGas * dataAvailabilityGasPrice) * destChainConfig.destDataAvailabilityMultiplierBps) * 1e14;
   }
 
   /// @notice Gets the transfer fee config for a given token.
@@ -713,17 +711,17 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
   /// @dev Convert the extra args bytes into a struct with validations against the dest chain config
   /// @param extraArgs The extra args bytes
-  /// @param destChainDynamicConfig Dest chain config to validate against
+  /// @param destChainConfig Dest chain config to validate against
   /// @return EVMExtraArgs the extra args struct (latest version)
   function _parseEVMExtraArgsFromBytes(
     bytes calldata extraArgs,
-    DestChainDynamicConfig memory destChainDynamicConfig
+    DestChainConfig memory destChainConfig
   ) internal pure returns (Client.EVMExtraArgsV2 memory) {
     Client.EVMExtraArgsV2 memory evmExtraArgs =
-      _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, destChainDynamicConfig.defaultTxGasLimit);
+      _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, destChainConfig.defaultTxGasLimit);
 
-    if (evmExtraArgs.gasLimit > uint256(destChainDynamicConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
-    if (destChainDynamicConfig.enforceOutOfOrder && !evmExtraArgs.allowOutOfOrderExecution) {
+    if (evmExtraArgs.gasLimit > uint256(destChainConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
+    if (destChainConfig.enforceOutOfOrder && !evmExtraArgs.allowOutOfOrderExecution) {
       revert ExtraArgOutOfOrderExecutionMustBeTrue();
     }
 
@@ -759,22 +757,22 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
   /// @notice Validate the forwarded message to ensure it matches the configuration limits (message length, number of tokens)
   /// and family-specific expectations (address format)
-  /// @param destChainDynamicConfig Dest chain config
+  /// @param destChainConfig Dest chain config
   /// @param dataLength The length of the data field of the message.
   /// @param numberOfTokens The number of tokens to be sent.
   /// @param receiver Message receiver on the dest chain
   function _validateMessage(
-    DestChainDynamicConfig memory destChainDynamicConfig,
+    DestChainConfig memory destChainConfig,
     uint256 dataLength,
     uint256 numberOfTokens,
     bytes memory receiver
   ) internal pure {
     // Check that payload is formed correctly
-    if (dataLength > uint256(destChainDynamicConfig.maxDataBytes)) {
-      revert MessageTooLarge(uint256(destChainDynamicConfig.maxDataBytes), dataLength);
+    if (dataLength > uint256(destChainConfig.maxDataBytes)) {
+      revert MessageTooLarge(uint256(destChainConfig.maxDataBytes), dataLength);
     }
-    if (numberOfTokens > uint256(destChainDynamicConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
-    _validateDestFamilyAddress(destChainDynamicConfig.chainFamilySelector, receiver);
+    if (numberOfTokens > uint256(destChainConfig.maxNumberOfTokensPerMsg)) revert UnsupportedNumberOfTokens();
+    _validateDestFamilyAddress(destChainConfig.chainFamilySelector, receiver);
   }
 
   /// @inheritdoc IPriceRegistry
@@ -784,7 +782,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     Client.EVMTokenAmount[] calldata sourceTokenAmounts
   ) external view returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) {
     uint64 destChainSelector = message.header.destChainSelector;
-    DestChainDynamicConfig storage destChainDynamicConfig = s_destChainDynamicConfigs[destChainSelector];
+    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
 
     for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
       address sourceToken = sourceTokenAmounts[i].token;
@@ -800,7 +798,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
         revert SourceTokenDataTooLarge(sourceToken);
       }
 
-      _validateDestFamilyAddress(destChainDynamicConfig.chainFamilySelector, message.tokenAmounts[i].destTokenAddress);
+      _validateDestFamilyAddress(destChainConfig.chainFamilySelector, message.tokenAmounts[i].destTokenAddress);
     }
 
     // Convert feeToken to link if not already in link
@@ -815,49 +813,49 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     // NOTE: when supporting non-EVM chains, revisit this and parse non-EVM args.
     // We can parse unvalidated args since getValidatedRampMessageParams is called after getFee (which will already validate the params)
     Client.EVMExtraArgsV2 memory extraArgs =
-      _parseUnvalidatedEVMExtraArgsFromBytes(message.extraArgs, destChainDynamicConfig.defaultTxGasLimit);
+      _parseUnvalidatedEVMExtraArgsFromBytes(message.extraArgs, destChainConfig.defaultTxGasLimit);
     isOutOfOrderExecution = extraArgs.allowOutOfOrderExecution;
 
     return (msgFeeJuels, isOutOfOrderExecution, abi.encode(extraArgs));
   }
 
-  /// @notice Returns the configured dynamic config for the dest chain selector
+  /// @notice Returns the configured config for the dest chain selector
   /// @param destChainSelector destination chain selector to fetch config for
-  /// @return destChainDynamicConfig Dynamic config for the dest chain
-  function getDestChainDynamicConfig(uint64 destChainSelector) external view returns (DestChainDynamicConfig memory) {
-    return s_destChainDynamicConfigs[destChainSelector];
+  /// @return destChainConfig config for the dest chain
+  function getDestChainConfig(uint64 destChainSelector) external view returns (DestChainConfig memory) {
+    return s_destChainConfigs[destChainSelector];
   }
 
   /// @notice Updates the destination chain specific config.
   /// @param destChainConfigArgs Array of source chain specific configs.
-  function applyDestChainConfigUpdates(DestChainDynamicConfigArgs[] memory destChainConfigArgs) external onlyOwner {
+  function applyDestChainConfigUpdates(DestChainConfigArgs[] memory destChainConfigArgs) external onlyOwner {
     _applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
   /// @notice Internal version of applyDestChainConfigUpdates.
-  function _applyDestChainConfigUpdates(DestChainDynamicConfigArgs[] memory destChainConfigArgs) internal {
+  function _applyDestChainConfigUpdates(DestChainConfigArgs[] memory destChainConfigArgs) internal {
     for (uint256 i = 0; i < destChainConfigArgs.length; ++i) {
-      DestChainDynamicConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
+      DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[i];
       uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
-      DestChainDynamicConfig memory destChainDynamicConfigArg = destChainConfigArg.dynamicConfig;
+      DestChainConfig memory destChainConfig = destChainConfigArg.destChainConfig;
 
       // NOTE: when supporting non-EVM chains, update chainFamilySelector validations
       if (
-        destChainSelector == 0 || destChainDynamicConfigArg.defaultTxGasLimit == 0
-          || destChainDynamicConfigArg.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
-          || destChainDynamicConfigArg.defaultTokenDestBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
+        destChainSelector == 0 || destChainConfig.defaultTxGasLimit == 0
+          || destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
+          || destChainConfig.defaultTokenDestBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
       ) {
         revert InvalidDestChainConfig(destChainSelector);
       }
 
       // The chain family selector cannot be zero - indicates that it is a new chain
-      if (s_destChainDynamicConfigs[destChainSelector].chainFamilySelector == 0) {
-        emit DestChainAdded(destChainSelector, destChainDynamicConfigArg);
+      if (s_destChainConfigs[destChainSelector].chainFamilySelector == 0) {
+        emit DestChainAdded(destChainSelector, destChainConfig);
       } else {
-        emit DestChainDynamicConfigUpdated(destChainSelector, destChainDynamicConfigArg);
+        emit DestChainConfigUpdated(destChainSelector, destChainConfig);
       }
 
-      s_destChainDynamicConfigs[destChainSelector] = destChainDynamicConfigArg;
+      s_destChainConfigs[destChainSelector] = destChainConfig;
     }
   }
 

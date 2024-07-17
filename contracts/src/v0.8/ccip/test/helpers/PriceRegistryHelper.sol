@@ -12,7 +12,7 @@ contract PriceRegistryHelper is PriceRegistry {
     TokenPriceFeedUpdate[] memory tokenPriceFeeds,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs,
-    DestChainDynamicConfigArgs[] memory destChainConfigArgs
+    DestChainConfigArgs[] memory destChainConfigArgs
   )
     PriceRegistry(
       staticConfig,
@@ -33,7 +33,7 @@ contract PriceRegistryHelper is PriceRegistry {
     uint32 tokenTransferBytesOverhead
   ) external view returns (uint256) {
     return _getDataAvailabilityCost(
-      s_destChainDynamicConfigs[destChainSelector],
+      s_destChainConfigs[destChainSelector],
       dataAvailabilityGasPrice,
       messageDataLength,
       numberOfTokens,
@@ -48,7 +48,7 @@ contract PriceRegistryHelper is PriceRegistry {
     Client.EVMTokenAmount[] calldata tokenAmounts
   ) external view returns (uint256, uint32, uint32) {
     return _getTokenTransferCost(
-      s_destChainDynamicConfigs[destChainSelector], destChainSelector, feeToken, feeTokenPrice, tokenAmounts
+      s_destChainConfigs[destChainSelector], destChainSelector, feeToken, feeTokenPrice, tokenAmounts
     );
   }
 
@@ -56,14 +56,14 @@ contract PriceRegistryHelper is PriceRegistry {
     bytes calldata extraArgs,
     uint64 destChainSelector
   ) external view returns (Client.EVMExtraArgsV2 memory) {
-    return _parseEVMExtraArgsFromBytes(extraArgs, s_destChainDynamicConfigs[destChainSelector]);
+    return _parseEVMExtraArgsFromBytes(extraArgs, s_destChainConfigs[destChainSelector]);
   }
 
   function parseEVMExtraArgsFromBytes(
     bytes calldata extraArgs,
-    DestChainDynamicConfig memory destChainDynamicConfig
+    DestChainConfig memory destChainConfig
   ) external pure returns (Client.EVMExtraArgsV2 memory) {
-    return _parseEVMExtraArgsFromBytes(extraArgs, destChainDynamicConfig);
+    return _parseEVMExtraArgsFromBytes(extraArgs, destChainConfig);
   }
 
   function validateDestFamilyAddress(bytes4 chainFamilySelector, bytes memory destAddress) external pure {

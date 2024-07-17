@@ -176,7 +176,7 @@ contract PriceRegistrySetup is TokenSetup {
       tokenPriceFeedUpdates,
       s_priceRegistryTokenTransferFeeConfigArgs,
       s_priceRegistryPremiumMultiplierWeiPerEthArgs,
-      _generatePriceRegistryDestChainDynamicConfigArgs()
+      _generatePriceRegistryDestChainConfigArgs()
     );
     s_priceRegistry.updatePrices(priceUpdates);
   }
@@ -242,16 +242,15 @@ contract PriceRegistrySetup is TokenSetup {
     return tokenTransferFeeConfigArgs;
   }
 
-  function _generatePriceRegistryDestChainDynamicConfigArgs()
+  function _generatePriceRegistryDestChainConfigArgs()
     internal
     pure
-    returns (PriceRegistry.DestChainDynamicConfigArgs[] memory)
+    returns (PriceRegistry.DestChainConfigArgs[] memory)
   {
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigs =
-      new PriceRegistry.DestChainDynamicConfigArgs[](1);
-    destChainConfigs[0] = PriceRegistry.DestChainDynamicConfigArgs({
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigs = new PriceRegistry.DestChainConfigArgs[](1);
+    destChainConfigs[0] = PriceRegistry.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
-      dynamicConfig: PriceRegistry.DestChainDynamicConfig({
+      destChainConfig: PriceRegistry.DestChainConfig({
         isEnabled: true,
         maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
         destGasOverhead: DEST_GAS_OVERHEAD,
@@ -312,9 +311,9 @@ contract PriceRegistrySetup is TokenSetup {
     assertEq(a.maxFeeJuelsPerMsg, b.maxFeeJuelsPerMsg);
   }
 
-  function _assertPriceRegistryDestChainDynamicConfigsEqual(
-    PriceRegistry.DestChainDynamicConfig memory a,
-    PriceRegistry.DestChainDynamicConfig memory b
+  function _assertPriceRegistryDestChainConfigsEqual(
+    PriceRegistry.DestChainConfig memory a,
+    PriceRegistry.DestChainConfig memory b
   ) internal pure {
     assertEq(a.isEnabled, b.isEnabled);
     assertEq(a.maxNumberOfTokensPerMsg, b.maxNumberOfTokensPerMsg);
@@ -458,8 +457,7 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
     tokenPriceFeedUpdates[1] =
       getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[1], s_dataFeedByToken[s_sourceTokens[1]], 6);
 
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigArgs =
-      _generatePriceRegistryDestChainDynamicConfigArgs();
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
 
     PriceRegistry.StaticConfig memory staticConfig = PriceRegistry.StaticConfig({
       linkToken: s_sourceTokens[0],
@@ -512,12 +510,10 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
     }
 
     for (uint256 i = 0; i < destChainConfigArgs.length; ++i) {
-      PriceRegistry.DestChainDynamicConfig memory expectedConfig = destChainConfigArgs[i].dynamicConfig;
+      PriceRegistry.DestChainConfig memory expectedConfig = destChainConfigArgs[i].destChainConfig;
       uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
 
-      _assertPriceRegistryDestChainDynamicConfigsEqual(
-        expectedConfig, s_priceRegistry.getDestChainDynamicConfig(destChainSelector)
-      );
+      _assertPriceRegistryDestChainConfigsEqual(expectedConfig, s_priceRegistry.getDestChainConfig(destChainSelector));
     }
   }
 
@@ -537,7 +533,7 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
       new PriceRegistry.TokenPriceFeedUpdate[](0),
       s_priceRegistryTokenTransferFeeConfigArgs,
       s_priceRegistryPremiumMultiplierWeiPerEthArgs,
-      new PriceRegistry.DestChainDynamicConfigArgs[](0)
+      new PriceRegistry.DestChainConfigArgs[](0)
     );
   }
 
@@ -557,7 +553,7 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
       new PriceRegistry.TokenPriceFeedUpdate[](0),
       s_priceRegistryTokenTransferFeeConfigArgs,
       s_priceRegistryPremiumMultiplierWeiPerEthArgs,
-      new PriceRegistry.DestChainDynamicConfigArgs[](0)
+      new PriceRegistry.DestChainConfigArgs[](0)
     );
   }
 
@@ -577,7 +573,7 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
       new PriceRegistry.TokenPriceFeedUpdate[](0),
       s_priceRegistryTokenTransferFeeConfigArgs,
       s_priceRegistryPremiumMultiplierWeiPerEthArgs,
-      new PriceRegistry.DestChainDynamicConfigArgs[](0)
+      new PriceRegistry.DestChainConfigArgs[](0)
     );
   }
 }
@@ -1170,73 +1166,68 @@ contract PriceRegistry_updateTokenPriceFeeds is PriceRegistrySetup {
 }
 
 contract PriceRegistry_applyDestChainConfigUpdates is PriceRegistrySetup {
-  function test_Fuzz_applyDestChainConfigUpdates_Success(
-    PriceRegistry.DestChainDynamicConfigArgs memory destChainConfigArgs
-  ) public {
+  function test_Fuzz_applyDestChainConfigUpdates_Success(PriceRegistry.DestChainConfigArgs memory destChainConfigArgs)
+    public
+  {
     vm.assume(destChainConfigArgs.destChainSelector != 0);
-    vm.assume(destChainConfigArgs.dynamicConfig.defaultTxGasLimit != 0);
-    destChainConfigArgs.dynamicConfig.defaultTokenDestBytesOverhead = uint32(
+    vm.assume(destChainConfigArgs.destChainConfig.defaultTxGasLimit != 0);
+    destChainConfigArgs.destChainConfig.defaultTokenDestBytesOverhead = uint32(
       bound(
-        destChainConfigArgs.dynamicConfig.defaultTokenDestBytesOverhead,
+        destChainConfigArgs.destChainConfig.defaultTokenDestBytesOverhead,
         Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
         type(uint32).max
       )
     );
-    destChainConfigArgs.dynamicConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
+    destChainConfigArgs.destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
 
     bool isNewChain = destChainConfigArgs.destChainSelector != DEST_CHAIN_SELECTOR;
 
-    PriceRegistry.DestChainDynamicConfigArgs[] memory newDestChainConfigArgs =
-      new PriceRegistry.DestChainDynamicConfigArgs[](1);
+    PriceRegistry.DestChainConfigArgs[] memory newDestChainConfigArgs = new PriceRegistry.DestChainConfigArgs[](1);
     newDestChainConfigArgs[0] = destChainConfigArgs;
 
     if (isNewChain) {
       vm.expectEmit();
-      emit PriceRegistry.DestChainAdded(destChainConfigArgs.destChainSelector, destChainConfigArgs.dynamicConfig);
+      emit PriceRegistry.DestChainAdded(destChainConfigArgs.destChainSelector, destChainConfigArgs.destChainConfig);
     } else {
       vm.expectEmit();
-      emit PriceRegistry.DestChainDynamicConfigUpdated(
-        destChainConfigArgs.destChainSelector, destChainConfigArgs.dynamicConfig
+      emit PriceRegistry.DestChainConfigUpdated(
+        destChainConfigArgs.destChainSelector, destChainConfigArgs.destChainConfig
       );
     }
 
     s_priceRegistry.applyDestChainConfigUpdates(newDestChainConfigArgs);
 
-    _assertPriceRegistryDestChainDynamicConfigsEqual(
-      destChainConfigArgs.dynamicConfig,
-      s_priceRegistry.getDestChainDynamicConfig(destChainConfigArgs.destChainSelector)
+    _assertPriceRegistryDestChainConfigsEqual(
+      destChainConfigArgs.destChainConfig, s_priceRegistry.getDestChainConfig(destChainConfigArgs.destChainSelector)
     );
   }
 
   function test_applyDestChainConfigUpdates_Success() public {
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigArgs =
-      new PriceRegistry.DestChainDynamicConfigArgs[](2);
-    destChainConfigArgs[0] = _generatePriceRegistryDestChainDynamicConfigArgs()[0];
-    destChainConfigArgs[0].dynamicConfig.isEnabled = false;
-    destChainConfigArgs[1] = _generatePriceRegistryDestChainDynamicConfigArgs()[0];
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = new PriceRegistry.DestChainConfigArgs[](2);
+    destChainConfigArgs[0] = _generatePriceRegistryDestChainConfigArgs()[0];
+    destChainConfigArgs[0].destChainConfig.isEnabled = false;
+    destChainConfigArgs[1] = _generatePriceRegistryDestChainConfigArgs()[0];
     destChainConfigArgs[1].destChainSelector = DEST_CHAIN_SELECTOR + 1;
 
     vm.expectEmit();
-    emit PriceRegistry.DestChainDynamicConfigUpdated(DEST_CHAIN_SELECTOR, destChainConfigArgs[0].dynamicConfig);
+    emit PriceRegistry.DestChainConfigUpdated(DEST_CHAIN_SELECTOR, destChainConfigArgs[0].destChainConfig);
     vm.expectEmit();
-    emit PriceRegistry.DestChainAdded(DEST_CHAIN_SELECTOR + 1, destChainConfigArgs[1].dynamicConfig);
+    emit PriceRegistry.DestChainAdded(DEST_CHAIN_SELECTOR + 1, destChainConfigArgs[1].destChainConfig);
 
     vm.recordLogs();
     s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
 
-    PriceRegistry.DestChainDynamicConfig memory gotDestChainConfig0 =
-      s_priceRegistry.getDestChainDynamicConfig(DEST_CHAIN_SELECTOR);
-    PriceRegistry.DestChainDynamicConfig memory gotDestChainConfig1 =
-      s_priceRegistry.getDestChainDynamicConfig(DEST_CHAIN_SELECTOR + 1);
+    PriceRegistry.DestChainConfig memory gotDestChainConfig0 = s_priceRegistry.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    PriceRegistry.DestChainConfig memory gotDestChainConfig1 =
+      s_priceRegistry.getDestChainConfig(DEST_CHAIN_SELECTOR + 1);
 
     assertEq(vm.getRecordedLogs().length, 2);
-    _assertPriceRegistryDestChainDynamicConfigsEqual(destChainConfigArgs[0].dynamicConfig, gotDestChainConfig0);
-    _assertPriceRegistryDestChainDynamicConfigsEqual(destChainConfigArgs[1].dynamicConfig, gotDestChainConfig1);
+    _assertPriceRegistryDestChainConfigsEqual(destChainConfigArgs[0].destChainConfig, gotDestChainConfig0);
+    _assertPriceRegistryDestChainConfigsEqual(destChainConfigArgs[1].destChainConfig, gotDestChainConfig1);
   }
 
   function test_applyDestChainConfigUpdatesZeroIntput_Success() public {
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigArgs =
-      new PriceRegistry.DestChainDynamicConfigArgs[](0);
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = new PriceRegistry.DestChainConfigArgs[](0);
 
     vm.recordLogs();
     s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
@@ -1247,11 +1238,10 @@ contract PriceRegistry_applyDestChainConfigUpdates is PriceRegistrySetup {
   // Reverts
 
   function test_applyDestChainConfigUpdatesDefaultTxGasLimitEqZero_Revert() public {
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigArgs =
-      _generatePriceRegistryDestChainDynamicConfigArgs();
-    PriceRegistry.DestChainDynamicConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    PriceRegistry.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
-    destChainConfigArg.dynamicConfig.defaultTxGasLimit = 0;
+    destChainConfigArg.destChainConfig.defaultTxGasLimit = 0;
     vm.expectRevert(
       abi.encodeWithSelector(PriceRegistry.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
     );
@@ -1259,9 +1249,8 @@ contract PriceRegistry_applyDestChainConfigUpdates is PriceRegistrySetup {
   }
 
   function test_InvalidDestChainConfigDestChainSelectorEqZero_Revert() public {
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigArgs =
-      _generatePriceRegistryDestChainDynamicConfigArgs();
-    PriceRegistry.DestChainDynamicConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    PriceRegistry.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     destChainConfigArg.destChainSelector = 0;
     vm.expectRevert(
@@ -1271,11 +1260,10 @@ contract PriceRegistry_applyDestChainConfigUpdates is PriceRegistrySetup {
   }
 
   function test_InvalidDestBytesOverhead_Revert() public {
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigArgs =
-      _generatePriceRegistryDestChainDynamicConfigArgs();
-    PriceRegistry.DestChainDynamicConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    PriceRegistry.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
-    destChainConfigArg.dynamicConfig.defaultTokenDestBytesOverhead = uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES - 1);
+    destChainConfigArg.destChainConfig.defaultTokenDestBytesOverhead = uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES - 1);
 
     vm.expectRevert(abi.encodeWithSelector(PriceRegistry.InvalidDestChainConfig.selector, DEST_CHAIN_SELECTOR));
 
@@ -1283,11 +1271,10 @@ contract PriceRegistry_applyDestChainConfigUpdates is PriceRegistrySetup {
   }
 
   function test_InvalidChainFamilySelector_Revert() public {
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigArgs =
-      _generatePriceRegistryDestChainDynamicConfigArgs();
-    PriceRegistry.DestChainDynamicConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    PriceRegistry.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
-    destChainConfigArg.dynamicConfig.chainFamilySelector = bytes4(uint32(1));
+    destChainConfigArg.destChainConfig.chainFamilySelector = bytes4(uint32(1));
 
     vm.expectRevert(
       abi.encodeWithSelector(PriceRegistry.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
@@ -1301,35 +1288,33 @@ contract PriceRegistry_getDataAvailabilityCost is PriceRegistrySetup {
     uint256 dataAvailabilityCostUSD =
       s_priceRegistry.getDataAvailabilityCost(DEST_CHAIN_SELECTOR, USD_PER_DATA_AVAILABILITY_GAS, 0, 0, 0);
 
-    PriceRegistry.DestChainDynamicConfig memory destChainDynamicConfig =
-      s_priceRegistry.getDestChainDynamicConfig(DEST_CHAIN_SELECTOR);
+    PriceRegistry.DestChainConfig memory destChainConfig = s_priceRegistry.getDestChainConfig(DEST_CHAIN_SELECTOR);
 
-    uint256 dataAvailabilityGas = destChainDynamicConfig.destDataAvailabilityOverheadGas
-      + destChainDynamicConfig.destGasPerDataAvailabilityByte * Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES;
-    uint256 expectedDataAvailabilityCostUSD = USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas
-      * destChainDynamicConfig.destDataAvailabilityMultiplierBps * 1e14;
+    uint256 dataAvailabilityGas = destChainConfig.destDataAvailabilityOverheadGas
+      + destChainConfig.destGasPerDataAvailabilityByte * Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES;
+    uint256 expectedDataAvailabilityCostUSD =
+      USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas * destChainConfig.destDataAvailabilityMultiplierBps * 1e14;
 
     assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD);
 
     // Test that the cost is destnation chain specific
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigArgs =
-      _generatePriceRegistryDestChainDynamicConfigArgs();
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
     destChainConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR + 1;
-    destChainConfigArgs[0].dynamicConfig.destDataAvailabilityOverheadGas =
-      destChainDynamicConfig.destDataAvailabilityOverheadGas * 2;
-    destChainConfigArgs[0].dynamicConfig.destGasPerDataAvailabilityByte =
-      destChainDynamicConfig.destGasPerDataAvailabilityByte * 2;
-    destChainConfigArgs[0].dynamicConfig.destDataAvailabilityMultiplierBps =
-      destChainDynamicConfig.destDataAvailabilityMultiplierBps * 2;
+    destChainConfigArgs[0].destChainConfig.destDataAvailabilityOverheadGas =
+      destChainConfig.destDataAvailabilityOverheadGas * 2;
+    destChainConfigArgs[0].destChainConfig.destGasPerDataAvailabilityByte =
+      destChainConfig.destGasPerDataAvailabilityByte * 2;
+    destChainConfigArgs[0].destChainConfig.destDataAvailabilityMultiplierBps =
+      destChainConfig.destDataAvailabilityMultiplierBps * 2;
     s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
 
-    destChainDynamicConfig = s_priceRegistry.getDestChainDynamicConfig(DEST_CHAIN_SELECTOR + 1);
+    destChainConfig = s_priceRegistry.getDestChainConfig(DEST_CHAIN_SELECTOR + 1);
     uint256 dataAvailabilityCostUSD2 =
       s_priceRegistry.getDataAvailabilityCost(DEST_CHAIN_SELECTOR + 1, USD_PER_DATA_AVAILABILITY_GAS, 0, 0, 0);
-    dataAvailabilityGas = destChainDynamicConfig.destDataAvailabilityOverheadGas
-      + destChainDynamicConfig.destGasPerDataAvailabilityByte * Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES;
-    expectedDataAvailabilityCostUSD = USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas
-      * destChainDynamicConfig.destDataAvailabilityMultiplierBps * 1e14;
+    dataAvailabilityGas = destChainConfig.destDataAvailabilityOverheadGas
+      + destChainConfig.destGasPerDataAvailabilityByte * Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES;
+    expectedDataAvailabilityCostUSD =
+      USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas * destChainConfig.destDataAvailabilityMultiplierBps * 1e14;
 
     assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD2);
     assertFalse(dataAvailabilityCostUSD == dataAvailabilityCostUSD2);
@@ -1339,15 +1324,14 @@ contract PriceRegistry_getDataAvailabilityCost is PriceRegistrySetup {
     uint256 dataAvailabilityCostUSD =
       s_priceRegistry.getDataAvailabilityCost(DEST_CHAIN_SELECTOR, USD_PER_DATA_AVAILABILITY_GAS, 100, 5, 50);
 
-    PriceRegistry.DestChainDynamicConfig memory destChainDynamicConfig =
-      s_priceRegistry.getDestChainDynamicConfig(DEST_CHAIN_SELECTOR);
+    PriceRegistry.DestChainConfig memory destChainConfig = s_priceRegistry.getDestChainConfig(DEST_CHAIN_SELECTOR);
 
     uint256 dataAvailabilityLengthBytes =
       Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES + 100 + (5 * Internal.ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN) + 50;
-    uint256 dataAvailabilityGas = destChainDynamicConfig.destDataAvailabilityOverheadGas
-      + destChainDynamicConfig.destGasPerDataAvailabilityByte * dataAvailabilityLengthBytes;
-    uint256 expectedDataAvailabilityCostUSD = USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas
-      * destChainDynamicConfig.destDataAvailabilityMultiplierBps * 1e14;
+    uint256 dataAvailabilityGas = destChainConfig.destDataAvailabilityOverheadGas
+      + destChainConfig.destGasPerDataAvailabilityByte * dataAvailabilityLengthBytes;
+    uint256 expectedDataAvailabilityCostUSD =
+      USD_PER_DATA_AVAILABILITY_GAS * dataAvailabilityGas * destChainConfig.destDataAvailabilityMultiplierBps * 1e14;
 
     assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD);
   }
@@ -1382,18 +1366,16 @@ contract PriceRegistry_getDataAvailabilityCost is PriceRegistrySetup {
     uint32 tokenTransferBytesOverhead
   ) public {
     vm.assume(destChainSelector != 0);
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigArgs =
-      new PriceRegistry.DestChainDynamicConfigArgs[](1);
-    PriceRegistry.DestChainDynamicConfig memory destChainConfig =
-      s_priceRegistry.getDestChainDynamicConfig(destChainSelector);
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = new PriceRegistry.DestChainConfigArgs[](1);
+    PriceRegistry.DestChainConfig memory destChainConfig = s_priceRegistry.getDestChainConfig(destChainSelector);
     destChainConfigArgs[0] =
-      PriceRegistry.DestChainDynamicConfigArgs({destChainSelector: destChainSelector, dynamicConfig: destChainConfig});
-    destChainConfigArgs[0].dynamicConfig.destDataAvailabilityOverheadGas = destDataAvailabilityOverheadGas;
-    destChainConfigArgs[0].dynamicConfig.destGasPerDataAvailabilityByte = destGasPerDataAvailabilityByte;
-    destChainConfigArgs[0].dynamicConfig.destDataAvailabilityMultiplierBps = destDataAvailabilityMultiplierBps;
-    destChainConfigArgs[0].dynamicConfig.defaultTxGasLimit = GAS_LIMIT;
-    destChainConfigArgs[0].dynamicConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
-    destChainConfigArgs[0].dynamicConfig.defaultTokenDestBytesOverhead = DEFAULT_TOKEN_BYTES_OVERHEAD;
+      PriceRegistry.DestChainConfigArgs({destChainSelector: destChainSelector, destChainConfig: destChainConfig});
+    destChainConfigArgs[0].destChainConfig.destDataAvailabilityOverheadGas = destDataAvailabilityOverheadGas;
+    destChainConfigArgs[0].destChainConfig.destGasPerDataAvailabilityByte = destGasPerDataAvailabilityByte;
+    destChainConfigArgs[0].destChainConfig.destDataAvailabilityMultiplierBps = destDataAvailabilityMultiplierBps;
+    destChainConfigArgs[0].destChainConfig.defaultTxGasLimit = GAS_LIMIT;
+    destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
+    destChainConfigArgs[0].destChainConfig.defaultTokenDestBytesOverhead = DEFAULT_TOKEN_BYTES_OVERHEAD;
 
     s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
 
@@ -1863,9 +1845,8 @@ contract PriceRegistry_getTokenTransferCost is PriceRegistryFeeSetup {
   function test_Fuzz_TokenTransferFeeDuplicateTokens_Success(uint256 transfers, uint256 amount) public view {
     // It shouldn't be possible to pay materially lower fees by splitting up the transfers.
     // Note it is possible to pay higher fees since the minimum fees are added.
-    PriceRegistry.DestChainDynamicConfig memory dynamicConfig =
-      s_priceRegistry.getDestChainDynamicConfig(DEST_CHAIN_SELECTOR);
-    transfers = bound(transfers, 1, dynamicConfig.maxNumberOfTokensPerMsg);
+    PriceRegistry.DestChainConfig memory destChainConfig = s_priceRegistry.getDestChainConfig(DEST_CHAIN_SELECTOR);
+    transfers = bound(transfers, 1, destChainConfig.maxNumberOfTokensPerMsg);
     // Cap amount to avoid overflow
     amount = bound(amount, 0, 1e36);
     Client.EVMTokenAmount[] memory multiple = new Client.EVMTokenAmount[](transfers);
@@ -1883,7 +1864,7 @@ contract PriceRegistry_getTokenTransferCost is PriceRegistryFeeSetup {
       s_priceRegistry.getTokenTransferCost(DEST_CHAIN_SELECTOR, feeToken, s_wrappedTokenPrice, multiple);
 
     // Note that there can be a rounding error once per split.
-    assertGe(feeMultipleUSDWei, (feeSingleUSDWei - dynamicConfig.maxNumberOfTokensPerMsg));
+    assertGe(feeMultipleUSDWei, (feeSingleUSDWei - destChainConfig.maxNumberOfTokensPerMsg));
     assertEq(gasOverheadMultiple, gasOverheadSingle * transfers);
     assertEq(bytesOverheadMultiple, bytesOverheadSingle * transfers);
   }
@@ -1972,15 +1953,13 @@ contract PriceRegistry_getValidatedFee is PriceRegistryFeeSetup {
       Client.EVM2AnyMessage memory message = _generateEmptyMessage();
       message.feeToken = testTokens[i];
       uint64 premiumMultiplierWeiPerEth = s_priceRegistry.getPremiumMultiplierWeiPerEth(message.feeToken);
-      PriceRegistry.DestChainDynamicConfig memory destChainDynamicConfig =
-        s_priceRegistry.getDestChainDynamicConfig(DEST_CHAIN_SELECTOR);
+      PriceRegistry.DestChainConfig memory destChainConfig = s_priceRegistry.getDestChainConfig(DEST_CHAIN_SELECTOR);
 
       uint256 feeAmount = s_priceRegistry.getValidatedFee(DEST_CHAIN_SELECTOR, message);
 
       uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
-      uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
-      uint256 messageFeeUSD =
-        (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * premiumMultiplierWeiPerEth);
+      uint256 gasFeeUSD = (gasUsed * destChainConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
+      uint256 messageFeeUSD = (configUSDCentToWei(destChainConfig.networkFeeUSDCents) * premiumMultiplierWeiPerEth);
       uint256 dataAvailabilityFeeUSD = s_priceRegistry.getDataAvailabilityCost(
         DEST_CHAIN_SELECTOR, USD_PER_DATA_AVAILABILITY_GAS, message.data.length, message.tokenAmounts.length, 0
       );
@@ -1991,25 +1970,21 @@ contract PriceRegistry_getValidatedFee is PriceRegistryFeeSetup {
   }
 
   function test_ZeroDataAvailabilityMultiplier_Success() public {
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigArgs =
-      new PriceRegistry.DestChainDynamicConfigArgs[](1);
-    PriceRegistry.DestChainDynamicConfig memory destChainConfig =
-      s_priceRegistry.getDestChainDynamicConfig(DEST_CHAIN_SELECTOR);
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = new PriceRegistry.DestChainConfigArgs[](1);
+    PriceRegistry.DestChainConfig memory destChainConfig = s_priceRegistry.getDestChainConfig(DEST_CHAIN_SELECTOR);
     destChainConfigArgs[0] =
-      PriceRegistry.DestChainDynamicConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, dynamicConfig: destChainConfig});
-    destChainConfigArgs[0].dynamicConfig.destDataAvailabilityMultiplierBps = 0;
+      PriceRegistry.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, destChainConfig: destChainConfig});
+    destChainConfigArgs[0].destChainConfig.destDataAvailabilityMultiplierBps = 0;
     s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint64 premiumMultiplierWeiPerEth = s_priceRegistry.getPremiumMultiplierWeiPerEth(message.feeToken);
-    PriceRegistry.DestChainDynamicConfig memory destChainDynamicConfig =
-      s_priceRegistry.getDestChainDynamicConfig(DEST_CHAIN_SELECTOR);
 
     uint256 feeAmount = s_priceRegistry.getValidatedFee(DEST_CHAIN_SELECTOR, message);
 
     uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
-    uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
-    uint256 messageFeeUSD = (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * premiumMultiplierWeiPerEth);
+    uint256 gasFeeUSD = (gasUsed * destChainConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
+    uint256 messageFeeUSD = (configUSDCentToWei(destChainConfig.networkFeeUSDCents) * premiumMultiplierWeiPerEth);
 
     uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD) / s_feeTokenPrice;
     assertEq(totalPriceInFeeToken, feeAmount);
@@ -2031,14 +2006,12 @@ contract PriceRegistry_getValidatedFee is PriceRegistryFeeSetup {
       });
 
       uint64 premiumMultiplierWeiPerEth = s_priceRegistry.getPremiumMultiplierWeiPerEth(message.feeToken);
-      PriceRegistry.DestChainDynamicConfig memory destChainDynamicConfig =
-        s_priceRegistry.getDestChainDynamicConfig(DEST_CHAIN_SELECTOR);
+      PriceRegistry.DestChainConfig memory destChainConfig = s_priceRegistry.getDestChainConfig(DEST_CHAIN_SELECTOR);
 
       uint256 feeAmount = s_priceRegistry.getValidatedFee(DEST_CHAIN_SELECTOR, message);
       uint256 gasUsed = customGasLimit + DEST_GAS_OVERHEAD + customDataSize * DEST_GAS_PER_PAYLOAD_BYTE;
-      uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
-      uint256 messageFeeUSD =
-        (configUSDCentToWei(destChainDynamicConfig.networkFeeUSDCents) * premiumMultiplierWeiPerEth);
+      uint256 gasFeeUSD = (gasUsed * destChainConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
+      uint256 messageFeeUSD = (configUSDCentToWei(destChainConfig.networkFeeUSDCents) * premiumMultiplierWeiPerEth);
       uint256 dataAvailabilityFeeUSD = s_priceRegistry.getDataAvailabilityCost(
         DEST_CHAIN_SELECTOR, USD_PER_DATA_AVAILABILITY_GAS, message.data.length, message.tokenAmounts.length, 0
       );
@@ -2056,8 +2029,7 @@ contract PriceRegistry_getValidatedFee is PriceRegistryFeeSetup {
     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
       Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, tokenAmount);
       message.feeToken = testTokens[i];
-      PriceRegistry.DestChainDynamicConfig memory destChainDynamicConfig =
-        s_priceRegistry.getDestChainDynamicConfig(DEST_CHAIN_SELECTOR);
+      PriceRegistry.DestChainConfig memory destChainConfig = s_priceRegistry.getDestChainConfig(DEST_CHAIN_SELECTOR);
       uint32 destBytesOverhead =
         s_priceRegistry.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token).destBytesOverhead;
       uint32 tokenBytesOverhead =
@@ -2067,7 +2039,7 @@ contract PriceRegistry_getValidatedFee is PriceRegistryFeeSetup {
 
       uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD
         + s_priceRegistry.getTokenTransferFeeConfig(DEST_CHAIN_SELECTOR, message.tokenAmounts[0].token).destGasOverhead;
-      uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
+      uint256 gasFeeUSD = (gasUsed * destChainConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
       (uint256 transferFeeUSD,,) = s_priceRegistry.getTokenTransferCost(
         DEST_CHAIN_SELECTOR, message.feeToken, feeTokenPrices[i], message.tokenAmounts
       );
@@ -2099,8 +2071,7 @@ contract PriceRegistry_getValidatedFee is PriceRegistryFeeSetup {
         extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: customGasLimit}))
       });
       uint64 premiumMultiplierWeiPerEth = s_priceRegistry.getPremiumMultiplierWeiPerEth(message.feeToken);
-      PriceRegistry.DestChainDynamicConfig memory destChainDynamicConfig =
-        s_priceRegistry.getDestChainDynamicConfig(DEST_CHAIN_SELECTOR);
+      PriceRegistry.DestChainConfig memory destChainConfig = s_priceRegistry.getDestChainConfig(DEST_CHAIN_SELECTOR);
 
       message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: 10000e18}); // feeTokenAmount
       message.tokenAmounts[1] = Client.EVMTokenAmount({token: CUSTOM_TOKEN, amount: 200000e18}); // customTokenAmount
@@ -2119,7 +2090,7 @@ contract PriceRegistry_getValidatedFee is PriceRegistryFeeSetup {
 
       uint256 gasUsed =
         customGasLimit + DEST_GAS_OVERHEAD + message.data.length * DEST_GAS_PER_PAYLOAD_BYTE + tokenGasOverhead;
-      uint256 gasFeeUSD = (gasUsed * destChainDynamicConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
+      uint256 gasFeeUSD = (gasUsed * destChainConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
       (uint256 transferFeeUSD,,) = s_priceRegistry.getTokenTransferCost(
         DEST_CHAIN_SELECTOR, message.feeToken, feeTokenPrices[i], message.tokenAmounts
       );
@@ -2138,13 +2109,12 @@ contract PriceRegistry_getValidatedFee is PriceRegistryFeeSetup {
   }
 
   function test_Fuzz_EnforceOutOfOrder(bool enforce, bool allowOutOfOrderExecution) public {
-    // Update dynamic config to enforce allowOutOfOrderExecution = defaultVal.
+    // Update config to enforce allowOutOfOrderExecution = defaultVal.
     vm.stopPrank();
     vm.startPrank(OWNER);
 
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigArgs =
-      _generatePriceRegistryDestChainDynamicConfigArgs();
-    destChainConfigArgs[0].dynamicConfig.enforceOutOfOrder = enforce;
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.enforceOutOfOrder = enforce;
     s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -2168,13 +2138,12 @@ contract PriceRegistry_getValidatedFee is PriceRegistryFeeSetup {
   }
 
   function test_EnforceOutOfOrder_Revert() public {
-    // Update dynamic config to enforce allowOutOfOrderExecution = true.
+    // Update config to enforce allowOutOfOrderExecution = true.
     vm.stopPrank();
     vm.startPrank(OWNER);
 
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigArgs =
-      _generatePriceRegistryDestChainDynamicConfigArgs();
-    destChainConfigArgs[0].dynamicConfig.enforceOutOfOrder = true;
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.enforceOutOfOrder = true;
     s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
     vm.stopPrank();
 
@@ -2519,11 +2488,11 @@ contract PriceRegistry_validateDestFamilyAddress is PriceRegistrySetup {
 }
 
 contract PriceRegistry_parseEVMExtraArgsFromBytes is PriceRegistrySetup {
-  PriceRegistry.DestChainDynamicConfig private s_destChainDynamicConfig;
+  PriceRegistry.DestChainConfig private s_destChainConfig;
 
   function setUp() public virtual override {
     super.setUp();
-    s_destChainDynamicConfig = _generatePriceRegistryDestChainDynamicConfigArgs()[0].dynamicConfig;
+    s_destChainConfig = _generatePriceRegistryDestChainConfigArgs()[0].destChainConfig;
   }
 
   function test_EVMExtraArgsV1_Success() public view {
@@ -2533,7 +2502,7 @@ contract PriceRegistry_parseEVMExtraArgsFromBytes is PriceRegistrySetup {
       Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: false});
 
     vm.assertEq(
-      abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes(inputExtraArgs, s_destChainDynamicConfig)),
+      abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes(inputExtraArgs, s_destChainConfig)),
       abi.encode(expectedOutputArgs)
     );
   }
@@ -2544,18 +2513,16 @@ contract PriceRegistry_parseEVMExtraArgsFromBytes is PriceRegistrySetup {
     bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
 
     vm.assertEq(
-      abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes(inputExtraArgs, s_destChainDynamicConfig)),
-      abi.encode(inputArgs)
+      abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes(inputExtraArgs, s_destChainConfig)), abi.encode(inputArgs)
     );
   }
 
   function test_EVMExtraArgsDefault_Success() public view {
     Client.EVMExtraArgsV2 memory expectedOutputArgs =
-      Client.EVMExtraArgsV2({gasLimit: s_destChainDynamicConfig.defaultTxGasLimit, allowOutOfOrderExecution: false});
+      Client.EVMExtraArgsV2({gasLimit: s_destChainConfig.defaultTxGasLimit, allowOutOfOrderExecution: false});
 
     vm.assertEq(
-      abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes("", s_destChainDynamicConfig)),
-      abi.encode(expectedOutputArgs)
+      abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes("", s_destChainConfig)), abi.encode(expectedOutputArgs)
     );
   }
 
@@ -2569,25 +2536,25 @@ contract PriceRegistry_parseEVMExtraArgsFromBytes is PriceRegistrySetup {
     inputExtraArgs[0] = bytes1(uint8(0));
 
     vm.expectRevert(PriceRegistry.InvalidExtraArgsTag.selector);
-    s_priceRegistry.parseEVMExtraArgsFromBytes(inputExtraArgs, s_destChainDynamicConfig);
+    s_priceRegistry.parseEVMExtraArgsFromBytes(inputExtraArgs, s_destChainConfig);
   }
 
   function test_EVMExtraArgsEnforceOutOfOrder_Revert() public {
     Client.EVMExtraArgsV2 memory inputArgs =
       Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: false});
     bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
-    s_destChainDynamicConfig.enforceOutOfOrder = true;
+    s_destChainConfig.enforceOutOfOrder = true;
 
     vm.expectRevert(PriceRegistry.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
-    s_priceRegistry.parseEVMExtraArgsFromBytes(inputExtraArgs, s_destChainDynamicConfig);
+    s_priceRegistry.parseEVMExtraArgsFromBytes(inputExtraArgs, s_destChainConfig);
   }
 
   function test_EVMExtraArgsGasLimitTooHigh_Revert() public {
     Client.EVMExtraArgsV2 memory inputArgs =
-      Client.EVMExtraArgsV2({gasLimit: s_destChainDynamicConfig.maxPerMsgGasLimit + 1, allowOutOfOrderExecution: true});
+      Client.EVMExtraArgsV2({gasLimit: s_destChainConfig.maxPerMsgGasLimit + 1, allowOutOfOrderExecution: true});
     bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
 
     vm.expectRevert(PriceRegistry.MessageGasLimitTooHigh.selector);
-    s_priceRegistry.parseEVMExtraArgsFromBytes(inputExtraArgs, s_destChainDynamicConfig);
+    s_priceRegistry.parseEVMExtraArgsFromBytes(inputExtraArgs, s_destChainConfig);
   }
 }

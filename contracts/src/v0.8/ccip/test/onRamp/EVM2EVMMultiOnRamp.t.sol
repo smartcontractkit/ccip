@@ -562,9 +562,8 @@ contract EVM2EVMMultiOnRamp_getFee is EVM2EVMMultiOnRampSetup {
     vm.stopPrank();
     vm.startPrank(OWNER);
 
-    PriceRegistry.DestChainDynamicConfigArgs[] memory destChainConfigArgs =
-      _generatePriceRegistryDestChainDynamicConfigArgs();
-    destChainConfigArgs[0].dynamicConfig.enforceOutOfOrder = true;
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.enforceOutOfOrder = true;
     s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
     vm.stopPrank();
 
