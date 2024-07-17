@@ -174,7 +174,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			chainReaderConfig,
 		)
 		if err2 != nil {
-			return nil, fmt.Errorf("failed to create contract reader for chain %s: %w", chain.ID(), err)
+			return nil, fmt.Errorf("failed to create contract reader for chain %s: %w", chain.ID(), err2)
 		}
 
 		// Even though we only write to the dest chain, we need to create chain writers for all chains
@@ -194,7 +194,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			evmconfigs.ChainWriterConfigRaw(fromAddress, chain.Config().EVM().GasEstimator().PriceMaxKey(fromAddress)),
 		)
 		if err2 != nil {
-			return nil, fmt.Errorf("failed to create chain writer for chain %s: %w", chain.ID(), err)
+			return nil, fmt.Errorf("failed to create chain writer for chain %s: %w", chain.ID(), err2)
 		}
 
 		chainSelector, ok := chainsel.EvmChainIdToChainSelector()[chain.ID().Uint64()]
