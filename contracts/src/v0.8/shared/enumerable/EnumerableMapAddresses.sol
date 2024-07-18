@@ -140,12 +140,9 @@ library EnumerableMapAddresses {
     return map._inner.get(bytes32(uint256(uint160(key))));
   }
 
-
-
   struct AddressToBytesMap {
     CCIPEnumerableMap.Bytes32ToBytesMap _inner;
   }
-
 
   /**
    * @dev Sets the value for `key` in the map. Returns true if the key was added to the map, that is if it was not already present.
