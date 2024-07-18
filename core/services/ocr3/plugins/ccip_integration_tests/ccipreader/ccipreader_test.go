@@ -104,7 +104,13 @@ func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 		cciptypes.NewSeqNumRange(5, 20),
 	)
 	require.NoError(t, err)
-	assert.Len(t, msgs, 2)
+	require.Len(t, msgs, 2)
+	require.Equal(t, cciptypes.SeqNum(10), msgs[0].Header.SequenceNumber)
+	require.Equal(t, cciptypes.SeqNum(15), msgs[1].Header.SequenceNumber)
+	for _, msg := range msgs {
+		require.Equal(t, chainS1, msg.Header.SourceChainSelector)
+		require.Equal(t, chainD, msg.Header.DestChainSelector)
+	}
 }
 
 func TestCCIPReader_NextSeqNum(t *testing.T) {
