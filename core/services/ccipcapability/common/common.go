@@ -10,6 +10,7 @@ import (
 
 // HashedCapabilityID returns the hashed capability id in a manner equivalent to the capability registry.
 func HashedCapabilityID(capabilityLabelledName, capabilityVersion string) (r [32]byte, err error) {
+	// TODO: investigate how to avoid parsing the ABI everytime.
 	tabi := `[{"type": "string"}, {"type": "string"}]`
 	abiEncoded, err := utils.ABIEncode(tabi, capabilityLabelledName, capabilityVersion)
 	if err != nil {
@@ -19,14 +20,4 @@ func HashedCapabilityID(capabilityLabelledName, capabilityVersion string) (r [32
 	h := crypto.Keccak256(abiEncoded)
 	copy(r[:], h)
 	return r, nil
-}
-
-// MustHashedCapabilityID is a helper function that panics if the HashedCapabilityID function returns an error.
-// should only use in tests.
-func MustHashedCapabilityID(capabilityLabelledName, capabilityVersion string) [32]byte {
-	r, err := HashedCapabilityID(capabilityLabelledName, capabilityVersion)
-	if err != nil {
-		panic(fmt.Errorf("failed to hash capability id (labelled name: %s, version: %s): %w", capabilityLabelledName, capabilityVersion, err))
-	}
-	return r
 }

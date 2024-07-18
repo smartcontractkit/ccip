@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
@@ -41,7 +42,7 @@ func Test_diff(t *testing.T) {
 				capabilityLabelledName: ccipCapName,
 				oldState: registrysyncer.State{
 					IDsToCapabilities: map[registrysyncer.HashedCapabilityID]kcr.CapabilitiesRegistryCapabilityInfo{
-						capcommon.MustHashedCapabilityID(ccipCapName, ccipCapVersion): {
+						mustHashedCapabilityID(ccipCapName, ccipCapVersion): {
 							LabelledName: ccipCapName,
 							Version:      ccipCapVersion,
 						},
@@ -51,7 +52,7 @@ func Test_diff(t *testing.T) {
 							Id: 1,
 							CapabilityConfigurations: []kcr.CapabilitiesRegistryCapabilityConfiguration{
 								{
-									CapabilityId: capcommon.MustHashedCapabilityID(ccipCapName, ccipCapVersion),
+									CapabilityId: mustHashedCapabilityID(ccipCapName, ccipCapVersion),
 								},
 							},
 						},
@@ -60,7 +61,7 @@ func Test_diff(t *testing.T) {
 				},
 				newState: registrysyncer.State{
 					IDsToCapabilities: map[registrysyncer.HashedCapabilityID]kcr.CapabilitiesRegistryCapabilityInfo{
-						capcommon.MustHashedCapabilityID(ccipCapName, ccipCapVersion): {
+						mustHashedCapabilityID(ccipCapName, ccipCapVersion): {
 							LabelledName: ccipCapName,
 							Version:      ccipCapVersion,
 						},
@@ -70,7 +71,7 @@ func Test_diff(t *testing.T) {
 							Id: 1,
 							CapabilityConfigurations: []kcr.CapabilitiesRegistryCapabilityConfiguration{
 								{
-									CapabilityId: capcommon.MustHashedCapabilityID(ccipCapName, ccipCapVersion),
+									CapabilityId: mustHashedCapabilityID(ccipCapName, ccipCapVersion),
 								},
 							},
 						},
@@ -92,7 +93,7 @@ func Test_diff(t *testing.T) {
 				capabilityLabelledName: ccipCapName,
 				oldState: registrysyncer.State{
 					IDsToCapabilities: map[registrysyncer.HashedCapabilityID]kcr.CapabilitiesRegistryCapabilityInfo{
-						capcommon.MustHashedCapabilityID(ccipCapName, ccipCapNewVersion): {
+						mustHashedCapabilityID(ccipCapName, ccipCapNewVersion): {
 							LabelledName: ccipCapName,
 							Version:      ccipCapNewVersion,
 						},
@@ -100,7 +101,7 @@ func Test_diff(t *testing.T) {
 				},
 				newState: registrysyncer.State{
 					IDsToCapabilities: map[registrysyncer.HashedCapabilityID]kcr.CapabilitiesRegistryCapabilityInfo{
-						capcommon.MustHashedCapabilityID(ccipCapName, ccipCapNewVersion): {
+						mustHashedCapabilityID(ccipCapName, ccipCapNewVersion): {
 							LabelledName: ccipCapName,
 							Version:      ccipCapNewVersion,
 						},
@@ -117,7 +118,7 @@ func Test_diff(t *testing.T) {
 				capabilityLabelledName: ccipCapName,
 				oldState: registrysyncer.State{
 					IDsToCapabilities: map[registrysyncer.HashedCapabilityID]kcr.CapabilitiesRegistryCapabilityInfo{
-						capcommon.MustHashedCapabilityID(ccipCapName, ccipCapVersion): {
+						mustHashedCapabilityID(ccipCapName, ccipCapVersion): {
 							LabelledName: ccipCapName,
 							Version:      ccipCapVersion,
 						},
@@ -126,7 +127,7 @@ func Test_diff(t *testing.T) {
 				},
 				newState: registrysyncer.State{
 					IDsToCapabilities: map[registrysyncer.HashedCapabilityID]kcr.CapabilitiesRegistryCapabilityInfo{
-						capcommon.MustHashedCapabilityID(ccipCapName, ccipCapVersion): {
+						mustHashedCapabilityID(ccipCapName, ccipCapVersion): {
 							LabelledName: ccipCapName,
 							Version:      ccipCapVersion,
 						},
@@ -136,7 +137,7 @@ func Test_diff(t *testing.T) {
 							Id: 1,
 							CapabilityConfigurations: []kcr.CapabilitiesRegistryCapabilityConfiguration{
 								{
-									CapabilityId: capcommon.MustHashedCapabilityID(ccipCapName, ccipCapVersion),
+									CapabilityId: mustHashedCapabilityID(ccipCapName, ccipCapVersion),
 								},
 							},
 						},
@@ -149,7 +150,7 @@ func Test_diff(t *testing.T) {
 						Id: 1,
 						CapabilityConfigurations: []kcr.CapabilitiesRegistryCapabilityConfiguration{
 							{
-								CapabilityId: capcommon.MustHashedCapabilityID(ccipCapName, ccipCapVersion),
+								CapabilityId: mustHashedCapabilityID(ccipCapName, ccipCapVersion),
 							},
 						},
 					},
@@ -290,7 +291,7 @@ func Test_filterCCIPDONs(t *testing.T) {
 							Id: 1,
 							CapabilityConfigurations: []kcr.CapabilitiesRegistryCapabilityConfiguration{
 								{
-									CapabilityId: capcommon.MustHashedCapabilityID(ccipCapName, ccipCapVersion),
+									CapabilityId: mustHashedCapabilityID(ccipCapName, ccipCapVersion),
 								},
 							},
 						},
@@ -302,7 +303,7 @@ func Test_filterCCIPDONs(t *testing.T) {
 					Id: 1,
 					CapabilityConfigurations: []kcr.CapabilitiesRegistryCapabilityConfiguration{
 						{
-							CapabilityId: capcommon.MustHashedCapabilityID(ccipCapName, ccipCapVersion),
+							CapabilityId: mustHashedCapabilityID(ccipCapName, ccipCapVersion),
 						},
 					},
 				},
@@ -322,7 +323,7 @@ func Test_filterCCIPDONs(t *testing.T) {
 							Id: 1,
 							CapabilityConfigurations: []kcr.CapabilitiesRegistryCapabilityConfiguration{
 								{
-									CapabilityId: capcommon.MustHashedCapabilityID(ccipCapName, ccipCapNewVersion),
+									CapabilityId: mustHashedCapabilityID(ccipCapName, ccipCapNewVersion),
 								},
 							},
 						},
@@ -345,10 +346,10 @@ func Test_filterCCIPDONs(t *testing.T) {
 							Id: 1,
 							CapabilityConfigurations: []kcr.CapabilitiesRegistryCapabilityConfiguration{
 								{
-									CapabilityId: capcommon.MustHashedCapabilityID(ccipCapName, ccipCapVersion),
+									CapabilityId: mustHashedCapabilityID(ccipCapName, ccipCapVersion),
 								},
 								{
-									CapabilityId: capcommon.MustHashedCapabilityID(ccipCapName, ccipCapNewVersion),
+									CapabilityId: mustHashedCapabilityID(ccipCapName, ccipCapNewVersion),
 								},
 							},
 						},
@@ -360,10 +361,10 @@ func Test_filterCCIPDONs(t *testing.T) {
 					Id: 1,
 					CapabilityConfigurations: []kcr.CapabilitiesRegistryCapabilityConfiguration{
 						{
-							CapabilityId: capcommon.MustHashedCapabilityID(ccipCapName, ccipCapVersion),
+							CapabilityId: mustHashedCapabilityID(ccipCapName, ccipCapVersion),
 						},
 						{
-							CapabilityId: capcommon.MustHashedCapabilityID(ccipCapName, ccipCapNewVersion),
+							CapabilityId: mustHashedCapabilityID(ccipCapName, ccipCapNewVersion),
 						},
 					},
 				},
@@ -403,11 +404,11 @@ func Test_checkCapabilityPresence(t *testing.T) {
 				capabilityLabelledName: ccipCapName,
 				state: registrysyncer.State{
 					IDsToCapabilities: map[registrysyncer.HashedCapabilityID]kcr.CapabilitiesRegistryCapabilityInfo{
-						capcommon.MustHashedCapabilityID(ccipCapName, ccipCapVersion): {
+						mustHashedCapabilityID(ccipCapName, ccipCapVersion): {
 							LabelledName: ccipCapName,
 							Version:      ccipCapVersion,
 						},
-						capcommon.MustHashedCapabilityID(ccipCapName, ccipCapNewVersion): {
+						mustHashedCapabilityID(ccipCapName, ccipCapNewVersion): {
 							LabelledName: ccipCapName,
 							Version:      ccipCapNewVersion,
 						},
@@ -427,7 +428,7 @@ func Test_checkCapabilityPresence(t *testing.T) {
 				capabilityLabelledName: ccipCapName,
 				state: registrysyncer.State{
 					IDsToCapabilities: map[registrysyncer.HashedCapabilityID]kcr.CapabilitiesRegistryCapabilityInfo{
-						capcommon.MustHashedCapabilityID(ccipCapName, ccipCapNewVersion): {
+						mustHashedCapabilityID(ccipCapName, ccipCapNewVersion): {
 							LabelledName: ccipCapName,
 							Version:      ccipCapNewVersion,
 						},
@@ -472,4 +473,12 @@ func Test_isMemberOfBootstrapSubcommittee(t *testing.T) {
 	}
 	require.True(t, isMemberOfBootstrapSubcommittee(bootstrapKeys, ragep2ptypes.PeerID(p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1)).PeerID())))
 	require.False(t, isMemberOfBootstrapSubcommittee(bootstrapKeys, ragep2ptypes.PeerID(p2pkey.MustNewV2XXXTestingOnly(big.NewInt(5)).PeerID())))
+}
+
+func mustHashedCapabilityID(capabilityLabelledName, capabilityVersion string) [32]byte {
+	r, err := capcommon.HashedCapabilityID(capabilityLabelledName, capabilityVersion)
+	if err != nil {
+		panic(fmt.Errorf("failed to hash capability id (labelled name: %s, version: %s): %w", capabilityLabelledName, capabilityVersion, err))
+	}
+	return r
 }
