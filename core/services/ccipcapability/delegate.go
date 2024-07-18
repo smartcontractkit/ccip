@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
@@ -234,6 +235,7 @@ func (d *Delegate) getHomeChainContractReader(
 		context.Background(),
 		d.lggr,
 		homeChain.LogPoller(),
+		homeChain.HeadTracker(),
 		homeChain.Client(),
 		configsevm.HomeChainReaderConfigRaw(),
 	)
@@ -270,7 +272,7 @@ func bindReader(ctx context.Context,
 	}
 
 	var ccipCapabilityInfo kcr.CapabilitiesRegistryCapabilityInfo
-	err = reader.GetLatestValue(ctx, consts.ContractNameCapabilitiesRegistry, consts.MethodNameGetCapability, map[string]any{
+	err = reader.GetLatestValue(ctx, consts.ContractNameCapabilitiesRegistry, consts.MethodNameGetCapability, primitives.Unconfirmed, map[string]any{
 		"hashedId": hid,
 	}, &ccipCapabilityInfo)
 	if err != nil {
