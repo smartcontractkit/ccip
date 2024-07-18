@@ -74,13 +74,14 @@ require (
 	github.com/shopspring/decimal v1.3.1
 	github.com/smartcontractkit/chain-selectors v1.0.18
 	github.com/smartcontractkit/chainlink-automation v1.0.4
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20240717155918-39aad01c3eeb
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240712162033-89bd3351ce6e
-	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20240710121324-3ed288aa9b45
-	github.com/smartcontractkit/chainlink-data-streams v0.0.0-20240716180914-6fd88994c89c
-	github.com/smartcontractkit/chainlink-feeds v0.0.0-20240710170203-5b41615da827
-	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240712132946-267a37c5ac6e
-	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240709043547-03612098f799
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20240717202359-0bcfc8ee468d
+	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240708180634-24440372521a
+	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20240621143432-85370a54b141
+	github.com/smartcontractkit/chainlink-data-streams v0.0.0-20240702144807-761f63e7b527
+	github.com/smartcontractkit/chainlink-feeds v0.0.0-20240522213638-159fb2d99917
+	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20240701154249-032706dcb7c8
+	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20240625074951-06ab5e670dba
+	github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868
 	github.com/smartcontractkit/libocr v0.0.0-20240702141926-063ceef8c42e
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20230906073235-9e478e5e19f1
 	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20230906073235-9e478e5e19f1
