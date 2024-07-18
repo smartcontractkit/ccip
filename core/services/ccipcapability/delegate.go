@@ -116,7 +116,9 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 	// since all queries are scoped by config digest.
 	ocrDB := ocr2.NewDB(d.ds, spec.ID, 0, d.lggr)
 
-	homeChainContractReader, err := d.getHomeChainContractReader(d.chains,
+	homeChainContractReader, err := d.getHomeChainContractReader(
+		ctx,
+		d.chains,
 		spec.CCIPSpec.CapabilityLabelledName,
 		spec.CCIPSpec.CapabilityVersion)
 	if err != nil {
@@ -215,6 +217,7 @@ func (d *Delegate) getTransmitterKeys(ctx context.Context, chains legacyevm.Lega
 }
 
 func (d *Delegate) getHomeChainContractReader(
+	ctx context.Context,
 	chains legacyevm.LegacyChainContainer,
 	capabilityLabelledName,
 	capabilityVersion string,
@@ -238,7 +241,7 @@ func (d *Delegate) getHomeChainContractReader(
 		return nil, fmt.Errorf("failed to create home chain contract reader: %w", err)
 	}
 
-	reader, err = bindReader(reader, d.capabilityConfig.ExternalRegistry().Address(), capabilityLabelledName, capabilityVersion)
+	reader, err = bindReader(ctx, reader, d.capabilityConfig.ExternalRegistry().Address(), capabilityLabelledName, capabilityVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to bind home chain contract reader: %w", err)
 	}
@@ -246,8 +249,12 @@ func (d *Delegate) getHomeChainContractReader(
 	return reader, nil
 }
 
-func bindReader(reader types.ContractReader, capRegAddress, capabilityLabelledName, capabilityVersion string) (types.ContractReader, error) {
-	err := reader.Bind(context.Background(), []types.BoundContract{
+func bindReader(ctx context.Context,
+	reader types.ContractReader,
+	capRegAddress,
+	capabilityLabelledName,
+	capabilityVersion string) (types.ContractReader, error) {
+	err := reader.Bind(ctx, []types.BoundContract{
 		{
 			Address: capRegAddress,
 			Name:    consts.ContractNameCapabilitiesRegistry,
@@ -263,7 +270,7 @@ func bindReader(reader types.ContractReader, capRegAddress, capabilityLabelledNa
 	}
 
 	var ccipCapabilityInfo kcr.CapabilitiesRegistryCapabilityInfo
-	err = reader.GetLatestValue(context.Background(), consts.ContractNameCapabilitiesRegistry, consts.MethodNameGetCapability, map[string]any{
+	err = reader.GetLatestValue(ctx, consts.ContractNameCapabilitiesRegistry, consts.MethodNameGetCapability, map[string]any{
 		"hashedId": hid,
 	}, &ccipCapabilityInfo)
 	if err != nil {
@@ -271,7 +278,7 @@ func bindReader(reader types.ContractReader, capRegAddress, capabilityLabelledNa
 	}
 
 	// bind the ccip capability configuration contract
-	err = reader.Bind(context.Background(), []types.BoundContract{
+	err = reader.Bind(ctx, []types.BoundContract{
 		{
 			Address: ccipCapabilityInfo.ConfigurationContract.String(),
 			Name:    consts.ContractNameCCIPConfig,

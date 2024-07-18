@@ -111,20 +111,7 @@ func (i *inprocessOracleCreator) CreateBootstrapOracle(config cctypes.OCR3Config
 		V2Bootstrappers:       i.bootstrapperLocators,
 		ContractConfigTracker: ocrimpls.NewConfigTracker(config),
 		Database:              i.db,
-		LocalConfig: ocrtypes.LocalConfig{
-			BlockchainTimeout: 10 * time.Second,
-
-			// Config tracking is handled by the launcher, since we're doing blue-green
-			// deployments we're not going to be using OCR's built-in config switching,
-			// which always shuts down the previous instance.
-			ContractConfigConfirmations:        1,
-			SkipContractConfigConfirmations:    true,
-			ContractConfigTrackerPollInterval:  10 * time.Second,
-			ContractTransmitterTransmitTimeout: 10 * time.Second,
-			DatabaseTimeout:                    10 * time.Second,
-			MinOCR2MaxDurationQuery:            1 * time.Second,
-			DevelopmentMode:                    "false",
-		},
+		LocalConfig:           defaultLocalConfig(),
 		Logger: ocrcommon.NewOCRWrapper(
 			i.lggr.
 				Named("CCIPBootstrap").
@@ -308,22 +295,10 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 		V2Bootstrappers:              i.bootstrapperLocators,
 		ContractConfigTracker:        ocrimpls.NewConfigTracker(config),
 		ContractTransmitter:          transmitter,
-		LocalConfig: ocrtypes.LocalConfig{
-			BlockchainTimeout: 10 * time.Second,
-			// Config tracking is handled by the launcher, since we're doing blue-green
-			// deployments we're not going to be using OCR's built-in config switching,
-			// which always shuts down the previous instance.
-			ContractConfigConfirmations:        1,
-			SkipContractConfigConfirmations:    true,
-			ContractConfigTrackerPollInterval:  10 * time.Second,
-			ContractTransmitterTransmitTimeout: 10 * time.Second,
-			DatabaseTimeout:                    10 * time.Second,
-			MinOCR2MaxDurationQuery:            1 * time.Second,
-			DevelopmentMode:                    "false",
-		},
+		LocalConfig:                  defaultLocalConfig(),
 		Logger: ocrcommon.NewOCRWrapper(
 			i.lggr.
-				Named("CCIPCommitOCR3").
+				Named(fmt.Sprintf("CCIP%sOCR3", pluginType.String())).
 				Named(destRelayID.String()).
 				Named(hexutil.Encode(config.Config.OfframpAddress)),
 			false,
@@ -345,4 +320,20 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 		return nil, err
 	}
 	return oracle, nil
+}
+
+func defaultLocalConfig() ocrtypes.LocalConfig {
+	return ocrtypes.LocalConfig{
+		BlockchainTimeout: 10 * time.Second,
+		// Config tracking is handled by the launcher, since we're doing blue-green
+		// deployments we're not going to be using OCR's built-in config switching,
+		// which always shuts down the previous instance.
+		ContractConfigConfirmations:        1,
+		SkipContractConfigConfirmations:    true,
+		ContractConfigTrackerPollInterval:  10 * time.Second,
+		ContractTransmitterTransmitTimeout: 10 * time.Second,
+		DatabaseTimeout:                    10 * time.Second,
+		MinOCR2MaxDurationQuery:            1 * time.Second,
+		DevelopmentMode:                    "false",
+	}
 }
