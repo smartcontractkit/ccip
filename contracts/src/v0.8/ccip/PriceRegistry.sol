@@ -11,14 +11,22 @@ import {Internal} from "./libraries/Internal.sol";
 import {Pool} from "./libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 
+import {IReceiver} from "../keystone/interfaces/IReceiver.sol";
 import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
 /// and the price of a token in USD allowing the owner or priceUpdater to update this value.
 /// The authorized callers in the contract represent the fee price updaters.
-contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
+contract PriceRegistry is
+  AuthorizedCallers,
+  IPriceRegistry,
+  ITypeAndVersion,
+  IReceiver,
+  KeystoneFeedsPermissionHandler
+{
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
+  using KeystoneFeedDefaultMetadataLib for bytes;
 
   /// @notice Token price data feed update
   struct TokenPriceFeedUpdate {
@@ -33,6 +41,13 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     uint96 maxFeeJuelsPerMsg; // ─╮ Maximum fee that can be charged for a message
     address linkToken; // ────────╯ LINK token address
     uint32 stalenessThreshold; // The amount of time a gas price can be stale before it is considered invalid.
+  }
+
+  /// @notice The struct representing the received CCIP feed report from keystone IReceiver.onReport()
+  struct ReceivedCCIPFeedReport {
+    address Token;
+    uint224 Price;
+    uint32 Timestamp;
   }
 
   error TokenNotSupported(address token);
@@ -437,6 +452,25 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
       s_usdPriceFeedsPerToken[sourceToken] = tokenPriceFeedConfig;
       emit PriceFeedPerTokenUpdated(sourceToken, tokenPriceFeedConfig);
+    }
+  }
+
+  /// @notice Handles the report containing price feeds and updates the internal price storage
+  /// @inheritdoc IReceiver
+  /// @dev This function is called to process incoming price feed data.
+  /// @param metadata Arbitrary metadata associated with the report (not used in this implementation).
+  /// @param report Encoded report containing an array of `ReceivedCCIPFeedReport` structs.
+  function onReport(bytes calldata metadata, bytes calldata report) external {
+    (bytes10 workflowName, address workflowOwner, bytes2 reportName) = metadata._extractMetadataInfo();
+
+    _validateReportPermission(msg.sender, workflowOwner, workflowName, reportName);
+
+    ReceivedCCIPFeedReport[] memory feeds = abi.decode(report, (ReceivedCCIPFeedReport[]));
+
+    for (uint256 i = 0; i < feeds.length; ++i) {
+      s_usdPerToken[feeds[i].Token] =
+        Internal.TimestampedPackedUint224({value: feeds[i].Price, timestamp: feeds[i].Timestamp});
+      emit UsdPerTokenUpdated(feeds[i].Token, feeds[i].Price, feeds[i].Timestamp);
     }
   }
 
