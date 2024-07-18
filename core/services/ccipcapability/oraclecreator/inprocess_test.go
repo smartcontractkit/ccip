@@ -46,6 +46,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
+const (
+	ccipCapabilityVersion = "v1.6.0-dev"
+)
+
 func TestOracleCreator_CreateBootstrap(t *testing.T) {
 	db := pgtest.NewSqlxDB(t)
 

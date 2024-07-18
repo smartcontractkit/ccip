@@ -1,7 +1,6 @@
 package evm
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -13,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
+	configstypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/configs/types"
 	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
@@ -22,28 +22,15 @@ var (
 	ccipConfigABI           = evmtypes.MustGetABI(ccip_config.CCIPConfigABI)
 )
 
-// MustSourceReaderConfig returns a ChainReaderConfig that can be used to read from the onramp.
-// The configuration is marshaled into JSON so that it can be passed to the relayer NewContractReader() method.
-func MustSourceReaderConfig() []byte {
-	rawConfig := SourceReaderConfig()
-	encoded, err := json.Marshal(rawConfig)
-	if err != nil {
-		panic(fmt.Errorf("failed to marshal ChainReaderConfig into JSON: %w", err))
+func CCIPReaderContractReaderConfig(chainSide configstypes.ChainSide) (evmrelaytypes.ChainReaderConfig, error) {
+	switch chainSide {
+	case configstypes.ChainSideDest:
+		return DestReaderConfig(), nil
+	case configstypes.ChainSideSource:
+		return SourceReaderConfig(), nil
+	default:
+		return evmrelaytypes.ChainReaderConfig{}, fmt.Errorf("unsupported chain side: %s", chainSide)
 	}
-
-	return encoded
-}
-
-// MustDestReaderConfig returns a ChainReaderConfig that can be used to read from the offramp.
-// The configuration is marshaled into JSON so that it can be passed to the relayer NewContractReader() method.
-func MustDestReaderConfig() []byte {
-	rawConfig := DestReaderConfig()
-	encoded, err := json.Marshal(rawConfig)
-	if err != nil {
-		panic(fmt.Errorf("failed to marshal ChainReaderConfig into JSON: %w", err))
-	}
-
-	return encoded
 }
 
 // DestReaderConfig returns a ChainReaderConfig that can be used to read from the offramp.

@@ -1,7 +1,6 @@
 package evm
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -19,16 +18,6 @@ import (
 var (
 	offrampABI = evmtypes.MustGetABI(evm_2_evm_multi_offramp.EVM2EVMMultiOffRampABI)
 )
-
-func MustChainWriterConfig(fromAddress common.Address, maxGasPrice *assets.Wei) []byte {
-	rawConfig := ChainWriterConfigRaw(fromAddress, maxGasPrice)
-	encoded, err := json.Marshal(rawConfig)
-	if err != nil {
-		panic(fmt.Errorf("failed to marshal ChainWriterConfig: %w", err))
-	}
-
-	return encoded
-}
 
 // ChainWriterConfigRaw returns a ChainWriterConfig that can be used to transmit commit and execute reports.
 func ChainWriterConfigRaw(fromAddress common.Address, maxGasPrice *assets.Wei) evmrelaytypes.ChainWriterConfig {

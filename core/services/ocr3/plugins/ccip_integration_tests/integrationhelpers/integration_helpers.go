@@ -22,7 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ocr3_config_encoder"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	configsevm "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/configs/evm"
+	capconfigs "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/configs"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 
@@ -77,8 +77,8 @@ const (
 	ChainC  uint64 = 3
 	FChainC uint8  = 3
 
-	CcipCapabilityLabelledName = "ccip"
-	CcipCapabilityVersion      = "v1.0"
+	CCIPCapabilityLabelledName = "ccip"
+	CCIPCapabilityVersion      = "v1.6.0-dev"
 )
 
 type TestUniverse struct {
@@ -171,8 +171,8 @@ func P2pIDsFromInts(ints []int64) [][32]byte {
 func (t *TestUniverse) AddCapability(p2pIDs [][32]byte) {
 	_, err := t.CapReg.AddCapabilities(t.Transactor, []kcr.CapabilitiesRegistryCapability{
 		{
-			LabelledName:          CcipCapabilityLabelledName,
-			Version:               CcipCapabilityVersion,
+			LabelledName:          CCIPCapabilityLabelledName,
+			Version:               CCIPCapabilityVersion,
 			CapabilityType:        0,
 			ResponseType:          0,
 			ConfigurationContract: t.CcipCfg.Address(),
@@ -181,7 +181,7 @@ func (t *TestUniverse) AddCapability(p2pIDs [][32]byte) {
 	require.NoError(t.TestingT, err, "failed to add capability to registry")
 	t.Backend.Commit()
 
-	ccipCapabilityID, err := t.CapReg.GetHashedCapabilityId(nil, CcipCapabilityLabelledName, CcipCapabilityVersion)
+	ccipCapabilityID, err := t.CapReg.GetHashedCapabilityId(nil, CCIPCapabilityLabelledName, CCIPCapabilityVersion)
 	require.NoError(t.TestingT, err)
 
 	for i := 0; i < len(p2pIDs); i++ {
@@ -227,7 +227,10 @@ func (t *TestUniverse) AddCapability(p2pIDs [][32]byte) {
 }
 
 func NewHomeChainReader(t *testing.T, logPoller logpoller.LogPoller, client client.Client, ccAddress common.Address) ccipreader.HomeChain {
-	cr := NewReader(t, logPoller, client, ccAddress, configsevm.HomeChainReaderConfigRaw())
+	crConfig, err := capconfigs.GetHomeChainContractReaderConfig(CCIPCapabilityVersion)
+	require.NoError(t, err)
+
+	cr := NewReader(t, logPoller, client, ccAddress, crConfig)
 
 	hcr := ccipreader.NewHomeChainReader(cr, logger.TestLogger(t), 500*time.Millisecond)
 	require.NoError(t, hcr.Start(testutils.Context(t)))

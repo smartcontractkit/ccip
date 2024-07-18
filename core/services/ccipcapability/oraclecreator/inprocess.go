@@ -2,6 +2,7 @@ package oraclecreator
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -27,7 +28,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/configs"
 	evmconfigs "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/configs/evm"
+	configstypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/configs/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/ocrimpls"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -47,6 +50,7 @@ var _ cctypes.OracleCreator = &inprocessOracleCreator{}
 // inprocessOracleCreator creates oracles that reference plugins running
 // in the same process as the chainlink node, i.e not LOOPPs.
 type inprocessOracleCreator struct {
+	ccipCapabilityVersion string
 	ocrKeyBundles         map[string]ocr2key.KeyBundle
 	transmitters          map[types.RelayID][]string
 	chains                legacyevm.LegacyChainContainer
@@ -63,6 +67,7 @@ type inprocessOracleCreator struct {
 }
 
 func New(
+	ccipCapabilityVersion string,
 	ocrKeyBundles map[string]ocr2key.KeyBundle,
 	transmitters map[types.RelayID][]string,
 	chains legacyevm.LegacyChainContainer,
@@ -150,12 +155,22 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	contractReaders := make(map[cciptypes.ChainSelector]types.ContractReader)
 	chainWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
 	for _, chain := range i.chains.Slice() {
-		var chainReaderConfig evmrelaytypes.ChainReaderConfig
-		if chain.ID().Uint64() == destChainID {
-			chainReaderConfig = evmconfigs.DestReaderConfig()
-		} else {
-			chainReaderConfig = evmconfigs.SourceReaderConfig()
+		chainSelector, ok := chainsel.EvmChainIdToChainSelector()[chain.ID().Uint64()]
+		if !ok {
+			return nil, fmt.Errorf("failed to get chain selector from chain ID %s", chain.ID())
 		}
+
+		var chainSide configstypes.ChainSide
+		if chain.ID().Uint64() == destChainID {
+			chainSide = configstypes.ChainSideDest
+		} else {
+			chainSide = configstypes.ChainSideSource
+		}
+		crConfig, err2 := getEVMCCIPReaderConfig(i.ccipCapabilityVersion, cciptypes.ChainSelector(chainSelector), chainSide)
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to get CCIP reader config for chain %s: %w", chain.ID(), err2)
+		}
+
 		cr, err2 := evm.NewChainReaderService(
 			context.Background(),
 			i.lggr.
@@ -164,7 +179,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 				Named(pluginType.String()),
 			chain.LogPoller(),
 			chain.Client(),
-			chainReaderConfig,
+			crConfig,
 		)
 		if err2 != nil {
 			return nil, fmt.Errorf("failed to create contract reader for chain %s: %w", chain.ID(), err2)
@@ -216,11 +231,6 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 		err2 = cw.Start(context.Background())
 		if err2 != nil {
 			return nil, fmt.Errorf("failed to start chain writer for chain %s: %w", chain.ID(), err2)
-		}
-
-		chainSelector, ok := chainsel.EvmChainIdToChainSelector()[chain.ID().Uint64()]
-		if !ok {
-			return nil, fmt.Errorf("failed to get chain selector from chain ID %s", chain.ID())
 		}
 
 		contractReaders[cciptypes.ChainSelector(chainSelector)] = cr
@@ -336,4 +346,49 @@ func defaultLocalConfig() ocrtypes.LocalConfig {
 		MinOCR2MaxDurationQuery:            1 * time.Second,
 		DevelopmentMode:                    "false",
 	}
+}
+
+func getEVMCCIPReaderConfig(
+	ccipCapVersion string,
+	chainSelector cciptypes.ChainSelector,
+	chainSide configstypes.ChainSide,
+) (evmrelaytypes.ChainReaderConfig, error) {
+	configBytes, err := configs.GetCCIPReaderContractReaderConfig(ccipCapVersion, chainSelector, chainSide)
+	if err != nil {
+		return evmrelaytypes.ChainReaderConfig{}, fmt.Errorf("failed to get CCIP reader contract reader config: %w", err)
+	}
+
+	// unmarshal it back into evmrelaytypes.ChainReaderConfig because we're instantiating
+	// the EVM chain reader directly.
+	// TODO: in the future, this should not be done, and instead we pass the raw bytes.
+	// Once we're using relayers, this should be possible.
+	var chainReaderConfig evmrelaytypes.ChainReaderConfig
+	err = json.Unmarshal(configBytes, &chainReaderConfig)
+	if err != nil {
+		return evmrelaytypes.ChainReaderConfig{}, fmt.Errorf("failed to unmarshal CCIP reader contract reader config: %w", err)
+	}
+
+	return chainReaderConfig, nil
+}
+
+func getEVMChainWriterConfig(
+	ccipCapVersion string,
+	chainSelector cciptypes.ChainSelector,
+) (evmrelaytypes.ChainWriterConfig, error) {
+	configBytes, err := configs.GetChainWriterConfig(ccipCapVersion, chainSelector)
+	if err != nil {
+		return evmrelaytypes.ChainWriterConfig{}, fmt.Errorf("failed to get chain writer config: %w", err)
+	}
+
+	// unmarshal it back into evmrelaytypes.ChainWriterConfig because we're instantiating
+	// the EVM chain writer directly.
+	// TODO: in the future, this should not be done, and instead we pass the raw bytes.
+	// Once we're using relayers, this should be possible.
+	var chainWriterConfig evmrelaytypes.ChainWriterConfig
+	err = json.Unmarshal(configBytes, &chainWriterConfig)
+	if err != nil {
+		return evmrelaytypes.ChainWriterConfig{}, fmt.Errorf("failed to unmarshal chain writer config: %w", err)
+	}
+
+	return chainWriterConfig, nil
 }

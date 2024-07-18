@@ -17,7 +17,7 @@ import (
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/common"
-	configsevm "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/configs/evm"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/configs"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/launcher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/oraclecreator"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -132,6 +132,7 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 	)
 
 	oracleCreator := oraclecreator.New(
+		spec.CCIPSpec.CapabilityVersion,
 		ocrKeys,
 		transmitterKeys,
 		d.chains,
@@ -230,12 +231,17 @@ func (d *Delegate) getHomeChainContractReader(
 		return nil, fmt.Errorf("home chain relayer not found, chain id: %s, err: %w", homeChainRelayID.String(), err)
 	}
 
+	readerConfig, err := configs.GetHomeChainContractReaderConfig(capabilityVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get home chain contract reader config: %w", err)
+	}
+
 	reader, err := evm.NewChainReaderService(
 		context.Background(),
 		d.lggr,
 		homeChain.LogPoller(),
 		homeChain.Client(),
-		configsevm.HomeChainReaderConfigRaw(),
+		readerConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create home chain contract reader: %w", err)

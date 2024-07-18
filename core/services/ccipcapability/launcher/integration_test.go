@@ -33,8 +33,8 @@ func TestIntegration_Launcher(t *testing.T) {
 
 	hcr := uni.HomeChainReader
 	launcher := New(
-		it.CcipCapabilityVersion,
-		it.CcipCapabilityLabelledName,
+		it.CCIPCapabilityVersion,
+		it.CCIPCapabilityLabelledName,
 		p2pIDs[0],
 		logger.TestLogger(t),
 		hcr,
@@ -62,7 +62,7 @@ func TestIntegration_Launcher(t *testing.T) {
 	require.NoError(t, err)
 	uni.Backend.Commit()
 
-	ccipCapabilityID, err := uni.CapReg.GetHashedCapabilityId(nil, it.CcipCapabilityLabelledName, it.CcipCapabilityVersion)
+	ccipCapabilityID, err := uni.CapReg.GetHashedCapabilityId(nil, it.CCIPCapabilityLabelledName, it.CCIPCapabilityVersion)
 	require.NoError(t, err)
 
 	uni.AddDONToRegistry(
