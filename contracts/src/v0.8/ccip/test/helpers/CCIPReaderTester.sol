@@ -8,6 +8,19 @@ contract CCIPReaderTester {
     bytes onRamp;
   }
 
+  struct EVM2AnyRampMessage {
+    RampMessageHeader header;
+    address sender;
+  }
+
+  struct RampMessageHeader {
+    bytes32 messageId;
+    uint64 sourceChainSelector;
+    uint64 destChainSelector;
+    uint64 sequenceNumber;
+    uint64 nonce;
+  }
+
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) internal s_sourceChainConfigs;
 
   function getSourceChainConfig(uint64 sourceChainSelector) external view returns (SourceChainConfig memory) {
@@ -16,5 +29,11 @@ contract CCIPReaderTester {
 
   function setSourceChainConfig(uint64 sourceChainSelector, SourceChainConfig memory sourceChainConfig) external {
     s_sourceChainConfigs[sourceChainSelector] = sourceChainConfig;
+  }
+
+  event CCIPSendRequested(uint64 indexed destChainSelector, EVM2AnyRampMessage message);
+
+  function EmitCCIPSendRequested(uint64 destChainSelector, EVM2AnyRampMessage memory message) external {
+    emit CCIPSendRequested(destChainSelector, message);
   }
 }

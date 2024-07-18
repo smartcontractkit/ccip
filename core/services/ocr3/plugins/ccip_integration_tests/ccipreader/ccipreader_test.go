@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/crconsts"
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -31,7 +32,80 @@ func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {}
 
 func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {}
 
-func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {}
+func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
+	lggr := logger.TestLogger(t)
+	ctx := context.Background()
+	const chainS1 = cciptypes.ChainSelector(1)
+	const chainD = cciptypes.ChainSelector(2)
+	s := testSetup(t, ctx, chainS1, nil)
+
+	cfg := evmtypes.ChainReaderConfig{
+		Contracts: map[string]evmtypes.ChainContractReader{
+			crconsts.ContractNameOnRamp: {
+				ContractPollingFilter: evmtypes.ContractPollingFilter{
+					GenericEventNames: []string{crconsts.EventNameCCIPSendRequested},
+				},
+				ContractABI: ccip_reader_tester.CCIPReaderTesterABI,
+				Configs: map[string]*evmtypes.ChainReaderDefinition{
+					crconsts.EventNameCCIPSendRequested: {
+						ChainSpecificName: crconsts.EventNameCCIPSendRequested,
+						ReadType:          evmtypes.Event,
+					},
+				},
+			},
+		},
+	}
+
+	cr, err := evm.NewChainReaderService(ctx, lggr, s.lp, s.cl, cfg)
+	assert.NoError(t, err)
+	err = cr.Bind(ctx, []types.BoundContract{
+		{
+			Address: s.contractAddr.String(),
+			Name:    crconsts.ContractNameOnRamp,
+			Pending: false,
+		},
+	})
+	assert.NoError(t, err)
+	err = cr.Start(ctx)
+	assert.NoError(t, err)
+
+	contractReaders := map[cciptypes.ChainSelector]types.ContractReader{chainS1: cr}
+	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
+	reader := ccipreaderpkg.NewCCIPReader(lggr, contractReaders, contractWriters, chainD)
+
+	_, err = s.contract.EmitCCIPSendRequested(s.auth, uint64(chainD), ccip_reader_tester.CCIPReaderTesterEVM2AnyRampMessage{
+		Header: ccip_reader_tester.CCIPReaderTesterRampMessageHeader{
+			MessageId:           [32]byte{1, 0, 0, 0, 0},
+			SourceChainSelector: uint64(chainS1),
+			DestChainSelector:   uint64(chainD),
+			SequenceNumber:      10,
+		},
+		Sender: common.Address{},
+	})
+	assert.NoError(t, err)
+
+	_, err = s.contract.EmitCCIPSendRequested(s.auth, uint64(chainD), ccip_reader_tester.CCIPReaderTesterEVM2AnyRampMessage{
+		Header: ccip_reader_tester.CCIPReaderTesterRampMessageHeader{
+			MessageId:           [32]byte{1, 0, 0, 0, 1},
+			SourceChainSelector: uint64(chainS1),
+			DestChainSelector:   uint64(chainD),
+			SequenceNumber:      15,
+		},
+		Sender: common.Address{},
+	})
+	assert.NoError(t, err)
+
+	s.sb.Commit()
+	time.Sleep(5 * time.Second)
+
+	msgs, err := reader.MsgsBetweenSeqNums(
+		ctx,
+		chainS1,
+		cciptypes.NewSeqNumRange(5, 20),
+	)
+	require.NoError(t, err)
+	assert.Len(t, msgs, 2)
+}
 
 func TestCCIPReader_NextSeqNum(t *testing.T) {
 	lggr := logger.TestLogger(t)
@@ -93,7 +167,7 @@ func TestCCIPReader_GasPrices(t *testing.T) {}
 
 func TestCCIPReader_Sync(t *testing.T) {}
 
-func testSetup(t *testing.T, ctx context.Context, destChain cciptypes.ChainSelector, onChainSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum) *testSetupData {
+func testSetup(t *testing.T, ctx context.Context, readerChain cciptypes.ChainSelector, onChainSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum) *testSetupData {
 	const chainID = 1337
 
 	// Generate a new key pair for the simulated account
@@ -128,9 +202,9 @@ func testSetup(t *testing.T, ctx context.Context, destChain cciptypes.ChainSelec
 		RpcBatchSize:             10,
 		KeepFinalizedBlocksDepth: 100000,
 	}
-	cl := client.NewSimulatedBackendClient(t, simulatedBackend, big.NewInt(0).SetUint64(uint64(destChain)))
+	cl := client.NewSimulatedBackendClient(t, simulatedBackend, big.NewInt(0).SetUint64(uint64(readerChain)))
 	headTracker := headtracker.NewSimulatedHeadTracker(cl, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
-	lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(0).SetUint64(uint64(destChain)), db, lggr),
+	lp := logpoller.NewLogPoller(logpoller.NewORM(big.NewInt(0).SetUint64(uint64(readerChain)), db, lggr),
 		cl,
 		lggr,
 		headTracker,
