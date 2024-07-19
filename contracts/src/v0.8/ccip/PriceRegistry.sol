@@ -801,7 +801,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     Client.EVMExtraArgsV2 memory parsedExtraArgs = _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, defaultTxGasLimit);
     isOutOfOrderExecution = parsedExtraArgs.allowOutOfOrderExecution;
 
-    return (msgFeeJuels, isOutOfOrderExecution, abi.encode(parsedExtraArgs));
+    return (msgFeeJuels, isOutOfOrderExecution, Client._argsToBytes(parsedExtraArgs));
   }
 
   /// @inheritdoc IPriceRegistry

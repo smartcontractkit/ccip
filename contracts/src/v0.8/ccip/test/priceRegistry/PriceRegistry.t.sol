@@ -403,7 +403,7 @@ contract PriceRegistryFeeSetup is PriceRegistrySetup {
       sender: originalSender,
       data: message.data,
       receiver: message.receiver,
-      extraArgs: abi.encode(extraArgs),
+      extraArgs: Client._argsToBytes(extraArgs),
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       tokenAmounts: new Internal.RampTokenAmount[](message.tokenAmounts.length)
@@ -2270,7 +2270,9 @@ contract PriceRegistry_processMessageArgs is PriceRegistryFeeSetup {
     ) = s_priceRegistry.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, "");
 
     assertEq(isOutOfOrderExecution, false);
-    assertEq(convertedExtraArgs, abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes("", DEST_CHAIN_SELECTOR)));
+    assertEq(
+      convertedExtraArgs, Client._argsToBytes(s_priceRegistry.parseEVMExtraArgsFromBytes("", DEST_CHAIN_SELECTOR))
+    );
   }
 
   function test_WithEVMExtraArgsV1_Success() public view {
@@ -2284,7 +2286,10 @@ contract PriceRegistry_processMessageArgs is PriceRegistryFeeSetup {
     ) = s_priceRegistry.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, extraArgs);
 
     assertEq(isOutOfOrderExecution, false);
-    assertEq(convertedExtraArgs, abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes(extraArgs, DEST_CHAIN_SELECTOR)));
+    assertEq(
+      convertedExtraArgs,
+      Client._argsToBytes(s_priceRegistry.parseEVMExtraArgsFromBytes(extraArgs, DEST_CHAIN_SELECTOR))
+    );
   }
 
   function test_WitEVMExtraArgsV2_Success() public view {
@@ -2298,7 +2303,10 @@ contract PriceRegistry_processMessageArgs is PriceRegistryFeeSetup {
     ) = s_priceRegistry.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, extraArgs);
 
     assertEq(isOutOfOrderExecution, true);
-    assertEq(convertedExtraArgs, abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes(extraArgs, DEST_CHAIN_SELECTOR)));
+    assertEq(
+      convertedExtraArgs,
+      Client._argsToBytes(s_priceRegistry.parseEVMExtraArgsFromBytes(extraArgs, DEST_CHAIN_SELECTOR))
+    );
   }
 
   // Reverts
