@@ -38,8 +38,14 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MessageHasher/MessageHasher.abi ../../../contracts/solc/v0.8.24/MessageHasher/MessageHasher.bin MessageHasher message_hasher
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MultiOCR3Helper/MultiOCR3Helper.abi ../../../contracts/solc/v0.8.24/MultiOCR3Helper/MultiOCR3Helper.bin MultiOCR3Helper multi_ocr3_helper
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/ReportCodec/ReportCodec.abi ../../../contracts/solc/v0.8.24/ReportCodec/ReportCodec.bin ReportCodec report_codec
-//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/EtherSenderReceiver/EtherSenderReceiver.abi ../../../contracts/solc/v0.8.24/EtherSenderReceiver/EtherSenderReceiver.bin EtherSenderReceiver ether_sender_receiver
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/WETH9/WETH9.abi ../../../contracts/solc/v0.8.24/WETH9/WETH9.bin WETH9 weth9
+
+// Audited Reference Contracts
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPReceiver/CCIPReceiver.abi ../../../contracts/solc/v0.8.24/CCIPReceiver/CCIPReceiver.bin CCIPReceiver ccipReceiver
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPClient/CCIPClient.abi ../../../contracts/solc/v0.8.24/CCIPClient/CCIPClient.bin CCIPClient ccipClient
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPClientWithACK/CCIPClientWithACK.abi ../../../contracts/solc/v0.8.24/CCIPClientWithACK/CCIPClientWithACK.bin CCIPClientWithACK ccipClientWithACK
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPSender/CCIPSender.abi ../../../contracts/solc/v0.8.24/CCIPSender/CCIPSender.bin CCIPSender ccipSender
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPReceiverWithACK/CCIPReceiverWithACK.abi ../../../contracts/solc/v0.8.24/CCIPReceiverWithACK/CCIPReceiverWithACK.bin CCIPReceiverWithACK ccipReceiverWithACK
 
 // Customer contracts
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/USDCTokenPool/USDCTokenPool.abi ../../../contracts/solc/v0.8.24/USDCTokenPool/USDCTokenPool.bin USDCTokenPool usdc_token_pool
