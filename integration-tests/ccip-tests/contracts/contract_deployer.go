@@ -818,13 +818,13 @@ func (e *CCIPContractsDeployer) DeployPriceRegistry(tokens []common.Address) (*P
 			auth *bind.TransactOpts,
 			_ bind.ContractBackend,
 		) (common.Address, *types.Transaction, interface{}, error) {
-			return price_registry.DeployPriceRegistry(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), nil, tokens, 60*60*24*14, nil)
+			return price_registry_1_2_0.DeployPriceRegistry(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), nil, tokens, 60*60*24*14)
 		})
 		if err != nil {
 			return nil, err
 		}
 		wrapper = &PriceRegistryWrapper{
-			Latest: instance.(*price_registry.PriceRegistry),
+			V1_2_0: instance.(*price_registry_1_2_0.PriceRegistry),
 		}
 	case V1_2_0:
 		address, _, instance, err = e.evmClient.DeployContract("PriceRegistry", func(
