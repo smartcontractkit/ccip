@@ -15,20 +15,20 @@ import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/
 contract CCIPClient is CCIPReceiver {
   using SafeERC20 for IERC20;
 
-  IERC20 public s_feeToken;
-
   event MessageSent(bytes32 messageId);
   event FeeTokenUpdated(address oldFeeToken, address newFeeToken);
 
-  bool public immutable i_isPreFunded;
+  IERC20 internal s_feeToken;
+  bool internal immutable i_isPreFunded;
 
   /// @dev A check for the zero-address is not explicitly performed since it is included in the CCIPBase parent constructor
+  /// @param feeToken An ERC20-compatible token, address(0) if fees should be paid in native tokens instead.
   constructor(address router, IERC20 feeToken, bool usePreFunding) CCIPReceiver(router) {
     s_feeToken = feeToken;
     i_isPreFunded = usePreFunding;
 
     if (address(feeToken) != address(0)) {
-      IERC20(s_feeToken).safeApprove(s_ccipRouter, type(uint256).max);
+      IERC20(feeToken).safeApprove(s_ccipRouter, type(uint256).max);
     }
   }
 
@@ -53,7 +53,7 @@ contract CCIPClient is CCIPReceiver {
 
     uint256 fee = IRouterClient(s_ccipRouter).getFee(destChainSelector, message);
 
-    if (!i_isPreFunded && address(s_feeToken) != address(0)) {
+    if (!usePreFundedFeeTokens() && address(s_feeToken) != address(0)) {
       IERC20(s_feeToken).safeTransferFrom(msg.sender, address(this), fee);
     }
 
@@ -78,6 +78,8 @@ contract CCIPClient is CCIPReceiver {
     return messageId;
   }
 
+  /// @notice Update the address of the token used to pay for CCIP fees.
+  /// @param token the token address, the zero address should be used if fees should be paid with native tokens
   function updateFeeToken(address token) external onlyOwner {
     // If the current fee token is not-native, zero out the allowance to the router for safety
     if (address(s_feeToken) != address(0)) {
@@ -93,5 +95,18 @@ contract CCIPClient is CCIPReceiver {
     }
 
     emit FeeTokenUpdated(oldFeeToken, token);
+  }
+
+  /// @notice Whether or not the contract should use funds already in its posesssion to pay CCIP fees, or to
+  /// transfer the necessary tokens from the msg.sender
+  /// @return isPreFunded Returns true if fees should be paid with pre funded tokens
+  function usePreFundedFeeTokens() public view virtual returns (bool isPreFunded) {
+    return i_isPreFunded;
+  }
+
+  /// @notice Retrieve the address of the fee token to be used in ccipSend()
+  /// @return feeToken the address of the token used to pay fees. The zero address indicates native-tokens
+  function getFeeToken() public view virtual returns (address feeToken) {
+    return address(s_feeToken);
   }
 }

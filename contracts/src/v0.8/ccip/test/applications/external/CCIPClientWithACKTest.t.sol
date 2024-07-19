@@ -131,6 +131,8 @@ contract CCIPClientWithACKTest is EVM2EVMOnRampSetup {
     // Make sure we give the receiver contract enough tokens like CCIP would.
     IERC20(token).approve(address(s_sender), type(uint256).max);
 
+    assertFalse(s_sender.usePreFundedFeeTokens(), "Not Using pre-funded fee tokens");
+
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(address(s_sender)),
       data: "",
@@ -147,6 +149,42 @@ contract CCIPClientWithACKTest is EVM2EVMOnRampSetup {
 
     // Assert that tokens were transfered for bridging + fees
     assertEq(IERC20(token).balanceOf(OWNER), feeTokenBalanceBefore - feeTokenAmount);
+  }
+
+  function test_ccipSend_with_NativeFeeToken_andNoDestTokens_Success() public {
+    address token = address(s_sourceFeeToken);
+    uint256 amount = 111333333777;
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+    destTokenAmounts[0] = Client.EVMTokenAmount({token: token, amount: amount});
+
+    s_sender.updateFeeToken(address(0));
+
+    // Make sure we give the receiver contract enough tokens like CCIP would.
+    IERC20(token).approve(address(s_sender), type(uint256).max);
+
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+      receiver: abi.encode(address(s_sender)),
+      data: "",
+      tokenAmounts: destTokenAmounts,
+      extraArgs: "",
+      feeToken: address(s_sourceFeeToken)
+    });
+
+    uint256 feeTokenAmount = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
+    uint256 tokenBalanceBefore = IERC20(token).balanceOf(OWNER);
+    uint256 nativeFeeTokenBalanceBefore = OWNER.balance;
+
+    s_sender.ccipSend{value: feeTokenAmount}({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      tokenAmounts: destTokenAmounts,
+      data: ""
+    });
+
+    // Assert that native fees are paid successfully and tokens are transferred
+    assertEq(IERC20(token).balanceOf(OWNER), tokenBalanceBefore - amount, "Tokens were not successfully delivered");
+    assertEq(
+      OWNER.balance, nativeFeeTokenBalanceBefore - feeTokenAmount, "Native fee tokens were not successfully forwarded"
+    );
   }
 
   function test_ccipSendAndReceiveAck_in_return_Success() public {

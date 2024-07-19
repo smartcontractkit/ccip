@@ -40,16 +40,19 @@ abstract contract CCIPBase is OwnerIsCreator {
   }
 
   struct ChainUpdate {
-    uint64 chainSelector; // The unique identifier for a chain to send/receive messages
-    bool allowed; //         Whether the chain should be enabled
-    bytes recipient; //      Address on the remote chain which should receive incoming messages from this. The should only be one per-chain
-    bytes extraArgsBytes; // Additional arguments to pass with the message including manually specifying gas limit and and whether to allow out-of-order execution
+    uint64 chainSelector; // ─╮ The unique CCIP specific identifier for a chain to send/receive messages
+    bool allowed; //   ───────╯ Whether the chain should be enabled
+    bytes recipient; //         Address on the remote chain which should receive incoming messages from this. The
+    //                          should only be one per-chain
+    bytes extraArgsBytes; //    Additional arguments to pass with the message including manually specifying gas limit
+      //                          and and whether to allow out-of-order execution
   }
 
   struct ChainConfig {
     bytes recipient; //      The address to send messages to on the destination chain, ABI encoded in the case of a remote EVM chain.
     bytes extraArgsBytes; // Specifies extraArgs to pass into ccipSend, includes configs such as gas limit, and out-of-order execution.
-    mapping(bytes recipient => bool isApproved) approvedSender; // Mapping is nested to support work-flows where Dapps may need to receive messages from one-or-more contracts on a source chain, or to support one-sided dapp upgrades.
+    mapping(bytes recipient => bool isApproved) approvedSender; // Mapping is nested to support work-flows where Dapps
+      //                        may need to receive messages from one-or-more contracts on a source chain, or to support one-sided dapp upgrades.
   }
 
   address internal s_ccipRouter;
@@ -102,7 +105,8 @@ abstract contract CCIPBase is OwnerIsCreator {
   }
 
   /// @notice Return whether a contract on the specified source chain is authorized to send messages to this contract through CCIP
-  /// @dev This function does not revert on an unapproved-sender, and should only be used as a getter-function for querying approvals from a ChainConfig object. The isValidSender modifier should be used instead for incoming message-validation
+  /// @dev This function does not revert on an unapproved-sender, and should only be used as a getter-function for
+  /// querying approvals from a ChainConfig object. The isValidSender modifier should be used instead for incoming message-validation
   /// @param sourceChainSelector A unique CCIP-specific identifier for the source chain
   /// @param senderAddr The address which sent the message on the source chain, abi-encoded if evm-compatible
   /// @return bool Whether the address is approved or not to invoke functions on this contract
@@ -118,12 +122,13 @@ abstract contract CCIPBase is OwnerIsCreator {
   /// @dev All the example applications accept prefunding. This function should be removed if prefunding in native fee token is not required.
   receive() external payable {}
 
-  /// @notice Allow the owner to recover any ERC-20 tokens sent to this contract out of error or withdraw any fee-tokens which were sent as a source of fee-token pre-funding
+  /// @notice Allow the owner to recover any ERC-20 tokens sent to this contract out of error or withdraw any fee-tokens
+  /// which were sent as a source of fee-token pre-funding
   /// @dev This should NOT be used for recovering tokens from a failed message. Token recoveries can happen only if
   /// the failed message is guaranteed to not succeed upon retry, otherwise this can lead to double spend.
   /// For implementation of token recovery, see inheriting contracts.
   /// @param to A payable address to send the recovered tokens to
-  /// @param amount the amount of native tokens to recover, denominated in wei  function withdrawTokens(address token, address to, uint256 amount) external onlyOwner {
+  /// @param amount the amount of tokens (or native) to recover, denominated in wei
   function withdrawTokens(address token, address to, uint256 amount) external onlyOwner {
     if (token == address(0)) {
       payable(to).sendValue(amount);
@@ -177,8 +182,7 @@ abstract contract CCIPBase is OwnerIsCreator {
   /// @notice Reverts if the specified chainSelector is not approved to send/receive messages to/from this contract
   /// @param chainSelector the CCIP specific chain selector for a given remote-chain.
   modifier isValidChain(uint64 chainSelector) {
-    ChainConfig storage currentConfig = s_chainConfigs[chainSelector]; // Must be storage because the nested mapping cannot be copied to memory
-    if (currentConfig.recipient.length == 0) revert InvalidChain(chainSelector);
+    if (s_chainConfigs[chainSelector].recipient.length == 0) revert InvalidChain(chainSelector);
     _;
   }
 

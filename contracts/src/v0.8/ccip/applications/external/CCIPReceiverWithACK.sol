@@ -46,10 +46,11 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     MessageType messageType; // Denotes whether the incoming message is being received for the first time, or is an acknowledgement that the initial outgoing correspondence was successfully received.
   }
 
-  bytes32 public constant ACK_MESSAGE_HEADER = keccak256("MESSAGE_ACKNOWLEDGED_");
+  // The keccak256 hash of the string "MESSAGE_ACKNOWLEDGED_"
+  bytes32 public constant ACK_MESSAGE_HEADER = 0x1c778f21871bcc06cfebd177c4d0360c2f3550962fb071f69ed007e4f55f23b2;
 
   // Current feeToken
-  IERC20 public s_feeToken;
+  IERC20 internal s_feeToken;
 
   mapping(bytes32 messageId => MessageStatus status) public s_messageStatus;
 
@@ -138,5 +139,11 @@ contract CCIPReceiverWithACK is CCIPReceiver {
     }(incomingMessage.sourceChainSelector, outgoingMessage);
 
     emit MessageSent(incomingMessage.messageId, ACKMessageId);
+  }
+
+  /// @notice returns the address of the fee token.
+  /// @dev the zero address indicates to pay fees in native-tokens instead.
+  function getFeeToken() public view virtual returns (address feeToken) {
+    return address(s_feeToken);
   }
 }

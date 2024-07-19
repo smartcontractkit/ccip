@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {CCIPBase} from "../../../applications/external/CCIPBase.sol";
+import {CCIPReceiver} from "../../../applications/external/CCIPReceiver.sol";
 import {CCIPReceiverWithACK} from "../../../applications/external/CCIPReceiverWithACK.sol";
 
 import {Client} from "../../../libraries/Client.sol";
@@ -165,7 +166,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
 
     s_receiver.updateFeeToken(WETH);
 
-    IERC20 newFeeToken = s_receiver.s_feeToken();
+    IERC20 newFeeToken = IERC20(s_receiver.getFeeToken());
     assertEq(address(newFeeToken), WETH);
     assertEq(newFeeToken.allowance(address(s_receiver), address(s_sourceRouter)), type(uint256).max);
     assertEq(IERC20(s_sourceFeeToken).allowance(address(s_receiver), address(s_sourceRouter)), 0);
@@ -175,5 +176,54 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
     CCIPReceiverWithACK newReceiver = new CCIPReceiverWithACK(address(s_sourceRouter), IERC20(s_sourceFeeToken));
 
     assertEq(IERC20(s_sourceFeeToken).allowance(address(newReceiver), address(s_sourceRouter)), type(uint256).max);
+  }
+
+  function test_attemptACK_message_which_has_already_been_acknowledged_Revert() public {
+    bytes32 messageId = keccak256("messageId");
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
+
+    // The receiver contract will revert if the router is not the sender.
+    vm.startPrank(address(s_sourceRouter));
+
+    CCIPReceiverWithACK.MessagePayload memory payload = CCIPReceiverWithACK.MessagePayload({
+      version: "",
+      data: abi.encode(s_receiver.ACK_MESSAGE_HEADER(), messageId),
+      messageType: CCIPReceiverWithACK.MessageType.ACK
+    });
+
+    vm.expectEmit();
+    emit MessageAckReceived(messageId);
+
+    s_receiver.ccipReceive(
+      Client.Any2EVMMessage({
+        messageId: messageId,
+        sourceChainSelector: destChainSelector,
+        sender: abi.encode(address(s_receiver)),
+        data: abi.encode(payload),
+        destTokenAmounts: destTokenAmounts
+      })
+    );
+
+    // Assert that the message was received and ACK'ED the first time
+    assertEq(
+      uint256(s_receiver.s_messageStatus(messageId)),
+      uint256(CCIPReceiverWithACK.MessageStatus.ACKNOWLEDGED),
+      "Ack message was not properly received"
+    );
+
+    vm.expectEmit();
+    emit CCIPReceiver.MessageFailed(
+      messageId, abi.encodeWithSelector(CCIPReceiverWithACK.MessageAlreadyAcknowledged.selector, messageId)
+    );
+
+    s_receiver.ccipReceive(
+      Client.Any2EVMMessage({
+        messageId: messageId,
+        sourceChainSelector: destChainSelector,
+        sender: abi.encode(address(s_receiver)),
+        data: abi.encode(payload),
+        destTokenAmounts: destTokenAmounts
+      })
+    );
   }
 }

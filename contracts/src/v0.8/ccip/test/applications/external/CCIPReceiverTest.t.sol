@@ -228,6 +228,16 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     );
   }
 
+  function test_apply_InvalidChainUpdate_Revert() public {
+    CCIPBase.ChainUpdate[] memory chainUpdates = new CCIPBase.ChainUpdate[](1);
+    chainUpdates[0] =
+      CCIPBase.ChainUpdate({chainSelector: sourceChainSelector, allowed: true, recipient: "", extraArgsBytes: ""});
+
+    // Revert because the recipient of an allowed chain is the zero address, which is prohibited
+    vm.expectRevert(abi.encodeWithSelector(CCIPBase.ZeroAddressNotAllowed.selector));
+    s_receiver.applyChainUpdates(chainUpdates);
+  }
+
   function test_disableChain_andRevert_onccipReceive_Revert() public {
     CCIPBase.ChainUpdate[] memory chainUpdates = new CCIPBase.ChainUpdate[](1);
     chainUpdates[0] = CCIPBase.ChainUpdate({
@@ -330,5 +340,21 @@ contract CCIPReceiverTest is EVM2EVMOnRampSetup {
     s_receiver.withdrawTokens(address(0), payable(OWNER), amount);
 
     assertEq(OWNER.balance, balanceBefore + amount);
+  }
+
+  function test_retryFailedMessage_which_has_not_already_failed_Revert() public {
+    bytes32 messageId = keccak256("RANDOM_DATA");
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPReceiver.MessageNotFailed.selector, messageId));
+
+    s_receiver.retryFailedMessage(messageId);
+  }
+
+  function test_abandonFailedMessage_which_has_not_already_failed_Revert() public {
+    bytes32 messageId = keccak256("RANDOM_DATA");
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPReceiver.MessageNotFailed.selector, messageId));
+
+    s_receiver.abandonFailedMessage(messageId, OWNER);
   }
 }

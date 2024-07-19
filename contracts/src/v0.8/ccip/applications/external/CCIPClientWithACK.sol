@@ -18,7 +18,7 @@ contract CCIPClientWithACK is CCIPReceiverWithACK {
 
   error CannotAcknowledgeUnsentMessage(bytes32);
 
-  bool public immutable i_isPreFunded;
+  bool internal immutable i_isPreFunded;
 
   constructor(address router, IERC20 feeToken, bool usePreFunding) CCIPReceiverWithACK(router, feeToken) {
     i_isPreFunded = usePreFunding;
@@ -56,7 +56,7 @@ contract CCIPClientWithACK is CCIPReceiverWithACK {
 
     uint256 fee = IRouterClient(s_ccipRouter).getFee(destChainSelector, message);
 
-    if (!i_isPreFunded && address(s_feeToken) != address(0)) {
+    if (!usePreFundedFeeTokens() && address(s_feeToken) != address(0)) {
       IERC20(s_feeToken).safeTransferFrom(msg.sender, address(this), fee);
     }
 
@@ -69,5 +69,12 @@ contract CCIPClientWithACK is CCIPReceiverWithACK {
     emit MessageSent(messageId, bytes32(0));
 
     return messageId;
+  }
+
+  /// @notice Whether or not the contract should use funds already in its posesssion to pay CCIP fees, or to
+  /// transfer the necessary tokens from the msg.sender
+  /// @return isPreFunded Returns true if fees should be paid with pre funded tokens
+  function usePreFundedFeeTokens() public view virtual returns (bool isPreFunded) {
+    return i_isPreFunded;
   }
 }

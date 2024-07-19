@@ -27,7 +27,6 @@ contract CCIPSender is CCIPBase {
   using SafeERC20 for IERC20;
 
   event MessageSent(bytes32 messageId);
-  event MessageReceived(bytes32 messageId);
 
   constructor(address router) CCIPBase(router) {}
 

@@ -81,9 +81,9 @@ contract CCIPReceiver is CCIPBase {
 
   /// @notice Executes a message that failed initial delivery, but with different logic specifically for re-execution.
   /// @dev Since the function invoked _retryFailedMessage(), which is marked onlyOwner, this may only be called by the
-  ///Owner as well. Function will revert if the messageId was not already stored as having failed its initial execution
+  /// Owner as well. The function will revert if the messageId was not already stored as failed during initial execution
   /// @param messageId the unique ID of the CCIP-message which failed initial-execution.
-  function retryFailedMessage(bytes32 messageId) external {
+  function retryFailedMessage(bytes32 messageId) external virtual {
     if (!s_failedMessages.contains(messageId)) revert MessageNotFailed(messageId);
 
     // Allow developer to implement arbitrary functionality on retried messages, such as just releasing the associated

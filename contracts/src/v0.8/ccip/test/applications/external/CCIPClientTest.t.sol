@@ -100,7 +100,7 @@ contract CCIPClientTest is EVM2EVMOnRampSetup {
 
     s_sender.updateFeeToken(WETH);
 
-    IERC20 newFeeToken = s_sender.s_feeToken();
+    IERC20 newFeeToken = IERC20(s_sender.getFeeToken());
     assertEq(address(newFeeToken), WETH);
     assertEq(newFeeToken.allowance(address(s_sender), address(s_sourceRouter)), type(uint256).max);
     assertEq(IERC20(s_sourceFeeToken).allowance(address(s_sender), address(s_sourceRouter)), 0);
