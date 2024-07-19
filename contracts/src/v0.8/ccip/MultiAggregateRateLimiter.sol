@@ -104,7 +104,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
     if (tokenBucket.isEnabled) {
       uint256 value;
       for (uint256 i = 0; i < tokenAmounts.length; ++i) {
-        if (s_rateLimitedTokensLocalToRemote[remoteChainSelector]._contains(tokenAmounts[i].token)) {
+        if (s_rateLimitedTokensLocalToRemote[remoteChainSelector].contains(tokenAmounts[i].token)) {
           value += _getTokenValue(tokenAmounts[i]);
         }
       }
@@ -202,7 +202,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
     view
     returns (address[] memory localTokens, bytes[] memory remoteTokens)
   {
-    uint256 tokenCount = s_rateLimitedTokensLocalToRemote[remoteChainSelector]._length();
+    uint256 tokenCount = s_rateLimitedTokensLocalToRemote[remoteChainSelector].length();
 
     localTokens = new address[](tokenCount);
     remoteTokens = new bytes[](tokenCount);

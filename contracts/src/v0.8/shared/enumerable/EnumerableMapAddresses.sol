@@ -171,7 +171,7 @@ library EnumerableMapAddresses {
    * @param key The key to check for presence in the map
    * @return bool indicating whether the key is in the map
    */
-  function _contains(AddressToBytesMap storage map, address key) internal view returns (bool) {
+  function contains(AddressToBytesMap storage map, address key) internal view returns (bool) {
     return map._inner._contains(bytes32(uint256(uint160(key))));
   }
 
@@ -180,7 +180,7 @@ library EnumerableMapAddresses {
    * @param map The map to check the length of
    * @return uint256 indicating the number of elements in the map
    */
-  function _length(AddressToBytesMap storage map) internal view returns (uint256) {
+  function length(AddressToBytesMap storage map) internal view returns (uint256) {
     return map._inner._length();
   }
 
@@ -214,7 +214,7 @@ library EnumerableMapAddresses {
    * @return bytes The value associated with the key
    */
   // solhint-disable-next-line chainlink-solidity/prefix-internal-functions-with-underscore
-  function _get(AddressToBytesMap storage map, address key) internal view returns (bytes memory) {
+  function get(AddressToBytesMap storage map, address key) internal view returns (bytes memory) {
     return map._inner._get(bytes32(uint256(uint160(key))));
   }
 }
