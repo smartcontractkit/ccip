@@ -141,8 +141,12 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       }
     }
 
-    // Validate the message with various checks
-    uint256 numberOfTokens = message.tokenAmounts.length;
+    // Convert message fee to juels and retrieve converted args
+    (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) = IPriceRegistry(
+      s_dynamicConfig.priceRegistry
+    ).processMessageArgs(destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs);
+
+    emit FeePaid(message.feeToken, msgFeeJuels);
 
     Internal.EVM2AnyRampMessage memory newMessage = Internal.EVM2AnyRampMessage({
       header: Internal.RampMessageHeader({
@@ -152,7 +156,11 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
         destChainSelector: destChainSelector,
         // We need the next available sequence number so we increment before we use the value
         sequenceNumber: ++s_destChainSequenceNumbers[destChainSelector],
-        nonce: 0
+        // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
+        // may block ordered message nonces, which is not what we want.
+        nonce: isOutOfOrderExecution
+          ? 0
+          : INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender)
       }),
       sender: originalSender,
       data: message.data,
@@ -160,23 +168,13 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       receiver: message.receiver,
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
-      tokenAmounts: new Internal.RampTokenAmount[](numberOfTokens) // should be populated after generation
+      // Should be populated via lock / burn pool calls
+      tokenAmounts: new Internal.RampTokenAmount[](message.tokenAmounts.length)
     });
-
-    (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) =
-      IPriceRegistry(s_dynamicConfig.priceRegistry).getValidatedRampMessageParams(newMessage);
-    emit FeePaid(message.feeToken, msgFeeJuels);
-
-    if (!isOutOfOrderExecution) {
-      // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
-      // may block ordered message nonces, which is not what we want.
-      newMessage.header.nonce =
-        INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender);
-    }
 
     // Lock the tokens as last step. TokenPools may not always be trusted.
     // There should be no state changes after external call to TokenPools.
-    for (uint256 i = 0; i < numberOfTokens; ++i) {
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
       newMessage.tokenAmounts[i] =
         _lockOrBurnSingleToken(message.tokenAmounts[i], destChainSelector, message.receiver, originalSender);
     }

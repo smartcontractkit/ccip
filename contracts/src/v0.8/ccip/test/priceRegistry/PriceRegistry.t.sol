@@ -2199,7 +2199,7 @@ contract PriceRegistry_getValidatedFee is PriceRegistryFeeSetup {
   }
 }
 
-contract PriceRegistry_getValidatedRampMessageParams is PriceRegistryFeeSetup {
+contract PriceRegistry_processMessageArgs is PriceRegistryFeeSetup {
   using USDPriceWith18Decimals for uint224;
 
   function setUp() public virtual override {
@@ -2207,155 +2207,103 @@ contract PriceRegistry_getValidatedRampMessageParams is PriceRegistryFeeSetup {
   }
 
   function test_WithLinkTokenAmount_Success() public view {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    Internal.EVM2AnyRampMessage memory messageEvent = _messageToEvent(message, MAX_MSG_FEES_JUELS, OWNER, "");
-
     (
       uint256 msgFeeJuels,
       /* bool isOutOfOrderExecution */
       ,
       /* bytes memory convertedExtraArgs */
-    ) = s_priceRegistry.getValidatedRampMessageParams(messageEvent);
+    ) = s_priceRegistry.processMessageArgs(
+      DEST_CHAIN_SELECTOR,
+      // LINK
+      s_sourceTokens[0],
+      MAX_MSG_FEES_JUELS,
+      ""
+    );
 
     assertEq(msgFeeJuels, MAX_MSG_FEES_JUELS);
   }
 
   function test_WithConvertedTokenAmount_Success() public view {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.feeToken = s_sourceTokens[1];
+    address feeToken = s_sourceTokens[1];
     uint256 feeTokenAmount = 10_000 gwei;
-    Internal.EVM2AnyRampMessage memory messageEvent = _messageToEvent(message, feeTokenAmount, OWNER, "");
+    uint256 expectedConvertedAmount = s_priceRegistry.convertTokenAmount(feeToken, feeTokenAmount, s_sourceTokens[0]);
 
     (
       uint256 msgFeeJuels,
       /* bool isOutOfOrderExecution */
       ,
       /* bytes memory convertedExtraArgs */
-    ) = s_priceRegistry.getValidatedRampMessageParams(messageEvent);
+    ) = s_priceRegistry.processMessageArgs(DEST_CHAIN_SELECTOR, feeToken, feeTokenAmount, "");
 
-    assertEq(msgFeeJuels, s_priceRegistry.convertTokenAmount(s_weth, feeTokenAmount, s_sourceTokens[0]));
+    assertEq(msgFeeJuels, expectedConvertedAmount);
   }
 
   function test_WithEmptyEVMExtraArgs_Success() public view {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    Internal.EVM2AnyRampMessage memory messageEvent = _generateSimpleMessageEvent(message);
-
     (
       /* uint256 msgFeeJuels */
       ,
       bool isOutOfOrderExecution,
       bytes memory convertedExtraArgs
-    ) = s_priceRegistry.getValidatedRampMessageParams(messageEvent);
+    ) = s_priceRegistry.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, "");
 
     assertEq(isOutOfOrderExecution, false);
-    assertEq(
-      convertedExtraArgs,
-      abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes(messageEvent.extraArgs, DEST_CHAIN_SELECTOR))
-    );
+    assertEq(convertedExtraArgs, abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes("", DEST_CHAIN_SELECTOR)));
   }
 
   function test_WithEVMExtraArgsV1_Success() public view {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    Internal.EVM2AnyRampMessage memory messageEvent =
-      _messageToEvent(message, 0, OWNER, Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 1000})));
+    bytes memory extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 1000}));
 
     (
       /* uint256 msgFeeJuels */
       ,
       bool isOutOfOrderExecution,
       bytes memory convertedExtraArgs
-    ) = s_priceRegistry.getValidatedRampMessageParams(messageEvent);
+    ) = s_priceRegistry.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, extraArgs);
 
     assertEq(isOutOfOrderExecution, false);
-    assertEq(
-      convertedExtraArgs,
-      abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes(messageEvent.extraArgs, DEST_CHAIN_SELECTOR))
-    );
+    assertEq(convertedExtraArgs, abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes(extraArgs, DEST_CHAIN_SELECTOR)));
   }
 
   function test_WitEVMExtraArgsV2_Success() public view {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    Internal.EVM2AnyRampMessage memory messageEvent = _messageToEvent(
-      message, 0, OWNER, Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 0, allowOutOfOrderExecution: true}))
-    );
+    bytes memory extraArgs = Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 0, allowOutOfOrderExecution: true}));
 
     (
       /* uint256 msgFeeJuels */
       ,
       bool isOutOfOrderExecution,
       bytes memory convertedExtraArgs
-    ) = s_priceRegistry.getValidatedRampMessageParams(messageEvent);
+    ) = s_priceRegistry.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, extraArgs);
 
     assertEq(isOutOfOrderExecution, true);
-    assertEq(
-      convertedExtraArgs,
-      abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes(messageEvent.extraArgs, DEST_CHAIN_SELECTOR))
-    );
+    assertEq(convertedExtraArgs, abi.encode(s_priceRegistry.parseEVMExtraArgsFromBytes(extraArgs, DEST_CHAIN_SELECTOR)));
   }
 
   // Reverts
 
   function test_MessageFeeTooHigh_Revert() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    Internal.EVM2AnyRampMessage memory messageEvent = _messageToEvent(message, MAX_MSG_FEES_JUELS + 1, OWNER, "");
-
     vm.expectRevert(
       abi.encodeWithSelector(PriceRegistry.MessageFeeTooHigh.selector, MAX_MSG_FEES_JUELS + 1, MAX_MSG_FEES_JUELS)
     );
 
-    s_priceRegistry.getValidatedRampMessageParams(messageEvent);
+    s_priceRegistry.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], MAX_MSG_FEES_JUELS + 1, "");
   }
 
   function test_InvalidExtraArgs_Revert() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    Internal.EVM2AnyRampMessage memory messageEvent = _messageToEvent(message, 0, OWNER, "abcde");
-
     vm.expectRevert(PriceRegistry.InvalidExtraArgsTag.selector);
 
-    s_priceRegistry.getValidatedRampMessageParams(messageEvent);
+    s_priceRegistry.processMessageArgs(DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, "abcde");
   }
 
   function test_MalformedEVMExtraArgs_Revert() public {
-    bytes memory extraArgBytes =
-      abi.encodeWithSelector(Client.EVM_EXTRA_ARGS_V2_TAG, Client.EVMExtraArgsV1({gasLimit: 100}));
-
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    Internal.EVM2AnyRampMessage memory messageEvent = _messageToEvent(message, 0, OWNER, extraArgBytes);
-
     // abi.decode error
     vm.expectRevert();
 
-    s_priceRegistry.getValidatedRampMessageParams(messageEvent);
-  }
-
-  function _messageToEvent(
-    Client.EVM2AnyMessage memory message,
-    uint256 feeTokenAmount,
-    address originalSender,
-    bytes memory extraArgs
-  ) internal view returns (Internal.EVM2AnyRampMessage memory) {
-    Internal.EVM2AnyRampMessage memory messageEvent = _messageToEvent(
-      message,
-      SOURCE_CHAIN_SELECTOR,
+    s_priceRegistry.processMessageArgs(
       DEST_CHAIN_SELECTOR,
-      1,
-      1,
-      feeTokenAmount,
-      originalSender,
-      bytes32("1"),
-      s_tokenAdminRegistry
+      s_sourceTokens[0],
+      0,
+      abi.encodeWithSelector(Client.EVM_EXTRA_ARGS_V2_TAG, Client.EVMExtraArgsV1({gasLimit: 100}))
     );
-    messageEvent.extraArgs = extraArgs;
-
-    return messageEvent;
-  }
-
-  function _generateSimpleMessageEvent(Client.EVM2AnyMessage memory message)
-    internal
-    view
-    returns (Internal.EVM2AnyRampMessage memory)
-  {
-    return _messageToEvent(message, 0, OWNER, "");
   }
 }
 

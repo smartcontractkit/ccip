@@ -82,15 +82,20 @@ interface IPriceRegistry {
     Client.EVM2AnyMessage calldata message
   ) external view returns (uint256 feeTokenAmount);
 
-  /// @notice Validates the message that is emitted from an OnRamp, and returns the extracted args and message fee in juels
-  /// @param message OnRamp message to validate
+  /// @notice Converts the extraArgs to the latest version and returns the converted message fee in juels
+  /// @param destChainSelector destination chain selector to process
+  /// @param feeToken Fee token address used to pay for message fees
+  /// @param feeTokenAmount Fee token amount
+  /// @param extraArgs Message extra args that were passed in by the client
   /// @return msgFeeJuels message fee in juels
   /// @return isOutOfOrderExecution true if the message should be executed out of order
   /// @return convertedExtraArgs extra args converted to the latest family-specific args version
-  function getValidatedRampMessageParams(Internal.EVM2AnyRampMessage memory message)
-    external
-    view
-    returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs);
+  function processMessageArgs(
+    uint64 destChainSelector,
+    address feeToken,
+    uint256 feeTokenAmount,
+    bytes memory extraArgs
+  ) external view returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs);
 
   /// @notice Validates pool return data
   /// @param destChainSelector Destination chain selector to which the token amounts are sent to

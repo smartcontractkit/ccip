@@ -447,9 +447,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message
   ) external view returns (uint256 feeTokenAmount) {
-    // Verify that the config is present (a 0 family chain selector impleis an unconfigured dest chain)
     DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
-
     if (!destChainConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
 
     uint256 numberOfTokens = message.tokenAmounts.length;
@@ -498,14 +496,13 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     // uint112(packedGasPrice) = executionGasPrice
 
     // NOTE: when supporting non-EVM chains, revisit how generic this fee logic can be
+    // NOTE: revisit parsing non-EVM args
 
-    uint256 executionGasCost =
-      destChainConfig.destGasOverhead + (message.data.length * destChainConfig.destGasPerPayloadByte) + tokenTransferGas;
-
-    // NOTE: when supporting non-EVM chains, revisit this and parse non-EVM args
-    executionGasCost += _parseEVMExtraArgsFromBytes(message.extraArgs, destChainConfig).gasLimit;
-
-    uint256 executionCost = uint112(packedGasPrice) * executionGasCost * destChainConfig.gasMultiplierWeiPerEth;
+    uint256 executionCost = uint112(packedGasPrice)
+      * (
+        destChainConfig.destGasOverhead + (message.data.length * destChainConfig.destGasPerPayloadByte) + tokenTransferGas
+          + _parseEVMExtraArgsFromBytes(message.extraArgs, destChainConfig).gasLimit
+      ) * destChainConfig.gasMultiplierWeiPerEth;
 
     // Calculate number of fee tokens to charge.
     // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
@@ -776,28 +773,28 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   }
 
   /// @inheritdoc IPriceRegistry
-  function getValidatedRampMessageParams(Internal.EVM2AnyRampMessage calldata message)
-    external
-    view
-    returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs)
-  {
+  function processMessageArgs(
+    uint64 destChainSelector,
+    address feeToken,
+    uint256 feeTokenAmount,
+    bytes calldata extraArgs
+  ) external view returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) {
     // Convert feeToken to link if not already in link
-    if (message.feeToken == i_linkToken) {
-      msgFeeJuels = message.feeTokenAmount;
+    if (feeToken == i_linkToken) {
+      msgFeeJuels = feeTokenAmount;
     } else {
-      msgFeeJuels = convertTokenAmount(message.feeToken, message.feeTokenAmount, i_linkToken);
+      msgFeeJuels = convertTokenAmount(feeToken, feeTokenAmount, i_linkToken);
     }
 
     if (msgFeeJuels > i_maxFeeJuelsPerMsg) revert MessageFeeTooHigh(msgFeeJuels, i_maxFeeJuelsPerMsg);
 
-    uint64 defaultTxGasLimit = s_destChainConfigs[message.header.destChainSelector].defaultTxGasLimit;
+    uint64 defaultTxGasLimit = s_destChainConfigs[destChainSelector].defaultTxGasLimit;
     // NOTE: when supporting non-EVM chains, revisit this and parse non-EVM args.
-    // We can parse unvalidated args since getValidatedRampMessageParams is called after getFee (which will already validate the params)
-    Client.EVMExtraArgsV2 memory extraArgs =
-      _parseUnvalidatedEVMExtraArgsFromBytes(message.extraArgs, defaultTxGasLimit);
-    isOutOfOrderExecution = extraArgs.allowOutOfOrderExecution;
+    // We can parse unvalidated args since this message is called after getFee (which will already validate the params)
+    Client.EVMExtraArgsV2 memory parsedExtraArgs = _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, defaultTxGasLimit);
+    isOutOfOrderExecution = parsedExtraArgs.allowOutOfOrderExecution;
 
-    return (msgFeeJuels, isOutOfOrderExecution, abi.encode(extraArgs));
+    return (msgFeeJuels, isOutOfOrderExecution, abi.encode(parsedExtraArgs));
   }
 
   /// @inheritdoc IPriceRegistry
@@ -816,11 +813,10 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
       // extraData. This prevents gas bomb attacks on the NOPs. As destBytesOverhead accounts for both
       // extraData and offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
       uint256 destPoolDataLength = rampTokenAmounts[i].extraData.length;
-      if (
-        destPoolDataLength > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
-          && destPoolDataLength > s_tokenTransferFeeConfig[destChainSelector][sourceToken].destBytesOverhead
-      ) {
-        revert SourceTokenDataTooLarge(sourceToken);
+      if (destPoolDataLength > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
+        if (destPoolDataLength > s_tokenTransferFeeConfig[destChainSelector][sourceToken].destBytesOverhead) {
+          revert SourceTokenDataTooLarge(sourceToken);
+        }
       }
 
       _validateDestFamilyAddress(chainFamilySelector, rampTokenAmounts[i].destTokenAddress);
