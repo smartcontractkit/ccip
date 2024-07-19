@@ -141,6 +141,21 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
     emit LiquidityRemoved(msg.sender, amount);
   }
 
+  /// @notice This function can be used to transfer liquidity from an older version of the pool to this pool. To do so
+  /// this pool will have to be set as the rebalancer in the older version of the pool. This allows it to transfer the
+  /// funds in the old pool to the new pool.
+  /// @dev When upgrading a LockRelease pool, this function can be called at the same time as the pool is changed in the
+  /// TokenAdminRegistry. This allows for a smooth transition of both liquidity and transactions to the new pool.
+  /// Alternatively, when no multicall is available, a portion of the funds can be transferred to the new pool before
+  /// changing which pool CCIP uses, to ensure both pools can operate. Then the pool should be changed in the
+  /// TokenAdminRegistry, which will activate the new pool. All new transactions will use the new pool and its
+  /// liquidity. Finally, the remaining liquidity can be transferred to the new pool using this function one more time.
+  /// @param from The address of the old pool.
+  /// @param amount The amount of liquidity to transfer.
+  function transferLiquidity(address from, uint256 amount) external onlyOwner {
+    LockReleaseTokenPoolAndProxy(from).withdrawLiquidity(amount);
+  }
+
   /// @notice Sets the rate limiter admin address.
   /// @dev Only callable by the owner or the rate limiter admin. NOTE: overwrites the normal
   /// onlyAdmin check in the base implementation to also allow the rate limiter admin.
