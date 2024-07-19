@@ -2060,7 +2060,7 @@ contract EVM2EVMMultiOnRamp_convertParsedExtraArgs is EVM2EVMMultiOnRampSetup {
       Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: false});
 
     vm.assertEq(
-      s_onRamp.convertParsedExtraArgs(inputExtraArgs, s_destChainDynamicConfig), abi.encode(expectedOutputArgs)
+      s_onRamp.convertParsedExtraArgs(inputExtraArgs, s_destChainDynamicConfig), Client._argsToBytes(expectedOutputArgs)
     );
   }
 
@@ -2069,14 +2069,16 @@ contract EVM2EVMMultiOnRamp_convertParsedExtraArgs is EVM2EVMMultiOnRampSetup {
       Client.EVMExtraArgsV2({gasLimit: GAS_LIMIT, allowOutOfOrderExecution: true});
     bytes memory inputExtraArgs = Client._argsToBytes(inputArgs);
 
-    vm.assertEq(s_onRamp.convertParsedExtraArgs(inputExtraArgs, s_destChainDynamicConfig), abi.encode(inputArgs));
+    vm.assertEq(
+      s_onRamp.convertParsedExtraArgs(inputExtraArgs, s_destChainDynamicConfig), Client._argsToBytes(inputArgs)
+    );
   }
 
   function test_EVMExtraArgsDefault_Success() public view {
     Client.EVMExtraArgsV2 memory expectedOutputArgs =
       Client.EVMExtraArgsV2({gasLimit: s_destChainDynamicConfig.defaultTxGasLimit, allowOutOfOrderExecution: false});
 
-    vm.assertEq(s_onRamp.convertParsedExtraArgs("", s_destChainDynamicConfig), abi.encode(expectedOutputArgs));
+    vm.assertEq(s_onRamp.convertParsedExtraArgs("", s_destChainDynamicConfig), Client._argsToBytes(expectedOutputArgs));
   }
 
   function test_EmptyExtraArgs_Success() public {

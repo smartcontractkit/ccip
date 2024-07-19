@@ -205,7 +205,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistrySetup {
       sender: originalSender,
       data: message.data,
       receiver: message.receiver,
-      extraArgs: abi.encode(extraArgs),
+      extraArgs: Client._argsToBytes(extraArgs),
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
       tokenAmounts: new Internal.RampTokenAmount[](message.tokenAmounts.length)

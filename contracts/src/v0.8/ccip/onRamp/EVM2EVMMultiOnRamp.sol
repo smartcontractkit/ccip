@@ -398,7 +398,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   ) internal pure returns (bytes memory encodedExtraArgs) {
     bytes4 chainFamilySelector = destChainDynamicConfig.chainFamilySelector;
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM) {
-      return abi.encode(_parseEVMExtraArgsFromBytes(extraArgs, destChainDynamicConfig));
+      return Client._argsToBytes(_parseEVMExtraArgsFromBytes(extraArgs, destChainDynamicConfig));
     }
     // Invalid chain family selectors cannot be configured - ignore invalid cases
     return encodedExtraArgs;
