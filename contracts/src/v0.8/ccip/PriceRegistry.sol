@@ -398,7 +398,10 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   // ================================================================
 
   /// @inheritdoc IPriceRegistry
-  function updatePrices(Internal.PriceUpdates calldata priceUpdates) external override requireUpdaterOrOwner {
+  function updatePrices(Internal.PriceUpdates calldata priceUpdates) external override {
+    // The caller must be the fee updater
+    _validateCaller();
+
     uint256 tokenUpdatesLength = priceUpdates.tokenPriceUpdates.length;
 
     for (uint256 i = 0; i < tokenUpdatesLength; ++i) {
@@ -880,17 +883,5 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
       linkToken: i_linkToken,
       stalenessThreshold: i_stalenessThreshold
     });
-  }
-
-  // ================================================================
-  // │                           Access                             │
-  // ================================================================
-  /// @notice Require that the caller is the owner or a fee updater.
-  modifier requireUpdaterOrOwner() {
-    if (msg.sender != owner()) {
-      // if not owner - check if the caller is a fee updater
-      _validateCaller();
-    }
-    _;
   }
 }

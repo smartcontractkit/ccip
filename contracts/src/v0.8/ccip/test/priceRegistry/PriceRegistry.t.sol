@@ -104,7 +104,8 @@ contract PriceRegistrySetup is TokenSetup {
 
     s_encodedInitialPriceUpdates = abi.encode(priceUpdates);
 
-    address[] memory priceUpdaters = new address[](0);
+    address[] memory priceUpdaters = new address[](1);
+    priceUpdaters[0] = OWNER;
     address[] memory feeTokens = new address[](2);
     feeTokens[0] = s_sourceTokens[0];
     feeTokens[1] = s_weth;
@@ -941,7 +942,7 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
 
   // Reverts
 
-  function test_OnlyCallableByUpdaterOrOwner_Revert() public {
+  function test_OnlyCallableByUpdater_Revert() public {
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
       gasPriceUpdates: new Internal.GasPriceUpdate[](0)
