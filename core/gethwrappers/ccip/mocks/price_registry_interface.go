@@ -1078,34 +1078,6 @@ func (_m *PriceRegistryInterface) GetValidatedFee(opts *bind.CallOpts, destChain
 	return r0, r1
 }
 
-// GetValidatedRampMessageParams provides a mock function with given fields: opts, message
-func (_m *PriceRegistryInterface) GetValidatedRampMessageParams(opts *bind.CallOpts, message price_registry.InternalEVM2AnyRampMessage) (price_registry.GetValidatedRampMessageParams, error) {
-	ret := _m.Called(opts, message)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetValidatedRampMessageParams")
-	}
-
-	var r0 price_registry.GetValidatedRampMessageParams
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, price_registry.InternalEVM2AnyRampMessage) (price_registry.GetValidatedRampMessageParams, error)); ok {
-		return rf(opts, message)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, price_registry.InternalEVM2AnyRampMessage) price_registry.GetValidatedRampMessageParams); ok {
-		r0 = rf(opts, message)
-	} else {
-		r0 = ret.Get(0).(price_registry.GetValidatedRampMessageParams)
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts, price_registry.InternalEVM2AnyRampMessage) error); ok {
-		r1 = rf(opts, message)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetValidatedTokenPrice provides a mock function with given fields: opts, token
 func (_m *PriceRegistryInterface) GetValidatedTokenPrice(opts *bind.CallOpts, token common.Address) (*big.Int, error) {
 	ret := _m.Called(opts, token)
@@ -1669,6 +1641,34 @@ func (_m *PriceRegistryInterface) ParseUsdPerUnitGasUpdated(log types.Log) (*pri
 
 	if rf, ok := ret.Get(1).(func(types.Log) error); ok {
 		r1 = rf(log)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ProcessMessageArgs provides a mock function with given fields: opts, destChainSelector, feeToken, feeTokenAmount, extraArgs
+func (_m *PriceRegistryInterface) ProcessMessageArgs(opts *bind.CallOpts, destChainSelector uint64, feeToken common.Address, feeTokenAmount *big.Int, extraArgs []byte) (price_registry.ProcessMessageArgs, error) {
+	ret := _m.Called(opts, destChainSelector, feeToken, feeTokenAmount, extraArgs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ProcessMessageArgs")
+	}
+
+	var r0 price_registry.ProcessMessageArgs
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, uint64, common.Address, *big.Int, []byte) (price_registry.ProcessMessageArgs, error)); ok {
+		return rf(opts, destChainSelector, feeToken, feeTokenAmount, extraArgs)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, uint64, common.Address, *big.Int, []byte) price_registry.ProcessMessageArgs); ok {
+		r0 = rf(opts, destChainSelector, feeToken, feeTokenAmount, extraArgs)
+	} else {
+		r0 = ret.Get(0).(price_registry.ProcessMessageArgs)
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.CallOpts, uint64, common.Address, *big.Int, []byte) error); ok {
+		r1 = rf(opts, destChainSelector, feeToken, feeTokenAmount, extraArgs)
 	} else {
 		r1 = ret.Error(1)
 	}
