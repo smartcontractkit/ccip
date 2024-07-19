@@ -30,7 +30,79 @@ import (
 
 func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {}
 
-func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {}
+func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
+	lggr := logger.TestLogger(t)
+	ctx := context.Background()
+	const chainS1 = cciptypes.ChainSelector(1)
+	const chainD = cciptypes.ChainSelector(2)
+	s := testSetup(t, ctx, chainS1, nil)
+
+	cfg := evmtypes.ChainReaderConfig{
+		Contracts: map[string]evmtypes.ChainContractReader{
+			crconsts.ContractNameOffRamp: {
+				ContractPollingFilter: evmtypes.ContractPollingFilter{
+					GenericEventNames: []string{crconsts.EventNameExecutionStateChanged},
+				},
+				ContractABI: ccip_reader_tester.CCIPReaderTesterABI,
+				Configs: map[string]*evmtypes.ChainReaderDefinition{
+					crconsts.EventNameExecutionStateChanged: {
+						ChainSpecificName: crconsts.EventNameExecutionStateChanged,
+						ReadType:          evmtypes.Event,
+					},
+				},
+			},
+		},
+	}
+
+	cr, err := evm.NewChainReaderService(ctx, lggr, s.lp, s.cl, cfg)
+	assert.NoError(t, err)
+	err = cr.Bind(ctx, []types.BoundContract{
+		{
+			Address: s.contractAddr.String(),
+			Name:    crconsts.ContractNameOffRamp,
+			Pending: false,
+		},
+	})
+	assert.NoError(t, err)
+	err = cr.Start(ctx)
+	assert.NoError(t, err)
+
+	contractReaders := map[cciptypes.ChainSelector]types.ContractReader{chainS1: cr}
+	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
+	reader := ccipreaderpkg.NewCCIPReader(lggr, contractReaders, contractWriters, chainD)
+
+	_, err = s.contract.EmitExecutionStateChanged(
+		s.auth,
+		uint64(chainS1),
+		14,
+		cciptypes.Bytes32{1, 0, 0, 1},
+		1,
+		[]byte{1, 2, 3, 4},
+	)
+	assert.NoError(t, err)
+
+	_, err = s.contract.EmitExecutionStateChanged(
+		s.auth,
+		uint64(chainS1),
+		15,
+		cciptypes.Bytes32{1, 0, 0, 2},
+		1,
+		[]byte{1, 2, 3, 4, 5},
+	)
+	assert.NoError(t, err)
+
+	s.sb.Commit()
+	time.Sleep(5 * time.Second)
+
+	executedRanges, err := reader.ExecutedMessageRanges(
+		ctx,
+		chainS1,
+		chainD,
+		cciptypes.NewSeqNumRange(14, 15),
+	)
+	require.NoError(t, err)
+	require.Len(t, executedRanges, 2)
+}
 
 func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 	lggr := logger.TestLogger(t)

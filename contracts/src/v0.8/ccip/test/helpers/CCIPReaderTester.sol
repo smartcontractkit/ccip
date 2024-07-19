@@ -36,4 +36,29 @@ contract CCIPReaderTester {
   function EmitCCIPSendRequested(uint64 destChainSelector, EVM2AnyRampMessage memory message) external {
     emit CCIPSendRequested(destChainSelector, message);
   }
+
+  enum MessageExecutionState {
+    UNTOUCHED,
+    IN_PROGRESS,
+    SUCCESS,
+    FAILURE
+  }
+
+  event ExecutionStateChanged(
+    uint64 indexed sourceChainSelector,
+    uint64 indexed sequenceNumber,
+    bytes32 indexed messageId,
+    MessageExecutionState state,
+    bytes returnData
+  );
+
+  function EmitExecutionStateChanged(
+    uint64 sourceChainSelector,
+    uint64 sequenceNumber,
+    bytes32 messageId,
+    MessageExecutionState state,
+    bytes memory returnData
+  ) external {
+    emit ExecutionStateChanged(sourceChainSelector, sequenceNumber, messageId, state, returnData);
+  }
 }
