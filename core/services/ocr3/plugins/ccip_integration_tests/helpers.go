@@ -1,9 +1,13 @@
 package ccip_integration_tests
 
 import (
+	"bytes"
 	"encoding/hex"
 	"math/big"
+	"sort"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
@@ -11,15 +15,13 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
-
-	chainsel "github.com/smartcontractkit/chain-selectors"
-
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ocr3_config_encoder"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
@@ -27,6 +29,13 @@ import (
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/link_token"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip_integration_tests/integrationhelpers"
+
+	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
+
+	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/stretchr/testify/require"
 )
@@ -38,13 +47,14 @@ var (
 const (
 	CapabilityLabelledName = "ccip"
 	CapabilityVersion      = "v1.0.0"
+	NodeOperatorID         = 1
 )
 
 func e18Mult(amount uint64) *big.Int {
-	return new(big.Int).Mul(uintBigInt(amount), uintBigInt(1e18))
+	return new(big.Int).Mul(uBigInt(amount), uBigInt(1e18))
 }
 
-func uintBigInt(i uint64) *big.Int {
+func uBigInt(i uint64) *big.Int {
 	return new(big.Int).SetUint64(i)
 }
 
@@ -53,7 +63,7 @@ type homeChain struct {
 	owner              *bind.TransactOpts
 	chainID            uint64
 	capabilityRegistry *kcr.CapabilitiesRegistry
-	ccipConfigContract common.Address
+	ccipConfig         *ccip_config.CCIPConfig
 }
 
 type onchainUniverse struct {
@@ -105,7 +115,7 @@ func createUniverses(
 		rmnProxy := deployARMProxyContract(t, owner, backend, rmn.Address(), chainID)
 		weth := deployWETHContract(t, owner, backend, chainID)
 		rout := deployRouter(t, owner, backend, weth.Address(), rmnProxy.Address(), chainID)
-		priceRegistry := deployPriceRegistry(t, owner, backend, linkToken.Address(), weth.Address(), chainID)
+		priceRegistry := deployPriceRegistry(t, owner, backend, linkToken.Address(), weth.Address(), big.NewInt(1e18), chainID)
 		tokenAdminRegistry := deployTokenAdminRegistry(t, owner, backend, chainID)
 		nonceManager := deployNonceManager(t, owner, backend, chainID)
 
@@ -116,10 +126,8 @@ func createUniverses(
 			owner,
 			backend,
 			evm_2_evm_multi_onramp.EVM2EVMMultiOnRampStaticConfig{
-				LinkToken:          linkToken.Address(),
-				ChainSelector:      chainID,
+				ChainSelector:      getSelector(chainID),
 				RmnProxy:           rmnProxy.Address(),
-				MaxFeeJuelsPerMsg:  big.NewInt(1e18),
 				NonceManager:       nonceManager.Address(),
 				TokenAdminRegistry: tokenAdminRegistry.Address(),
 			},
@@ -130,21 +138,6 @@ func createUniverses(
 				// so we can set this to any address
 				FeeAggregator: testutils.NewAddress(),
 			},
-			// Destination chain configs will be set up later once we have all chains
-			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{},
-			// PremiumMultiplier is always needed if the onramp is enabled
-			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs{
-				{
-					PremiumMultiplierWeiPerEth: 9e17, //0.9 ETH
-					Token:                      linkToken.Address(),
-				},
-				{
-					PremiumMultiplierWeiPerEth: 1e18,
-					Token:                      weth.Address(),
-				},
-			},
-			//TODO: We'll need to have TransferFeeConfigArgs when we start testing with sending tokens
-			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampTokenTransferFeeConfigArgs{},
 		)
 		require.NoErrorf(t, err, "failed to deploy onramp on chain id %d", chainID)
 		backend.Commit()
@@ -158,10 +151,14 @@ func createUniverses(
 			owner,
 			backend,
 			evm_2_evm_multi_offramp.EVM2EVMMultiOffRampStaticConfig{
-				ChainSelector:      chainID,
+				ChainSelector:      getSelector(chainID),
 				RmnProxy:           rmnProxy.Address(),
 				TokenAdminRegistry: tokenAdminRegistry.Address(),
 				NonceManager:       nonceManager.Address(),
+			},
+			evm_2_evm_multi_offramp.EVM2EVMMultiOffRampDynamicConfig{
+				Router:        rout.Address(),
+				PriceRegistry: priceRegistry.Address(),
 			},
 			// Source chain configs will be set up later once we have all chains
 			[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{},
@@ -194,6 +191,24 @@ func createUniverses(
 
 	// Once we have all chains created and contracts deployed, we can set up the initial configurations and wire chains together
 	connectUniverses(t, universes)
+
+	// print out all contract addresses for debugging purposes
+	for chainID, uni := range universes {
+		t.Logf("Chain ID: %d\n Chain Selector: %d\n LinkToken: %s\n WETH: %s\n Router: %s\n RMNProxy: %s\n RMN: %s\n OnRamp: %s\n OffRamp: %s\n PriceRegistry: %s\n TokenAdminRegistry: %s\n NonceManager: %s\n",
+			chainID,
+			getSelector(chainID),
+			uni.linkToken.Address().Hex(),
+			uni.weth.Address().Hex(),
+			uni.router.Address().Hex(),
+			uni.rmnProxy.Address().Hex(),
+			uni.rmn.Address().Hex(),
+			uni.onramp.Address().Hex(),
+			uni.offramp.Address().Hex(),
+			uni.priceRegistry.Address().Hex(),
+			uni.tokenAdminRegistry.Address().Hex(),
+			uni.nonceManager.Address().Hex(),
+		)
+	}
 
 	return homeChainUniverse, universes
 }
@@ -255,13 +270,223 @@ func setupHomeChain(t *testing.T, owner *bind.TransactOpts, backend *backends.Si
 	require.NoError(t, err, "failed to add capabilities to the capability registry")
 	backend.Commit()
 
+	// Add NodeOperator, for simplicity we'll add one NodeOperator only
+	// First NodeOperator will have NodeOperatorId = 1
+	_, err = capabilityRegistry.AddNodeOperators(owner, []kcr.CapabilitiesRegistryNodeOperator{
+		{
+			Admin: owner.From,
+			Name:  "NodeOperator",
+		},
+	})
+	require.NoError(t, err, "failed to add node operator to the capability registry")
+	backend.Commit()
+
 	return homeChain{
 		backend:            backend,
 		owner:              owner,
 		chainID:            homeChainID,
 		capabilityRegistry: capabilityRegistry,
-		ccipConfigContract: capabilityConfig.Address(),
+		ccipConfig:         capabilityConfig,
 	}
+}
+
+func sortP2PIDS(p2pIDs [][32]byte) {
+	sort.Slice(p2pIDs, func(i, j int) bool {
+		return bytes.Compare(p2pIDs[i][:], p2pIDs[j][:]) < 0
+	})
+}
+
+func (h *homeChain) AddNodes(
+	t *testing.T,
+	p2pIDs [][32]byte,
+	capabilityIDs [][32]byte,
+) {
+	// Need to sort, otherwise _checkIsValidUniqueSubset onChain will fail
+	sortP2PIDS(p2pIDs)
+	var nodeParams []kcr.CapabilitiesRegistryNodeParams
+	for _, p2pID := range p2pIDs {
+		nodeParam := kcr.CapabilitiesRegistryNodeParams{
+			NodeOperatorId:      NodeOperatorID,
+			Signer:              p2pID, // Not used in tests
+			P2pId:               p2pID,
+			HashedCapabilityIds: capabilityIDs,
+		}
+		nodeParams = append(nodeParams, nodeParam)
+	}
+	_, err := h.capabilityRegistry.AddNodes(h.owner, nodeParams)
+	require.NoError(t, err, "failed to add node operator oracles")
+	h.backend.Commit()
+}
+
+func AddChainConfig(
+	t *testing.T,
+	h homeChain,
+	chainSelector uint64,
+	p2pIDs [][32]byte,
+	f uint8,
+) ccip_config.CCIPConfigTypesChainConfigInfo {
+	// Need to sort, otherwise _checkIsValidUniqueSubset onChain will fail
+	sortP2PIDS(p2pIDs)
+	// First Add ChainConfig that includes all p2pIDs as readers
+	chainConfig := integrationhelpers.SetupConfigInfo(chainSelector, p2pIDs, f, []byte(strconv.FormatUint(chainSelector, 10)))
+	inputConfig := []ccip_config.CCIPConfigTypesChainConfigInfo{
+		chainConfig,
+	}
+	_, err := h.ccipConfig.ApplyChainConfigUpdates(h.owner, nil, inputConfig)
+	require.NoError(t, err)
+	h.backend.Commit()
+	return chainConfig
+}
+
+func (h *homeChain) AddDON(
+	t *testing.T,
+	ccipCapabilityID [32]byte,
+	chainSelector uint64,
+	uni onchainUniverse,
+	f uint8,
+	bootstrapP2PID [32]byte,
+	p2pIDs [][32]byte,
+	oracles []confighelper2.OracleIdentityExtra,
+) {
+	// Get OCR3 Config from helper
+	var schedule []int
+	for range oracles {
+		schedule = append(schedule, 1)
+	}
+	signers, transmitters, f, _, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
+		30*time.Second, // deltaProgress
+		10*time.Second, // deltaResend
+		20*time.Second, // deltaInitial
+		2*time.Second,  // deltaRound
+		20*time.Second, // deltaGrace
+		10*time.Second, // deltaCertifiedCommitRequest
+		10*time.Second, // deltaStage
+		3,              // rmax
+		schedule,
+		oracles,
+		[]byte{},            // empty offchain config
+		50*time.Millisecond, // maxDurationQuery
+		5*time.Second,       // maxDurationObservation
+		10*time.Second,      // maxDurationShouldAcceptAttestedReport
+		10*time.Second,      // maxDurationShouldTransmitAcceptedReport
+		int(f),
+		[]byte{}) // empty OnChainConfig
+	require.NoError(t, err, "failed to create contract config")
+
+	tabi, err := ocr3_config_encoder.IOCR3ConfigEncoderMetaData.GetAbi()
+	require.NoError(t, err)
+
+	signersBytes := make([][]byte, len(signers))
+	for i, signer := range signers {
+		signersBytes[i] = signer
+	}
+
+	transmittersBytes := make([][]byte, len(transmitters))
+	for i, transmitter := range transmitters {
+		// anotherErr because linting doesn't want to shadow err
+		parsed, anotherErr := common.ParseHexOrString(string(transmitter))
+		require.NoError(t, anotherErr)
+		transmittersBytes[i] = parsed
+	}
+
+	// Add DON on capability registry contract
+	var ocr3Configs []ocr3_config_encoder.CCIPConfigTypesOCR3Config
+	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
+		ocr3Configs = append(ocr3Configs, ocr3_config_encoder.CCIPConfigTypesOCR3Config{
+			PluginType:            uint8(pluginType),
+			ChainSelector:         chainSelector,
+			F:                     f,
+			OffchainConfigVersion: offchainConfigVersion,
+			OfframpAddress:        uni.offramp.Address().Bytes(),
+			BootstrapP2PIds:       [][32]byte{bootstrapP2PID},
+			P2pIds:                p2pIDs,
+			Signers:               signersBytes,
+			Transmitters:          transmittersBytes,
+			OffchainConfig:        offchainConfig,
+		})
+	}
+
+	encodedCall, err := tabi.Pack("exposeOCR3Config", ocr3Configs)
+	require.NoError(t, err)
+
+	// Trim first four bytes to remove function selector.
+	encodedConfigs := encodedCall[4:]
+
+	// commit so that we have an empty block to filter events from
+	h.backend.Commit()
+
+	_, err = h.capabilityRegistry.AddDON(h.owner, p2pIDs, []kcr.CapabilitiesRegistryCapabilityConfiguration{
+		{
+			CapabilityId: ccipCapabilityID,
+			Config:       encodedConfigs,
+		},
+	}, false, false, f)
+	require.NoError(t, err)
+	h.backend.Commit()
+
+	endBlock := h.backend.Blockchain().CurrentBlock().Number.Uint64()
+	iter, err := h.capabilityRegistry.FilterConfigSet(&bind.FilterOpts{
+		Start: h.backend.Blockchain().CurrentBlock().Number.Uint64() - 1,
+		End:   &endBlock,
+	})
+	require.NoError(t, err, "failed to filter config set events")
+	var donID uint32
+	for iter.Next() {
+		donID = iter.Event.DonId
+		break
+	}
+	require.NotZero(t, donID, "failed to get donID from config set event")
+
+	var signerAddresses []common.Address
+	for _, signer := range signers {
+		signerAddresses = append(signerAddresses, common.BytesToAddress(signer))
+	}
+
+	var transmitterAddresses []common.Address
+	for _, transmitter := range transmitters {
+		transmitterAddresses = append(transmitterAddresses, common.HexToAddress(string(transmitter)))
+	}
+
+	// get the config digest from the ccip config contract and set config on the offramp.
+	var offrampOCR3Configs []evm_2_evm_multi_offramp.MultiOCR3BaseOCRConfigArgs
+	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
+		ocrConfig, err1 := h.ccipConfig.GetOCRConfig(&bind.CallOpts{
+			Context: testutils.Context(t),
+		}, donID, uint8(pluginType))
+		require.NoError(t, err1, "failed to get OCR3 config from ccip config contract")
+		require.Len(t, ocrConfig, 1, "expected exactly one OCR3 config")
+		offrampOCR3Configs = append(offrampOCR3Configs, evm_2_evm_multi_offramp.MultiOCR3BaseOCRConfigArgs{
+			ConfigDigest:                   ocrConfig[0].ConfigDigest,
+			OcrPluginType:                  uint8(pluginType),
+			F:                              f,
+			IsSignatureVerificationEnabled: pluginType == cctypes.PluginTypeCCIPCommit,
+			Signers:                        signerAddresses,
+			Transmitters:                   transmitterAddresses,
+		})
+	}
+
+	uni.backend.Commit()
+
+	_, err = uni.offramp.SetOCR3Configs(uni.owner, offrampOCR3Configs)
+	require.NoError(t, err, "failed to set ocr3 configs on offramp")
+	uni.backend.Commit()
+
+	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
+		ocrConfig, err := uni.offramp.LatestConfigDetails(&bind.CallOpts{
+			Context: testutils.Context(t),
+		}, uint8(pluginType))
+		require.NoError(t, err, "failed to get latest commit OCR3 config")
+		require.Equalf(t, offrampOCR3Configs[pluginType].ConfigDigest, ocrConfig.ConfigInfo.ConfigDigest, "%s OCR3 config digest mismatch", pluginType.String())
+		require.Equalf(t, offrampOCR3Configs[pluginType].F, ocrConfig.ConfigInfo.F, "%s OCR3 config F mismatch", pluginType.String())
+		require.Equalf(t, offrampOCR3Configs[pluginType].IsSignatureVerificationEnabled, ocrConfig.ConfigInfo.IsSignatureVerificationEnabled, "%s OCR3 config signature verification mismatch", pluginType.String())
+		if pluginType == cctypes.PluginTypeCCIPCommit {
+			// only commit will set signers, exec doesn't need them.
+			require.Equalf(t, offrampOCR3Configs[pluginType].Signers, ocrConfig.Signers, "%s OCR3 config signers mismatch", pluginType.String())
+		}
+		require.Equalf(t, offrampOCR3Configs[pluginType].Transmitters, ocrConfig.Transmitters, "%s OCR3 config transmitters mismatch", pluginType.String())
+	}
+
+	t.Logf("set ocr3 config on the offramp, signers: %+v, transmitters: %+v", signerAddresses, transmitterAddresses)
 }
 
 func connectUniverses(
@@ -270,7 +495,7 @@ func connectUniverses(
 ) {
 	for _, uni := range universes {
 		wireRouter(t, uni, universes)
-		wireOnRamp(t, uni, universes)
+		wirePriceRegistry(t, uni, universes)
 		wireOffRamp(t, uni, universes)
 		initRemoteChainsGasPrices(t, uni, universes)
 	}
@@ -313,7 +538,15 @@ func setupUniverseBasics(t *testing.T, uni onchainUniverse) {
 	_, err = uni.priceRegistry.UpdatePrices(owner, price_registry.InternalPriceUpdates{
 		TokenPriceUpdates: tokenPriceUpdates,
 	})
-	require.NoErrorf(t, err, "failed to apply price registry updates on chain id %d", uni.chainID)
+	require.NoErrorf(t, err, "failed to update prices in price registry on chain id %d", uni.chainID)
+	uni.backend.Commit()
+
+	_, err = uni.priceRegistry.ApplyAuthorizedCallerUpdates(owner, price_registry.AuthorizedCallersAuthorizedCallerArgs{
+		AddedCallers: []common.Address{
+			uni.offramp.Address(),
+		},
+	})
+	require.NoError(t, err, "failed to authorize offramp on price registry")
 	uni.backend.Commit()
 
 	//=============================================================================
@@ -345,11 +578,11 @@ func wireRouter(t *testing.T, uni onchainUniverse, universes map[uint64]onchainU
 			continue
 		}
 		routerOnrampUpdates = append(routerOnrampUpdates, router.RouterOnRamp{
-			DestChainSelector: remoteChainID,
+			DestChainSelector: getSelector(remoteChainID),
 			OnRamp:            uni.onramp.Address(),
 		})
 		routerOfframpUpdates = append(routerOfframpUpdates, router.RouterOffRamp{
-			SourceChainSelector: remoteChainID,
+			SourceChainSelector: getSelector(remoteChainID),
 			OffRamp:             uni.offramp.Address(),
 		})
 	}
@@ -359,20 +592,20 @@ func wireRouter(t *testing.T, uni onchainUniverse, universes map[uint64]onchainU
 }
 
 // Setting OnRampDestChainConfigs
-func wireOnRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchainUniverse) {
+func wirePriceRegistry(t *testing.T, uni onchainUniverse, universes map[uint64]onchainUniverse) {
 	owner := uni.owner
-	var onrampDestChainConfigArgs []evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs
+	var priceRegistryDestChainConfigArgs []price_registry.PriceRegistryDestChainConfigArgs
 	for remoteChainID := range universes {
 		if remoteChainID == uni.chainID {
 			continue
 		}
-		onrampDestChainConfigArgs = append(onrampDestChainConfigArgs, evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
-			DestChainSelector: remoteChainID,
-			DynamicConfig:     defaultOnRampDynamicConfig(t),
+		priceRegistryDestChainConfigArgs = append(priceRegistryDestChainConfigArgs, price_registry.PriceRegistryDestChainConfigArgs{
+			DestChainSelector: getSelector(remoteChainID),
+			DestChainConfig:   defaultPriceRegistryDestChainConfig(t),
 		})
 	}
-	_, err := uni.onramp.ApplyDestChainConfigUpdates(owner, onrampDestChainConfigArgs)
-	require.NoErrorf(t, err, "failed to apply dest chain config updates on onramp on chain id %d", uni.chainID)
+	_, err := uni.priceRegistry.ApplyDestChainConfigUpdates(owner, priceRegistryDestChainConfigArgs)
+	require.NoErrorf(t, err, "failed to apply dest chain config updates on price registry on chain id %d", uni.chainID)
 	uni.backend.Commit()
 }
 
@@ -385,7 +618,7 @@ func wireOffRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchain
 			continue
 		}
 		offrampSourceChainConfigArgs = append(offrampSourceChainConfigArgs, evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
-			SourceChainSelector: remoteChainID, // for each destination chain, add a source chain config
+			SourceChainSelector: getSelector(remoteChainID), // for each destination chain, add a source chain config
 			IsEnabled:           true,
 			OnRamp:              remoteUniverse.onramp.Address().Bytes(),
 		})
@@ -393,6 +626,14 @@ func wireOffRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchain
 	_, err := uni.offramp.ApplySourceChainConfigUpdates(owner, offrampSourceChainConfigArgs)
 	require.NoErrorf(t, err, "failed to apply source chain config updates on offramp on chain id %d", uni.chainID)
 	uni.backend.Commit()
+}
+
+func getSelector(chainID uint64) uint64 {
+	selector, err := chainsel.SelectorFromChainId(chainID)
+	if err != nil {
+		panic(err)
+	}
+	return selector
 }
 
 // initRemoteChainsGasPrices sets the gas prices for all chains except the local chain in the local price registry
@@ -404,7 +645,7 @@ func initRemoteChainsGasPrices(t *testing.T, uni onchainUniverse, universes map[
 		}
 		gasPriceUpdates = append(gasPriceUpdates,
 			price_registry.InternalGasPriceUpdate{
-				DestChainSelector: remoteChainID,
+				DestChainSelector: getSelector(remoteChainID),
 				UsdPerUnitGas:     big.NewInt(2e12),
 			},
 		)
@@ -415,7 +656,7 @@ func initRemoteChainsGasPrices(t *testing.T, uni onchainUniverse, universes map[
 	require.NoError(t, err)
 }
 
-func defaultOnRampDynamicConfig(t *testing.T) evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainDynamicConfig {
+func defaultPriceRegistryDestChainConfig(t *testing.T) price_registry.PriceRegistryDestChainConfig {
 	// https://github.com/smartcontractkit/ccip/blob/c4856b64bd766f1ddbaf5d13b42d3c4b12efde3a/contracts/src/v0.8/ccip/libraries/Internal.sol#L337-L337
 	/*
 		```Solidity
@@ -425,7 +666,7 @@ func defaultOnRampDynamicConfig(t *testing.T) evm_2_evm_multi_onramp.EVM2EVMMult
 	*/
 	evmFamilySelector, err := hex.DecodeString("2812d52c")
 	require.NoError(t, err)
-	return evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainDynamicConfig{
+	return price_registry.PriceRegistryDestChainConfig{
 		IsEnabled:                         true,
 		MaxNumberOfTokensPerMsg:           10,
 		MaxDataBytes:                      256,
@@ -490,8 +731,44 @@ func deployRouter(t *testing.T, owner *bind.TransactOpts, backend *backends.Simu
 	return rout
 }
 
-func deployPriceRegistry(t *testing.T, owner *bind.TransactOpts, backend *backends.SimulatedBackend, linkAddr, wethAddr common.Address, chainID uint64) *price_registry.PriceRegistry {
-	priceRegistryAddr, _, _, err := price_registry.DeployPriceRegistry(owner, backend, []common.Address{}, []common.Address{linkAddr, wethAddr}, 24*60*60, []price_registry.PriceRegistryTokenPriceFeedUpdate{})
+func deployPriceRegistry(
+	t *testing.T,
+	owner *bind.TransactOpts,
+	backend *backends.SimulatedBackend,
+	linkAddr,
+	wethAddr common.Address,
+	maxFeeJuelsPerMsg *big.Int,
+	chainID uint64,
+) *price_registry.PriceRegistry {
+	priceRegistryAddr, _, _, err := price_registry.DeployPriceRegistry(
+		owner,
+		backend,
+		price_registry.PriceRegistryStaticConfig{
+			MaxFeeJuelsPerMsg:  maxFeeJuelsPerMsg,
+			LinkToken:          linkAddr,
+			StalenessThreshold: 24 * 60 * 60, // 24 hours
+		},
+		[]common.Address{
+			owner.From, // owner can update prices in this test
+		}, // price updaters, will be set to offramp later
+		[]common.Address{linkAddr, wethAddr}, // fee tokens
+		// empty for now, need to fill in when testing token transfers
+		[]price_registry.PriceRegistryTokenPriceFeedUpdate{},
+		// empty for now, need to fill in when testing token transfers
+		[]price_registry.PriceRegistryTokenTransferFeeConfigArgs{},
+		[]price_registry.PriceRegistryPremiumMultiplierWeiPerEthArgs{
+			{
+				PremiumMultiplierWeiPerEth: 9e17, //0.9 ETH
+				Token:                      linkAddr,
+			},
+			{
+				PremiumMultiplierWeiPerEth: 1e18,
+				Token:                      wethAddr,
+			},
+		},
+		// Destination chain configs will be set up later once we have all chains
+		[]price_registry.PriceRegistryDestChainConfigArgs{},
+	)
 	require.NoErrorf(t, err, "failed to deploy price registry on chain id %d", chainID)
 	backend.Commit()
 	priceRegistry, err := price_registry.NewPriceRegistry(priceRegistryAddr, backend)
