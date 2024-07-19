@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
@@ -32,6 +33,7 @@ type CCIPOnChainState struct {
 	ArmProxies           map[uint64]*arm_proxy_contract.ARMProxyContract
 	NonceManagers        map[uint64]*nonce_manager.NonceManager
 	TokenAdminRegistries map[uint64]*token_admin_registry.TokenAdminRegistry
+	Routers              map[uint64]*router.Router
 	Timelocks            map[uint64]rbactimelock.Rbactimelock
 	Mcms                 map[uint64]manychainmultisig.Manychainmultisig
 
@@ -93,7 +95,17 @@ func toJSON(v interface{}) (string, error) {
 }
 
 func GenerateOnchainState(chains map[uint64]Chain, addressBook ContractAddressBook) (CCIPOnChainState, error) {
-	var state CCIPOnChainState
+	state := CCIPOnChainState{
+		EvmOnRampsV160:       make(map[uint64]*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp),
+		EvmOffRampsV160:      make(map[uint64]*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp),
+		PriceRegistries:      make(map[uint64]*price_registry.PriceRegistry),
+		ArmProxies:           make(map[uint64]*arm_proxy_contract.ARMProxyContract),
+		NonceManagers:        make(map[uint64]*nonce_manager.NonceManager),
+		TokenAdminRegistries: make(map[uint64]*token_admin_registry.TokenAdminRegistry),
+		Timelocks:            make(map[uint64]rbactimelock.Rbactimelock),
+		Routers:              make(map[uint64]*router.Router),
+		Mcms:                 make(map[uint64]manychainmultisig.Manychainmultisig),
+	}
 	// Get all the onchain state
 	for chainSelector, addresses := range addressBook.Addresses() {
 		for address := range addresses {
@@ -106,6 +118,9 @@ func GenerateOnchainState(chains map[uint64]Chain, addressBook ContractAddressBo
 			}
 			tvStr, err := tv.TypeAndVersion(nil)
 			if err != nil {
+				// TODO: there are some contracts which dont'
+				// Try other known
+			
 				return state, err
 			}
 			switch tvStr {
@@ -145,6 +160,18 @@ func GenerateOnchainState(chains map[uint64]Chain, addressBook ContractAddressBo
 					return state, err
 				}
 				state.TokenAdminRegistries[chainSelector] = tm
+			case "Router 1.2.0":
+				r, err := router.NewRouter(common.HexToAddress(address), chains[chainSelector].Client)
+				if err != nil {
+					return state, err
+				}
+				state.Routers[chainSelector] = r
+			case "PriceRegistry 1.6.0-dev":
+				pr, err := price_registry.NewPriceRegistry(common.HexToAddress(address), chains[chainSelector].Client)
+				if err != nil {
+					return state, err
+				}
+				state.PriceRegistries[chainSelector] = pr
 			default:
 				return state, fmt.Errorf("unknown contract %s", tvStr)
 			}

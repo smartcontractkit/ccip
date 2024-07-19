@@ -226,21 +226,23 @@ func DeployNewCCIPToExistingDON(addressBook ContractAddressBook,
 	if err != nil {
 		return err
 	}
+	fmt.Println(ccipState)
 	// We expect no job specs yet, just the onchain state to be populated.
 	// Build the job specs from the onchain state.
-	nodesToJobs := make(map[string][]CCIPSpec)
-	for _, nodeId := range nodesIds {
-		// One spec needed per node in CCIPv2.
-		nodesToJobs[nodeId] = []CCIPSpec{
-			{
-				CapabilityRegistry: ccipState.CapabilityRegistry.Address(),
-			},
-		}
-	}
-	// Build the jobs specs
-	if err := deployJobSpecs(nodesToJobs, jobServiceClient); err != nil {
-		return err
-	}
+	//nodesToJobs := make(map[string][]CCIPSpec)
+	//for _, nodeId := range nodesIds {
+	//	// One spec needed per node in CCIPv2.
+	//	nodesToJobs[nodeId] = []CCIPSpec{
+	//		{
+	//			CapabilityRegistry: ccipState.CapabilityRegistry.Address(),
+	//		},
+	//	}
+	//}
+	//// Build the jobs specs
+	//if err := deployJobSpecs(nodesToJobs, jobServiceClient); err != nil {
+	//	return err
+	//}
+	//return nil
 	return nil
 }
 
