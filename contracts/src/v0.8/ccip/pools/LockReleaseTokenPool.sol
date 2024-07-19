@@ -5,7 +5,6 @@ import {ILiquidityContainer} from "../../liquiditymanager/interfaces/ILiquidityC
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 
 import {Pool} from "../libraries/Pool.sol";
-import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
