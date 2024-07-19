@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	deployments "github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/deployment"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/deployment/jobdistributor"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"os"
@@ -42,7 +43,7 @@ func main() {
 				nodeIDs,
 				chains,
 				nil,
-				deployments.NewJobServiceClient(clientConn(jobDistributorURL)))
+				jobdistributor.NewJobServiceClient(clientConn(jobDistributorURL)))
 		},
 	}
 

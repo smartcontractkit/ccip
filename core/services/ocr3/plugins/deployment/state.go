@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
 	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/deployment/jobdistributor"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/deployment/ownerhelpers/manychainmultisig"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/deployment/ownerhelpers/rbactimelock"
 	"reflect"
@@ -85,7 +85,7 @@ func toJSON(v interface{}) (string, error) {
 	return string(jsonData), nil
 }
 
-func generateOnchainState(rpcs map[uint64]bind.ContractBackend, addressBook ContractAddressBook) (CCIPOnChainState, error) {
+func GenerateOnchainState(chains map[uint64]Chain, addressBook ContractAddressBook) (CCIPOnChainState, error) {
 	var state CCIPOnChainState
 	// Get all the onchain state
 	for chainSelector, addresses := range addressBook.Addresses() {
@@ -93,7 +93,7 @@ func generateOnchainState(rpcs map[uint64]bind.ContractBackend, addressBook Cont
 			// we assume all contract support the type and version interface.
 			// this allow us to load the appropriate binding.
 			// TODO: make this family agnostic.
-			tv, err := type_and_version.NewTypeAndVersionInterface(common.HexToAddress(address), rpcs[chainSelector])
+			tv, err := type_and_version.NewTypeAndVersionInterface(common.HexToAddress(address), chains[chainSelector].Client)
 			if err != nil {
 				return state, err
 			}
@@ -102,29 +102,31 @@ func generateOnchainState(rpcs map[uint64]bind.ContractBackend, addressBook Cont
 				return state, err
 			}
 			switch tvStr {
-			case "CapabilityRegistry 1.0.0":
-				cr, err := capabilities_registry.NewCapabilitiesRegistry(common.HexToAddress(address), rpcs[chainSelector])
+			case "CapabilitiesRegistry 1.0.0":
+				cr, err := capabilities_registry.NewCapabilitiesRegistry(common.HexToAddress(address), chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.CapabilityRegistry = cr
 			case "EVM2MultiOnRamp 1.6.0":
-				onRamp, err := evm_2_evm_multi_onramp.NewEVM2EVMMultiOnRamp(common.HexToAddress(address), rpcs[chainSelector])
+				onRamp, err := evm_2_evm_multi_onramp.NewEVM2EVMMultiOnRamp(common.HexToAddress(address), chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.EvmOnRampsV160[chainSelector] = onRamp
 				// TODO: add each contract as needed.
+			default:
+				return state, fmt.Errorf("unknown contract %s", tv)
 			}
 		}
 	}
 	return state, nil
 }
 
-func generateOffchainState(nodeIds []string, client JobServiceClient) (CCIPOffChainState, error) {
+func generateOffchainState(nodeIds []string, client jobdistributor.JobServiceClient) (CCIPOffChainState, error) {
 	var state CCIPOffChainState
 	// Get all the offchain state.
-	jobs, err := client.ListJobs(context.Background(), &ListJobsRequest{Filter: &ListJobsRequest_Filter{NodeIds: nodeIds}})
+	jobs, err := client.ListJobs(context.Background(), &jobdistributor.ListJobsRequest{Filter: &jobdistributor.ListJobsRequest_Filter{NodeIds: nodeIds}})
 	if err != nil {
 		return CCIPOffChainState{}, err
 	}
@@ -135,7 +137,7 @@ func generateOffchainState(nodeIds []string, client JobServiceClient) (CCIPOffCh
 		jobsToNodes[job.NodeId] = job.Id
 		jobIds = append(jobIds, job.Id)
 	}
-	proposals, err := client.ListProposals(context.Background(), &ListProposalsRequest{Filter: &ListProposalsRequest_Filter{JobIds: jobIds}})
+	proposals, err := client.ListProposals(context.Background(), &jobdistributor.ListProposalsRequest{Filter: &jobdistributor.ListProposalsRequest_Filter{JobIds: jobIds}})
 	if err != nil {
 		return CCIPOffChainState{}, err
 	}
@@ -148,9 +150,9 @@ func generateOffchainState(nodeIds []string, client JobServiceClient) (CCIPOffCh
 
 }
 
-func generateState(rpcs map[uint64]bind.ContractBackend, addressBook ContractAddressBook, nodeIds []string, client JobServiceClient) (CCIPState, error) {
+func generateState(rpcs map[uint64]Chain, addressBook ContractAddressBook, nodeIds []string, client jobdistributor.JobServiceClient) (CCIPState, error) {
 	var state CCIPState
-	onChainState, err := generateOnchainState(rpcs, addressBook)
+	onChainState, err := GenerateOnchainState(rpcs, addressBook)
 	if err != nil {
 		return state, err
 	}

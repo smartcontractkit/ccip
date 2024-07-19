@@ -4,47 +4,141 @@ import (
 	"context"
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
+	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/deployment/jobdistributor"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/deployment/ownerhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/deployment/ownerhelpers/rbactimelock"
 	"math/big"
 )
+
+func deployAndSaveAddress(
+	ab ContractAddressBook,
+	chain Chain,
+	deploy func(chain Chain) (common.Address, common.Hash, error),
+	confirm func(tx common.Hash, chain Chain) error,
+) (common.Address, error) {
+	addr, hash, err := deploy(chain)
+	if err != nil {
+		return common.Address{}, err
+	}
+	if err := confirm(hash, chain); err != nil {
+		return common.Address{}, err
+	}
+	if err := ab.Save(chain.Selector, addr.String()); err != nil {
+		// Note if we fail to save but we confirm, then we need to manually retry the save
+		// using logs.
+		return common.Address{}, err
+	}
+	return addr, nil
+}
 
 // For these top level workflows we update the address after every deployment so that if
 // if errors we can resume from wherever we left off.
 // TODO: bind.ContractBackend would have to be abstracted for multi-family (OR just have a switch statement
 // for the handful of families)
 // deployNewCCIPContracts deploys a completely fresh V2 set of contracts
-func deployNewCCIPContracts(addressBook ContractAddressBook, chains map[uint64]bind.ContractBackend, auth *bind.TransactOpts) error {
-	for chainSelector, rpc := range chains {
-		// Deploy relevant contracts per chain
-		offRampAddr, _, _, _ := evm_2_evm_multi_offramp.DeployEVM2EVMMultiOffRamp(auth, rpc,
-			evm_2_evm_multi_offramp.EVM2EVMMultiOffRampStaticConfig{},
-			evm_2_evm_multi_offramp.EVM2EVMMultiOffRampDynamicConfig{},
-			[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{})
-		// TODO: Confirm TX
-		// Once confirmed save the address
-		if err := addressBook.Save(chainSelector, offRampAddr.String()); err != nil {
+// TODO: confirm each tx after deploying.
+func deployNewCCIPContracts(
+	addressBook ContractAddressBook,
+	chains map[uint64]Chain,
+	confirm func(hash common.Hash, chain Chain) error,
+) error {
+	for chainSelector, chain := range chains {
+		linkToken, err := deployAndSaveAddress(addressBook, chain, func(chain Chain) (common.Address, common.Hash, error) {
+			linkToken, tx, _, err := burn_mint_erc677.DeployBurnMintERC677(
+				chain.Auth,
+				chain.Client,
+				"link", "LINK", 18, big.NewInt(1e9))
+			return linkToken, tx.Hash(), err
+		}, confirm)
+		if err != nil {
 			return err
 		}
-		// Rest of deployments
+		tokenAdminRegistry, err := deployAndSaveAddress(addressBook, chain, func(chain Chain) (common.Address, common.Hash, error) {
+			tokenAdminRegistry, tx, _, err := token_admin_registry.DeployTokenAdminRegistry(
+				chain.Auth,
+				chain.Client)
+			return tokenAdminRegistry, tx.Hash(), err
+		}, confirm)
+		if err != nil {
+			return err
+		}
+		rmnProxy, err := deployAndSaveAddress(addressBook, chain, func(chain Chain) (common.Address, common.Hash, error) {
+			rmnProxy, tx, _, err := arm_proxy_contract.DeployARMProxyContract(
+				chain.Auth,
+				chain.Client,
+				common.HexToAddress("0x12"))
+			return rmnProxy, tx.Hash(), err
+		}, confirm)
+		if err != nil {
+			return err
+		}
+		nonceManager, err := deployAndSaveAddress(addressBook, chain, func(chain Chain) (common.Address, common.Hash, error) {
+			nonceManager, tx, _, err := nonce_manager.DeployNonceManager(
+				chain.Auth,
+				chain.Client,
+				nil)
+			return nonceManager, tx.Hash(), err
+		}, confirm)
+		if err != nil {
+			return err
+		}
+		_, err = deployAndSaveAddress(addressBook, chain, func(chain Chain) (common.Address, common.Hash, error) {
+			dest := make([]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs, 0)
+			prem := make([]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampPremiumMultiplierWeiPerEthArgs, 0)
+			tt := make([]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampTokenTransferFeeConfigArgs, 0)
+			onRampAddr, tx, _, err := evm_2_evm_multi_onramp.DeployEVM2EVMMultiOnRamp(chain.Auth,
+				chain.Client,
+				evm_2_evm_multi_onramp.EVM2EVMMultiOnRampStaticConfig{
+					LinkToken:          linkToken,
+					ChainSelector:      chainSelector,
+					MaxFeeJuelsPerMsg:  big.NewInt(1e18),
+					NonceManager:       nonceManager,
+					RmnProxy:           rmnProxy,
+					TokenAdminRegistry: tokenAdminRegistry,
+				},
+				evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDynamicConfig{},
+				dest,
+				prem,
+				tt)
+			return onRampAddr, tx.Hash(), err
+		}, confirm)
+		if err != nil {
+			return err
+		}
+		_, err = deployAndSaveAddress(addressBook, chain, func(chain Chain) (common.Address, common.Hash, error) {
+			offRampAddr, tx, _, err := evm_2_evm_multi_offramp.DeployEVM2EVMMultiOffRamp(chain.Auth, chain.Client,
+				evm_2_evm_multi_offramp.EVM2EVMMultiOffRampStaticConfig{},
+				evm_2_evm_multi_offramp.EVM2EVMMultiOffRampDynamicConfig{},
+				[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{})
+			return offRampAddr, tx.Hash(), err
+		}, confirm)
+		if err != nil {
+			return fmt.Errorf("offramp %s", err)
+		}
 	}
-	for chainSelector, rpc := range chains {
+	for chainSelector, chain := range chains {
 		// Wire contracts for each chain
 		// Note we need not save the configuration, we regenerate from the chain.
-		fmt.Println(chainSelector, rpc)
+		fmt.Println(chainSelector, chain.Auth)
 	}
 	return nil
 }
 
 // We can implement a JobServiceClient which sends the jobs to an in memory chainlink application.
-func deployJobSpecs(nodesToJobs map[string][]CCIPSpec, jobClient JobServiceClient) error {
+func deployJobSpecs(nodesToJobs map[string][]CCIPSpec, jobClient jobdistributor.JobServiceClient) error {
 	for node, jobs := range nodesToJobs {
 		for _, job := range jobs {
 			// We shouldn't need to persist this data, thats on the job distributor.
 			// It holds the source of truth.
-			_, err := jobClient.ProposeJob(context.Background(), &ProposeJobRequest{
+			_, err := jobClient.ProposeJob(context.Background(), &jobdistributor.ProposeJobRequest{
 				NodeId: node,
 				Spec:   job.ToTOML(),
 			})
@@ -57,13 +151,36 @@ func deployJobSpecs(nodesToJobs map[string][]CCIPSpec, jobClient JobServiceClien
 	return nil
 }
 
+type Chain struct {
+	Selector uint64 // note can map to evm using selector pkg.
+	Client   bind.ContractBackend
+	Auth     *bind.TransactOpts
+}
+
+func DeployCapabilityRegistry(addressBook ContractAddressBook, chain Chain, confirm func(tx common.Hash, chain Chain) error) error {
+	// deploy the capability registry on the home chain
+	crAddress, tx, _, err := kcr.DeployCapabilitiesRegistry(chain.Auth, chain.Client)
+	if err != nil {
+		return err
+	}
+	if err := addressBook.Save(chain.Selector, crAddress.String()); err != nil {
+		return err
+	}
+	if err := confirm(tx.Hash(), chain); err != nil {
+		return err
+	}
+	fmt.Println("Deployed %s to %s", crAddress, chain.Selector)
+	return nil
+}
+
 // Deploys a brand new CCIP system (on/offchain components) read for onchain messaging.
 func DeployNewCCIPToExistingDON(addressBook ContractAddressBook,
 	nodesIds []string,
-	chains map[uint64]bind.ContractBackend,
-	deployerKey *bind.TransactOpts,
-	jobServiceClient JobServiceClient) error {
-	if err := deployNewCCIPContracts(addressBook, chains, deployerKey); err != nil {
+	chains map[uint64]Chain,
+	jobServiceClient jobdistributor.JobServiceClient,
+	confirm func(tx common.Hash, chain Chain) error,
+) error {
+	if err := deployNewCCIPContracts(addressBook, chains, confirm); err != nil {
 		return err
 	}
 	// Obtain the deployed state.
@@ -90,7 +207,7 @@ func DeployNewCCIPToExistingDON(addressBook ContractAddressBook,
 }
 
 // Example of changing something through a proposal.
-func ProposePremiumMultiplierUpdates(rpcs map[uint64]bind.ContractBackend,
+func ProposePremiumMultiplierUpdates(chains map[uint64]Chain,
 	addressBook ContractAddressBook,
 	opts *bind.TransactOpts,
 	chainsToApply []uint64,
@@ -98,7 +215,7 @@ func ProposePremiumMultiplierUpdates(rpcs map[uint64]bind.ContractBackend,
 	delay *big.Int,
 ) (ownerhelpers.SetRootArgs, error) {
 	var setRootArgs ownerhelpers.SetRootArgs
-	state, err := generateOnchainState(rpcs, addressBook)
+	state, err := GenerateOnchainState(chains, addressBook)
 	if err != nil {
 		return setRootArgs, err
 	}

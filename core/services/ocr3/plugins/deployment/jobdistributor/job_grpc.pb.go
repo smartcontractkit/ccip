@@ -1,4 +1,4 @@
-package deployments
+package jobdistributor
 
 import (
 	context "context"
