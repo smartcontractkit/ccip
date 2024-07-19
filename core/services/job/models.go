@@ -697,7 +697,7 @@ type BlockHeaderFeederSpec struct {
 	// FromAddress is the sender address that should be used to store blockhashes.
 	FromAddresses []evmtypes.EIP55Address `toml:"fromAddresses"`
 
-	// GetBlockHashesBatchSize is the RPC call batch size for retrieving blockhashes
+	// GetBlockhashesBatchSize is the RPC call batch size for retrieving blockhashes
 	GetBlockhashesBatchSize uint16 `toml:"getBlockhashesBatchSize"`
 
 	// StoreBlockhashesBatchSize is the RPC call batch size for storing blockhashes

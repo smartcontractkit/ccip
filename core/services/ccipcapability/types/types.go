@@ -40,7 +40,7 @@ type CCIPOracle interface {
 //
 //go:generate mockery --name OracleCreator --output ./mocks/ --case underscore
 type OracleCreator interface {
-	// CreatePlugin creates a new oracle that will run either the commit or exec ccip plugin.
+	// CreatePluginOracle creates a new oracle that will run either the commit or exec ccip plugin.
 	// The oracle must be returned unstarted.
 	CreatePluginOracle(pluginType PluginType, config OCR3ConfigWithMeta) (CCIPOracle, error)
 
