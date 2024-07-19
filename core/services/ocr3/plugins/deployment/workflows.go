@@ -9,6 +9,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
@@ -80,11 +82,31 @@ func deployNewCCIPContracts(
 		if err != nil {
 			return err
 		}
+		router, err := deployAndSaveAddress(addressBook, chain, func(chain Chain) (common.Address, common.Hash, error) {
+			router, tx, _, err := router.DeployRouter(
+				chain.Auth,
+				chain.Client,
+				common.HexToAddress("0x1"), rmnProxy)
+			return router, tx.Hash(), err
+		}, confirm)
+		if err != nil {
+			return err
+		}
 		nonceManager, err := deployAndSaveAddress(addressBook, chain, func(chain Chain) (common.Address, common.Hash, error) {
 			nonceManager, tx, _, err := nonce_manager.DeployNonceManager(
 				chain.Auth,
 				chain.Client,
 				nil)
+			return nonceManager, tx.Hash(), err
+		}, confirm)
+		if err != nil {
+			return err
+		}
+		priceRegistry, err := deployAndSaveAddress(addressBook, chain, func(chain Chain) (common.Address, common.Hash, error) {
+			nonceManager, tx, _, err := price_registry.DeployPriceRegistry(
+				chain.Auth,
+				chain.Client,
+				[]common.Address{}, []common.Address{}, uint32(90000), []price_registry.PriceRegistryTokenPriceFeedUpdate{})
 			return nonceManager, tx.Hash(), err
 		}, confirm)
 		if err != nil {
@@ -104,7 +126,11 @@ func deployNewCCIPContracts(
 					RmnProxy:           rmnProxy,
 					TokenAdminRegistry: tokenAdminRegistry,
 				},
-				evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDynamicConfig{},
+				evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDynamicConfig{
+					Router:        router,
+					PriceRegistry: priceRegistry,
+					FeeAggregator: common.HexToAddress("0x123"),
+				},
 				dest,
 				prem,
 				tt)
@@ -115,8 +141,20 @@ func deployNewCCIPContracts(
 		}
 		_, err = deployAndSaveAddress(addressBook, chain, func(chain Chain) (common.Address, common.Hash, error) {
 			offRampAddr, tx, _, err := evm_2_evm_multi_offramp.DeployEVM2EVMMultiOffRamp(chain.Auth, chain.Client,
-				evm_2_evm_multi_offramp.EVM2EVMMultiOffRampStaticConfig{},
-				evm_2_evm_multi_offramp.EVM2EVMMultiOffRampDynamicConfig{},
+				evm_2_evm_multi_offramp.EVM2EVMMultiOffRampStaticConfig{
+					ChainSelector:      chainSelector,
+					RmnProxy:           rmnProxy,
+					TokenAdminRegistry: tokenAdminRegistry,
+					NonceManager:       nonceManager,
+				},
+				evm_2_evm_multi_offramp.EVM2EVMMultiOffRampDynamicConfig{
+					Router:                                  router,
+					PermissionLessExecutionThresholdSeconds: uint32(86400),
+					MaxTokenTransferGas:                     200_000,
+					MaxPoolReleaseOrMintGas:                 200_000,
+					MessageValidator:                        common.HexToAddress("0x0"),
+					PriceRegistry:                           priceRegistry,
+				},
 				[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{})
 			return offRampAddr, tx.Hash(), err
 		}, confirm)

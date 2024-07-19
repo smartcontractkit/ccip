@@ -5,14 +5,17 @@ import {IEVM2AnyOnRamp} from "./interfaces/IEVM2AnyOnRamp.sol";
 import {INonceManager} from "./interfaces/INonceManager.sol";
 
 import {AuthorizedCallers} from "../shared/access/AuthorizedCallers.sol";
+import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
 
 /// @title NonceManager
 /// @notice NonceManager contract that manages sender nonces for the on/off ramps
-contract NonceManager is INonceManager, AuthorizedCallers {
+contract NonceManager is INonceManager, AuthorizedCallers, ITypeAndVersion {
   error PreviousRampAlreadySet();
 
   event PreviousRampsUpdated(uint64 indexed remoteChainSelector, PreviousRamps prevRamp);
   event SkippedIncorrectNonce(uint64 sourceChainSelector, uint64 nonce, bytes sender);
+
+  string public constant override typeAndVersion = "NonceManager 1.6.0-dev";
 
   /// @dev Struct that contains the previous on/off ramp addresses
   struct PreviousRamps {

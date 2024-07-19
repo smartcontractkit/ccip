@@ -5,7 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/deployment/jobdistributor"
@@ -21,12 +26,14 @@ type CCIPOnChainState struct {
 	// Populated go bindings for the appropriate version for all contracts.
 	// We would hold 2 versions of each contract here. Once we upgrade we can phase out the old one.
 	// When generating bindings, make sure the package name corresponds to the version.
-	EvmOnRampsV160 map[uint64]*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp
-	// TODO: all other CCIP contracts.
-	// Analogous to https://github.com/smartcontractkit/rddtool-ccip/blob/d975a799e1981e98c350684365f8e32a74881803/types/cross_chain/ccipState.go#L15
-	// except its all derivable from the chain using the bare minimum persisted offchain.
-	Timelocks map[uint64]rbactimelock.Rbactimelock
-	Mcms      map[uint64]manychainmultisig.Manychainmultisig
+	EvmOnRampsV160       map[uint64]*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp
+	EvmOffRampsV160      map[uint64]*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp
+	PriceRegistries      map[uint64]*price_registry.PriceRegistry
+	ArmProxies           map[uint64]*arm_proxy_contract.ARMProxyContract
+	NonceManagers        map[uint64]*nonce_manager.NonceManager
+	TokenAdminRegistries map[uint64]*token_admin_registry.TokenAdminRegistry
+	Timelocks            map[uint64]rbactimelock.Rbactimelock
+	Mcms                 map[uint64]manychainmultisig.Manychainmultisig
 
 	// Only lives on the home chain.
 	CapabilityRegistry *capabilities_registry.CapabilitiesRegistry
@@ -108,15 +115,38 @@ func GenerateOnchainState(chains map[uint64]Chain, addressBook ContractAddressBo
 					return state, err
 				}
 				state.CapabilityRegistry = cr
-			case "EVM2MultiOnRamp 1.6.0":
+			case "EVM2EVMMultiOnRamp 1.6.0-dev":
 				onRamp, err := evm_2_evm_multi_onramp.NewEVM2EVMMultiOnRamp(common.HexToAddress(address), chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.EvmOnRampsV160[chainSelector] = onRamp
-				// TODO: add each contract as needed.
+			case "EVM2EVMMultiOffRamp 1.6.0-dev":
+				offRamp, err := evm_2_evm_multi_offramp.NewEVM2EVMMultiOffRamp(common.HexToAddress(address), chains[chainSelector].Client)
+				if err != nil {
+					return state, err
+				}
+				state.EvmOffRampsV160[chainSelector] = offRamp
+			case "ARMProxy 1.0.0":
+				armProxy, err := arm_proxy_contract.NewARMProxyContract(common.HexToAddress(address), chains[chainSelector].Client)
+				if err != nil {
+					return state, err
+				}
+				state.ArmProxies[chainSelector] = armProxy
+			case "NonceManager 1.6.0-dev":
+				nm, err := nonce_manager.NewNonceManager(common.HexToAddress(address), chains[chainSelector].Client)
+				if err != nil {
+					return state, err
+				}
+				state.NonceManagers[chainSelector] = nm
+			case "TokenAdminRegistry 1.5.0-dev":
+				tm, err := token_admin_registry.NewTokenAdminRegistry(common.HexToAddress(address), chains[chainSelector].Client)
+				if err != nil {
+					return state, err
+				}
+				state.TokenAdminRegistries[chainSelector] = tm
 			default:
-				return state, fmt.Errorf("unknown contract %s", tv)
+				return state, fmt.Errorf("unknown contract %s", tvStr)
 			}
 		}
 	}
