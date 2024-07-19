@@ -367,10 +367,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     s_outboundMessageValidator.setMessageIdValidationState(keccak256(abi.encode(message)), true);
 
     vm.expectRevert(
-      abi.encodeWithSelector(
-        IMessageInterceptor.MessageValidationError.selector,
-        abi.encodeWithSelector(IMessageInterceptor.MessageValidationError.selector, bytes("Invalid message"))
-      )
+      abi.encodeWithSelector(IMessageInterceptor.MessageValidationError.selector, bytes("Invalid message"))
     );
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);

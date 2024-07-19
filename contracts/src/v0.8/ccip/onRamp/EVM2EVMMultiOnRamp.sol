@@ -135,10 +135,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
     address messageValidator = s_dynamicConfig.messageValidator;
     if (messageValidator != address(0)) {
-      try IMessageInterceptor(messageValidator).onOutboundMessage(destChainSelector, message) {}
-      catch (bytes memory err) {
-        revert IMessageInterceptor.MessageValidationError(err);
-      }
+      IMessageInterceptor(messageValidator).onOutboundMessage(destChainSelector, message);
     }
 
     // Convert message fee to juels and retrieve converted args

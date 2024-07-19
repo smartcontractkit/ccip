@@ -696,6 +696,10 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     }
   }
 
+  // ================================================================
+  // │             Validations & message processing                 │
+  // ================================================================
+
   /// @notice Validates that the destAddress matches the expected format of the family.
   /// @param chainFamilySelector Tag to identify the target family
   /// @param destAddress Dest address to validate
@@ -822,6 +826,10 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
       _validateDestFamilyAddress(chainFamilySelector, rampTokenAmounts[i].destTokenAddress);
     }
   }
+
+  // ================================================================
+  // │                           Configs                            │
+  // ================================================================
 
   /// @notice Returns the configured config for the dest chain selector
   /// @param destChainSelector destination chain selector to fetch config for
