@@ -20,7 +20,6 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
   error InsufficientLiquidity();
   error LiquidityNotAccepted();
-  error Unauthorized(address caller);
 
   event LiquidityTransferred(address indexed from, uint256 amount);
 
@@ -29,13 +28,10 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
   /// @dev Whether or not the pool accepts liquidity.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
   /// and CCIP is facilitating mint/burn on all the other chains, in which case the invariant
-  /// balanceOf(pool) on home chain == sum(totalSupply(mint/burn "wrapped" token) on all remote chains) should always hold
+  /// balanceOf(pool) on home chain >= sum(totalSupply(mint/burn "wrapped" token) on all remote chains) should always hold
   bool internal immutable i_acceptLiquidity;
   /// @notice The address of the rebalancer.
   address internal s_rebalancer;
-  /// @notice The address of the rate limiter admin.
-  /// @dev Can be address(0) if none is configured.
-  address internal s_rateLimitAdmin;
 
   constructor(
     IERC20 token,
@@ -97,18 +93,6 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     s_rebalancer = rebalancer;
   }
 
-  /// @notice Sets the rate limiter admin address.
-  /// @dev Only callable by the owner.
-  /// @param rateLimitAdmin The new rate limiter admin address.
-  function setRateLimitAdmin(address rateLimitAdmin) external onlyOwner {
-    s_rateLimitAdmin = rateLimitAdmin;
-  }
-
-  /// @notice Gets the rate limiter admin address.
-  function getRateLimitAdmin() external view returns (address) {
-    return s_rateLimitAdmin;
-  }
-
   /// @notice Checks if the pool can accept liquidity.
   /// @return true if the pool can accept liquidity, false otherwise.
   function canAcceptLiquidity() external view returns (bool) {
@@ -150,21 +134,5 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     LockReleaseTokenPool(from).withdrawLiquidity(amount);
 
     emit LiquidityTransferred(from, amount);
-  }
-
-  /// @notice Sets the rate limiter admin address.
-  /// @dev Only callable by the owner or the rate limiter admin. NOTE: overwrites the normal
-  /// onlyAdmin check in the base implementation to also allow the rate limiter admin.
-  /// @param remoteChainSelector The remote chain selector for which the rate limits apply.
-  /// @param outboundConfig The new outbound rate limiter config.
-  /// @param inboundConfig The new inbound rate limiter config.
-  function setChainRateLimiterConfig(
-    uint64 remoteChainSelector,
-    RateLimiter.Config memory outboundConfig,
-    RateLimiter.Config memory inboundConfig
-  ) external override {
-    if (msg.sender != s_rateLimitAdmin && msg.sender != owner()) revert Unauthorized(msg.sender);
-
-    _setRateLimitConfig(remoteChainSelector, outboundConfig, inboundConfig);
   }
 }
