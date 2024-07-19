@@ -82,7 +82,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     uint16 defaultTokenFeeUSDCents; //           │ Default token fee charged per token transfer
     uint32 defaultTokenDestGasOverhead; // ──────╯ Default gas charged to execute the token transfer on the destination chain
     uint32 defaultTokenDestBytesOverhead; // ────╮ Default extra data availability bytes charged per token transfer
-    uint64 defaultTxGasLimit; //                 │ Default gas limit for a tx
+    uint32 defaultTxGasLimit; //                 │ Default gas limit for a tx
     uint64 gasMultiplierWeiPerEth; //            │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
     uint32 networkFeeUSDCents; //                │ Flat network fee to charge for messages,  multiples of 0.01 USD
     bool enforceOutOfOrder; //                   │ Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
@@ -859,6 +859,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
         destChainSelector == 0 || destChainConfig.defaultTxGasLimit == 0
           || destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
           || destChainConfig.defaultTokenDestBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
+          || destChainConfig.defaultTxGasLimit > destChainConfig.maxPerMsgGasLimit
       ) {
         revert InvalidDestChainConfig(destChainSelector);
       }

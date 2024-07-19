@@ -1171,7 +1171,12 @@ contract PriceRegistry_applyDestChainConfigUpdates is PriceRegistrySetup {
     public
   {
     vm.assume(destChainConfigArgs.destChainSelector != 0);
-    vm.assume(destChainConfigArgs.destChainConfig.defaultTxGasLimit != 0);
+    vm.assume(destChainConfigArgs.destChainConfig.maxPerMsgGasLimit != 0);
+    destChainConfigArgs.destChainConfig.defaultTxGasLimit = uint32(
+      bound(
+        destChainConfigArgs.destChainConfig.defaultTxGasLimit, 1, destChainConfigArgs.destChainConfig.maxPerMsgGasLimit
+      )
+    );
     destChainConfigArgs.destChainConfig.defaultTokenDestBytesOverhead = uint32(
       bound(
         destChainConfigArgs.destChainConfig.defaultTokenDestBytesOverhead,
@@ -1243,6 +1248,22 @@ contract PriceRegistry_applyDestChainConfigUpdates is PriceRegistrySetup {
     PriceRegistry.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     destChainConfigArg.destChainConfig.defaultTxGasLimit = 0;
+    vm.expectRevert(
+      abi.encodeWithSelector(PriceRegistry.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
+    );
+    s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
+  }
+
+  function test_applyDestChainConfigUpdatesDefaultTxGasLimitGtMaxPerMessageGasLimit_Revert() public {
+    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    PriceRegistry.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
+
+    // Allow setting to the max value
+    destChainConfigArg.destChainConfig.defaultTxGasLimit = destChainConfigArg.destChainConfig.maxPerMsgGasLimit;
+    s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    // Revert when exceeding max value
+    destChainConfigArg.destChainConfig.defaultTxGasLimit = destChainConfigArg.destChainConfig.maxPerMsgGasLimit + 1;
     vm.expectRevert(
       abi.encodeWithSelector(PriceRegistry.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
     );
@@ -1375,6 +1396,7 @@ contract PriceRegistry_getDataAvailabilityCost is PriceRegistrySetup {
     destChainConfigArgs[0].destChainConfig.destGasPerDataAvailabilityByte = destGasPerDataAvailabilityByte;
     destChainConfigArgs[0].destChainConfig.destDataAvailabilityMultiplierBps = destDataAvailabilityMultiplierBps;
     destChainConfigArgs[0].destChainConfig.defaultTxGasLimit = GAS_LIMIT;
+    destChainConfigArgs[0].destChainConfig.maxPerMsgGasLimit = GAS_LIMIT;
     destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
     destChainConfigArgs[0].destChainConfig.defaultTokenDestBytesOverhead = DEFAULT_TOKEN_BYTES_OVERHEAD;
 
