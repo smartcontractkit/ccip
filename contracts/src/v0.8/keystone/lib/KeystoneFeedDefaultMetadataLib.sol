@@ -30,5 +30,6 @@ library KeystoneFeedDefaultMetadataLib {
       // no shifting needed for bytes2 type
       reportName := mload(add(metadata, 94))
     }
+    return (workflowName, workflowOwner, reportName);
   }
 }
