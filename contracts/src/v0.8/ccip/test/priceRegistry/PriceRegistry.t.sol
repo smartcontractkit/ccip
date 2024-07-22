@@ -23,14 +23,14 @@ import {PriceRegistryHelper} from "../helpers/PriceRegistryHelper.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
+import {KeystoneFeedsPermissionHandler} from "../../../keystone/KeystoneFeedsPermissionHandler.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {console} from "forge-std/console.sol";
-import {KeystoneFeedsPermissionHandler} from "../../../keystone/KeystoneFeedsPermissionHandler.sol";
 
 contract PriceRegistrySetup is TokenSetup {
   uint112 internal constant USD_PER_GAS = 1e6; // 0.001 gwei
   uint112 internal constant USD_PER_DATA_AVAILABILITY_GAS = 1e9; // 1 gwei
-  address constant internal KEYSTONE_REPORT_FORWARDER = address(0x1);
+  address internal constant KEYSTONE_REPORT_FORWARDER = address(0x1);
 
   address internal constant CUSTOM_TOKEN = address(12345);
   uint224 internal constant CUSTOM_TOKEN_PRICE = 1e17; // $0.1 CUSTOM
@@ -2566,28 +2566,17 @@ contract PriceRegistry_KeystoneSetup is PriceRegistrySetup {
 contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
   function test_OnReport_Success() public {
     setupPriceRegistryAsKeystoneReceiver();
-    bytes memory encodedPermissionsMetadata = abi.encodePacked(
-      keccak256(abi.encode("workflowCID")),
-      WORKFLOW_NAME_1,
-      WORKFLOW_OWNER_1,
-      REPORT_NAME_1
-    );
+    bytes memory encodedPermissionsMetadata =
+      abi.encodePacked(keccak256(abi.encode("workflowCID")), WORKFLOW_NAME_1, WORKFLOW_OWNER_1, REPORT_NAME_1);
 
     PriceRegistry.ReceivedCCIPFeedReport[] memory report = new PriceRegistry.ReceivedCCIPFeedReport[](1);
-    report[0] = PriceRegistry.ReceivedCCIPFeedReport(
-      {
-        Token: s_sourceTokens[0],
-        Price: 4e18,
-        Timestamp: uint32(block.timestamp)
-      }
-    );
+    report[0] =
+      PriceRegistry.ReceivedCCIPFeedReport({Token: s_sourceTokens[0], Price: 4e18, Timestamp: uint32(block.timestamp)});
 
     bytes memory encodedReport = abi.encode(report);
 
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(
-      report[0].Token, report[0].Price, block.timestamp
-    );
+    emit PriceRegistry.UsdPerTokenUpdated(report[0].Token, report[0].Price, block.timestamp);
 
     changePrank(FORWARDER_1);
     s_priceRegistry.onReport(encodedPermissionsMetadata, encodedReport);
@@ -2595,24 +2584,19 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
 
   function test_OnReport_InvalidForwarder_Reverts() public {
     setupPriceRegistryAsKeystoneReceiver();
-    bytes memory encodedPermissionsMetadata = abi.encodePacked(
-      keccak256(abi.encode("workflowCID")),
-      WORKFLOW_NAME_1,
-      WORKFLOW_OWNER_1,
-      REPORT_NAME_1
-    );
+    bytes memory encodedPermissionsMetadata =
+      abi.encodePacked(keccak256(abi.encode("workflowCID")), WORKFLOW_NAME_1, WORKFLOW_OWNER_1, REPORT_NAME_1);
     PriceRegistry.ReceivedCCIPFeedReport[] memory report = new PriceRegistry.ReceivedCCIPFeedReport[](1);
-    report[0] = PriceRegistry.ReceivedCCIPFeedReport(
-      {
-        Token: s_sourceTokens[0],
-        Price: 4e18,
-        Timestamp: uint32(block.timestamp)
-      }
-    );
+    report[0] =
+      PriceRegistry.ReceivedCCIPFeedReport({Token: s_sourceTokens[0], Price: 4e18, Timestamp: uint32(block.timestamp)});
 
     bytes memory encodedReport = abi.encode(report);
 
-    vm.expectRevert(abi.encodeWithSelector(KeystoneFeedsPermissionHandler.Unauthorized.selector, STRANGER, WORKFLOW_OWNER_1, WORKFLOW_NAME_1, REPORT_NAME_1));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        KeystoneFeedsPermissionHandler.Unauthorized.selector, STRANGER, WORKFLOW_OWNER_1, WORKFLOW_NAME_1, REPORT_NAME_1
+      )
+    );
     changePrank(STRANGER);
     s_priceRegistry.onReport(encodedPermissionsMetadata, encodedReport);
   }
