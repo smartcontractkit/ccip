@@ -11,10 +11,10 @@ import {Internal} from "./libraries/Internal.sol";
 import {Pool} from "./libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 
-import {IReceiver} from "../keystone/interfaces/IReceiver.sol";
-import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 import {KeystoneFeedsPermissionHandler} from "../keystone/KeystoneFeedsPermissionHandler.sol";
+import {IReceiver} from "../keystone/interfaces/IReceiver.sol";
 import {KeystoneFeedDefaultMetadataLib} from "../keystone/lib/KeystoneFeedDefaultMetadataLib.sol";
+import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
 /// and the price of a token in USD allowing the owner or priceUpdater to update this value.
@@ -463,7 +463,6 @@ contract PriceRegistry is
   /// @param metadata Arbitrary metadata associated with the report (not used in this implementation).
   /// @param report Encoded report containing an array of `ReceivedCCIPFeedReport` structs.
   function onReport(bytes calldata metadata, bytes calldata report) external {
-
     (bytes10 workflowName, address workflowOwner, bytes2 reportName) = metadata._extractMetadataInfo();
 
     _validateReportPermission(msg.sender, workflowOwner, workflowName, reportName);
