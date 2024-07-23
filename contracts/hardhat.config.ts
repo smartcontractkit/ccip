@@ -1,8 +1,8 @@
 import '@nomicfoundation/hardhat-ethers'
 import '@nomicfoundation/hardhat-verify'
-import '@nomicfoundation/hardhat-chai-matchers'
+// import '@nomicfoundation/hardhat-chai-matchers'
 import "@matterlabs/hardhat-zksync-solc";
-import '@typechain/hardhat'
+// import '@typechain/hardhat'
 import 'hardhat-abi-exporter'
 import { subtask } from 'hardhat/config'
 import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from 'hardhat/builtin-tasks/task-names'
@@ -105,8 +105,9 @@ let config = {
     },
   },
   zksolc: {
+    version: "latest", // optional.
     settings: {
-      compilerPath: "zksolc",  // optional. Ignored for compilerSource "docker". Can be used if compiler is located in a specific folder
+      // compilerPath: "zksolc",  // optional. Ignored for compilerSource "docker". Can be used if compiler is located in a specific folder
       optimizer: {
         enabled: true, // optional. True by default
         mode: '3', // optional. 3 by default, z to optimize bytecode size
