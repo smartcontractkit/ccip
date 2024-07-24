@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/consul/sdk/freeport"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -131,8 +132,9 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		require.NoErrorf(t, tApp.AddJobV2(ctx, &jb), "Wasn't able to create ccip job for node %d", i)
 	}
 
-	// sourceChain map[uint64],  destChain [32]byte
-	var messageIDs = make(map[uint64]map[uint64][32]byte)
+	// sourceChain, destChain, msgID
+	//var messageIDs = make(map[uint64]map[uint64][32]byte)
+	var messageHeaders = make(map[uint64][]evm_2_evm_multi_onramp.InternalRampMessageHeader)
 	// map[uint64] chainID, blocks
 	var replayBlocks = make(map[uint64]uint64)
 	pingPongs := initializePingPongContracts(t, universes)
@@ -180,11 +182,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, expNextSeqNr+1, newExpNextSeqNr, "expected next sequence number should be bumped by 1")
 
-			_, ok := messageIDs[chainID]
-			if !ok {
-				messageIDs[chainID] = make(map[uint64][32]byte)
-			}
-			messageIDs[chainID][otherChain] = log.Message.Header.MessageId
+			messageHeaders[chainID] = append(messageHeaders[chainID], log.Message.Header)
 
 			// replay block should be the earliest block that has a ccip message.
 			if replayBlock == 0 {
@@ -212,18 +210,22 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	for _, uni := range universes {
 		waitForCommit(t, uni)
 	}
+
+	for _, uni := range universes {
+		waitForExec(t, uni, messageHeaders[uni.chainID])
+	}
 }
 
 func waitForCommit(t *testing.T, uni onchainUniverse) {
 	sink := make(chan *evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReportAccepted)
-	subscipriton, err := uni.offramp.WatchCommitReportAccepted(&bind.WatchOpts{}, sink)
+	subscription, err := uni.offramp.WatchCommitReportAccepted(&bind.WatchOpts{}, sink)
 	require.NoError(t, err)
 
 	for {
 		select {
 		case <-time.After(5 * time.Second):
 			t.Logf("Waiting for commit report on chain id %d (selector %d)", uni.chainID, getSelector(uni.chainID))
-		case subErr := <-subscipriton.Err():
+		case subErr := <-subscription.Err():
 			t.Fatalf("Subscription error: %+v", subErr)
 		case report := <-sink:
 			if len(report.Report.MerkleRoots) > 0 {
@@ -231,7 +233,48 @@ func waitForCommit(t *testing.T, uni onchainUniverse) {
 			} else {
 				t.Logf("Received commit report without merkle roots: %+v", report)
 			}
+			report.Report.MerkleRoots = nil
 			return
+		}
+	}
+}
+
+func waitForExec(t *testing.T, uni onchainUniverse, messageHeaders []evm_2_evm_multi_onramp.InternalRampMessageHeader) {
+	sink := make(chan *evm_2_evm_multi_offramp.EVM2EVMMultiOffRampExecutionStateChanged)
+	msgIDs := make([][32]byte, len(messageHeaders))
+	for i, header := range messageHeaders {
+		msgIDs[i] = header.MessageId
+	}
+	subscription, err := uni.offramp.WatchExecutionStateChanged(&bind.WatchOpts{}, sink, nil, nil, nil)
+	require.NoError(t, err)
+	//watchOps, sink, sourceChainSelector []uint64, sequenceNumber []uint64, messageId [][32]byte
+	for {
+		msgsCount := 0
+		select {
+		case <-time.After(5 * time.Second):
+			t.Logf("Waiting for exec report on chain id %d (selector %d)", uni.chainID, getSelector(uni.chainID))
+		case subErr := <-subscription.Err():
+			t.Fatalf("Subscription error: %+v", subErr)
+		case report := <-sink:
+			// check message id is in the list of message ids
+			found := false
+			for _, msgID := range msgIDs {
+				if msgID == report.MessageId {
+					found = true
+					break
+				}
+			}
+			if found {
+				msgsCount++
+				t.Logf("Execution State Changed: %+v", report)
+			} else {
+				t.Logf("Received execution state changed for unexpected message %+v", report)
+			}
+
+			if msgsCount == len(msgIDs) {
+				t.Logf("Executed all messages")
+				return
+			}
 		}
 	}
 }

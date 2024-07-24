@@ -35,10 +35,10 @@ func (c *CommitPluginCodecV1) Encode(ctx context.Context, report cciptypes.Commi
 	merkleRoots := make([]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampMerkleRoot, 0, len(report.MerkleRoots))
 	for _, root := range report.MerkleRoots {
 		merkleRoots = append(merkleRoots, evm_2_evm_multi_offramp.EVM2EVMMultiOffRampMerkleRoot{
-			SourceChainSelector: uint64(root.ChainSel),
+			SourceChainSelector: uint64(root.SourceChainSelector),
 			Interval: evm_2_evm_multi_offramp.EVM2EVMMultiOffRampInterval{
-				Min: uint64(root.SeqNumsRange.Start()),
-				Max: uint64(root.SeqNumsRange.End()),
+				Min: uint64(root.Interval.Start()),
+				Max: uint64(root.Interval.End()),
 			},
 			MerkleRoot: root.MerkleRoot,
 		})
@@ -46,27 +46,27 @@ func (c *CommitPluginCodecV1) Encode(ctx context.Context, report cciptypes.Commi
 
 	tokenPriceUpdates := make([]evm_2_evm_multi_offramp.InternalTokenPriceUpdate, 0, len(report.PriceUpdates.TokenPriceUpdates))
 	for _, update := range report.PriceUpdates.TokenPriceUpdates {
-		if !common.IsHexAddress(string(update.TokenID)) {
-			return nil, fmt.Errorf("invalid token address: %s", update.TokenID)
+		if !common.IsHexAddress(string(update.SourceToken)) {
+			return nil, fmt.Errorf("invalid token address: %s", update.SourceToken)
 		}
-		if update.Price.IsEmpty() {
-			return nil, fmt.Errorf("empty price for token: %s", update.TokenID)
+		if update.UsdPerToken.IsEmpty() {
+			return nil, fmt.Errorf("empty price for token: %s", update.SourceToken)
 		}
 		tokenPriceUpdates = append(tokenPriceUpdates, evm_2_evm_multi_offramp.InternalTokenPriceUpdate{
-			SourceToken: common.HexToAddress(string(update.TokenID)),
-			UsdPerToken: update.Price.Int,
+			SourceToken: common.HexToAddress(string(update.SourceToken)),
+			UsdPerToken: update.UsdPerToken.Int,
 		})
 	}
 
 	gasPriceUpdates := make([]evm_2_evm_multi_offramp.InternalGasPriceUpdate, 0, len(report.PriceUpdates.GasPriceUpdates))
 	for _, update := range report.PriceUpdates.GasPriceUpdates {
-		if update.GasPrice.IsEmpty() {
-			return nil, fmt.Errorf("empty gas price for chain: %d", update.ChainSel)
+		if update.UsdPerUnitGas.IsEmpty() {
+			return nil, fmt.Errorf("empty gas price for chain: %d", update.DestChainSelector)
 		}
 
 		gasPriceUpdates = append(gasPriceUpdates, evm_2_evm_multi_offramp.InternalGasPriceUpdate{
-			DestChainSelector: uint64(update.ChainSel),
-			UsdPerUnitGas:     update.GasPrice.Int,
+			DestChainSelector: uint64(update.DestChainSelector),
+			UsdPerUnitGas:     update.UsdPerUnitGas.Int,
 		})
 	}
 
@@ -100,8 +100,8 @@ func (c *CommitPluginCodecV1) Decode(ctx context.Context, bytes []byte) (cciptyp
 	merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(commitReport.MerkleRoots))
 	for _, root := range commitReport.MerkleRoots {
 		merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
-			ChainSel: cciptypes.ChainSelector(root.SourceChainSelector),
-			SeqNumsRange: cciptypes.NewSeqNumRange(
+			SourceChainSelector: cciptypes.ChainSelector(root.SourceChainSelector),
+			Interval: cciptypes.NewSeqNumRange(
 				cciptypes.SeqNum(root.Interval.Min),
 				cciptypes.SeqNum(root.Interval.Max),
 			),
@@ -112,16 +112,16 @@ func (c *CommitPluginCodecV1) Decode(ctx context.Context, bytes []byte) (cciptyp
 	tokenPriceUpdates := make([]cciptypes.TokenPrice, 0, len(commitReport.PriceUpdates.TokenPriceUpdates))
 	for _, update := range commitReport.PriceUpdates.TokenPriceUpdates {
 		tokenPriceUpdates = append(tokenPriceUpdates, cciptypes.TokenPrice{
-			TokenID: types.Account(update.SourceToken.String()),
-			Price:   cciptypes.NewBigInt(big.NewInt(0).Set(update.UsdPerToken)),
+			SourceToken: types.Account(update.SourceToken.String()),
+			UsdPerToken: cciptypes.NewBigInt(big.NewInt(0).Set(update.UsdPerToken)),
 		})
 	}
 
 	gasPriceUpdates := make([]cciptypes.GasPriceChain, 0, len(commitReport.PriceUpdates.GasPriceUpdates))
 	for _, update := range commitReport.PriceUpdates.GasPriceUpdates {
 		gasPriceUpdates = append(gasPriceUpdates, cciptypes.GasPriceChain{
-			GasPrice: cciptypes.NewBigInt(big.NewInt(0).Set(update.UsdPerUnitGas)),
-			ChainSel: cciptypes.ChainSelector(update.DestChainSelector),
+			UsdPerUnitGas:     cciptypes.NewBigInt(big.NewInt(0).Set(update.UsdPerUnitGas)),
+			DestChainSelector: cciptypes.ChainSelector(update.DestChainSelector),
 		})
 	}
 
