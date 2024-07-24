@@ -228,10 +228,10 @@ func waitForCommit(t *testing.T, uni onchainUniverse) {
 		case report := <-sink:
 			if len(report.Report.MerkleRoots) > 0 {
 				t.Logf("Received commit report with merkle roots: %+v", report)
+				return
 			} else {
 				t.Logf("Received commit report without merkle roots: %+v", report)
 			}
-			return
 		}
 	}
 }
