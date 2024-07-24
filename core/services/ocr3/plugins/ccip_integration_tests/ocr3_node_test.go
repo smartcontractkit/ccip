@@ -3,6 +3,7 @@ package ccip_integration_tests
 import (
 	"fmt"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -207,34 +208,52 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		}
 	}
 
+	numUnis := len(universes)
+	var wg sync.WaitGroup
 	for _, uni := range universes {
-		waitForCommit(t, uni)
+		wg.Add(1)
+		go func(uni onchainUniverse) {
+			defer wg.Done()
+			waitForCommit(t, uni, numUnis)
+		}(uni)
 	}
 
-	for _, uni := range universes {
-		waitForExec(t, uni, messageHeaders[uni.chainID])
-	}
+	wg.Wait()
+
+	//var wg2 sync.WaitGroup
+	//for _, uni := range universes {
+	//	wg2.Add(1)
+	//	go func(uni onchainUniverse) {
+	//		defer wg2.Done()
+	//		waitForExec(t, uni, messageHeaders[uni.chainID])
+	//	}(uni)
+	//}
+	//wg2.Wait()
 }
 
-func waitForCommit(t *testing.T, uni onchainUniverse) {
+func waitForCommit(t *testing.T, uni onchainUniverse, numUnis int) {
 	sink := make(chan *evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReportAccepted)
-	subscription, err := uni.offramp.WatchCommitReportAccepted(&bind.WatchOpts{}, sink)
+	subscipriton, err := uni.offramp.WatchCommitReportAccepted(&bind.WatchOpts{}, sink)
 	require.NoError(t, err)
 
 	for {
 		select {
 		case <-time.After(5 * time.Second):
 			t.Logf("Waiting for commit report on chain id %d (selector %d)", uni.chainID, getSelector(uni.chainID))
-		case subErr := <-subscription.Err():
+		case subErr := <-subscipriton.Err():
 			t.Fatalf("Subscription error: %+v", subErr)
 		case report := <-sink:
 			if len(report.Report.MerkleRoots) > 0 {
-				t.Logf("Received commit report with merkle roots: %+v", report)
+				if len(report.Report.MerkleRoots) == numUnis-1 {
+					t.Logf("Received commit report with %d merkle roots on chain id %d (selector %d): %+v",
+						len(report.Report.MerkleRoots), uni.chainID, getSelector(uni.chainID), report)
+					return
+				} else {
+					t.Fatalf("Received commit report with %d merkle roots, expected %d", len(report.Report.MerkleRoots), numUnis)
+				}
 			} else {
-				t.Logf("Received commit report without merkle roots: %+v", report)
+				t.Logf("Received commit report without merkle roots on chain id %d (selector %d): %+v", uni.chainID, getSelector(uni.chainID), report)
 			}
-			report.Report.MerkleRoots = nil
-			return
 		}
 	}
 }
@@ -266,9 +285,9 @@ func waitForExec(t *testing.T, uni onchainUniverse, messageHeaders []evm_2_evm_m
 			}
 			if found {
 				msgsCount++
-				t.Logf("Execution State Changed: %+v", report)
+				t.Logf("Execution state changed: %+v", report)
 			} else {
-				t.Logf("Received execution state changed for unexpected message %+v", report)
+				t.Logf("Execution state changed for unexpected message %+v", report)
 			}
 
 			if msgsCount == len(msgIDs) {
