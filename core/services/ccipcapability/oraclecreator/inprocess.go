@@ -163,6 +163,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 				Named(chain.ID().String()).
 				Named(pluginType.String()),
 			chain.LogPoller(),
+			chain.HeadTracker(),
 			chain.Client(),
 			chainReaderConfig,
 		)
@@ -256,6 +257,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			i.lggr.
 				Named("CCIPCommitPlugin").
 				Named(destRelayID.String()).
+				Named(fmt.Sprintf("%d", config.Config.ChainSelector)).
 				Named(hexutil.Encode(config.Config.OfframpAddress)),
 			ccipreaderpkg.OCR3ConfigWithMeta(config),
 			ccipevm.NewCommitPluginCodecV1(),
