@@ -338,7 +338,7 @@ func (d *Delegate) cleanupEVM(ctx context.Context, jb job.Job, relayID types.Rel
 			return err2
 		}
 		err2 = ccipcommit.UnregisterCommitPluginLpFilters(srcProvider, dstProvider)
-		if err != nil {
+		if err2 != nil {
 			d.lggr.Errorw("failed to unregister ccip commit plugin filters", "err", err2, "spec", spec)
 		}
 		return nil
