@@ -74,7 +74,7 @@ require (
 	github.com/shopspring/decimal v1.3.1
 	github.com/smartcontractkit/chain-selectors v1.0.18
 	github.com/smartcontractkit/chainlink-automation v1.0.4
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20240724145452-2695437da15e
+	github.com/smartcontractkit/chainlink-ccip v0.0.0-20240725023421-49b3cc9d2310
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240724141910-a4e00c83240c
 	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20240621143432-85370a54b141
 	github.com/smartcontractkit/chainlink-data-streams v0.0.0-20240702144807-761f63e7b527
@@ -358,4 +358,6 @@ replace (
 
 	// until merged upstream: https://github.com/mwitkow/grpc-proxy/pull/69
 	github.com/mwitkow/grpc-proxy => github.com/smartcontractkit/grpc-proxy v0.0.0-20230731113816-f1be6620749f
+
+	github.com/smartcontractkit/chainlink-ccip => ../chainlink-ccip
 )

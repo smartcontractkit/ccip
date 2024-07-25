@@ -220,15 +220,15 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 
 	wg.Wait()
 
-	//var wg2 sync.WaitGroup
-	//for _, uni := range universes {
-	//	wg2.Add(1)
-	//	go func(uni onchainUniverse) {
-	//		defer wg2.Done()
-	//		waitForExec(t, uni, messageHeaders[uni.chainID])
-	//	}(uni)
-	//}
-	//wg2.Wait()
+	var wg2 sync.WaitGroup
+	for _, uni := range universes {
+		wg2.Add(1)
+		go func(uni onchainUniverse) {
+			defer wg2.Done()
+			waitForExec(t, uni, messageHeaders[uni.chainID])
+		}(uni)
+	}
+	wg2.Wait()
 }
 
 func waitForCommit(t *testing.T, uni onchainUniverse, numUnis int) {
@@ -287,6 +287,7 @@ func waitForExec(t *testing.T, uni onchainUniverse, messageHeaders []evm_2_evm_m
 				msgsCount++
 				t.Logf("Execution state changed: %+v", report)
 			} else {
+				msgsCount++
 				t.Logf("Execution state changed for unexpected message %+v", report)
 			}
 
