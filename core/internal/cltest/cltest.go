@@ -18,6 +18,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -385,7 +387,11 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 
 	testCtx := testutils.Context(t)
 	// evm alway enabled for backward compatibility
-	initOps := []chainlink.CoreRelayerChainInitFunc{chainlink.InitDummy(testCtx, relayerFactory), chainlink.InitEVM(testCtx, relayerFactory, evmOpts)}
+	telemetryManager := telemetry.NewManager(cfg.TelemetryIngress(), keyStore.CSA(), lggr)
+	initOps := []chainlink.CoreRelayerChainInitFunc{
+		chainlink.InitDummy(testCtx, relayerFactory),
+		chainlink.InitEVM(testCtx, relayerFactory, evmOpts, telemetryManager),
+	}
 
 	if cfg.CosmosEnabled() {
 		cosmosCfg := chainlink.CosmosFactoryConfig{
@@ -429,6 +435,10 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		SecretGenerator:            MockSecretGenerator{},
 		LoopRegistry:               plugins.NewLoopRegistry(lggr, nil),
 		MercuryPool:                mercuryPool,
+		CapabilitiesRegistry:       capabilitiesRegistry,
+		CapabilitiesDispatcher:     dispatcher,
+		CapabilitiesPeerWrapper:    peerWrapper,
+		TelemetryManager:           telemetryManager,
 	})
 	require.NoError(t, err)
 	app := appInstance.(*chainlink.ChainlinkApplication)
