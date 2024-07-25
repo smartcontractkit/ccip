@@ -3,6 +3,7 @@ package ccip_integration_tests
 import (
 	"fmt"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -209,14 +210,94 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		}
 	}
 
+	numUnis := len(universes)
+	var wg sync.WaitGroup
 	for _, uni := range universes {
-		waitForCommit(t, uni)
+		wg.Add(1)
+		go func(uni onchainUniverse) {
+			defer wg.Done()
+			waitForCommit(t, uni, numUnis, nil)
+		}(uni)
 	}
+
+	t.Log("waiting for commit reports")
+	wg.Wait()
+
+	var preRequestBlocks = make(map[uint64]uint64)
+	for _, uni := range universes {
+		preRequestBlocks[uni.chainID] = uni.backend.Blockchain().CurrentBlock().Number.Uint64()
+	}
+
+	for chainID, uni := range universes {
+		for otherChain, pingPong := range pingPongs[chainID] {
+			t.Log("PingPong again From: ", chainID, " To: ", otherChain)
+
+			expNextSeqNr, err1 := uni.onramp.GetExpectedNextSequenceNumber(&bind.CallOpts{}, getSelector(otherChain))
+			require.NoError(t, err1)
+			require.Equal(t, uint64(2), expNextSeqNr, "expected next sequence number should be 1")
+
+			uni.backend.Commit()
+
+			_, err2 := pingPong.StartPingPong(uni.owner)
+			require.NoError(t, err2)
+			uni.backend.Commit()
+
+			endBlock := uni.backend.Blockchain().CurrentBlock().Number.Uint64()
+			logIter, err3 := uni.onramp.FilterCCIPSendRequested(&bind.FilterOpts{
+				Start: endBlock - 1,
+				End:   &endBlock,
+			}, []uint64{getSelector(otherChain)})
+			require.NoError(t, err3)
+			// Iterate until latest event
+			var count int
+			for logIter.Next() {
+				count++
+			}
+			require.Equal(t, 1, count, "expected 1 CCIPSendRequested log only")
+
+			log := logIter.Event
+			require.Equal(t, getSelector(otherChain), log.DestChainSelector)
+			require.Equal(t, pingPong.Address(), log.Message.Sender)
+			chainPingPongAddr := pingPongs[otherChain][chainID].Address().Bytes()
+
+			// Receiver address is abi-encoded if destination is EVM.
+			paddedAddr := common.LeftPadBytes(chainPingPongAddr, len(log.Message.Receiver))
+			require.Equal(t, paddedAddr, log.Message.Receiver)
+
+			// check that sequence number is equal to the expected next sequence number.
+			// and that the sequence number is bumped in the onramp.
+			require.Equalf(t, log.Message.Header.SequenceNumber, expNextSeqNr, "incorrect sequence number in CCIPSendRequested event on chain %d", log.DestChainSelector)
+			newExpNextSeqNr, err := uni.onramp.GetExpectedNextSequenceNumber(&bind.CallOpts{}, getSelector(otherChain))
+			require.NoError(t, err)
+			require.Equal(t, expNextSeqNr+1, newExpNextSeqNr, "expected next sequence number should be bumped by 1")
+
+			_, ok := messageIDs[chainID]
+			if !ok {
+				messageIDs[chainID] = make(map[uint64][32]byte)
+			}
+			messageIDs[chainID][otherChain] = log.Message.Header.MessageId
+		}
+	}
+
+	for _, uni := range universes {
+		startBlock := preRequestBlocks[uni.chainID]
+		wg.Add(1)
+		go func(uni onchainUniverse, startBlock *uint64) {
+			defer wg.Done()
+			waitForCommit(t, uni, numUnis, nil)
+		}(uni, &startBlock)
+	}
+
+	t.Log("waiting for second batch of commit reports")
+	wg.Wait()
 }
 
-func waitForCommit(t *testing.T, uni onchainUniverse) {
+func waitForCommit(t *testing.T, uni onchainUniverse, numUnis int, startBlock *uint64) {
 	sink := make(chan *evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReportAccepted)
-	subscipriton, err := uni.offramp.WatchCommitReportAccepted(&bind.WatchOpts{}, sink)
+	subscipriton, err := uni.offramp.WatchCommitReportAccepted(&bind.WatchOpts{
+		Start:   startBlock,
+		Context: testutils.Context(t),
+	}, sink)
 	require.NoError(t, err)
 
 	for {
@@ -227,10 +308,15 @@ func waitForCommit(t *testing.T, uni onchainUniverse) {
 			t.Fatalf("Subscription error: %+v", subErr)
 		case report := <-sink:
 			if len(report.Report.MerkleRoots) > 0 {
-				t.Logf("Received commit report with merkle roots: %+v", report)
-				return
+				if len(report.Report.MerkleRoots) == numUnis-1 {
+					t.Logf("Received commit report with %d merkle roots on chain id %d (selector %d): %+v",
+						len(report.Report.MerkleRoots), uni.chainID, getSelector(uni.chainID), report)
+					return
+				} else {
+					t.Fatalf("Received commit report with %d merkle roots, expected %d", len(report.Report.MerkleRoots), numUnis)
+				}
 			} else {
-				t.Logf("Received commit report without merkle roots: %+v", report)
+				t.Logf("Received commit report without merkle roots on chain id %d (selector %d): %+v", uni.chainID, getSelector(uni.chainID), report)
 			}
 		}
 	}
