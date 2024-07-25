@@ -117,27 +117,29 @@ func (bs ZKOverflowBatchingStrategy) BuildBatch(
 		}
 		// Message is not inflight, continue with checks
 		// Check if the messsage is overflown using TXM
-		statuses, _, err := bs.statuschecker.CheckMessageStatus(ctx, hexutil.Encode(msg.MessageID[:]))
+		statuses, count, err := bs.statuschecker.CheckMessageStatus(ctx, hexutil.Encode(msg.MessageID[:]))
 		if err != nil {
 			batchBuilder.skip(msg, TXMCheckError)
 			continue
 		}
+
+		msgLggr.Infow("TXM check result", "statuses", statuses, "count", count)
 
 		if len(statuses) == 0 {
 			// No status found for message = first time we see it
 			msgLggr.Infow("No status found for message, adding to batch")
 		} else {
 			// Status(es) found for message = check if any of them is final to decide if we should add it to the batch
-			haveFatalStatus := false
+			hasFatalStatus := false
 			for _, s := range statuses {
 				if s == types.Fatal {
 					msgLggr.Infow("Skipping message - TXM status is fatal")
 					batchBuilder.skip(msg, TXMFatalStatus)
-					haveFatalStatus = true
+					hasFatalStatus = true
 					break
 				}
 			}
-			if haveFatalStatus {
+			if hasFatalStatus {
 				continue
 			}
 			msgLggr.Infow("No final status found for message, adding to batch")

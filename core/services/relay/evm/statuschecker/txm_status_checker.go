@@ -3,7 +3,6 @@ package statuschecker
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
@@ -12,7 +11,7 @@ import (
 // CheckMessageStatus checks the status of a transaction for a given message ID.
 // It returns a list of transaction statuses, the retry counter, and an error if any occurred during the process.
 //
-//go:generate mockery --quiet --name CCIPTransactionStatusChecker --output ./mocks/ --case=underscore
+
 type CCIPTransactionStatusChecker interface {
 	CheckMessageStatus(ctx context.Context, msgID string) (transactionStatuses []types.TransactionStatus, retryCounter int, err error)
 }
@@ -30,18 +29,17 @@ func NewTxmStatusChecker(getTransactionStatus func(ctx context.Context, transact
 // The key will follow the format: <msgID>-<counter>. TXM will be queried for each key until a NotFound error is returned.
 // The goal is to find all transactions associated with a message ID and snooze messages if they are fatal in the Execution Plugin.
 func (tsc *TxmStatusChecker) CheckMessageStatus(ctx context.Context, msgID string) ([]types.TransactionStatus, int, error) {
-	var allStatuses []types.TransactionStatus
 	var counter int
 	const maxStatuses = 1000 // Cap the number of statuses to avoid infinite loop
+
+	allStatuses := make([]types.TransactionStatus, 0)
 
 	for {
 		transactionID := fmt.Sprintf("%s-%d", msgID, counter)
 		status, err := tsc.getTransactionStatus(ctx, transactionID)
-		if err != nil {
-			if strings.Contains(err.Error(), fmt.Sprintf("failed to find transaction with IdempotencyKey %s", transactionID)) {
-				break
-			}
-			return nil, counter - 1, err
+		if err != nil && status == types.Unknown {
+			// If the status is unknown and err not nil, it means the transaction was not found
+			break
 		}
 		allStatuses = append(allStatuses, status)
 		counter++

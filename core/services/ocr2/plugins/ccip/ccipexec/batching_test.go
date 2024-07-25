@@ -579,7 +579,7 @@ func TestBatchingStrategies(t *testing.T) {
 			},
 			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("CheckMessageStatus", mock.Anything, mock.Anything).Return([]types.TransactionStatus{}, 0, nil)
+				m.On("CheckMessageStatus", mock.Anything, mock.Anything).Return([]types.TransactionStatus{}, -1, nil)
 			},
 		},
 		{
@@ -618,7 +618,7 @@ func TestBatchingStrategies(t *testing.T) {
 			},
 			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
+				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Fatal}, 0, nil)
 				m.On("CheckMessageStatus", mock.Anything, zkMsg2.MessageID.String()).Return([]types.TransactionStatus{}, -1, nil)
 			},
 		},
@@ -638,8 +638,8 @@ func TestBatchingStrategies(t *testing.T) {
 			},
 			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
-				m.On("CheckMessageStatus", mock.Anything, zkMsg2.MessageID.String()).Return([]types.TransactionStatus{types.Fatal}, 2, nil)
+				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Fatal}, 0, nil)
+				m.On("CheckMessageStatus", mock.Anything, zkMsg2.MessageID.String()).Return([]types.TransactionStatus{types.Fatal}, 0, nil)
 			},
 			skipGasPriceEstimator: true,
 		},
@@ -659,7 +659,7 @@ func TestBatchingStrategies(t *testing.T) {
 			},
 			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
 				m.Mock = mock.Mock{} // reset mock
-				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed}, 0, nil)
+				m.On("CheckMessageStatus", mock.Anything, zkMsg1.MessageID.String()).Return([]types.TransactionStatus{types.Unconfirmed, types.Failed}, 1, nil)
 			},
 		},
 		{
@@ -772,6 +772,10 @@ func TestBatchingStrategies(t *testing.T) {
 				newMessageExecState(zkMsg1.SequenceNumber, zkMsg1.MessageID, SkippedInflight),
 				newMessageExecState(zkMsg2.SequenceNumber, zkMsg2.MessageID, SkippedInflight),
 				newMessageExecState(zkMsg3.SequenceNumber, zkMsg3.MessageID, AddedToBatch),
+			},
+			statuschecker: func(m *mockstatuschecker.CCIPTransactionStatusChecker) {
+				m.Mock = mock.Mock{} // reset mock
+				m.On("CheckMessageStatus", mock.Anything, zkMsg3.MessageID.String()).Return([]types.TransactionStatus{}, -1, nil)
 			},
 			skipGasPriceEstimator: false,
 		},
