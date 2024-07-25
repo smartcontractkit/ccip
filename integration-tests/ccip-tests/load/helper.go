@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/AlekSi/pointer"
+	"github.com/grafana/pyroscope-go"
 	"github.com/rs/zerolog"
 	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/require"
@@ -306,11 +307,17 @@ func (l *LoadArgs) TriggerLoadByLane() {
 			FailOnErr:             pointer.GetBool(l.TestCfg.TestGroupInput.LoadProfile.FailOnFirstErrorInLoad),
 		}
 		waspCfg.LokiConfig.Timeout = time.Minute
-		loadRunner, err := wasp.NewGenerator(waspCfg)
-		require.NoError(l.TestCfg.Test, err, "initiating loadgen for lane %s --> %s",
-			lane.SourceNetworkName, lane.DestNetworkName)
-		loadRunner.Run(false)
-		l.AddToRunnerGroup(loadRunner)
+		pyroscope.TagWrapper(
+			context.Background(),
+			pyroscope.Labels("ccip_loadgen", fmt.Sprintf("lane_%s_%s", lane.SourceNetworkName, lane.DestNetworkName)),
+			func(_ context.Context) {
+				loadRunner, err := wasp.NewGenerator(waspCfg)
+				require.NoError(l.TestCfg.Test, err, "initiating loadgen for lane %s --> %s",
+					lane.SourceNetworkName, lane.DestNetworkName,
+				)
+				loadRunner.Run(false)
+				l.AddToRunnerGroup(loadRunner)
+			})
 	}
 
 	for _, lane := range l.TestSetupArgs.Lanes {
