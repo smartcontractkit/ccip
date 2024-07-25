@@ -11,6 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/consul/sdk/freeport"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ping_pong_demo"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
@@ -135,6 +137,58 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	// map[uint64] chainID, blocks
 	var replayBlocks = make(map[uint64]uint64)
 	pingPongs := initializePingPongContracts(t, universes)
+
+	sendPingPong(t, universes, pingPongs, messageIDs, replayBlocks, 1)
+	// HACK: wait for the oracles to come up.
+	// Need some data driven way to do this.
+	time.Sleep(30 * time.Second)
+
+	// replay the log poller on all the chains so that the logs are in the db.
+	// otherwise the plugins won't pick them up.
+	// TODO: this is happening too early, we need to wait for the chain readers to get their config
+	// and register the LP filters before this has any effect.
+	for _, node := range nodes {
+		for chainID, replayBlock := range replayBlocks {
+			t.Logf("Replaying logs for chain %d from block %d", chainID, replayBlock)
+			require.NoError(t, node.app.ReplayFromBlock(big.NewInt(int64(chainID)), replayBlock, false), "failed to replay logs")
+		}
+	}
+
+	numUnis := len(universes)
+	var wg sync.WaitGroup
+	for _, uni := range universes {
+		wg.Add(1)
+		go func(uni onchainUniverse) {
+			defer wg.Done()
+			waitForCommit(t, uni, numUnis, nil)
+		}(uni)
+	}
+
+	t.Log("waiting for commit reports")
+	wg.Wait()
+
+	var preRequestBlocks = make(map[uint64]uint64)
+	for _, uni := range universes {
+		preRequestBlocks[uni.chainID] = uni.backend.Blockchain().CurrentBlock().Number.Uint64()
+	}
+
+	t.Log("PingPong AGAIN")
+	sendPingPong(t, universes, pingPongs, messageIDs, replayBlocks, 2)
+
+	for _, uni := range universes {
+		startBlock := preRequestBlocks[uni.chainID]
+		wg.Add(1)
+		go func(uni onchainUniverse, startBlock *uint64) {
+			defer wg.Done()
+			waitForCommit(t, uni, numUnis, startBlock)
+		}(uni, &startBlock)
+	}
+
+	t.Log("waiting for second batch of commit reports")
+	wg.Wait()
+}
+
+func sendPingPong(t *testing.T, universes map[uint64]onchainUniverse, pingPongs map[uint64]map[uint64]*ping_pong_demo.PingPongDemo, messageIDs map[uint64]map[uint64][32]byte, replayBlocks map[uint64]uint64, expectedSeqNum uint64) {
 	for chainID, uni := range universes {
 		var replayBlock uint64
 		for otherChain, pingPong := range pingPongs[chainID] {
@@ -142,7 +196,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 
 			expNextSeqNr, err1 := uni.onramp.GetExpectedNextSequenceNumber(&bind.CallOpts{}, getSelector(otherChain))
 			require.NoError(t, err1)
-			require.Equal(t, uint64(1), expNextSeqNr, "expected next sequence number should be 1")
+			require.Equal(t, expectedSeqNum, expNextSeqNr, "expected next sequence number should be 1")
 
 			uni.backend.Commit()
 
@@ -192,102 +246,6 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		}
 		replayBlocks[chainID] = replayBlock
 	}
-
-	// HACK: wait for the oracles to come up.
-	// Need some data driven way to do this.
-	time.Sleep(30 * time.Second)
-
-	// replay the log poller on all the chains so that the logs are in the db.
-	// otherwise the plugins won't pick them up.
-	// TODO: this is happening too early, we need to wait for the chain readers to get their config
-	// and register the LP filters before this has any effect.
-	for _, node := range nodes {
-		for chainID, replayBlock := range replayBlocks {
-			t.Logf("Replaying logs for chain %d from block %d", chainID, replayBlock)
-			require.NoError(t, node.app.ReplayFromBlock(big.NewInt(int64(chainID)), replayBlock, false), "failed to replay logs")
-		}
-	}
-
-	numUnis := len(universes)
-	var wg sync.WaitGroup
-	for _, uni := range universes {
-		wg.Add(1)
-		go func(uni onchainUniverse) {
-			defer wg.Done()
-			waitForCommit(t, uni, numUnis, nil)
-		}(uni)
-	}
-
-	t.Log("waiting for commit reports")
-	wg.Wait()
-
-	var preRequestBlocks = make(map[uint64]uint64)
-	for _, uni := range universes {
-		preRequestBlocks[uni.chainID] = uni.backend.Blockchain().CurrentBlock().Number.Uint64()
-	}
-
-	for chainID, uni := range universes {
-		for otherChain, pingPong := range pingPongs[chainID] {
-			t.Log("PingPong again From: ", chainID, " To: ", otherChain)
-
-			expNextSeqNr, err1 := uni.onramp.GetExpectedNextSequenceNumber(&bind.CallOpts{}, getSelector(otherChain))
-			require.NoError(t, err1)
-			require.Equal(t, uint64(2), expNextSeqNr, "expected next sequence number should be 1")
-
-			uni.backend.Commit()
-
-			_, err2 := pingPong.StartPingPong(uni.owner)
-			require.NoError(t, err2)
-			uni.backend.Commit()
-
-			endBlock := uni.backend.Blockchain().CurrentBlock().Number.Uint64()
-			logIter, err3 := uni.onramp.FilterCCIPSendRequested(&bind.FilterOpts{
-				Start: endBlock - 1,
-				End:   &endBlock,
-			}, []uint64{getSelector(otherChain)})
-			require.NoError(t, err3)
-			// Iterate until latest event
-			var count int
-			for logIter.Next() {
-				count++
-			}
-			require.Equal(t, 1, count, "expected 1 CCIPSendRequested log only")
-
-			log := logIter.Event
-			require.Equal(t, getSelector(otherChain), log.DestChainSelector)
-			require.Equal(t, pingPong.Address(), log.Message.Sender)
-			chainPingPongAddr := pingPongs[otherChain][chainID].Address().Bytes()
-
-			// Receiver address is abi-encoded if destination is EVM.
-			paddedAddr := common.LeftPadBytes(chainPingPongAddr, len(log.Message.Receiver))
-			require.Equal(t, paddedAddr, log.Message.Receiver)
-
-			// check that sequence number is equal to the expected next sequence number.
-			// and that the sequence number is bumped in the onramp.
-			require.Equalf(t, log.Message.Header.SequenceNumber, expNextSeqNr, "incorrect sequence number in CCIPSendRequested event on chain %d", log.DestChainSelector)
-			newExpNextSeqNr, err := uni.onramp.GetExpectedNextSequenceNumber(&bind.CallOpts{}, getSelector(otherChain))
-			require.NoError(t, err)
-			require.Equal(t, expNextSeqNr+1, newExpNextSeqNr, "expected next sequence number should be bumped by 1")
-
-			_, ok := messageIDs[chainID]
-			if !ok {
-				messageIDs[chainID] = make(map[uint64][32]byte)
-			}
-			messageIDs[chainID][otherChain] = log.Message.Header.MessageId
-		}
-	}
-
-	for _, uni := range universes {
-		startBlock := preRequestBlocks[uni.chainID]
-		wg.Add(1)
-		go func(uni onchainUniverse, startBlock *uint64) {
-			defer wg.Done()
-			waitForCommit(t, uni, numUnis, nil)
-		}(uni, &startBlock)
-	}
-
-	t.Log("waiting for second batch of commit reports")
-	wg.Wait()
 }
 
 func waitForCommit(t *testing.T, uni onchainUniverse, numUnis int, startBlock *uint64) {
@@ -310,9 +268,8 @@ func waitForCommit(t *testing.T, uni onchainUniverse, numUnis int, startBlock *u
 					t.Logf("Received commit report with %d merkle roots on chain id %d (selector %d): %+v",
 						len(report.Report.MerkleRoots), uni.chainID, getSelector(uni.chainID), report)
 					return
-				} else {
-					t.Fatalf("Received commit report with %d merkle roots, expected %d", len(report.Report.MerkleRoots), numUnis)
 				}
+				t.Fatalf("Received commit report with %d merkle roots, expected %d", len(report.Report.MerkleRoots), numUnis)
 			} else {
 				t.Logf("Received commit report without merkle roots on chain id %d (selector %d): %+v", uni.chainID, getSelector(uni.chainID), report)
 			}
