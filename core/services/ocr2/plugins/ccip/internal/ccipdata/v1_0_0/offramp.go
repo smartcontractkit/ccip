@@ -503,7 +503,6 @@ func (o *OffRamp) GetExecutionStateChangesForSeqNums(ctx context.Context, seqNum
 
 			return &cciptypes.ExecutionStateChanged{
 				SequenceNumber: sc.SequenceNumber,
-				Finalized:      sc.Raw.BlockNumber <= uint64(latestBlock.FinalizedBlockNumber),
 			}, nil
 		},
 	)
@@ -514,7 +513,7 @@ func (o *OffRamp) GetExecutionStateChangesForSeqNums(ctx context.Context, seqNum
 	res := make([]cciptypes.ExecutionStateChangedWithTxMeta, 0, len(parsedLogs))
 	for _, log := range parsedLogs {
 		res = append(res, cciptypes.ExecutionStateChangedWithTxMeta{
-			TxMeta:                log.TxMeta,
+			TxMeta:                log.TxMeta.WithFinalityStatus(uint64(latestBlock.FinalizedBlockNumber)),
 			ExecutionStateChanged: log.Data,
 		})
 	}
