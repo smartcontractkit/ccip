@@ -30,9 +30,35 @@ var (
 	_ = abi.ConvertType
 )
 
+type CCIPReaderTesterCommitReport struct {
+	PriceUpdates CCIPReaderTesterPriceUpdates
+	MerkleRoots  []CCIPReaderTesterMerkleRoot
+}
+
 type CCIPReaderTesterEVM2AnyRampMessage struct {
 	Header CCIPReaderTesterRampMessageHeader
 	Sender common.Address
+}
+
+type CCIPReaderTesterGasPriceUpdate struct {
+	DestChainSelector uint64
+	UsdPerUnitGas     *big.Int
+}
+
+type CCIPReaderTesterInterval struct {
+	Min uint64
+	Max uint64
+}
+
+type CCIPReaderTesterMerkleRoot struct {
+	SourceChainSelector uint64
+	Interval            CCIPReaderTesterInterval
+	MerkleRoot          [32]byte
+}
+
+type CCIPReaderTesterPriceUpdates struct {
+	TokenPriceUpdates []CCIPReaderTesterTokenPriceUpdate
+	GasPriceUpdates   []CCIPReaderTesterGasPriceUpdate
 }
 
 type CCIPReaderTesterRampMessageHeader struct {
@@ -49,9 +75,14 @@ type CCIPReaderTesterSourceChainConfig struct {
 	OnRamp    []byte
 }
 
+type CCIPReaderTesterTokenPriceUpdate struct {
+	SourceToken common.Address
+	UsdPerToken *big.Int
+}
+
 var CCIPReaderTesterMetaData = &bind.MetaData{
-	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"components\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"nonce\",\"type\":\"uint64\"}],\"internalType\":\"structCCIPReaderTester.RampMessageHeader\",\"name\":\"header\",\"type\":\"tuple\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"indexed\":false,\"internalType\":\"structCCIPReaderTester.EVM2AnyRampMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"CCIPSendRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"enumCCIPReaderTester.MessageExecutionState\",\"name\":\"state\",\"type\":\"uint8\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"returnData\",\"type\":\"bytes\"}],\"name\":\"ExecutionStateChanged\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"components\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"nonce\",\"type\":\"uint64\"}],\"internalType\":\"structCCIPReaderTester.RampMessageHeader\",\"name\":\"header\",\"type\":\"tuple\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"internalType\":\"structCCIPReaderTester.EVM2AnyRampMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"EmitCCIPSendRequested\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"enumCCIPReaderTester.MessageExecutionState\",\"name\":\"state\",\"type\":\"uint8\"},{\"internalType\":\"bytes\",\"name\":\"returnData\",\"type\":\"bytes\"}],\"name\":\"EmitExecutionStateChanged\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"}],\"name\":\"getSourceChainConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"bool\",\"name\":\"isEnabled\",\"type\":\"bool\"},{\"internalType\":\"uint64\",\"name\":\"minSeqNr\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"onRamp\",\"type\":\"bytes\"}],\"internalType\":\"structCCIPReaderTester.SourceChainConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"components\":[{\"internalType\":\"bool\",\"name\":\"isEnabled\",\"type\":\"bool\"},{\"internalType\":\"uint64\",\"name\":\"minSeqNr\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"onRamp\",\"type\":\"bytes\"}],\"internalType\":\"structCCIPReaderTester.SourceChainConfig\",\"name\":\"sourceChainConfig\",\"type\":\"tuple\"}],\"name\":\"setSourceChainConfig\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b506109a9806100206000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c806383b95f4414610051578063e9d68a8e14610066578063f2c2a53b1461008f578063f831af81146100a2575b600080fd5b61006461005f3660046104a6565b6100b5565b005b610079610074366004610525565b61010c565b60405161008691906105ab565b60405180910390f35b61006461009d3660046105ee565b6101fd565b6100646100b03660046106e5565b6102a5565b828467ffffffffffffffff168667ffffffffffffffff167f8c324ce1367b83031769f6a813e3bb4c117aba2185789d66b98b791405be6df285856040516100fd92919061078e565b60405180910390a45050505050565b60408051606080820183526000808352602080840182905283850183905267ffffffffffffffff86811683528282529185902085519384018652805460ff811615158552610100900490921690830152600181018054939492939192840191610174906107de565b80601f01602080910402602001604051908101604052809291908181526020018280546101a0906107de565b80156101ed5780601f106101c2576101008083540402835291602001916101ed565b820191906000526020600020905b8154815290600101906020018083116101d057829003601f168201915b5050505050815250509050919050565b8167ffffffffffffffff167f44f1faa7d73ff2ac41c8e2f4cf1566d41e2599c1a51d7d862d00410f3810850182604051610299919081518051825260208082015167ffffffffffffffff9081168285015260408084015182169085015260608084015182169085015260809283015116918301919091529091015173ffffffffffffffffffffffffffffffffffffffff1660a082015260c00190565b60405180910390a25050565b67ffffffffffffffff8281166000908152602081815260409182902084518154928601517fffffffffffffffffffffffffffffffffffffffffffffff0000000000000000009093169015157fffffffffffffffffffffffffffffffffffffffffffffff0000000000000000ff1617610100929094169190910292909217825582015182919060018201906103399082610882565b5050505050565b803567ffffffffffffffff8116811461035857600080fd5b919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040805190810167ffffffffffffffff811182821017156103af576103af61035d565b60405290565b60405160a0810167ffffffffffffffff811182821017156103af576103af61035d565b6040516060810167ffffffffffffffff811182821017156103af576103af61035d565b600082601f83011261040c57600080fd5b813567ffffffffffffffff808211156104275761042761035d565b604051601f83017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0908116603f0116810190828211818310171561046d5761046d61035d565b8160405283815286602085880101111561048657600080fd5b836020870160208301376000602085830101528094505050505092915050565b600080600080600060a086880312156104be57600080fd5b6104c786610340565b94506104d560208701610340565b9350604086013592506060860135600481106104f057600080fd5b9150608086013567ffffffffffffffff81111561050c57600080fd5b610518888289016103fb565b9150509295509295909350565b60006020828403121561053757600080fd5b61054082610340565b9392505050565b6000815180845260005b8181101561056d57602081850181015186830182015201610551565b5060006020828601015260207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f83011685010191505092915050565b6020815281511515602082015267ffffffffffffffff6020830151166040820152600060408301516060808401526105e66080840182610547565b949350505050565b60008082840360e081121561060257600080fd5b61060b84610340565b92507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe00160c081121561063d57600080fd5b61064561038c565b60a082121561065357600080fd5b61065b6103b5565b91506020850135825261067060408601610340565b602083015261068160608601610340565b604083015261069260808601610340565b60608301526106a360a08601610340565b608083015290815260c08401359073ffffffffffffffffffffffffffffffffffffffff821682146106d357600080fd5b81602082015280925050509250929050565b600080604083850312156106f857600080fd5b61070183610340565b9150602083013567ffffffffffffffff8082111561071e57600080fd5b908401906060828703121561073257600080fd5b61073a6103d8565b8235801515811461074a57600080fd5b815261075860208401610340565b602082015260408301358281111561076f57600080fd5b61077b888286016103fb565b6040830152508093505050509250929050565b6000600484106107c7577f4e487b7100000000000000000000000000000000000000000000000000000000600052602160045260246000fd5b838252604060208301526105e66040830184610547565b600181811c908216806107f257607f821691505b60208210810361082b577f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b50919050565b601f82111561087d576000816000526020600020601f850160051c8101602086101561085a5750805b601f850160051c820191505b8181101561087957828155600101610866565b5050505b505050565b815167ffffffffffffffff81111561089c5761089c61035d565b6108b0816108aa84546107de565b84610831565b602080601f83116001811461090357600084156108cd5750858301515b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600386901b1c1916600185901b178555610879565b6000858152602081207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08616915b8281101561095057888601518255948401946001909101908401610931565b508582101561098c57878501517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600388901b60f8161c191681555b5050505050600190811b0190555056fea164736f6c6343000818000a",
+	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"components\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"nonce\",\"type\":\"uint64\"}],\"internalType\":\"structCCIPReaderTester.RampMessageHeader\",\"name\":\"header\",\"type\":\"tuple\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"indexed\":false,\"internalType\":\"structCCIPReaderTester.EVM2AnyRampMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"CCIPSendRequested\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"components\":[{\"components\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"sourceToken\",\"type\":\"address\"},{\"internalType\":\"uint224\",\"name\":\"usdPerToken\",\"type\":\"uint224\"}],\"internalType\":\"structCCIPReaderTester.TokenPriceUpdate[]\",\"name\":\"tokenPriceUpdates\",\"type\":\"tuple[]\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint224\",\"name\":\"usdPerUnitGas\",\"type\":\"uint224\"}],\"internalType\":\"structCCIPReaderTester.GasPriceUpdate[]\",\"name\":\"gasPriceUpdates\",\"type\":\"tuple[]\"}],\"internalType\":\"structCCIPReaderTester.PriceUpdates\",\"name\":\"priceUpdates\",\"type\":\"tuple\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"min\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"max\",\"type\":\"uint64\"}],\"internalType\":\"structCCIPReaderTester.Interval\",\"name\":\"interval\",\"type\":\"tuple\"},{\"internalType\":\"bytes32\",\"name\":\"merkleRoot\",\"type\":\"bytes32\"}],\"internalType\":\"structCCIPReaderTester.MerkleRoot[]\",\"name\":\"merkleRoots\",\"type\":\"tuple[]\"}],\"indexed\":false,\"internalType\":\"structCCIPReaderTester.CommitReport\",\"name\":\"report\",\"type\":\"tuple\"}],\"name\":\"CommitReportAccepted\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"indexed\":true,\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"enumCCIPReaderTester.MessageExecutionState\",\"name\":\"state\",\"type\":\"uint8\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"returnData\",\"type\":\"bytes\"}],\"name\":\"ExecutionStateChanged\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"components\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"nonce\",\"type\":\"uint64\"}],\"internalType\":\"structCCIPReaderTester.RampMessageHeader\",\"name\":\"header\",\"type\":\"tuple\"},{\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"internalType\":\"structCCIPReaderTester.EVM2AnyRampMessage\",\"name\":\"message\",\"type\":\"tuple\"}],\"name\":\"EmitCCIPSendRequested\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"components\":[{\"components\":[{\"internalType\":\"address\",\"name\":\"sourceToken\",\"type\":\"address\"},{\"internalType\":\"uint224\",\"name\":\"usdPerToken\",\"type\":\"uint224\"}],\"internalType\":\"structCCIPReaderTester.TokenPriceUpdate[]\",\"name\":\"tokenPriceUpdates\",\"type\":\"tuple[]\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint224\",\"name\":\"usdPerUnitGas\",\"type\":\"uint224\"}],\"internalType\":\"structCCIPReaderTester.GasPriceUpdate[]\",\"name\":\"gasPriceUpdates\",\"type\":\"tuple[]\"}],\"internalType\":\"structCCIPReaderTester.PriceUpdates\",\"name\":\"priceUpdates\",\"type\":\"tuple\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"min\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"max\",\"type\":\"uint64\"}],\"internalType\":\"structCCIPReaderTester.Interval\",\"name\":\"interval\",\"type\":\"tuple\"},{\"internalType\":\"bytes32\",\"name\":\"merkleRoot\",\"type\":\"bytes32\"}],\"internalType\":\"structCCIPReaderTester.MerkleRoot[]\",\"name\":\"merkleRoots\",\"type\":\"tuple[]\"}],\"internalType\":\"structCCIPReaderTester.CommitReport\",\"name\":\"report\",\"type\":\"tuple\"}],\"name\":\"EmitCommitReportAccepted\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"sequenceNumber\",\"type\":\"uint64\"},{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"enumCCIPReaderTester.MessageExecutionState\",\"name\":\"state\",\"type\":\"uint8\"},{\"internalType\":\"bytes\",\"name\":\"returnData\",\"type\":\"bytes\"}],\"name\":\"EmitExecutionStateChanged\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"}],\"name\":\"getSourceChainConfig\",\"outputs\":[{\"components\":[{\"internalType\":\"bool\",\"name\":\"isEnabled\",\"type\":\"bool\"},{\"internalType\":\"uint64\",\"name\":\"minSeqNr\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"onRamp\",\"type\":\"bytes\"}],\"internalType\":\"structCCIPReaderTester.SourceChainConfig\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"components\":[{\"internalType\":\"bool\",\"name\":\"isEnabled\",\"type\":\"bool\"},{\"internalType\":\"uint64\",\"name\":\"minSeqNr\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"onRamp\",\"type\":\"bytes\"}],\"internalType\":\"structCCIPReaderTester.SourceChainConfig\",\"name\":\"sourceChainConfig\",\"type\":\"tuple\"}],\"name\":\"setSourceChainConfig\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b50610f6c806100206000396000f3fe608060405234801561001057600080fd5b50600436106100675760003560e01c8063f2c2a53b11610050578063f2c2a53b146100aa578063f831af81146100bd578063f8b327f2146100d057600080fd5b806383b95f441461006c578063e9d68a8e14610081575b600080fd5b61007f61007a366004610540565b6100e3565b005b61009461008f3660046105bf565b61013a565b6040516100a19190610645565b60405180910390f35b61007f6100b83660046106ac565b61022b565b61007f6100cb366004610786565b6102d3565b61007f6100de366004610a06565b61036e565b828467ffffffffffffffff168667ffffffffffffffff167f8c324ce1367b83031769f6a813e3bb4c117aba2185789d66b98b791405be6df2858560405161012b929190610b6f565b60405180910390a45050505050565b60408051606080820183526000808352602080840182905283850183905267ffffffffffffffff86811683528282529185902085519384018652805460ff8116151585526101009004909216908301526001810180549394929391928401916101a290610bbf565b80601f01602080910402602001604051908101604052809291908181526020018280546101ce90610bbf565b801561021b5780601f106101f05761010080835404028352916020019161021b565b820191906000526020600020905b8154815290600101906020018083116101fe57829003601f168201915b5050505050815250509050919050565b8167ffffffffffffffff167f44f1faa7d73ff2ac41c8e2f4cf1566d41e2599c1a51d7d862d00410f38108501826040516102c7919081518051825260208082015167ffffffffffffffff9081168285015260408084015182169085015260608084015182169085015260809283015116918301919091529091015173ffffffffffffffffffffffffffffffffffffffff1660a082015260c00190565b60405180910390a25050565b67ffffffffffffffff8281166000908152602081815260409182902084518154928601517fffffffffffffffffffffffffffffffffffffffffffffff0000000000000000009093169015157fffffffffffffffffffffffffffffffffffffffffffffff0000000000000000ff1617610100929094169190910292909217825582015182919060018201906103679082610c63565b5050505050565b7f3a3950e13dd607cc37980db0ef14266c40d2bba9c01b2e44bfe549808883095d8160405161039d9190610e4c565b60405180910390a150565b803567ffffffffffffffff811681146103c057600080fd5b919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6040805190810167ffffffffffffffff81118282101715610417576104176103c5565b60405290565b60405160a0810167ffffffffffffffff81118282101715610417576104176103c5565b6040516060810167ffffffffffffffff81118282101715610417576104176103c5565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016810167ffffffffffffffff811182821017156104aa576104aa6103c5565b604052919050565b600082601f8301126104c357600080fd5b813567ffffffffffffffff8111156104dd576104dd6103c5565b61050e60207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f84011601610463565b81815284602083860101111561052357600080fd5b816020850160208301376000918101602001919091529392505050565b600080600080600060a0868803121561055857600080fd5b610561866103a8565b945061056f602087016103a8565b93506040860135925060608601356004811061058a57600080fd5b9150608086013567ffffffffffffffff8111156105a657600080fd5b6105b2888289016104b2565b9150509295509295909350565b6000602082840312156105d157600080fd5b6105da826103a8565b9392505050565b6000815180845260005b81811015610607576020818501810151868301820152016105eb565b5060006020828601015260207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f83011685010191505092915050565b6020815281511515602082015267ffffffffffffffff60208301511660408201526000604083015160608084015261068060808401826105e1565b949350505050565b803573ffffffffffffffffffffffffffffffffffffffff811681146103c057600080fd5b60008082840360e08112156106c057600080fd5b6106c9846103a8565b92507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe00160c08112156106fb57600080fd5b6107036103f4565b60a082121561071157600080fd5b61071961041d565b91506020850135825261072e604086016103a8565b602083015261073f606086016103a8565b6040830152610750608086016103a8565b606083015261076160a086016103a8565b608083015281815261077560c08601610688565b602082015280925050509250929050565b6000806040838503121561079957600080fd5b6107a2836103a8565b9150602083013567ffffffffffffffff808211156107bf57600080fd5b90840190606082870312156107d357600080fd5b6107db610440565b823580151581146107eb57600080fd5b81526107f9602084016103a8565b602082015260408301358281111561081057600080fd5b61081c888286016104b2565b6040830152508093505050509250929050565b600067ffffffffffffffff821115610849576108496103c5565b5060051b60200190565b80357bffffffffffffffffffffffffffffffffffffffffffffffffffffffff811681146103c057600080fd5b600082601f83011261089057600080fd5b813560206108a56108a08361082f565b610463565b82815260069290921b840181019181810190868411156108c457600080fd5b8286015b8481101561091157604081890312156108e15760008081fd5b6108e96103f4565b6108f2826103a8565b81526108ff858301610853565b818601528352918301916040016108c8565b509695505050505050565b600082601f83011261092d57600080fd5b8135602061093d6108a08361082f565b82815260079290921b8401810191818101908684111561095c57600080fd5b8286015b8481101561091157808803608081121561097a5760008081fd5b610982610440565b61098b836103a8565b81526040807fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0840112156109bf5760008081fd5b6109c76103f4565b92506109d48785016103a8565b83526109e18185016103a8565b8388015281870192909252606083013591810191909152835291830191608001610960565b60006020808385031215610a1957600080fd5b823567ffffffffffffffff80821115610a3157600080fd5b81850191506040808388031215610a4757600080fd5b610a4f6103f4565b833583811115610a5e57600080fd5b84016040818a031215610a7057600080fd5b610a786103f4565b813585811115610a8757600080fd5b8201601f81018b13610a9857600080fd5b8035610aa66108a08261082f565b81815260069190911b8201890190898101908d831115610ac557600080fd5b928a01925b82841015610b135787848f031215610ae25760008081fd5b610aea6103f4565b610af385610688565b8152610b008c8601610853565b818d0152825292870192908a0190610aca565b845250505081870135935084841115610b2b57600080fd5b610b378a85840161087f565b8188015282525083850135915082821115610b5157600080fd5b610b5d8883860161091c565b85820152809550505050505092915050565b600060048410610ba8577f4e487b7100000000000000000000000000000000000000000000000000000000600052602160045260246000fd5b8382526040602083015261068060408301846105e1565b600181811c90821680610bd357607f821691505b602082108103610c0c577f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b50919050565b601f821115610c5e576000816000526020600020601f850160051c81016020861015610c3b5750805b601f850160051c820191505b81811015610c5a57828155600101610c47565b5050505b505050565b815167ffffffffffffffff811115610c7d57610c7d6103c5565b610c9181610c8b8454610bbf565b84610c12565b602080601f831160018114610ce45760008415610cae5750858301515b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600386901b1c1916600185901b178555610c5a565b6000858152602081207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08616915b82811015610d3157888601518255948401946001909101908401610d12565b5085821015610d6d57878501517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600388901b60f8161c191681555b5050505050600190811b01905550565b60008151808452602080850194506020840160005b83811015610de1578151805167ffffffffffffffff1688528301517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff168388015260409096019590820190600101610d92565b509495945050505050565b600081518084526020808501945080840160005b83811015610de1578151805167ffffffffffffffff90811689528482015180518216868b0152850151166040808a01919091520151606088015260809096019590820190600101610e00565b6000602080835283516040808386015260a0850182516040606088015281815180845260c0890191508683019350600092505b80831015610edc578351805173ffffffffffffffffffffffffffffffffffffffff1683528701517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff1687830152928601926001929092019190840190610e7f565b50938501518785037fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa001608089015293610f168186610d7d565b9450505050508185015191507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0848203016040850152610f568183610dec565b9594505050505056fea164736f6c6343000818000a",
 }
 
 var CCIPReaderTesterABI = CCIPReaderTesterMetaData.ABI
@@ -224,6 +255,18 @@ func (_CCIPReaderTester *CCIPReaderTesterTransactorSession) EmitCCIPSendRequeste
 	return _CCIPReaderTester.Contract.EmitCCIPSendRequested(&_CCIPReaderTester.TransactOpts, destChainSelector, message)
 }
 
+func (_CCIPReaderTester *CCIPReaderTesterTransactor) EmitCommitReportAccepted(opts *bind.TransactOpts, report CCIPReaderTesterCommitReport) (*types.Transaction, error) {
+	return _CCIPReaderTester.contract.Transact(opts, "EmitCommitReportAccepted", report)
+}
+
+func (_CCIPReaderTester *CCIPReaderTesterSession) EmitCommitReportAccepted(report CCIPReaderTesterCommitReport) (*types.Transaction, error) {
+	return _CCIPReaderTester.Contract.EmitCommitReportAccepted(&_CCIPReaderTester.TransactOpts, report)
+}
+
+func (_CCIPReaderTester *CCIPReaderTesterTransactorSession) EmitCommitReportAccepted(report CCIPReaderTesterCommitReport) (*types.Transaction, error) {
+	return _CCIPReaderTester.Contract.EmitCommitReportAccepted(&_CCIPReaderTester.TransactOpts, report)
+}
+
 func (_CCIPReaderTester *CCIPReaderTesterTransactor) EmitExecutionStateChanged(opts *bind.TransactOpts, sourceChainSelector uint64, sequenceNumber uint64, messageId [32]byte, state uint8, returnData []byte) (*types.Transaction, error) {
 	return _CCIPReaderTester.contract.Transact(opts, "EmitExecutionStateChanged", sourceChainSelector, sequenceNumber, messageId, state, returnData)
 }
@@ -370,6 +413,123 @@ func (_CCIPReaderTester *CCIPReaderTesterFilterer) WatchCCIPSendRequested(opts *
 func (_CCIPReaderTester *CCIPReaderTesterFilterer) ParseCCIPSendRequested(log types.Log) (*CCIPReaderTesterCCIPSendRequested, error) {
 	event := new(CCIPReaderTesterCCIPSendRequested)
 	if err := _CCIPReaderTester.contract.UnpackLog(event, "CCIPSendRequested", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
+type CCIPReaderTesterCommitReportAcceptedIterator struct {
+	Event *CCIPReaderTesterCommitReportAccepted
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *CCIPReaderTesterCommitReportAcceptedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(CCIPReaderTesterCommitReportAccepted)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(CCIPReaderTesterCommitReportAccepted)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *CCIPReaderTesterCommitReportAcceptedIterator) Error() error {
+	return it.fail
+}
+
+func (it *CCIPReaderTesterCommitReportAcceptedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type CCIPReaderTesterCommitReportAccepted struct {
+	Report CCIPReaderTesterCommitReport
+	Raw    types.Log
+}
+
+func (_CCIPReaderTester *CCIPReaderTesterFilterer) FilterCommitReportAccepted(opts *bind.FilterOpts) (*CCIPReaderTesterCommitReportAcceptedIterator, error) {
+
+	logs, sub, err := _CCIPReaderTester.contract.FilterLogs(opts, "CommitReportAccepted")
+	if err != nil {
+		return nil, err
+	}
+	return &CCIPReaderTesterCommitReportAcceptedIterator{contract: _CCIPReaderTester.contract, event: "CommitReportAccepted", logs: logs, sub: sub}, nil
+}
+
+func (_CCIPReaderTester *CCIPReaderTesterFilterer) WatchCommitReportAccepted(opts *bind.WatchOpts, sink chan<- *CCIPReaderTesterCommitReportAccepted) (event.Subscription, error) {
+
+	logs, sub, err := _CCIPReaderTester.contract.WatchLogs(opts, "CommitReportAccepted")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(CCIPReaderTesterCommitReportAccepted)
+				if err := _CCIPReaderTester.contract.UnpackLog(event, "CommitReportAccepted", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_CCIPReaderTester *CCIPReaderTesterFilterer) ParseCommitReportAccepted(log types.Log) (*CCIPReaderTesterCommitReportAccepted, error) {
+	event := new(CCIPReaderTesterCommitReportAccepted)
+	if err := _CCIPReaderTester.contract.UnpackLog(event, "CommitReportAccepted", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
@@ -527,6 +687,8 @@ func (_CCIPReaderTester *CCIPReaderTester) ParseLog(log types.Log) (generated.Ab
 	switch log.Topics[0] {
 	case _CCIPReaderTester.abi.Events["CCIPSendRequested"].ID:
 		return _CCIPReaderTester.ParseCCIPSendRequested(log)
+	case _CCIPReaderTester.abi.Events["CommitReportAccepted"].ID:
+		return _CCIPReaderTester.ParseCommitReportAccepted(log)
 	case _CCIPReaderTester.abi.Events["ExecutionStateChanged"].ID:
 		return _CCIPReaderTester.ParseExecutionStateChanged(log)
 
@@ -537,6 +699,10 @@ func (_CCIPReaderTester *CCIPReaderTester) ParseLog(log types.Log) (generated.Ab
 
 func (CCIPReaderTesterCCIPSendRequested) Topic() common.Hash {
 	return common.HexToHash("0x44f1faa7d73ff2ac41c8e2f4cf1566d41e2599c1a51d7d862d00410f38108501")
+}
+
+func (CCIPReaderTesterCommitReportAccepted) Topic() common.Hash {
+	return common.HexToHash("0x3a3950e13dd607cc37980db0ef14266c40d2bba9c01b2e44bfe549808883095d")
 }
 
 func (CCIPReaderTesterExecutionStateChanged) Topic() common.Hash {
@@ -552,6 +718,8 @@ type CCIPReaderTesterInterface interface {
 
 	EmitCCIPSendRequested(opts *bind.TransactOpts, destChainSelector uint64, message CCIPReaderTesterEVM2AnyRampMessage) (*types.Transaction, error)
 
+	EmitCommitReportAccepted(opts *bind.TransactOpts, report CCIPReaderTesterCommitReport) (*types.Transaction, error)
+
 	EmitExecutionStateChanged(opts *bind.TransactOpts, sourceChainSelector uint64, sequenceNumber uint64, messageId [32]byte, state uint8, returnData []byte) (*types.Transaction, error)
 
 	SetSourceChainConfig(opts *bind.TransactOpts, sourceChainSelector uint64, sourceChainConfig CCIPReaderTesterSourceChainConfig) (*types.Transaction, error)
@@ -561,6 +729,12 @@ type CCIPReaderTesterInterface interface {
 	WatchCCIPSendRequested(opts *bind.WatchOpts, sink chan<- *CCIPReaderTesterCCIPSendRequested, destChainSelector []uint64) (event.Subscription, error)
 
 	ParseCCIPSendRequested(log types.Log) (*CCIPReaderTesterCCIPSendRequested, error)
+
+	FilterCommitReportAccepted(opts *bind.FilterOpts) (*CCIPReaderTesterCommitReportAcceptedIterator, error)
+
+	WatchCommitReportAccepted(opts *bind.WatchOpts, sink chan<- *CCIPReaderTesterCommitReportAccepted) (event.Subscription, error)
+
+	ParseCommitReportAccepted(log types.Log) (*CCIPReaderTesterCommitReportAccepted, error)
 
 	FilterExecutionStateChanged(opts *bind.FilterOpts, sourceChainSelector []uint64, sequenceNumber []uint64, messageId [][32]byte) (*CCIPReaderTesterExecutionStateChangedIterator, error)
 
