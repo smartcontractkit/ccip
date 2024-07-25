@@ -112,7 +112,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.Rep
 			return reportingPluginAndInfo{}, fmt.Errorf("get onchain config from offramp: %w", err)
 		}
 
-		batchingStrategy, err := NewBatchingStrategy(offchainConfig.BatchingStrategyID, statuschecker.NewTxmStatusChecker(rf.config.txManager))
+		batchingStrategy, err := NewBatchingStrategy(offchainConfig.BatchingStrategyID, statuschecker.NewTxmStatusChecker(rf.config.getTransactionStatus))
 		if err != nil {
 			return reportingPluginAndInfo{}, fmt.Errorf("get batching strategy: %w", err)
 		}

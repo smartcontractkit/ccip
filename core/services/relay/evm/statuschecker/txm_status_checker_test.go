@@ -18,7 +18,7 @@ func Test_CheckMessageStatus(t *testing.T) {
 	testutils.SkipShort(t, "")
 	ctx := context.Background()
 	mockTxManager := mocks.NewMockEvmTxManager(t)
-	checker := NewTxmStatusChecker(mockTxManager)
+	checker := NewTxmStatusChecker(mockTxManager.GetTransactionStatus)
 
 	msgID := "test-message-id"
 
@@ -111,7 +111,7 @@ func Test_CheckMessageStatus(t *testing.T) {
 func Test_FailForMoreThan1000Retries(t *testing.T) {
 	ctx := context.Background()
 	mockTxManager := mocks.NewMockEvmTxManager(t)
-	checker := NewTxmStatusChecker(mockTxManager)
+	checker := NewTxmStatusChecker(mockTxManager.GetTransactionStatus)
 
 	for i := 0; i < 1000; i++ {
 		mockTxManager.On("GetTransactionStatus", ctx, fmt.Sprintf("test-message-id-%d", i)).Return(types.Finalized, nil)

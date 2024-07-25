@@ -841,7 +841,7 @@ func generateTransmitterFrom(ctx context.Context, rargs commontypes.RelayArgs, e
 			checker,
 			configWatcher.chain.ID(),
 			ethKeystore,
-			statuschecker.NewTxmStatusChecker(configWatcher.chain.TxManager()),
+			statuschecker.NewTxmStatusChecker(configWatcher.chain.TxManager().GetTransactionStatus),
 		)
 	default:
 		transmitter, err = ocrcommon.NewTransmitter(

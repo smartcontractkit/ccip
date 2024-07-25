@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 )
 
 // CCIPTransactionStatusChecker is an interface that defines the method for checking the status of a transaction.
@@ -19,11 +18,11 @@ type CCIPTransactionStatusChecker interface {
 }
 
 type TxmStatusChecker struct {
-	txManager txmgr.TxManager
+	getTransactionStatus func(ctx context.Context, transactionID string) (types.TransactionStatus, error)
 }
 
-func NewTxmStatusChecker(txManager txmgr.TxManager) *TxmStatusChecker {
-	return &TxmStatusChecker{txManager: txManager}
+func NewTxmStatusChecker(getTransactionStatus func(ctx context.Context, transactionID string) (types.TransactionStatus, error)) *TxmStatusChecker {
+	return &TxmStatusChecker{getTransactionStatus: getTransactionStatus}
 }
 
 // CheckMessageStatus checks the status of a message by checking the status of all transactions associated with the message ID.
@@ -37,7 +36,7 @@ func (tsc *TxmStatusChecker) CheckMessageStatus(ctx context.Context, msgID strin
 
 	for {
 		transactionID := fmt.Sprintf("%s-%d", msgID, counter)
-		status, err := tsc.txManager.GetTransactionStatus(ctx, transactionID)
+		status, err := tsc.getTransactionStatus(ctx, transactionID)
 		if err != nil {
 			if strings.Contains(err.Error(), fmt.Sprintf("failed to find transaction with IdempotencyKey %s", transactionID)) {
 				break

@@ -16,9 +16,8 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
@@ -50,6 +49,8 @@ var (
 	_ types.ReportingPlugin        = &ExecutionReportingPlugin{}
 )
 
+type GetTransactionStatusFunc func(ctx context.Context, transactionID string) (commontypes.TransactionStatus, error)
+
 type ExecutionPluginStaticConfig struct {
 	lggr                          logger.Logger
 	onRampReader                  ccipdata.OnRampReader
@@ -64,7 +65,7 @@ type ExecutionPluginStaticConfig struct {
 	metricsCollector              ccip.PluginMetricsCollector
 	chainHealthcheck              cache.ChainHealthcheck
 	newReportingPluginRetryConfig ccipdata.RetryConfig
-	txManager                     txmgr.TxManager
+	getTransactionStatus          GetTransactionStatusFunc
 }
 
 type ExecutionReportingPlugin struct {

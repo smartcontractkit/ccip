@@ -165,7 +165,7 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 		metricsCollector:              metricsCollector,
 		chainHealthcheck:              chainHealthcheck,
 		newReportingPluginRetryConfig: defaultNewReportingPluginRetryConfig,
-		txManager:                     dstChain.TxManager(),
+		getTransactionStatus:          dstProvider.GetTransactionStatus,
 	})
 
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetInt64(dstChainID))
