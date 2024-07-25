@@ -666,20 +666,6 @@ func getInflightAggregateRateLimit(
 	return inflightAggregateValue, nil
 }
 
-func aggregateTokenValue(lggr logger.Logger, destTokenPricesUSD map[cciptypes.Address]*big.Int, sourceToDest map[cciptypes.Address]cciptypes.Address, tokensAndAmount []cciptypes.TokenAmount) (*big.Int, error) {
-	sum := big.NewInt(0)
-	for i := 0; i < len(tokensAndAmount); i++ {
-		price, ok := destTokenPricesUSD[sourceToDest[tokensAndAmount[i].Token]]
-		if !ok {
-			// If we don't have a price for the token, we will assume it's worth 0.
-			lggr.Infof("No price for token %s, assuming 0", tokensAndAmount[i].Token)
-			continue
-		}
-		sum.Add(sum, new(big.Int).Quo(new(big.Int).Mul(price, tokensAndAmount[i].Amount), big.NewInt(1e18)))
-	}
-	return sum, nil
-}
-
 // getTokensPrices returns token prices of the given price registry,
 // price values are USD per 1e18 of smallest token denomination, in base units 1e18 (e.g. 5$ = 5e18 USD per 1e18 units).
 // this function is used for price registry of both source and destination chains.
