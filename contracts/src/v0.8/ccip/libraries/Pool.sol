@@ -25,7 +25,7 @@ library Pool {
   }
 
   struct LockOrBurnOutV1 {
-    // The address of the destination token pool, abi encoded in the case of EVM chains
+    // The address of the destination token, abi encoded in the case of EVM chains
     // This value is UNTRUSTED as any pool owner can return whatever value they want.
     bytes destTokenAddress;
     // Optional pool data to be transferred to the destination chain. Be default this is capped at
