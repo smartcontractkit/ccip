@@ -179,6 +179,7 @@ func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
 		[]byte{1, 2, 3, 4},
 	)
 	assert.NoError(t, err)
+	s.sb.Commit()
 
 	_, err = s.contract.EmitExecutionStateChanged(
 		s.auth,
@@ -189,7 +190,6 @@ func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
 		[]byte{1, 2, 3, 4, 5},
 	)
 	assert.NoError(t, err)
-
 	s.sb.Commit()
 
 	var executedRanges []cciptypes.SeqNumRange
@@ -200,11 +200,15 @@ func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
 			chainD,
 			cciptypes.NewSeqNumRange(14, 15),
 		)
-		// require.NoError(t, err) // todo: fails because chainReader is returning structs with all empty fields
-		return len(executedRanges) == 0
-	}, 5*time.Second, 100*time.Millisecond)
+		require.NoError(t, err) // todo: fails because chainReader is returning structs with all empty fields
+		return len(executedRanges) == 2
+	}, 5*time.Second, 50*time.Millisecond)
 
-	// todo: more validations
+	assert.Equal(t, cciptypes.SeqNum(14), executedRanges[0].Start())
+	assert.Equal(t, cciptypes.SeqNum(14), executedRanges[0].End())
+
+	assert.Equal(t, cciptypes.SeqNum(15), executedRanges[1].Start())
+	assert.Equal(t, cciptypes.SeqNum(15), executedRanges[1].End())
 }
 
 func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
