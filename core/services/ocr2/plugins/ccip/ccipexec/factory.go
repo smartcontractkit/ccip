@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
 )
 
 type ExecutionReportingPluginFactory struct {
@@ -112,7 +111,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.Rep
 			return reportingPluginAndInfo{}, fmt.Errorf("get onchain config from offramp: %w", err)
 		}
 
-		batchingStrategy, err := NewBatchingStrategy(offchainConfig.BatchingStrategyID, statuschecker.NewTxmStatusChecker(rf.config.getTransactionStatus))
+		batchingStrategy, err := NewBatchingStrategy(offchainConfig.BatchingStrategyID, rf.config.txmStatusChecker)
 		if err != nil {
 			return reportingPluginAndInfo{}, fmt.Errorf("get batching strategy: %w", err)
 		}

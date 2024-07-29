@@ -644,7 +644,7 @@ func TestBatchingStrategies(t *testing.T) {
 			skipGasPriceEstimator: true,
 		},
 		{
-			name:                   "message batched when unconfrimed or failed",
+			name:                   "message batched when unconfirmed or failed",
 			reqs:                   []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{zkMsg1, zkMsg2},
 			inflight:               []InflightInternalExecutionReport{},
 			inflightAggregateValue: big.NewInt(0),

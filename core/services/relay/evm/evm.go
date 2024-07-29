@@ -55,7 +55,6 @@ import (
 	reportcodecv2 "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/v2/reportcodec"
 	reportcodecv3 "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/v3/reportcodec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/wsrpc"
-	statuschecker "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
@@ -841,7 +840,6 @@ func generateTransmitterFrom(ctx context.Context, rargs commontypes.RelayArgs, e
 			checker,
 			configWatcher.chain.ID(),
 			ethKeystore,
-			statuschecker.NewTxmStatusChecker(configWatcher.chain.TxManager().GetTransactionStatus),
 		)
 	default:
 		transmitter, err = ocrcommon.NewTransmitter(

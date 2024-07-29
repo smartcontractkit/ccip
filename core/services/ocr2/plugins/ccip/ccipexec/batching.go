@@ -106,18 +106,19 @@ func (bs ZKOverflowBatchingStrategy) BuildBatch(
 	inflightSeqNums := getInflightSeqNums(batchCtx.inflight)
 
 	for _, msg := range batchCtx.report.sendRequestsWithMeta {
-		msgLggr := batchCtx.lggr.With("messageID", hexutil.Encode(msg.MessageID[:]), "seqNr", msg.SequenceNumber)
+		msgId := hexutil.Encode(msg.MessageID[:])
+		msgLggr := batchCtx.lggr.With("messageID", msgId, "seqNr", msg.SequenceNumber)
 
 		// Check if msg is inflight
 		if exists := inflightSeqNums.Contains(msg.SequenceNumber); exists {
 			// Message is inflight, skip it
-			msgLggr.Infow("Skipping message - already inflight")
+			msgLggr.Infow("Skipping message - already inflight", "message", msgId)
 			batchBuilder.skip(msg, SkippedInflight)
 			continue
 		}
 		// Message is not inflight, continue with checks
 		// Check if the messsage is overflown using TXM
-		statuses, count, err := bs.statuschecker.CheckMessageStatus(ctx, hexutil.Encode(msg.MessageID[:]))
+		statuses, count, err := bs.statuschecker.CheckMessageStatus(ctx, msgId)
 		if err != nil {
 			batchBuilder.skip(msg, TXMCheckError)
 			continue
@@ -127,13 +128,13 @@ func (bs ZKOverflowBatchingStrategy) BuildBatch(
 
 		if len(statuses) == 0 {
 			// No status found for message = first time we see it
-			msgLggr.Infow("No status found for message, adding to batch")
+			msgLggr.Infow("No status found for message - proceeding with checks", "message", msgId)
 		} else {
 			// Status(es) found for message = check if any of them is final to decide if we should add it to the batch
 			hasFatalStatus := false
 			for _, s := range statuses {
 				if s == types.Fatal {
-					msgLggr.Infow("Skipping message - TXM status is fatal")
+					msgLggr.Infow("Skipping message - found a fatal TXM status", "message", msgId)
 					batchBuilder.skip(msg, TXMFatalStatus)
 					hasFatalStatus = true
 					break
@@ -142,7 +143,7 @@ func (bs ZKOverflowBatchingStrategy) BuildBatch(
 			if hasFatalStatus {
 				continue
 			}
-			msgLggr.Infow("No final status found for message, adding to batch")
+			msgLggr.Infow("No final status found for message - proceeding with checks", "message", msgId)
 		}
 
 		status, messageMaxGas, tokenData, msgValue, err := performCommonChecks(ctx, batchCtx, msg, msgLggr)
@@ -157,6 +158,7 @@ func (bs ZKOverflowBatchingStrategy) BuildBatch(
 		}
 
 		updateBatchContext(batchCtx, msg, messageMaxGas, msgValue, msgLggr)
+		msgLggr.Infow("Adding message to batch", "message", msgId)
 		batchBuilder.addToBatch(msg, tokenData)
 
 		// Batch size is limited to 1 for ZK Overflow chains

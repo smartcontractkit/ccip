@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	statuschecker "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
@@ -19,6 +20,7 @@ type roundRobinKeystore interface {
 
 type txManager interface {
 	CreateTransaction(ctx context.Context, txRequest txmgr.TxRequest) (tx txmgr.Tx, err error)
+	GetTransactionStatus(ctx context.Context, transactionID string) (state commontypes.TransactionStatus, err error)
 }
 
 type Transmitter interface {
@@ -75,28 +77,20 @@ func NewTransmitterWithStatusChecker(
 	checker txmgr.TransmitCheckerSpec,
 	chainID *big.Int,
 	keystore roundRobinKeystore,
-	statuschecker statuschecker.CCIPTransactionStatusChecker,
 ) (Transmitter, error) {
-	// Ensure that a keystore is provided.
-	if keystore == nil {
-		return nil, errors.New("nil keystore provided to transmitter")
+	t, err := NewTransmitter(txm, fromAddresses, gasLimit, effectiveTransmitterAddress, strategy, checker, chainID, keystore)
+
+	if err != nil {
+		return nil, err
 	}
 
-	if statuschecker == nil {
-		return nil, errors.New("nil statuschecker provided to transmitter")
+	transmitter, ok := t.(*transmitter)
+	if !ok {
+		return nil, errors.New("failed to type assert Transmitter to *transmitter")
 	}
+	transmitter.statuschecker = statuschecker.NewTxmStatusChecker(txm.GetTransactionStatus)
 
-	return &transmitter{
-		txm:                         txm,
-		fromAddresses:               fromAddresses,
-		gasLimit:                    gasLimit,
-		effectiveTransmitterAddress: effectiveTransmitterAddress,
-		strategy:                    strategy,
-		checker:                     checker,
-		chainID:                     chainID,
-		keystore:                    keystore,
-		statuschecker:               statuschecker,
-	}, nil
+	return transmitter, nil
 }
 
 func (t *transmitter) CreateEthTransaction(ctx context.Context, toAddress common.Address, payload []byte, txMeta *txmgr.TxMeta) error {
