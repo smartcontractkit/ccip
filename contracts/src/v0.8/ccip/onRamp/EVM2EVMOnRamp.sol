@@ -304,11 +304,15 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     }
     if (s_nopFeesJuels > i_maxNopFeesJuels) revert MaxFeeBalanceReached();
 
-    if (i_prevOnRamp != address(0)) {
-      if (s_senderNonce[originalSender] == 0) {
-        // If this is first time send for a sender in new OnRamp, check if they have a nonce
-        // from the previous OnRamp and start from there instead of zero.
-        s_senderNonce[originalSender] = IEVM2AnyOnRamp(i_prevOnRamp).getSenderNonce(originalSender);
+    // Get the current nonce if the message is an ordered message. If it's not ordered, we don't have to make the
+    // external call.
+    if (!extraArgs.allowOutOfOrderExecution) {
+      if (i_prevOnRamp != address(0)) {
+        if (s_senderNonce[originalSender] == 0) {
+          // If this is first time send for a sender in new OnRamp, check if they have a nonce
+          // from the previous OnRamp and start from there instead of zero.
+          s_senderNonce[originalSender] = IEVM2AnyOnRamp(i_prevOnRamp).getSenderNonce(originalSender);
+        }
       }
     }
 
