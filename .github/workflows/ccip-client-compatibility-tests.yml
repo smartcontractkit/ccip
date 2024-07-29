@@ -658,7 +658,7 @@ jobs:
           PATH=$PATH:$(go env GOPATH)/bin
           export PATH
           
-          workflowresultparser -workflowRunID ${{ github.run_id }} -githubToken ${{ github.token }} -githubRepo "${{ github.repository }}" -jobNameRegex "^CCIP Compatibility with (.*?)$" -namedKey="CCIP" -outputFile=output.json
+          workflowresultparser -workflowRunID ${{ github.run_id }} -githubToken ${{ github.token }} -githubRepo "${{ github.repository }}" -jobNameRegex "^CCIP Compatibility with (.*)$" -namedKey="CCIP" -outputFile=output.json
           
           echo "base64_parsed_results=$(base64 -w 0 output.json)" >> $GITHUB_OUTPUT
 
