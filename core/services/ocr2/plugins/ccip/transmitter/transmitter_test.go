@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -22,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ethkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -197,7 +197,6 @@ func Test_Transmitter_With_StatusChecker_CreateEthTransaction(t *testing.T) {
 	effectiveTransmitterAddress := fromAddress
 	txm := txmmocks.NewMockEvmTxManager(t)
 	strategy := newMockTxStrategy(t)
-	statusChecker := mocks.NewCCIPTransactionStatusChecker(t)
 	toAddress := testutils.NewAddress()
 	payload := []byte{1, 2, 3}
 	idempotencyKey := "1-0"
@@ -212,11 +211,11 @@ func Test_Transmitter_With_StatusChecker_CreateEthTransaction(t *testing.T) {
 		txmgr.TransmitCheckerSpec{},
 		chainID,
 		ethKeyStore,
-		statusChecker,
 	)
 	require.NoError(t, err)
 
-	statusChecker.On("CheckMessageStatus", mock.Anything, "1").Return([]types.TransactionStatus{}, -1, nil).Once()
+	// This case is for when the message ID was not found in the status checker
+	txm.On("GetTransactionStatus", mock.Anything, idempotencyKey).Return(types.Unknown, errors.New("dummy")).Once()
 
 	txm.On("CreateTransaction", mock.Anything, txmgr.TxRequest{
 		IdempotencyKey:   &idempotencyKey,
@@ -230,8 +229,7 @@ func Test_Transmitter_With_StatusChecker_CreateEthTransaction(t *testing.T) {
 	}).Return(txmgr.Tx{}, nil).Once()
 
 	require.NoError(t, transmitter.CreateEthTransaction(testutils.Context(t), toAddress, payload, txMeta))
-	// check that the status checker was called
-	statusChecker.AssertExpectations(t)
+	txm.AssertExpectations(t)
 }
 
 func NewKeyStore(t testing.TB, ds sqlutil.DataSource) keystore.Master {
