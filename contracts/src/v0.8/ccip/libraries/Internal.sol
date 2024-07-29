@@ -114,7 +114,8 @@ library Internal {
   uint256 public constant MESSAGE_FIXED_BYTES = 32 * 17;
 
   /// @dev Each token transfer adds 1 EVMTokenAmount and 3 bytes at 3 slots each.
-  /// When abiEncoded, each EVMTokenAmount takes 2 slots, each bytes takes 2 slots, excl bytes contents
+  /// When abi encoded, each EVMTokenAmount takes 2 slots, each bytes takes 1 slot for length, one slot of data and one
+  /// slot for the offset. This results in effectively 3*3 slots per SourceTokenData.
   uint256 public constant MESSAGE_FIXED_BYTES_PER_TOKEN = 32 * (3 * 3 + 2);
 
   /// @dev Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, receiver and tokenAmounts).
