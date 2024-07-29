@@ -25,11 +25,14 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
       nonceManager: address(s_outboundNonceManager),
       tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
-    EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig =
-      _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry));
+    EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig = _generateDynamicMultiOnRampConfig(address(s_priceRegistry));
 
     vm.expectEmit();
     emit EVM2EVMMultiOnRamp.ConfigSet(staticConfig, dynamicConfig);
+    vm.expectEmit();
+    emit EVM2EVMMultiOnRamp.DestChainConfigSet(
+      DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, address(s_sourceRouter))
+    );
 
     _deployOnRamp(
       SOURCE_CHAIN_SELECTOR, address(s_sourceRouter), address(s_outboundNonceManager), address(s_tokenAdminRegistry)
@@ -45,6 +48,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     assertEq("EVM2EVMMultiOnRamp 1.6.0-dev", s_onRamp.typeAndVersion());
     assertEq(OWNER, s_onRamp.owner());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR));
+    assertEq(address(s_sourceRouter), s_onRamp.getSourceRouterAddress(DEST_CHAIN_SELECTOR));
   }
 
   function test_Constructor_InvalidConfigChainSelectorEqZero_Revert() public {
@@ -56,7 +60,8 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry))
+      _generateDynamicMultiOnRampConfig(address(s_priceRegistry)),
+      _generateDestChainConfigArgs(address(0))
     );
   }
 
@@ -69,7 +74,8 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry))
+      _generateDynamicMultiOnRampConfig(address(s_priceRegistry)),
+      _generateDestChainConfigArgs(address(0))
     );
   }
 
@@ -82,7 +88,8 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
         nonceManager: address(0),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry))
+      _generateDynamicMultiOnRampConfig(address(s_priceRegistry)),
+      _generateDestChainConfigArgs(address(0))
     );
   }
 
@@ -95,7 +102,8 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(0)
       }),
-      _generateDynamicMultiOnRampConfig(address(s_sourceRouter), address(s_priceRegistry))
+      _generateDynamicMultiOnRampConfig(address(s_priceRegistry)),
+      _generateDestChainConfigArgs(address(0))
     );
   }
 }
@@ -128,6 +136,25 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     vm.expectEmit();
     emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
 
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+  }
+
+  function test_ForwardFromRouter_Success_ConfigurableSourceRouter() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+    // Change the source router for this lane
+    address newRouter = makeAddr("NEW ROUTER");
+    vm.stopPrank();
+    vm.prank(OWNER);
+    s_onRamp.applyDestChainConfigUpdates(_generateDestChainConfigArgs(newRouter));
+    // forward fails from wrong router
+    vm.prank(address(s_sourceRouter));
+    vm.expectRevert(EVM2EVMMultiOnRamp.MustBeCalledByRouter.selector);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+    // forward succeeds from correct router
+    vm.prank(newRouter);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 
@@ -327,8 +354,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     // We pause by disabling the whitelist
     vm.stopPrank();
     vm.startPrank(OWNER);
-    address router = address(0);
-    s_onRamp.setDynamicConfig(_generateDynamicMultiOnRampConfig(router, address(2)));
+    s_onRamp.setDynamicConfig(_generateDynamicMultiOnRampConfig(address(2)));
     vm.expectRevert(EVM2EVMMultiOnRamp.MustBeCalledByRouter.selector);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, OWNER);
   }
@@ -577,7 +603,6 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
   function test_SetDynamicConfig_Success() public {
     EVM2EVMMultiOnRamp.StaticConfig memory staticConfig = s_onRamp.getStaticConfig();
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
-      router: address(2134),
       priceRegistry: address(23423),
       messageValidator: makeAddr("messageValidator"),
       feeAggregator: FEE_AGGREGATOR
@@ -589,7 +614,6 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
     s_onRamp.setDynamicConfig(newConfig);
 
     EVM2EVMMultiOnRamp.DynamicConfig memory gotDynamicConfig = s_onRamp.getDynamicConfig();
-    assertEq(newConfig.router, gotDynamicConfig.router);
     assertEq(newConfig.priceRegistry, gotDynamicConfig.priceRegistry);
   }
 
@@ -597,7 +621,6 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
 
   function test_SetConfigInvalidConfigPriceRegistryEqAddressZero_Revert() public {
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
-      router: address(2134),
       priceRegistry: address(0),
       feeAggregator: FEE_AGGREGATOR,
       messageValidator: makeAddr("messageValidator")
@@ -609,7 +632,6 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
 
   function test_SetConfigInvalidConfig_Revert() public {
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
-      router: address(1),
       priceRegistry: address(23423),
       messageValidator: address(0),
       feeAggregator: FEE_AGGREGATOR
@@ -623,7 +645,6 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
 
   function test_SetConfigInvalidConfigFeeAggregatorEqAddressZero_Revert() public {
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
-      router: address(2134),
       priceRegistry: address(23423),
       messageValidator: address(0),
       feeAggregator: address(0)
@@ -635,10 +656,10 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
   function test_SetConfigOnlyOwner_Revert() public {
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setDynamicConfig(_generateDynamicMultiOnRampConfig(address(1), address(2)));
+    s_onRamp.setDynamicConfig(_generateDynamicMultiOnRampConfig(address(2)));
     vm.startPrank(ADMIN);
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setDynamicConfig(_generateDynamicMultiOnRampConfig(address(1), address(2)));
+    s_onRamp.setDynamicConfig(_generateDynamicMultiOnRampConfig(address(2)));
   }
 }
 
@@ -716,5 +737,34 @@ contract EVM2EVMMultiOnRamp_getTokenPool is EVM2EVMMultiOnRampSetup {
     address nonExistentPool = address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_SELECTOR, IERC20(wrongToken)));
 
     assertEq(address(0), nonExistentPool);
+  }
+}
+
+contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSetup {
+  function test_ApplyDestChainConfigUpdates_Success() external {
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory configArgs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
+    configArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
+    // supports disabling a lane by setting a router to zero
+    vm.expectEmit();
+    emit EVM2EVMMultiOnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, address(0)));
+    s_onRamp.applyDestChainConfigUpdates(configArgs);
+    assertEq(address(0), s_onRamp.getSourceRouterAddress(DEST_CHAIN_SELECTOR));
+    // supports updating and adding lanes simultaneously
+    configArgs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](2);
+    configArgs[0] = EVM2EVMMultiOnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      sourceRouter: address(s_sourceRouter)
+    });
+    configArgs[1] = EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: 9999, sourceRouter: address(9999)});
+    vm.expectEmit();
+    emit EVM2EVMMultiOnRamp.DestChainConfigSet(
+      DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, address(s_sourceRouter))
+    );
+    emit EVM2EVMMultiOnRamp.DestChainConfigSet(9999, EVM2EVMMultiOnRamp.DestChainConfig(0, address(9999)));
+    s_onRamp.applyDestChainConfigUpdates(configArgs);
+    assertEq(address(s_sourceRouter), s_onRamp.getSourceRouterAddress(DEST_CHAIN_SELECTOR));
+    assertEq(address(9999), s_onRamp.getSourceRouterAddress(9999));
   }
 }
