@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -113,7 +114,7 @@ func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 		)
 		require.NoError(t, err)
 		return len(reports) == 1
-	}, 15*time.Second, 100*time.Millisecond)
+	}, testutils.WaitTimeout(t), 50*time.Millisecond)
 
 	assert.Len(t, reports[0].Report.MerkleRoots, 1)
 	assert.Equal(t, chainS1, reports[0].Report.MerkleRoots[0].ChainSel)
@@ -202,7 +203,7 @@ func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
 		)
 		require.NoError(t, err) // todo: fails because chainReader is returning structs with all empty fields
 		return len(executedRanges) == 2
-	}, 5*time.Second, 50*time.Millisecond)
+	}, testutils.WaitTimeout(t), 50*time.Millisecond)
 
 	assert.Equal(t, cciptypes.SeqNum(14), executedRanges[0].Start())
 	assert.Equal(t, cciptypes.SeqNum(14), executedRanges[0].End())
@@ -285,7 +286,7 @@ func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 		)
 		require.NoError(t, err)
 		return len(msgs) == 2
-	}, 5*time.Second, 100*time.Millisecond)
+	}, testutils.WaitTimeout(t), 100*time.Millisecond)
 
 	require.Len(t, msgs, 2)
 	require.Equal(t, cciptypes.SeqNum(10), msgs[0].Header.SequenceNumber)
