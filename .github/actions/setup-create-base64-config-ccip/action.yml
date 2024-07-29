@@ -40,6 +40,8 @@ inputs:
   evmNodeLogLevel:
     description: Log level for the custom EVM nodes
     default: "info"
+  walletKey:
+    description: Holds private key of wallet that used in the test
 
 runs:
   using: composite
@@ -65,6 +67,7 @@ runs:
         GRAFANA_BEARER_TOKEN: ${{ inputs.grafanaBearerToken }}
         CUSTOM_EVM_NODES: ${{ inputs.customEvmNodes }}
         EVM_NODE_LOG_LEVEL: ${{ inputs.evmNodeLogLevel }}
+        WALLET_KEY: ${{ inputs.walletKey }}
       run: |
         echo ::add-mask::$CHAINLINK_IMAGE
         function convert_to_toml_array() {
@@ -133,11 +136,20 @@ runs:
           fi
         fi
 
+        wallet_key_from_secret="[CCIP.Env.Network.WalletKeys]"
+        
+        for i in "${!networks_array[@]}"; do
+          wallet_key_from_secret += "
+          ${networks_array[i]} = [$wallet_key]
+          "
+        done
+        
         grafana_bearer_token=""
         if [ -n "$GRAFANA_BEARER_TOKEN" ]; then
           grafana_bearer_token="bearer_token_secret=\"$GRAFANA_BEARER_TOKEN\""
         fi
-
+        
+    
         cat << EOF > config.toml
         [CCIP]
         [CCIP.Env]
@@ -155,6 +167,8 @@ runs:
         version="$UPGRADE_VERSION"
 
         $custom_nodes_toml
+        
+        $wallet_key_from_secret
 
         [CCIP.Env.Logging]
         test_log_collect=$test_log_collect
@@ -178,6 +192,7 @@ runs:
 
         [CCIP.Groups.smoke]
         TestRunName = '$EXISTING_NAMESPACE'
+        
 
         EOF
 
