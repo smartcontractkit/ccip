@@ -14,9 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -27,6 +24,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
@@ -112,9 +113,20 @@ func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 		)
 		require.NoError(t, err)
 		return len(reports) == 1
-	}, 5*time.Second, 100*time.Millisecond)
+	}, 15*time.Second, 100*time.Millisecond)
 
-	// todo: validate report content
+	assert.Len(t, reports[0].Report.MerkleRoots, 1)
+	assert.Equal(t, chainS1, reports[0].Report.MerkleRoots[0].ChainSel)
+	assert.Equal(t, cciptypes.SeqNum(10), reports[0].Report.MerkleRoots[0].SeqNumsRange.Start())
+	assert.Equal(t, cciptypes.SeqNum(20), reports[0].Report.MerkleRoots[0].SeqNumsRange.End())
+	assert.Equal(t, "0x0102030000000000000000000000000000000000000000000000000000000000",
+		reports[0].Report.MerkleRoots[0].MerkleRoot.String())
+
+	assert.Equal(t, tokenA.String(), string(reports[0].Report.PriceUpdates.TokenPriceUpdates[0].TokenID))
+	assert.Equal(t, uint64(1000), reports[0].Report.PriceUpdates.TokenPriceUpdates[0].Price.Uint64())
+
+	assert.Equal(t, chainD, reports[0].Report.PriceUpdates.GasPriceUpdates[0].ChainSel)
+	assert.Equal(t, uint64(90), reports[0].Report.PriceUpdates.GasPriceUpdates[0].GasPrice.Uint64())
 }
 
 func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
