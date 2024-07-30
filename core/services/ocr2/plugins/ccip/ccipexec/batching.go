@@ -143,7 +143,7 @@ func (bs ZKOverflowBatchingStrategy) BuildBatch(
 			if hasFatalStatus {
 				continue
 			}
-			msgLggr.Infow("No final status found for message - proceeding with checks", "message", msgId)
+			msgLggr.Infow("No fatal status found for message - proceeding with checks", "message", msgId)
 		}
 
 		status, messageMaxGas, tokenData, msgValue, err := performCommonChecks(ctx, batchCtx, msg, msgLggr)
