@@ -64,6 +64,7 @@ func setupNodeOCR3(
 	p2pV2Bootstrappers []commontypes.BootstrapperLocator,
 	universes map[uint64]onchainUniverse,
 	homeChainUniverse homeChain,
+	logLevel zapcore.Level,
 ) *ocr3Node {
 	// Do not want to load fixtures as they contain a dummy chainID.
 	cfg, db := heavyweight.FullTestDBNoFixturesV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
@@ -91,7 +92,7 @@ func setupNodeOCR3(
 		c.OCR2.Enabled = ptr(true)
 		c.OCR2.ContractPollInterval = config.MustNewDuration(5 * time.Second)
 
-		c.Log.Level = ptr(configv2.LogLevel(zapcore.InfoLevel))
+		c.Log.Level = ptr(configv2.LogLevel(logLevel))
 
 		var chains v2toml.EVMConfigs
 		for chainID := range universes {
@@ -101,7 +102,7 @@ func setupNodeOCR3(
 	})
 
 	lggr := logger.TestLogger(t)
-	lggr.SetLogLevel(zapcore.InfoLevel)
+	lggr.SetLogLevel(logLevel)
 	ctx := testutils.Context(t)
 	clients := make(map[uint64]client.Client)
 
