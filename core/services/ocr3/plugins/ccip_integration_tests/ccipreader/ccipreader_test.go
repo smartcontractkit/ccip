@@ -34,11 +34,15 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
+const (
+	chainS1 = cciptypes.ChainSelector(1)
+	chainS2 = cciptypes.ChainSelector(2)
+	chainS3 = cciptypes.ChainSelector(3)
+	chainD  = cciptypes.ChainSelector(4)
+)
+
 func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
-	lggr := logger.TestLogger(t)
-	ctx := context.Background()
-	const chainS1 = cciptypes.ChainSelector(1)
-	const chainD = cciptypes.ChainSelector(2)
+	ctx := testutils.Context(t)
 
 	cfg := evmtypes.ChainReaderConfig{
 		Contracts: map[string]evmtypes.ChainContractReader{
@@ -59,29 +63,11 @@ func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 
 	s := testSetup(ctx, t, chainD, chainD, nil, cfg)
 
-	headTracker := headtracker.NewSimulatedHeadTracker(s.cl, false, 0)
-	cr, err := evm.NewChainReaderService(ctx, lggr, s.lp, headTracker, s.cl, cfg)
-	assert.NoError(t, err)
-	err = cr.Bind(ctx, []types.BoundContract{
-		{
-			Address: s.contractAddr.String(),
-			Name:    consts.ContractNameOffRamp,
-		},
-	})
-	assert.NoError(t, err)
-	err = cr.Start(ctx)
-	assert.NoError(t, err)
-
-	contractReaders := map[cciptypes.ChainSelector]types.ContractReader{chainD: cr}
-	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
-	reader := ccipreaderpkg.NewCCIPReader(lggr, contractReaders, contractWriters, chainD)
-
 	tokenA := common.HexToAddress("123")
-
 	const numReports = 5
 
 	for i := uint8(0); i < numReports; i++ {
-		_, err = s.contract.EmitCommitReportAccepted(s.auth, ccip_reader_tester.EVM2EVMMultiOffRampCommitReport{
+		_, err := s.contract.EmitCommitReportAccepted(s.auth, ccip_reader_tester.EVM2EVMMultiOffRampCommitReport{
 			PriceUpdates: ccip_reader_tester.InternalPriceUpdates{
 				TokenPriceUpdates: []ccip_reader_tester.InternalTokenPriceUpdate{
 					{
@@ -112,8 +98,9 @@ func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 	}
 
 	var reports []plugintypes.CommitPluginReportWithMeta
+	var err error
 	require.Eventually(t, func() bool {
-		reports, err = reader.CommitReportsGTETimestamp(
+		reports, err = s.reader.CommitReportsGTETimestamp(
 			ctx,
 			chainD,
 			time.Unix(30, 0), // Skips first report, simulated backend report timestamps are [20, 30, 40, ...]
@@ -138,11 +125,7 @@ func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 }
 
 func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
-	lggr := logger.TestLogger(t)
-	ctx := context.Background()
-	const chainS1 = cciptypes.ChainSelector(1)
-	const chainD = cciptypes.ChainSelector(2)
-
+	ctx := testutils.Context(t)
 	cfg := evmtypes.ChainReaderConfig{
 		Contracts: map[string]evmtypes.ChainContractReader{
 			consts.ContractNameOffRamp: {
@@ -160,24 +143,9 @@ func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
 		},
 	}
 
-	s := testSetup(ctx, t, chainS1, chainD, nil, cfg)
+	s := testSetup(ctx, t, chainD, chainD, nil, cfg)
 
-	headTracker := headtracker.NewSimulatedHeadTracker(s.cl, false, 0)
-	cr, err := evm.NewChainReaderService(ctx, lggr, s.lp, headTracker, s.cl, cfg)
-	assert.NoError(t, err)
-	err = cr.Bind(ctx, []types.BoundContract{
-		{
-			Address: s.contractAddr.String(),
-			Name:    consts.ContractNameOffRamp,
-		},
-	})
-	assert.NoError(t, err)
-
-	contractReaders := map[cciptypes.ChainSelector]types.ContractReader{chainD: cr}
-	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
-	reader := ccipreaderpkg.NewCCIPReader(lggr, contractReaders, contractWriters, chainD)
-
-	_, err = s.contract.EmitExecutionStateChanged(
+	_, err := s.contract.EmitExecutionStateChanged(
 		s.auth,
 		uint64(chainS1),
 		14,
@@ -201,7 +169,7 @@ func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
 
 	var executedRanges []cciptypes.SeqNumRange
 	require.Eventually(t, func() bool {
-		executedRanges, err = reader.ExecutedMessageRanges(
+		executedRanges, err = s.reader.ExecutedMessageRanges(
 			ctx,
 			chainS1,
 			chainD,
@@ -219,10 +187,7 @@ func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
 }
 
 func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
-	lggr := logger.TestLogger(t)
-	ctx := context.Background()
-	const chainS1 = cciptypes.ChainSelector(1)
-	const chainD = cciptypes.ChainSelector(2)
+	ctx := testutils.Context(t)
 
 	cfg := evmtypes.ChainReaderConfig{
 		Contracts: map[string]evmtypes.ChainContractReader{
@@ -243,20 +208,7 @@ func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 
 	s := testSetup(ctx, t, chainS1, chainD, nil, cfg)
 
-	headTracker := headtracker.NewSimulatedHeadTracker(s.cl, false, 0)
-	cr, err := evm.NewChainReaderService(ctx, lggr, s.lp, headTracker, s.cl, cfg)
-	assert.NoError(t, err)
-	err = cr.Bind(ctx, []types.BoundContract{
-		{
-			Address: s.contractAddr.String(),
-			Name:    consts.ContractNameOnRamp,
-		},
-	})
-	assert.NoError(t, err)
-	err = cr.Start(ctx)
-	assert.NoError(t, err)
-
-	_, err = s.contract.EmitCCIPSendRequested(s.auth, uint64(chainD), ccip_reader_tester.InternalEVM2AnyRampMessage{
+	_, err := s.contract.EmitCCIPSendRequested(s.auth, uint64(chainD), ccip_reader_tester.InternalEVM2AnyRampMessage{
 		Header: ccip_reader_tester.InternalRampMessageHeader{
 			MessageId:           [32]byte{1, 0, 0, 0, 0},
 			SourceChainSelector: uint64(chainS1),
@@ -313,13 +265,7 @@ func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 }
 
 func TestCCIPReader_NextSeqNum(t *testing.T) {
-	lggr := logger.TestLogger(t)
-	ctx := context.Background()
-
-	const chainS1 = cciptypes.ChainSelector(1)
-	const chainS2 = cciptypes.ChainSelector(2)
-	const chainS3 = cciptypes.ChainSelector(3)
-	const chainD = cciptypes.ChainSelector(4)
+	ctx := testutils.Context(t)
 
 	onChainSeqNums := map[cciptypes.ChainSelector]cciptypes.SeqNum{
 		chainS1: 10,
@@ -342,19 +288,6 @@ func TestCCIPReader_NextSeqNum(t *testing.T) {
 	}
 
 	s := testSetup(ctx, t, chainD, chainD, onChainSeqNums, cfg)
-
-	headTracker := headtracker.NewSimulatedHeadTracker(s.cl, false, 0)
-	cr, err := evm.NewChainReaderService(ctx, lggr, s.lp, headTracker, s.cl, cfg)
-	assert.NoError(t, err)
-	err = cr.Bind(ctx, []types.BoundContract{
-		{
-			Address: s.contractAddr.String(),
-			Name:    consts.ContractNameOffRamp,
-		},
-	})
-	assert.NoError(t, err)
-	err = cr.Start(ctx)
-	assert.NoError(t, err)
 
 	seqNums, err := s.reader.NextSeqNum(ctx, []cciptypes.ChainSelector{chainS1, chainS2, chainS3})
 	assert.NoError(t, err)
