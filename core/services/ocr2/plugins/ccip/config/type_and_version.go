@@ -19,6 +19,7 @@ var (
 	EVM2EVMOffRamp ContractType = "EVM2EVMOffRamp"
 	CommitStore    ContractType = "CommitStore"
 	PriceRegistry  ContractType = "PriceRegistry"
+	Unknown        ContractType = "Unknown"
 	ContractTypes               = mapset.NewSet[ContractType](
 		EVM2EVMOffRamp,
 		EVM2EVMOnRamp,
@@ -26,6 +27,9 @@ var (
 		PriceRegistry,
 	)
 )
+
+// Version to use when TypeAndVersion is missing.
+const defaultVersion = "1.0"
 
 func VerifyTypeAndVersion(addr common.Address, client bind.ContractBackend, expectedType ContractType) (semver.Version, error) {
 	contractType, version, err := TypeAndVersion(addr, client)
@@ -64,6 +68,9 @@ func TypeAndVersion(addr common.Address, client bind.ContractBackend) (ContractT
 }
 
 func ParseTypeAndVersion(tvStr string) (string, string, error) {
+	if tvStr == "" {
+		tvStr = string(Unknown) + " " + defaultVersion
+	}
 	typeAndVersionValues := strings.Split(tvStr, " ")
 
 	if len(typeAndVersionValues) < 2 {
