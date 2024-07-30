@@ -3,6 +3,7 @@ package oraclecreator
 import (
 	"context"
 	"fmt"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/ccipevm"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -34,7 +35,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccipevm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"

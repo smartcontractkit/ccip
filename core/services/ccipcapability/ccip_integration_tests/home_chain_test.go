@@ -1,6 +1,7 @@
 package ccip_integration_tests
 
 import (
+	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/ccip_integration_tests/integrationhelpers"
 	"testing"
 	"time"
 
@@ -16,8 +17,6 @@ import (
 	capcfg "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip_integration_tests/integrationhelpers"
-
 	"github.com/stretchr/testify/require"
 )
 

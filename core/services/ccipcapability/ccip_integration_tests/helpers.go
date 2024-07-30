@@ -3,6 +3,7 @@ package ccip_integration_tests
 import (
 	"bytes"
 	"encoding/hex"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/ccip_integration_tests/integrationhelpers"
 	"math/big"
 	"sort"
 	"strconv"
@@ -30,8 +31,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/link_token"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip_integration_tests/integrationhelpers"
-
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 

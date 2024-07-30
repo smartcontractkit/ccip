@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	it "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/ccip_integration_tests/integrationhelpers"
 	"testing"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/types"
-	it "github.com/smartcontractkit/chainlink/v2/core/services/ocr3/plugins/ccip_integration_tests/integrationhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 )
 
