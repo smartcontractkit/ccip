@@ -195,6 +195,28 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	t.Log("Waiting for second batch of commit reports")
 	wg.Wait()
 	t.Logf("Second batch of commit reports received after %s", time.Since(tStart))
+
+	// ------------------- WAIT EXECUTION STATE CHANGES -------------------
+	// WARNING: This is some very dummy code that waits for the execution state changes, do not merge if test is passing.
+	for _, uni := range universes {
+		messageIDsForThisDest := make([][32]byte, 0)
+		for destChain, destMsgs := range messageIDs {
+			if destChain != uni.chainID {
+				continue
+			}
+			for _, msgID := range destMsgs {
+				messageIDsForThisDest = append(messageIDsForThisDest, msgID)
+			}
+		}
+		wg.Add(1)
+		go func(uni onchainUniverse, startBlock *uint64) {
+			defer wg.Done()
+			waitForExec(t, uni, startBlock, messageIDsForThisDest)
+		}(uni, nil)
+	}
+	tStart = time.Now()
+	t.Log("Waiting for execution state changes")
+	wg.Wait()
 }
 
 func sendPingPong(t *testing.T, universes map[uint64]onchainUniverse, pingPongs map[uint64]map[uint64]*ping_pong_demo.PingPongDemo, messageIDs map[uint64]map[uint64][32]byte, replayBlocks map[uint64]uint64, expectedSeqNum uint64) {
@@ -282,6 +304,27 @@ func waitForCommit(t *testing.T, uni onchainUniverse, numUnis int, startBlock *u
 			} else {
 				t.Logf("Received commit report without merkle roots on chain id %d (selector %d): %+v", uni.chainID, getSelector(uni.chainID), report)
 			}
+		}
+	}
+}
+
+// WARNING: This is some very dummy code that waits for the execution state changes (it panics!).
+func waitForExec(t *testing.T, uni onchainUniverse, startBlock *uint64, messageIDs [][32]byte) {
+	sink := make(chan *evm_2_evm_multi_offramp.EVM2EVMMultiOffRampExecutionStateChanged)
+	subscription, err := uni.offramp.WatchExecutionStateChanged(&bind.WatchOpts{
+		Start:   startBlock,
+		Context: testutils.Context(t),
+	}, sink, []uint64{uni.chainID}, []uint64{1, 2}, messageIDs)
+	require.NoError(t, err)
+
+	for {
+		select {
+		case <-time.After(5 * time.Second):
+			t.Logf("Waiting for exec state changes on chain id %d (selector %d)", uni.chainID, getSelector(uni.chainID))
+		case subErr := <-subscription.Err():
+			t.Fatalf("Subscription error: %+v", subErr)
+		case stateChange := <-sink:
+			panic(fmt.Errorf("got a state change: %#v", stateChange))
 		}
 	}
 }
