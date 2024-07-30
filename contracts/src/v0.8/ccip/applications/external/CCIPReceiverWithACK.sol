@@ -29,24 +29,27 @@ contract CCIPReceiverWithACK is CCIPReceiver {
 
   enum MessageType {
     OUTGOING, // Indicates that a message is being sent for the first time to its recipient.
-    ACK // Indicates that another message of type "OUTGOING" has already been received, and an acknowledgement is being returned to the original sender, by the original recipient.
+    ACK // Indicates that another message of type "OUTGOING" has already been received, and an acknowledgement is being
+      // returned to the original sender, by the original recipient.
 
   }
 
   enum MessageStatus {
     QUIET, // A message which has not been sent yet, the default status for any messageId
     SENT, // Indicates a message has been sent through CCIP but not yet received an ACK response from the recipient
-    ACKNOWLEDGED // The original SENT message was received and processed by the recipient, and confirmation of reception was received by this via the returned ACK message sent in response.
+    ACKNOWLEDGED // The original SENT message was received and processed by the recipient, and confirmation of
+      // reception was received by this via the returned ACK message sent in response.
 
   }
 
   struct MessagePayload {
-    bytes version; // An optional byte string which can be used to denote the ACK version formatting or how to decode the remaining arbitrary data.
+    bytes version; // An optional byte string which can be used to denote the ACK version formatting or how to decode remaining data.
     bytes data; // The Arbitrary data initially meant to be received by this contract and sent from the source chain.
-    MessageType messageType; // Denotes whether the incoming message is being received for the first time, or is an acknowledgement that the initial outgoing correspondence was successfully received.
+    MessageType messageType; // Denotes whether the incoming message is being received for the first time, or is an
+      // acknowledgement that the initial outgoing correspondence was successfully received.
   }
 
-  // The keccak256 hash of the string "MESSAGE_ACKNOWLEDGED_"
+  // keccak256("MESSAGE_ACKNOWLEDGED_)"
   bytes32 public constant ACK_MESSAGE_HEADER = 0x1c778f21871bcc06cfebd177c4d0360c2f3550962fb071f69ed007e4f55f23b2;
 
   // Current feeToken
@@ -123,7 +126,8 @@ contract CCIPReceiverWithACK is CCIPReceiver {
 
   /// @notice Sends the acknowledgement message back through CCIP to original sender contract
   function _sendAck(Client.Any2EVMMessage calldata incomingMessage) internal {
-    // Build the outgoing ACK message, with no tokens, with data being the concatenation of the acknowledgement header and incoming-messageId
+    // Build the outgoing ACK message, with no tokens, with data being the concatenation of the acknowledgement header
+    // and incoming-messageId
     Client.EVM2AnyMessage memory outgoingMessage = Client.EVM2AnyMessage({
       receiver: incomingMessage.sender,
       data: abi.encode(ACK_MESSAGE_HEADER, incomingMessage.messageId),
