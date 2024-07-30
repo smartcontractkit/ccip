@@ -34,6 +34,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		simulatedBackendBlockTime = 900 * time.Millisecond // Simulated backend blocks commiting interval
 		oraclesBootWaitTime       = 30 * time.Second       // Time to wait for oracles to come up (HACK)
 		fChain                    = 1                      // fChain value for all the chains
+		oracleLogLevel            = zapcore.InfoLevel      // Log level for the oracle / plugins.
 	)
 
 	t.Logf("creating %d universes", numChains)
@@ -57,7 +58,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 
 	for i := 0; i < numNodes; i++ {
 		t.Logf("Setting up ocr3 node:%d at port:%d", i, ports[i])
-		node := setupNodeOCR3(t, ports[i], bootstrappers, universes, homeChainUni, zapcore.InfoLevel)
+		node := setupNodeOCR3(t, ports[i], bootstrappers, universes, homeChainUni, oracleLogLevel)
 
 		for chainID, transmitter := range node.transmitters {
 			identity := confighelper2.OracleIdentityExtra{
