@@ -237,9 +237,6 @@ CertFile = ''
 TransmitQueueMaxSize = 10000
 TransmitTimeout = '5s'
 
-[HeadReport]
-TelemetryEnabled = false
-
 [Capabilities]
 [Capabilities.Peering]
 IncomingMessageBufferSize = 10
@@ -326,6 +323,8 @@ MaxBufferSize = 3
 SamplingInterval = '1s'
 MaxAllowedFinalityDepth = 10000
 FinalityTagBypass = true
+HeadTelemetryEnabled = false
+HeadTelemetryEnabled = false
 
 [EVM.NodePool]
 PollFailureThreshold = 5
@@ -425,6 +424,7 @@ MaxBufferSize = 3
 SamplingInterval = '1s'
 MaxAllowedFinalityDepth = 10000
 FinalityTagBypass = true
+HeadTelemetryEnabled = false
 
 [EVM.NodePool]
 PollFailureThreshold = 5

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
-	"github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -37,11 +36,10 @@ type (
 	}
 )
 
-func NewHeadReporterService(config config.HeadReport, ds sqlutil.DataSource, chainContainer legacyevm.LegacyChainContainer, lggr logger.Logger, monitoringEndpointGen telemetry.MonitoringEndpointGenerator, opts ...interface{}) *HeadReporterService {
-	reporters := make([]HeadReporter, 1, 2)
-	reporters[0] = NewPrometheusReporter(ds, chainContainer, lggr, opts)
-	if config.TelemetryEnabled() {
-		reporters = append(reporters, NewTelemetryReporter(chainContainer, lggr, monitoringEndpointGen))
+func NewHeadReporterService(ds sqlutil.DataSource, chainContainer legacyevm.LegacyChainContainer, lggr logger.Logger, monitoringEndpointGen telemetry.MonitoringEndpointGenerator, opts ...interface{}) *HeadReporterService {
+	reporters := []HeadReporter{
+		NewPrometheusReporter(ds, chainContainer, lggr, opts),
+		NewTelemetryReporter(chainContainer, lggr, monitoringEndpointGen),
 	}
 	return NewHeadReporterServiceWithReporters(ds, chainContainer, lggr, reporters, opts)
 }
@@ -73,8 +71,10 @@ func NewHeadReporterServiceWithReporters(ds sqlutil.DataSource, chainContainer l
 func (hrd *HeadReporterService) subscribe() {
 	hrd.unsubscribeFns = make([]func(), 0, hrd.chains.Len())
 	for _, chain := range hrd.chains.Slice() {
-		_, unsubscribe := chain.HeadBroadcaster().Subscribe(hrd)
-		hrd.unsubscribeFns = append(hrd.unsubscribeFns, unsubscribe)
+		if chain.Config().EVM().HeadTracker().HeadTelemetryEnabled() {
+			_, unsubscribe := chain.HeadBroadcaster().Subscribe(hrd)
+			hrd.unsubscribeFns = append(hrd.unsubscribeFns, unsubscribe)
+		}
 	}
 }
 
