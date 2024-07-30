@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -80,25 +81,25 @@ func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 	const numReports = 5
 
 	for i := uint8(0); i < numReports; i++ {
-		_, err = s.contract.EmitCommitReportAccepted(s.auth, ccip_reader_tester.CCIPReaderTesterCommitReport{
-			PriceUpdates: ccip_reader_tester.CCIPReaderTesterPriceUpdates{
-				TokenPriceUpdates: []ccip_reader_tester.CCIPReaderTesterTokenPriceUpdate{
+		_, err = s.contract.EmitCommitReportAccepted(s.auth, ccip_reader_tester.EVM2EVMMultiOffRampCommitReport{
+			PriceUpdates: ccip_reader_tester.InternalPriceUpdates{
+				TokenPriceUpdates: []ccip_reader_tester.InternalTokenPriceUpdate{
 					{
 						SourceToken: tokenA,
 						UsdPerToken: big.NewInt(1000),
 					},
 				},
-				GasPriceUpdates: []ccip_reader_tester.CCIPReaderTesterGasPriceUpdate{
+				GasPriceUpdates: []ccip_reader_tester.InternalGasPriceUpdate{
 					{
 						DestChainSelector: uint64(chainD),
 						UsdPerUnitGas:     big.NewInt(90),
 					},
 				},
 			},
-			MerkleRoots: []ccip_reader_tester.CCIPReaderTesterMerkleRoot{
+			MerkleRoots: []ccip_reader_tester.EVM2EVMMultiOffRampMerkleRoot{
 				{
 					SourceChainSelector: uint64(chainS1),
-					Interval: ccip_reader_tester.CCIPReaderTesterInterval{
+					Interval: ccip_reader_tester.EVM2EVMMultiOffRampInterval{
 						Min: 10,
 						Max: 20,
 					},
@@ -255,25 +256,37 @@ func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 	err = cr.Start(ctx)
 	assert.NoError(t, err)
 
-	_, err = s.contract.EmitCCIPSendRequested(s.auth, uint64(chainD), ccip_reader_tester.CCIPReaderTesterEVM2AnyRampMessage{
-		Header: ccip_reader_tester.CCIPReaderTesterRampMessageHeader{
+	_, err = s.contract.EmitCCIPSendRequested(s.auth, uint64(chainD), ccip_reader_tester.InternalEVM2AnyRampMessage{
+		Header: ccip_reader_tester.InternalRampMessageHeader{
 			MessageId:           [32]byte{1, 0, 0, 0, 0},
 			SourceChainSelector: uint64(chainS1),
 			DestChainSelector:   uint64(chainD),
 			SequenceNumber:      10,
 		},
-		Sender: common.Address{},
+		Sender:         utils.RandomAddress(),
+		Data:           make([]byte, 0),
+		Receiver:       utils.RandomAddress().Bytes(),
+		ExtraArgs:      make([]byte, 0),
+		FeeToken:       utils.RandomAddress(),
+		FeeTokenAmount: big.NewInt(0),
+		TokenAmounts:   make([]ccip_reader_tester.InternalRampTokenAmount, 0),
 	})
 	assert.NoError(t, err)
 
-	_, err = s.contract.EmitCCIPSendRequested(s.auth, uint64(chainD), ccip_reader_tester.CCIPReaderTesterEVM2AnyRampMessage{
-		Header: ccip_reader_tester.CCIPReaderTesterRampMessageHeader{
+	_, err = s.contract.EmitCCIPSendRequested(s.auth, uint64(chainD), ccip_reader_tester.InternalEVM2AnyRampMessage{
+		Header: ccip_reader_tester.InternalRampMessageHeader{
 			MessageId:           [32]byte{1, 0, 0, 0, 1},
 			SourceChainSelector: uint64(chainS1),
 			DestChainSelector:   uint64(chainD),
 			SequenceNumber:      15,
 		},
-		Sender: common.Address{},
+		Sender:         utils.RandomAddress(),
+		Data:           make([]byte, 0),
+		Receiver:       utils.RandomAddress().Bytes(),
+		ExtraArgs:      make([]byte, 0),
+		FeeToken:       utils.RandomAddress(),
+		FeeTokenAmount: big.NewInt(0),
+		TokenAmounts:   make([]ccip_reader_tester.InternalRampTokenAmount, 0),
 	})
 	assert.NoError(t, err)
 
@@ -397,7 +410,7 @@ func testSetup(ctx context.Context, t *testing.T, readerChain, destChain cciptyp
 	assert.NoError(t, lp.Start(ctx))
 
 	for sourceChain, seqNum := range onChainSeqNums {
-		_, err1 := contract.SetSourceChainConfig(auth, uint64(sourceChain), ccip_reader_tester.CCIPReaderTesterSourceChainConfig{
+		_, err1 := contract.SetSourceChainConfig(auth, uint64(sourceChain), ccip_reader_tester.EVM2EVMMultiOffRampSourceChainConfig{
 			IsEnabled: true,
 			MinSeqNr:  uint64(seqNum),
 		})
