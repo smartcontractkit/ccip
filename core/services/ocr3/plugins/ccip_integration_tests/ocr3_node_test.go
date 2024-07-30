@@ -33,7 +33,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		simulatedBackendBlockTime = 900 * time.Millisecond // Simulated backend blocks committing interval
 		oraclesBootWaitTime       = 30 * time.Second       // Time to wait for oracles to come up (HACK)
 		fChain                    = 1                      // fChain value for all the chains
-		oracleLogLevel            = zapcore.ErrorLevel     // Log level for the oracle / plugins.
+		oracleLogLevel            = zapcore.InfoLevel      // Log level for the oracle / plugins.
 	)
 
 	t.Logf("creating %d universes", numChains)
@@ -151,8 +151,6 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 
 	// Replay the log poller on all the chains so that the logs are in the db.
 	// otherwise the plugins won't pick them up.
-	// TODO: this is happening too early, we need to wait for the chain readers to get their config
-	// and register the LP filters before this has any effect.
 	for _, node := range nodes {
 		for chainID, replayBlock := range replayBlocks {
 			t.Logf("Replaying logs for chain %d from block %d", chainID, replayBlock)
