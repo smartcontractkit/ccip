@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
+	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
+	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 	"io"
 	"math/big"
 	"math/rand"
@@ -315,6 +318,31 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 
 	if auditLogger == nil {
 		auditLogger = audit.NoopLogger
+	}
+
+	var capabilitiesRegistry *capabilities.Registry
+	capabilitiesRegistry = capabilities.NewRegistry(lggr)
+	for _, dep := range flagsAndDeps {
+		registry, _ := dep.(*capabilities.Registry)
+		if registry != nil {
+			capabilitiesRegistry = registry
+		}
+	}
+
+	var dispatcher remotetypes.Dispatcher
+	for _, dep := range flagsAndDeps {
+		dispatcher, _ = dep.(remotetypes.Dispatcher)
+		if dispatcher != nil {
+			break
+		}
+	}
+
+	var peerWrapper p2ptypes.PeerWrapper
+	for _, dep := range flagsAndDeps {
+		peerWrapper, _ = dep.(p2ptypes.PeerWrapper)
+		if peerWrapper != nil {
+			break
+		}
 	}
 
 	url := cfg.Database().URL()
