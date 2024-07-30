@@ -29,7 +29,7 @@ var (
 )
 
 // Version to use when TypeAndVersion is missing.
-const defaultVersion = "1.0"
+const defaultVersion = "1.0.0"
 
 func VerifyTypeAndVersion(addr common.Address, client bind.ContractBackend, expectedType ContractType) (semver.Version, error) {
 	contractType, version, err := TypeAndVersion(addr, client)
