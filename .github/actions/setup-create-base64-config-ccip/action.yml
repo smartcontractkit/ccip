@@ -147,6 +147,7 @@ runs:
         
           "
         done
+        echo $wallet_key_from_secret
         
         grafana_bearer_token=""
         if [ -n "$GRAFANA_BEARER_TOKEN" ]; then

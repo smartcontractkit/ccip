@@ -180,7 +180,7 @@ jobs:
           logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
           grafanaUrl: ${{ vars.GRAFANA_URL }}
           grafanaDashboardUrl: "/d/6vjVx-1V8/ccip-long-running-tests"
-          walletKey: ${{ secrets.QA_EVM_KEYS }}
+          walletKey: ${{ secrets.SampleWalletKey }}
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@5dd916d08c03cb5f9a97304f4f174820421bb946 # v2.3.11
         env:
