@@ -18,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -55,7 +56,7 @@ func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 		},
 	}
 
-	s := testSetup(t, ctx, chainD, chainD, nil, cfg)
+	s := testSetup(ctx, t, chainD, chainD, nil, cfg)
 
 	headTracker := headtracker.NewSimulatedHeadTracker(s.cl, false, 0)
 	cr, err := evm.NewChainReaderService(ctx, lggr, s.lp, headTracker, s.cl, cfg)
@@ -158,7 +159,7 @@ func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
 		},
 	}
 
-	s := testSetup(t, ctx, chainS1, chainD, nil, cfg)
+	s := testSetup(ctx, t, chainS1, chainD, nil, cfg)
 
 	headTracker := headtracker.NewSimulatedHeadTracker(s.cl, false, 0)
 	cr, err := evm.NewChainReaderService(ctx, lggr, s.lp, headTracker, s.cl, cfg)
@@ -239,7 +240,7 @@ func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 		},
 	}
 
-	s := testSetup(t, ctx, chainS1, chainD, nil, cfg)
+	s := testSetup(ctx, t, chainS1, chainD, nil, cfg)
 
 	headTracker := headtracker.NewSimulatedHeadTracker(s.cl, false, 0)
 	cr, err := evm.NewChainReaderService(ctx, lggr, s.lp, headTracker, s.cl, cfg)
@@ -327,7 +328,7 @@ func TestCCIPReader_NextSeqNum(t *testing.T) {
 		},
 	}
 
-	s := testSetup(t, ctx, chainD, chainD, onChainSeqNums, cfg)
+	s := testSetup(ctx, t, chainD, chainD, onChainSeqNums, cfg)
 
 	headTracker := headtracker.NewSimulatedHeadTracker(s.cl, false, 0)
 	cr, err := evm.NewChainReaderService(ctx, lggr, s.lp, headTracker, s.cl, cfg)
@@ -350,7 +351,7 @@ func TestCCIPReader_NextSeqNum(t *testing.T) {
 	assert.Equal(t, cciptypes.SeqNum(30), seqNums[2])
 }
 
-func testSetup(t *testing.T, ctx context.Context, readerChain, destChain cciptypes.ChainSelector, onChainSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum, cfg evmtypes.ChainReaderConfig) *testSetupData {
+func testSetup(ctx context.Context, t *testing.T, readerChain, destChain cciptypes.ChainSelector, onChainSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum, cfg evmtypes.ChainReaderConfig) *testSetupData {
 	const chainID = 1337
 
 	// Generate a new key pair for the simulated account
@@ -396,14 +397,14 @@ func testSetup(t *testing.T, ctx context.Context, readerChain, destChain cciptyp
 	assert.NoError(t, lp.Start(ctx))
 
 	for sourceChain, seqNum := range onChainSeqNums {
-		_, err := contract.SetSourceChainConfig(auth, uint64(sourceChain), ccip_reader_tester.CCIPReaderTesterSourceChainConfig{
+		_, err1 := contract.SetSourceChainConfig(auth, uint64(sourceChain), ccip_reader_tester.CCIPReaderTesterSourceChainConfig{
 			IsEnabled: true,
 			MinSeqNr:  uint64(seqNum),
 		})
-		assert.NoError(t, err)
+		assert.NoError(t, err1)
 		simulatedBackend.Commit()
-		scc, err := contract.GetSourceChainConfig(&bind.CallOpts{Context: ctx}, uint64(sourceChain))
-		assert.NoError(t, err)
+		scc, err1 := contract.GetSourceChainConfig(&bind.CallOpts{Context: ctx}, uint64(sourceChain))
+		assert.NoError(t, err1)
 		assert.Equal(t, seqNum, cciptypes.SeqNum(scc.MinSeqNr))
 	}
 
