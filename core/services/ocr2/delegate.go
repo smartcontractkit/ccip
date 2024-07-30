@@ -328,18 +328,18 @@ func (d *Delegate) cleanupEVM(ctx context.Context, jb job.Job, relayID types.Rel
 			return err
 		}
 
-		dstProvider, err := d.ccipCommitGetDstProvider(ctx, jb, pluginJobSpecConfig, transmitterID)
-		if err != nil {
+		dstProvider, err2 := d.ccipCommitGetDstProvider(ctx, jb, pluginJobSpecConfig, transmitterID)
+		if err2 != nil {
 			return err
 		}
 
-		srcProvider, _, err := d.ccipCommitGetSrcProvider(ctx, jb, pluginJobSpecConfig, transmitterID, dstProvider)
-		if err != nil {
+		srcProvider, _, err2 := d.ccipCommitGetSrcProvider(ctx, jb, pluginJobSpecConfig, transmitterID, dstProvider)
+		if err2 != nil {
 			return err
 		}
-		err = ccipcommit.UnregisterCommitPluginLpFilters(srcProvider, dstProvider)
-		if err != nil {
-			d.lggr.Errorw("failed to unregister ccip commit plugin filters", "err", err, "spec", spec)
+		err2 = ccipcommit.UnregisterCommitPluginLpFilters(srcProvider, dstProvider)
+		if err2 != nil {
+			d.lggr.Errorw("failed to unregister ccip commit plugin filters", "err", err2, "spec", spec)
 		}
 		return nil
 	case types.CCIPExecution:
@@ -351,18 +351,18 @@ func (d *Delegate) cleanupEVM(ctx context.Context, jb job.Job, relayID types.Rel
 			return err
 		}
 
-		dstProvider, err := d.ccipExecGetDstProvider(ctx, jb, pluginJobSpecConfig, transmitterID)
-		if err != nil {
+		dstProvider, err2 := d.ccipExecGetDstProvider(ctx, jb, pluginJobSpecConfig, transmitterID)
+		if err2 != nil {
 			return err
 		}
 
-		srcProvider, _, err := d.ccipExecGetSrcProvider(ctx, jb, pluginJobSpecConfig, transmitterID, dstProvider)
-		if err != nil {
+		srcProvider, _, err2 := d.ccipExecGetSrcProvider(ctx, jb, pluginJobSpecConfig, transmitterID, dstProvider)
+		if err2 != nil {
 			return err
 		}
-		err = ccipexec.UnregisterExecPluginLpFilters(srcProvider, dstProvider)
-		if err != nil {
-			d.lggr.Errorw("failed to unregister ccip exec plugin filters", "err", err, "spec", spec)
+		err2 = ccipexec.UnregisterExecPluginLpFilters(srcProvider, dstProvider)
+		if err2 != nil {
+			d.lggr.Errorw("failed to unregister ccip exec plugin filters", "err", err2, "spec", spec)
 		}
 		return nil
 	default:
