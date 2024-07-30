@@ -136,11 +136,15 @@ runs:
           fi
         fi
 
-        wallet_key_from_secret="[CCIP.Env.Network.WalletKeys]"
+        wallet_key_from_secret="
+        [CCIP.Env.Network.WalletKeys]
+        
+        "
         
         for i in "${!networks_array[@]}"; do
           wallet_key_from_secret += "
-          ${networks_array[i]} = [$wallet_key]
+          ${networks_array[i]} = [\'$wallet_key\']
+        
           "
         done
         
