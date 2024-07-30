@@ -373,6 +373,12 @@ func testSetup(ctx context.Context, t *testing.T, readerChain, destChain cciptyp
 	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
 	reader := ccipreaderpkg.NewCCIPReader(lggr, contractReaders, contractWriters, destChain)
 
+	t.Cleanup(func() {
+		require.NoError(t, cr.Close())
+		require.NoError(t, lp.Close())
+		require.NoError(t, db.Close())
+	})
+
 	return &testSetupData{
 		contractAddr: address,
 		contract:     contract,
