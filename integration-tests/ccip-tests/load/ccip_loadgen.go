@@ -268,8 +268,8 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	}
 
 	// the msg is no longer needed, so we can clear it to avoid holding extra data during load
-	// nolint:SA4006
 	msg = router.ClientEVM2AnyMessage{}
+	lggr.Debug().Interface("msg", msg).Msg("msg cleared")
 
 	txConfirmationTime := time.Now().UTC()
 	lggr = lggr.With().Str("Msg Tx", sendTx.Hash().String()).Logger()
