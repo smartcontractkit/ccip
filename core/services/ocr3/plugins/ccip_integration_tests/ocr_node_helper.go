@@ -42,8 +42,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
 
-	"github.com/smartcontractkit/libocr/commontypes"
-
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 )
@@ -61,7 +59,6 @@ type ocr3Node struct {
 func setupNodeOCR3(
 	t *testing.T,
 	port int,
-	p2pV2Bootstrappers []commontypes.BootstrapperLocator,
 	universes map[uint64]onchainUniverse,
 	homeChainUniverse homeChain,
 	logLevel zapcore.Level,
@@ -77,9 +74,6 @@ func setupNodeOCR3(
 		c.P2P.V2.DeltaDial = config.MustNewDuration(500 * time.Millisecond)
 		c.P2P.V2.DeltaReconcile = config.MustNewDuration(5 * time.Second)
 		c.P2P.V2.ListenAddresses = &[]string{fmt.Sprintf("127.0.0.1:%d", port)}
-		if len(p2pV2Bootstrappers) > 0 {
-			c.P2P.V2.DefaultBootstrappers = &p2pV2Bootstrappers
-		}
 
 		// Enable Capabilities, This is a pre-requisite for registrySyncer to work.
 		c.Capabilities.ExternalRegistry.NetworkID = ptr(relay.NetworkEVM)

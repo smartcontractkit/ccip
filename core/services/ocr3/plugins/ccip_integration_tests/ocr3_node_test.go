@@ -19,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 
-	"github.com/smartcontractkit/libocr/commontypes"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -31,10 +30,10 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		numChains = 3 // number of chains that this test will run on
 		numNodes  = 4 // number of OCR3 nodes, test assumes that every node supports every chain
 
-		simulatedBackendBlockTime = 900 * time.Millisecond // Simulated backend blocks commiting interval
+		simulatedBackendBlockTime = 900 * time.Millisecond // Simulated backend blocks committing interval
 		oraclesBootWaitTime       = 30 * time.Second       // Time to wait for oracles to come up (HACK)
 		fChain                    = 1                      // fChain value for all the chains
-		oracleLogLevel            = zapcore.InfoLevel      // Log level for the oracle / plugins.
+		oracleLogLevel            = zapcore.ErrorLevel     // Log level for the oracle / plugins.
 	)
 
 	t.Logf("creating %d universes", numChains)
@@ -49,7 +48,6 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		// The bootstrap node will be: nodes[0]
 		bootstrapPort  int
 		bootstrapP2PID p2pkey.PeerID
-		bootstrappers  []commontypes.BootstrapperLocator
 	)
 
 	ports := freeport.GetN(t, numNodes)
@@ -58,7 +56,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 
 	for i := 0; i < numNodes; i++ {
 		t.Logf("Setting up ocr3 node:%d at port:%d", i, ports[i])
-		node := setupNodeOCR3(t, ports[i], bootstrappers, universes, homeChainUni, oracleLogLevel)
+		node := setupNodeOCR3(t, ports[i], universes, homeChainUni, oracleLogLevel)
 
 		for chainID, transmitter := range node.transmitters {
 			identity := confighelper2.OracleIdentityExtra{
@@ -84,9 +82,6 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	bootstrapPort = ports[0]
 	bootstrapP2PID = p2pIDs[0]
 	bootstrapAddr := fmt.Sprintf("127.0.0.1:%d", bootstrapPort)
-	bootstrappers = []commontypes.BootstrapperLocator{
-		{PeerID: nodes[0].peerID, Addrs: []string{bootstrapAddr}},
-	}
 	t.Logf("[bootstrap node] peerID:%s p2pID:%d address:%s", nodes[0].peerID, bootstrapP2PID, bootstrapAddr)
 
 	// Start committing periodically in the background for all the chains
