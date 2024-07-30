@@ -25,7 +25,7 @@ contract CCIPReaderTester {
     s_sourceChainConfigs[sourceChainSelector] = sourceChainConfig;
   }
 
-  function EmitCCIPSendRequested(uint64 destChainSelector, Internal.EVM2AnyRampMessage memory message) external {
+  function emitCCIPSendRequested(uint64 destChainSelector, Internal.EVM2AnyRampMessage memory message) external {
     emit CCIPSendRequested(destChainSelector, message);
   }
 
@@ -37,7 +37,7 @@ contract CCIPReaderTester {
     bytes returnData
   );
 
-  function EmitExecutionStateChanged(
+  function emitExecutionStateChanged(
     uint64 sourceChainSelector,
     uint64 sequenceNumber,
     bytes32 messageId,
@@ -49,7 +49,7 @@ contract CCIPReaderTester {
 
   event CommitReportAccepted(EVM2EVMMultiOffRamp.CommitReport report);
 
-  function EmitCommitReportAccepted(EVM2EVMMultiOffRamp.CommitReport memory report) external {
+  function emitCommitReportAccepted(EVM2EVMMultiOffRamp.CommitReport memory report) external {
     emit CommitReportAccepted(report);
   }
 }
