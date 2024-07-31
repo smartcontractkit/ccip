@@ -33,7 +33,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		simulatedBackendBlockTime = 900 * time.Millisecond // Simulated backend blocks committing interval
 		oraclesBootWaitTime       = 30 * time.Second       // Time to wait for oracles to come up (HACK)
 		fChain                    = 1                      // fChain value for all the chains
-		oracleLogLevel            = zapcore.WarnLevel      // Log level for the oracle / plugins.
+		oracleLogLevel            = zapcore.InfoLevel      // Log level for the oracle / plugins.
 	)
 
 	t.Logf("creating %d universes", numChains)
@@ -198,21 +198,17 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 
 	// ------------------- WAIT EXECUTION STATE CHANGES -------------------
 	// WARNING: This is some very dummy code that waits for the execution state changes, do not merge if test is passing.
+
+	allChains := make([]uint64, 0)
+	for uni := range universes {
+		allChains = append(allChains, uni)
+	}
 	for _, uni := range universes {
-		messageIDsForThisDest := make([][32]byte, 0)
-		for destChain, destMsgs := range messageIDs {
-			if destChain != uni.chainID {
-				continue
-			}
-			for _, msgID := range destMsgs {
-				messageIDsForThisDest = append(messageIDsForThisDest, msgID)
-			}
-		}
 		wg.Add(1)
-		go func(uni onchainUniverse, startBlock *uint64) {
+		go func(uni onchainUniverse) {
 			defer wg.Done()
-			waitForExec(t, uni, startBlock, messageIDsForThisDest)
-		}(uni, nil)
+			waitForExec(t, uni, allChains)
+		}(uni)
 	}
 	tStart = time.Now()
 	t.Log("Waiting for execution state changes")
@@ -310,22 +306,25 @@ func waitForCommit(t *testing.T, uni onchainUniverse, numUnis int, startBlock *u
 }
 
 // WARNING: This is some very dummy code that waits for the execution state changes (it panics!).
-func waitForExec(t *testing.T, uni onchainUniverse, startBlock *uint64, messageIDs [][32]byte) {
-	sink := make(chan *evm_2_evm_multi_offramp.EVM2EVMMultiOffRampExecutionStateChanged)
-	subscription, err := uni.offramp.WatchExecutionStateChanged(&bind.WatchOpts{
-		Start:   startBlock,
-		Context: testutils.Context(t),
-	}, sink, []uint64{uni.chainID}, []uint64{1, 2}, messageIDs)
-	require.NoError(t, err)
+func waitForExec(t *testing.T, uni onchainUniverse, sourceChains []uint64) {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {
-		case <-time.After(5 * time.Second):
-			t.Logf("Waiting for exec state changes on chain id %d (selector %d)", uni.chainID, getSelector(uni.chainID))
-		case subErr := <-subscription.Err():
-			t.Fatalf("Subscription error: %+v", subErr)
-		case stateChange := <-sink:
-			panic(fmt.Errorf("got a state change: %#v", stateChange))
+		case <-ticker.C:
+			for _, sourceChain := range sourceChains {
+				if sourceChain == uni.chainID {
+					continue
+				}
+				srcChainCfg, err := uni.offramp.GetSourceChainConfig(&bind.CallOpts{}, sourceChain)
+				require.NoError(t, err)
+				t.Logf("[WAIT FOR EXEC] %d->%d: %d", sourceChain, uni.chainID, srcChainCfg.MinSeqNr)
+
+				if srcChainCfg.MinSeqNr > 0 {
+					panic(fmt.Errorf("good news we have execution state changes"))
+				}
+			}
 		}
 	}
 }
