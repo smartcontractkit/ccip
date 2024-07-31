@@ -48,8 +48,8 @@ contract PriceRegistry is
   /// @notice The struct representing the received CCIP feed report from keystone IReceiver.onReport()
   struct ReceivedCCIPFeedReport {
     address token; // Token address
-    uint224 price;// ─────────╮ Price of the token in USD with 18 decimals
-    uint32 timestamp;// ──────╯ Timestamp of the price update
+    uint224 price; // ─────────╮ Price of the token in USD with 18 decimals
+    uint32 timestamp; // ──────╯ Timestamp of the price update
   }
 
   error TokenNotSupported(address token);
