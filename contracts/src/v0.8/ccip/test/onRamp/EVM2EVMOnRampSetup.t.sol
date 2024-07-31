@@ -157,7 +157,6 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       maxPerMsgGasLimit: MAX_GAS_LIMIT,
       defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
       defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
-      defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
       enforceOutOfOrder: false
     });
   }
@@ -236,7 +235,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(s_sourcePoolByToken[message.tokenAmounts[i].token]),
           destTokenAddress: abi.encode(s_destTokenBySourceToken[message.tokenAmounts[i].token]),
-          extraData: ""
+          extraData: "",
+          destGasAmount: DEST_TOKEN_GAS
         })
       );
     }

@@ -23,6 +23,7 @@ contract USDCTokenPoolSetup is BaseTest {
   IBurnMintERC20 internal s_token;
   MockUSDCTokenMessenger internal s_mockUSDC;
   MockE2EUSDCTransmitter internal s_mockUSDCTransmitter;
+  uint32 internal constant USDC_DEST_TOKEN_GAS = 150_000;
 
   struct USDCMessage {
     uint32 version;
@@ -345,7 +346,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
         USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
-        )
+        ),
+      destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
     bytes memory offchainTokenData =
@@ -390,7 +392,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain}))
+      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain})),
+      destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
     // The mocked receiver does not release the token to the pool, so we manually do it here
@@ -442,7 +445,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
         USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
-        )
+        ),
+      destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
     bytes memory offchainTokenData = abi.encode(
@@ -474,7 +478,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER}))
+      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
+      destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
     bytes memory offchainTokenData =

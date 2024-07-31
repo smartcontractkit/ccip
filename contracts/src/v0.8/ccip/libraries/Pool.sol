@@ -14,7 +14,7 @@ library Pool {
   // The default max number of bytes in the return data for a pool v1 lockOrBurn call.
   // This data can be used to send information to the destination chain token pool. Can be overwritten
   // in the TokenTransferFeeConfig.destBytesOverhead if more data is required.
-  uint256 public constant CCIP_LOCK_OR_BURN_V1_RET_BYTES = 32;
+  uint32 public constant CCIP_LOCK_OR_BURN_V1_RET_BYTES = 32;
 
   struct LockOrBurnInV1 {
     bytes receiver; //  The recipient of the tokens on the destination chain, abi encoded

@@ -96,8 +96,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
     uint16 defaultTokenFeeUSDCents; // ──────────╮ Default token fee charged per token transfer
     uint32 defaultTokenDestGasOverhead; //       │ Default gas charged to execute the token transfer on the destination chain
-    //                                           │ Default data availability bytes that are returned from the source pool and sent
-    uint32 defaultTokenDestBytesOverhead; //     | to the destination pool. Must be >= Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
     bool enforceOutOfOrder; // ──────────────────╯ Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
   }
 
@@ -362,10 +360,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the
       // extraData. This prevents gas bomb attacks on the NOPs. As destBytesOverhead accounts for both
       // extraData and offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
-      if (poolReturnData.destPoolData.length > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
-        if (poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead) {
-          revert SourceTokenDataTooLarge(tokenAndAmount.token);
-        }
+      uint32 allowedTokenDestGasAmount = s_tokenTransferFeeConfig[tokenAndAmount.token].isEnabled
+        ? s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead
+        : Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES;
+
+      if (poolReturnData.destPoolData.length > allowedTokenDestGasAmount) {
+        revert SourceTokenDataTooLarge(tokenAndAmount.token);
       }
       // We validate the token address to ensure it is a valid EVM address
       Internal._validateEVMAddress(poolReturnData.destTokenAddress);
@@ -374,7 +374,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(sourcePool),
           destTokenAddress: poolReturnData.destTokenAddress,
-          extraData: poolReturnData.destPoolData
+          extraData: poolReturnData.destPoolData,
+          destGasAmount: 50_000
         })
       );
     }
@@ -468,10 +469,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
     // We permit router to be set to zero as a way to pause the contract.
     if (dynamicConfig.priceRegistry == address(0)) revert InvalidConfig();
-    if (dynamicConfig.defaultTokenDestBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
-      revert InvalidDestBytesOverhead(address(0), dynamicConfig.defaultTokenDestBytesOverhead);
-    }
-
     s_dynamicConfig = dynamicConfig;
 
     emit ConfigSet(
@@ -639,7 +636,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       if (!transferFeeConfig.isEnabled) {
         tokenTransferFeeUSDWei += uint256(s_dynamicConfig.defaultTokenFeeUSDCents) * 1e16;
         tokenTransferGas += s_dynamicConfig.defaultTokenDestGasOverhead;
-        tokenTransferBytesOverhead += s_dynamicConfig.defaultTokenDestBytesOverhead;
+        tokenTransferBytesOverhead += Pool.CCIP_POOL_V1_RET_BYTES;
         continue;
       }
 

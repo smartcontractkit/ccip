@@ -170,7 +170,8 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(s_sourcePoolByToken[tokenAmounts[i].token]),
           destTokenAddress: abi.encode(s_destTokenBySourceToken[tokenAmounts[i].token]),
-          extraData: ""
+          extraData: "",
+          destGasAmount: DEST_TOKEN_GAS
         })
       );
     }
@@ -255,7 +256,8 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(s_sourcePoolByToken[srcTokenAmounts[i].token]),
           destTokenAddress: abi.encode(s_destTokenBySourceToken[srcTokenAmounts[i].token]),
-          extraData: ""
+          extraData: "",
+          destGasAmount: DEST_TOKEN_GAS
         })
       );
     }
