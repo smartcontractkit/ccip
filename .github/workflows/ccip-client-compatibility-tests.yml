@@ -292,6 +292,7 @@ jobs:
           git_commit_sha: ${{ needs.select-versions.outputs.chainlink_version }}
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
+          check_image_exists: 'true'
 
   get-latest-available-images:
     name: Get Latest EVM Implementation's Images
