@@ -339,7 +339,6 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
         maxPerMsgGasLimit: dynamicConfig.maxPerMsgGasLimit,
         defaultTokenFeeUSDCents: dynamicConfig.defaultTokenFeeUSDCents,
         defaultTokenDestGasOverhead: dynamicConfig.defaultTokenDestGasOverhead,
-        defaultTokenDestBytesOverhead: dynamicConfig.defaultTokenDestBytesOverhead,
         enforceOutOfOrder: enforce
       })
     );
@@ -806,7 +805,6 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
         maxPerMsgGasLimit: dynamicConfig.maxPerMsgGasLimit,
         defaultTokenFeeUSDCents: dynamicConfig.defaultTokenFeeUSDCents,
         defaultTokenDestGasOverhead: dynamicConfig.defaultTokenDestGasOverhead,
-        defaultTokenDestBytesOverhead: dynamicConfig.defaultTokenDestBytesOverhead,
         enforceOutOfOrder: true
       })
     );
@@ -1926,7 +1924,6 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       maxPerMsgGasLimit: MAX_GAS_LIMIT / 2,
       defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
       defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
-      defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
       enforceOutOfOrder: false
     });
 
@@ -1961,7 +1958,6 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       maxPerMsgGasLimit: MAX_GAS_LIMIT / 2,
       defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
       defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
-      defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
       enforceOutOfOrder: false
     });
 
