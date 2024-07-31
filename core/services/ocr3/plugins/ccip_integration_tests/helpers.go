@@ -48,7 +48,9 @@ const (
 	CapabilityLabelledName = "ccip"
 	CapabilityVersion      = "v1.0.0"
 	NodeOperatorID         = 1
-	FirstBlockAge          = 24 * time.Hour
+	// TODO: this is 8 hours now to match what is hardcoded in the exec plugin.
+	// Eventually this should drive what is set in the exec plugin.
+	FirstBlockAge = 8 * time.Hour
 )
 
 func e18Mult(amount uint64) *big.Int {
@@ -221,13 +223,18 @@ func createChains(t *testing.T, numChains int) map[uint64]chainBase {
 	chains := make(map[uint64]chainBase)
 
 	homeChainOwner := testutils.MustNewSimTransactor(t)
+	homeChainBackend := backends.NewSimulatedBackend(core.GenesisAlloc{
+		homeChainOwner.From: core.GenesisAccount{
+			Balance: assets.Ether(10_000).ToInt(),
+		},
+	}, 30e6)
+	tweakChainTimestamp(t, homeChainBackend, FirstBlockAge)
+	t.Logf("block timestamp after tweaking for chain %d is %s",
+		homeChainID, time.Unix(int64(homeChainBackend.Blockchain().CurrentHeader().Time), 0))
+
 	chains[homeChainID] = chainBase{
-		owner: homeChainOwner,
-		backend: backends.NewSimulatedBackend(core.GenesisAlloc{
-			homeChainOwner.From: core.GenesisAccount{
-				Balance: assets.Ether(10_000).ToInt(),
-			},
-		}, 30e6),
+		owner:   homeChainOwner,
+		backend: homeChainBackend,
 	}
 
 	for chainID := chainsel.TEST_90000001.EvmChainID; len(chains) < numChains && chainID < chainsel.TEST_90000020.EvmChainID; chainID++ {
@@ -239,6 +246,9 @@ func createChains(t *testing.T, numChains int) map[uint64]chainBase {
 		}, 30e6)
 
 		tweakChainTimestamp(t, backend, FirstBlockAge)
+
+		t.Logf("block timestamp after tweaking for chain %d is %s",
+			chainID, time.Unix(int64(backend.Blockchain().CurrentHeader().Time), 0))
 
 		chains[chainID] = chainBase{
 			owner:   owner,
@@ -253,11 +263,14 @@ func createChains(t *testing.T, numChains int) map[uint64]chainBase {
 // This trick is used to move the clock closer to the current time. We set first block to be X hours ago.
 // Tests create plenty of transactions so this number can't be too low, every new block mined will tick the clock,
 // if you mine more than "X hours" transactions, SimulatedBackend will panic because generated timestamps will be in the future.
-// IMPORTANT: Any adjustments to FirstBlockAge will automatically update PermissionLessExecutionThresholdSeconds in tests
 func tweakChainTimestamp(t *testing.T, backend *backends.SimulatedBackend, tweak time.Duration) {
-	blockTime := time.UnixMilli(int64(backend.Blockchain().CurrentHeader().Time))
-	err := backend.AdjustTime(time.Since(blockTime) - tweak)
+	blockTime := time.Unix(int64(backend.Blockchain().CurrentHeader().Time), 0)
+	sinceBlockTime := time.Since(blockTime)
+	diff := sinceBlockTime - tweak
+	t.Logf("block timestamp before tweaking is %s, sinceBlocktime %s, diff %s", blockTime, sinceBlockTime, diff)
+	err := backend.AdjustTime(diff)
 	require.NoError(t, err, "unable to adjust time on simulated chain")
+	backend.Commit()
 	backend.Commit()
 }
 
