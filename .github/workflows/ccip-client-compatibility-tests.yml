@@ -290,9 +290,9 @@ jobs:
           tag_suffix: ""
           dockerfile: core/chainlink.Dockerfile
           git_commit_sha: ${{ needs.select-versions.outputs.chainlink_version }}
+          check_image_exists: 'true'
           AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          check_image_exists: 'true'
 
   get-latest-available-images:
     name: Get Latest EVM Implementation's Images
@@ -739,3 +739,4 @@ jobs:
           slack_channel_id: ${{ secrets.QA_CCIP_SLACK_CHANNEL }}
           slack_bot_token: ${{ secrets.QA_SLACK_API_KEY }}
           slack_thread_ts: ${{ needs.start-slack-thread.outputs.thread_ts }}
+          base64_parsed_results: ${{ steps.get-product-results.outputs.base64_result }}
