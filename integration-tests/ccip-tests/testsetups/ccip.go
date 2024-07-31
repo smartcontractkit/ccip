@@ -3,6 +3,7 @@ package testsetups
 import (
 	"context"
 	"fmt"
+	ch "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/chaos"
 	"math/big"
 	"math/rand"
 	"os"
@@ -1087,6 +1088,37 @@ func CCIPDefaultTestSetUp(
 	}
 	lggr.Info().Msg("Test setup completed")
 	return setUpArgs
+}
+
+// SetupReorgSuite defines the setup required to perform re-org step
+func SetupReorgSuite(t *testing.T, setupOutput *CCIPTestSetUpOutputs, testCfg *CCIPTestConfig) *ch.ReorgSuite {
+	var finalitySrc uint64
+	var finalityDst uint64
+	if setupOutput.Cfg.SelectedNetworks[0].FinalityTag {
+		finalitySrc = 10
+	} else {
+		finalitySrc = setupOutput.Cfg.SelectedNetworks[0].FinalityDepth
+	}
+	if setupOutput.Cfg.SelectedNetworks[1].FinalityTag {
+		finalityDst = 10
+	} else {
+		finalityDst = setupOutput.Cfg.SelectedNetworks[1].FinalityDepth
+	}
+	rs, err := ch.NewReorgSuite(t, &ch.ReorgConfig{
+		SrcGethHTTPURL:     setupOutput.Env.K8Env.URLs["source-chain_http"][0], // setupOutput.Env.LocalCluster.EVMNetworks[0].URL, //K8Env.URLs["source-chain_http"][0],
+		DstGethHTTPURL:     setupOutput.Env.K8Env.URLs["dest-chain_http"][0],   //setupOutput.Env.LocalCluster.EVMNetworks[1].URL,
+		SrcFinalityDepth:   finalitySrc,
+		DstFinalityDepth:   finalityDst,
+		FinalityDelta:      setupOutput.Cfg.TestGroupInput.ChaosReorgProfile.FinalityDelta,
+		ExperimentDuration: setupOutput.Cfg.TestGroupInput.ChaosReorgProfile.Duration.Duration(),
+		GrafanaConfig: &ch.GrafanaConfig{
+			GrafanaURL:   *testCfg.EnvInput.Logging.Grafana.BaseUrl,
+			GrafanaToken: *testCfg.EnvInput.Logging.Grafana.BearerToken,
+			DashboardURL: *testCfg.EnvInput.Logging.Grafana.DashboardUrl,
+		},
+	})
+	require.NoError(t, err)
+	return rs
 }
 
 // CreateEnvironment creates the environment for the test and registers the test clean-up function to tear down the set-up environment
