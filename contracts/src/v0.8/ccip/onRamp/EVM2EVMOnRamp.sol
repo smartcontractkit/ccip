@@ -360,13 +360,15 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the
       // extraData. This prevents gas bomb attacks on the NOPs. As destBytesOverhead accounts for both
       // extraData and offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
-      uint32 allowedTokenDestGasAmount = s_tokenTransferFeeConfig[tokenAndAmount.token].isEnabled
-        ? s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead
-        : Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES;
-
-      if (poolReturnData.destPoolData.length > allowedTokenDestGasAmount) {
-        revert SourceTokenDataTooLarge(tokenAndAmount.token);
+      if (poolReturnData.destPoolData.length > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
+        // If TokenTransferFeeConfig.enabled is false, there is no config. That means destBytesOverhead is zero and
+        // this check is always true. That ensures that a pool without config cannot send more than
+        // Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes of data.
+        if (poolReturnData.destPoolData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead) {
+          revert SourceTokenDataTooLarge(tokenAndAmount.token);
+        }
       }
+
       // We validate the token address to ensure it is a valid EVM address
       Internal._validateEVMAddress(poolReturnData.destTokenAddress);
 
@@ -375,7 +377,11 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
           sourcePoolAddress: abi.encode(sourcePool),
           destTokenAddress: poolReturnData.destTokenAddress,
           extraData: poolReturnData.destPoolData,
-          destGasAmount: 50_000
+          // The user will be billed either the default or the override, so we send the exact amount that we billed for
+          // to the destination chain to be used for the token releaseOrMint and transfer.
+          destGasAmount: s_tokenTransferFeeConfig[tokenAndAmount.token].isEnabled
+            ? s_tokenTransferFeeConfig[tokenAndAmount.token].destGasOverhead
+            : s_dynamicConfig.defaultTokenDestGasOverhead
         })
       );
     }

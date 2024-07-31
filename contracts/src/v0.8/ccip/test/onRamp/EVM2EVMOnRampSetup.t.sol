@@ -231,12 +231,15 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     });
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
+      EVM2EVMOnRamp.TokenTransferFeeConfig memory tokenTransferFeeConfig =
+        s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[i].token);
+
       messageEvent.sourceTokenData[i] = abi.encode(
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(s_sourcePoolByToken[message.tokenAmounts[i].token]),
           destTokenAddress: abi.encode(s_destTokenBySourceToken[message.tokenAmounts[i].token]),
           extraData: "",
-          destGasAmount: DEST_TOKEN_GAS
+          destGasAmount: tokenTransferFeeConfig.isEnabled ? tokenTransferFeeConfig.destGasOverhead : DEST_TOKEN_GAS
         })
       );
     }

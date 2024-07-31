@@ -10,7 +10,7 @@ import {WETH9} from "../WETH9.sol";
 contract RouterSetup is BaseTest {
   Router internal s_sourceRouter;
   Router internal s_destRouter;
-  uint32 internal constant DEST_TOKEN_GAS = 50_000;
+  uint32 internal constant DEST_TOKEN_GAS = DEFAULT_TOKEN_DEST_GAS_OVERHEAD;
 
   function setUp() public virtual override {
     BaseTest.setUp();
