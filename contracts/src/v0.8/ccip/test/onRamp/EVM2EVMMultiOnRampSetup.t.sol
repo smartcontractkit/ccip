@@ -111,20 +111,20 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
     return result;
   }
 
-  function _generateDestChainConfigArgs(address sourceRouter)
+  function _generateDestChainConfigArgs(address router)
     internal
     pure
     returns (EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory)
   {
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
     destChainConfigs[0] =
-      EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, sourceRouter: sourceRouter});
+      EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: router});
     return destChainConfigs;
   }
 
   function _deployOnRamp(
     uint64 sourceChainSelector,
-    address sourceRouter,
+    address router,
     address nonceManager,
     address tokenAdminRegistry
   ) internal returns (EVM2EVMMultiOnRampHelper, bytes32 metadataHash) {
@@ -136,7 +136,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
         tokenAdminRegistry: tokenAdminRegistry
       }),
       _generateDynamicMultiOnRampConfig(address(s_priceRegistry)),
-      _generateDestChainConfigArgs(sourceRouter)
+      _generateDestChainConfigArgs(router)
     );
 
     address[] memory authorizedCallers = new address[](1);

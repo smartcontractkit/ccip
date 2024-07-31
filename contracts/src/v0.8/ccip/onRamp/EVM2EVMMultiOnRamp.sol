@@ -73,7 +73,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     /// Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
     /// Must match the metadataHash used in computing leaf hashes offchain for the root committed in
     /// the commitStore and i_metadataHash in the offRamp.
-    address sourceRouter; // This is the local router address that is allowed to send messages to the destination chain.
+    address router; // This is the local router address that is allowed to send messages to the destination chain.
       // This is NOT the receiving router address on the destination chain.
   }
 
@@ -82,7 +82,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   //solhint-disable gas-struct-packing
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector
-    address sourceRouter; // Source router address
+    address router; // Source router address
   }
 
   // STATIC CONFIG
@@ -144,13 +144,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     return s_destChainConfigs[destChainSelector].sequenceNumber + 1;
   }
 
-  /// @notice Gets the source router for a destination chain
-  /// @param destChainSelector The destination chain selector
-  /// @return sourceRouterAddress the source router address that is allowed to send messages to the destination chain
-  function getSourceRouterAddress(uint64 destChainSelector) external view returns (address) {
-    return s_destChainConfigs[destChainSelector].sourceRouter;
-  }
-
   /// @inheritdoc IEVM2AnyOnRampClient
   function forwardFromRouter(
     uint64 destChainSelector,
@@ -162,7 +155,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause.
-    if (msg.sender != s_destChainConfigs[destChainSelector].sourceRouter) revert MustBeCalledByRouter();
+    if (msg.sender != s_destChainConfigs[destChainSelector].router) revert MustBeCalledByRouter();
 
     address messageValidator = s_dynamicConfig.messageValidator;
     if (messageValidator != address(0)) {
@@ -317,6 +310,13 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     );
   }
 
+  /// @notice Gets the source router for a destination chain
+  /// @param destChainSelector The destination chain selector
+  /// @return destChainConfig the config for the provided destination chain
+  function getDestChainConfig(uint64 destChainSelector) external view returns (DestChainConfig memory) {
+    return s_destChainConfigs[destChainSelector];
+  }
+
   /// @notice Updates the destination chain specific config.
   /// @param destChainConfigArgs Array of source chain specific configs.
   function applyDestChainConfigUpdates(DestChainConfigArgs[] memory destChainConfigArgs) external onlyOwner {
@@ -335,7 +335,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
       DestChainConfig memory newDestChainConfig = DestChainConfig({
         sequenceNumber: s_destChainConfigs[destChainSelector].sequenceNumber,
-        sourceRouter: destChainConfigArg.sourceRouter
+        router: destChainConfigArg.router
       });
       s_destChainConfigs[destChainSelector] = newDestChainConfig;
 

@@ -48,7 +48,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     assertEq("EVM2EVMMultiOnRamp 1.6.0-dev", s_onRamp.typeAndVersion());
     assertEq(OWNER, s_onRamp.owner());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR));
-    assertEq(address(s_sourceRouter), s_onRamp.getSourceRouterAddress(DEST_CHAIN_SELECTOR));
+    assertEq(address(s_sourceRouter), s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).router);
   }
 
   function test_Constructor_InvalidConfigChainSelectorEqZero_Revert() public {
@@ -750,21 +750,19 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     vm.expectEmit();
     emit EVM2EVMMultiOnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, address(0)));
     s_onRamp.applyDestChainConfigUpdates(configArgs);
-    assertEq(address(0), s_onRamp.getSourceRouterAddress(DEST_CHAIN_SELECTOR));
+    assertEq(address(0), s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).router);
     // supports updating and adding lanes simultaneously
     configArgs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](2);
-    configArgs[0] = EVM2EVMMultiOnRamp.DestChainConfigArgs({
-      destChainSelector: DEST_CHAIN_SELECTOR,
-      sourceRouter: address(s_sourceRouter)
-    });
-    configArgs[1] = EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: 9999, sourceRouter: address(9999)});
+    configArgs[0] =
+      EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: address(s_sourceRouter)});
+    configArgs[1] = EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: 9999, router: address(9999)});
     vm.expectEmit();
     emit EVM2EVMMultiOnRamp.DestChainConfigSet(
       DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, address(s_sourceRouter))
     );
     emit EVM2EVMMultiOnRamp.DestChainConfigSet(9999, EVM2EVMMultiOnRamp.DestChainConfig(0, address(9999)));
     s_onRamp.applyDestChainConfigUpdates(configArgs);
-    assertEq(address(s_sourceRouter), s_onRamp.getSourceRouterAddress(DEST_CHAIN_SELECTOR));
-    assertEq(address(9999), s_onRamp.getSourceRouterAddress(9999));
+    assertEq(address(s_sourceRouter), s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).router);
+    assertEq(address(9999), s_onRamp.getDestChainConfig(9999).router);
   }
 }
