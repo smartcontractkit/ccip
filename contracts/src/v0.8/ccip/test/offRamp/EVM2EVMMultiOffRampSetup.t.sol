@@ -398,8 +398,6 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
   ) public pure {
     assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
     assertEq(a.router, b.router);
-    assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);
-    assertEq(a.maxTokenTransferGas, b.maxTokenTransferGas);
     assertEq(a.messageValidator, b.messageValidator);
     assertEq(a.priceRegistry, b.priceRegistry);
   }
