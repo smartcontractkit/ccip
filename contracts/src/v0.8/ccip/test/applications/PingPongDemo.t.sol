@@ -5,6 +5,8 @@ import {PingPongDemo} from "../../applications/PingPongDemo.sol";
 import {Client} from "../../libraries/Client.sol";
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 
+import {Router} from "../../Router.sol";
+
 // setup
 contract PingPongDappSetup is EVM2EVMOnRampSetup {
   PingPongDemo internal s_pingPong;
@@ -27,16 +29,27 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
 }
 
 contract PingPong_startPingPong is PingPongDappSetup {
-  function test_StartPingPong_Success() public {
+  function test_StartPingPong_Success(bool isOutOfOrderExecution) public {
+    s_pingPong.setOutOfOrderExecution(isOutOfOrderExecution);
+
     uint256 pingPongNumber = 1;
     bytes memory data = abi.encode(pingPongNumber);
+
+    bytes memory extraArgs;
+    if (isOutOfOrderExecution) {
+      extraArgs = Client._argsToBytes(
+        Client.EVMExtraArgsV2({gasLimit: 2e5, allowOutOfOrderExecution: isOutOfOrderExecution})
+      );
+    } else {
+      extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}));
+    }
 
     Client.EVM2AnyMessage memory sentMessage = Client.EVM2AnyMessage({
       receiver: abi.encode(i_pongContract),
       data: data,
       tokenAmounts: new Client.EVMTokenAmount[](0),
       feeToken: s_sourceFeeToken,
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}))
+      extraArgs: extraArgs
     });
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, sentMessage);
@@ -47,7 +60,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       sender: address(s_pingPong),
       receiver: i_pongContract,
-      nonce: 1,
+      nonce: isOutOfOrderExecution ? 0 : 1,
       data: data,
       tokenAmounts: sentMessage.tokenAmounts,
       sourceTokenData: new bytes[](sentMessage.tokenAmounts.length),
@@ -93,9 +106,12 @@ contract PingPong_ccipReceive is PingPongDappSetup {
 
 contract PingPong_plumbing is PingPongDappSetup {
   function test_Fuzz_CounterPartChainSelector_Success(uint64 chainSelector) public {
+    _setOnRamp(chainSelector);
+
     s_pingPong.setCounterpartChainSelector(chainSelector);
 
     assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
+    assertEq(s_pingPong.getTxGasLimit(), GAS_LIMIT);
   }
 
   function test_Fuzz_CounterPartAddress_Success(address counterpartAddress) public {
@@ -105,6 +121,10 @@ contract PingPong_plumbing is PingPongDappSetup {
   }
 
   function test_Fuzz_CounterPartAddress_Success(uint64 chainSelector, address counterpartAddress) public {
+    _setOnRamp(chainSelector);
+
+    s_pingPong.setCounterpartChainSelector(chainSelector);
+
     s_pingPong.setCounterpart(chainSelector, counterpartAddress);
 
     assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
@@ -117,5 +137,57 @@ contract PingPong_plumbing is PingPongDappSetup {
     s_pingPong.setPaused(true);
 
     assertTrue(s_pingPong.isPaused());
+  }
+
+  function test_OutOfOrderExecution_Success() public {
+    assertFalse(s_pingPong.getOutOfOrderExecution());
+
+    s_pingPong.setOutOfOrderExecution(true);
+
+    assertTrue(s_pingPong.getOutOfOrderExecution());
+  }
+
+  function test_TxGasLimit_Success() public {
+    uint64 newGasLimit = 1e5;
+
+    s_pingPong.setTxGasLimit(newGasLimit);
+
+    assertEq(s_pingPong.getTxGasLimit(), newGasLimit);
+  }
+
+  function test_DefaultTxGasLimit_Success() public {
+    uint64 newGasLimit = 1e5;
+
+    // Deploy a new onramp with the new gas limit
+    EVM2EVMOnRampHelper newOnramp = new EVM2EVMOnRampHelper(
+      EVM2EVMOnRamp.StaticConfig({
+        linkToken: s_sourceTokens[0],
+        chainSelector: SOURCE_CHAIN_SELECTOR,
+        destChainSelector: DEST_CHAIN_SELECTOR,
+        defaultTxGasLimit: newGasLimit,
+        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
+        prevOnRamp: address(0),
+        rmnProxy: address(s_mockRMN),
+        tokenAdminRegistry: address(s_tokenAdminRegistry)
+      }),
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
+      getOutboundRateLimiterConfig(),
+      s_feeTokenConfigArgs,
+      s_tokenTransferFeeConfigArgs,
+      getNopsAndWeights()
+    );
+
+    _setOnRamp(DEST_CHAIN_SELECTOR);
+
+    s_pingPong.setDefaultTxGasLimit();
+
+    assertEq(s_pingPong.getTxGasLimit(), newGasLimit);
+  }
+
+  // setting an onramp to the new chain
+  function _setOnRamp(uint64 chainSelector) internal {
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: chainSelector, onRamp: address(s_onRamp)});
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
   }
 }

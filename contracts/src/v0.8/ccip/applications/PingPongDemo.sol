@@ -7,6 +7,8 @@ import {IRouterClient} from "../interfaces/IRouterClient.sol";
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {Client} from "../libraries/Client.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
+import {EVM2EVMOnRamp} from "../onRamp/EVM2EVMOnRamp.sol";
+import {Router} from "../Router.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
@@ -23,6 +25,10 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
   bool private s_isPaused;
   // The fee token used to pay for CCIP transactions
   IERC20 internal s_feeToken;
+  // Allowing out of order execution
+  bool private s_outOfOrderExecution;
+  // The gas limit for the transaction
+  uint64 private s_txGasLimit;
 
   constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
     s_isPaused = false;
@@ -37,6 +43,8 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
   function setCounterpart(uint64 counterpartChainSelector, address counterpartAddress) external onlyOwner {
     s_counterpartChainSelector = counterpartChainSelector;
     s_counterpartAddress = counterpartAddress;
+    // setting the chain selector will reset the gas limit to the default new chain
+    setDefaultTxGasLimit();
   }
 
   function startPingPong() external onlyOwner {
@@ -51,11 +59,18 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
       emit Pong(pingPongCount);
     }
     bytes memory data = abi.encode(pingPongCount);
+
+    Client.EVMExtraArgsV2 memory extraArgs = Client.EVMExtraArgsV2({
+      gasLimit: uint256(s_txGasLimit),
+      allowOutOfOrderExecution: s_outOfOrderExecution
+    });
+    bytes memory extraArgsBytes = Client._argsToBytes(extraArgs);
+
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(s_counterpartAddress),
       data: data,
       tokenAmounts: new Client.EVMTokenAmount[](0),
-      extraArgs: "",
+      extraArgs: extraArgsBytes,
       feeToken: address(s_feeToken)
     });
     IRouterClient(getRouter()).ccipSend(s_counterpartChainSelector, message);
@@ -78,6 +93,8 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
 
   function setCounterpartChainSelector(uint64 chainSelector) external onlyOwner {
     s_counterpartChainSelector = chainSelector;
+    // setting the chain selector will reset the gas limit to the default new chain
+    setDefaultTxGasLimit();
   }
 
   function getCounterpartAddress() external view returns (address) {
@@ -98,5 +115,29 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
 
   function setPaused(bool pause) external onlyOwner {
     s_isPaused = pause;
+  }
+
+  function getOutOfOrderExecution() external view returns (bool) {
+    return s_outOfOrderExecution;
+  }
+
+  function setOutOfOrderExecution(bool outOfOrderExecution) external onlyOwner {
+    s_outOfOrderExecution = outOfOrderExecution;
+  }
+
+  function getTxGasLimit() external view returns (uint64) {
+    return s_txGasLimit;
+  }
+
+  function setTxGasLimit(uint64 txGasLimit) external onlyOwner {
+    s_txGasLimit = txGasLimit;
+  }
+
+  function setDefaultTxGasLimit() public onlyOwner {
+    // Get the default gas limit using the onramp
+    EVM2EVMOnRamp onramp = EVM2EVMOnRamp(Router(getRouter()).getOnRamp(s_counterpartChainSelector));
+    EVM2EVMOnRamp.StaticConfig memory staticConfig = onramp.getStaticConfig();
+
+    s_txGasLimit = staticConfig.defaultTxGasLimit;
   }
 }
