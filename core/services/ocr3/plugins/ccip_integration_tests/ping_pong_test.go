@@ -85,6 +85,7 @@ func initializePingPongContracts(
 			fmt.Println(getSelector(chainUniverses[chainToConnect].chainID))
 			fmt.Println(getSelector(chainUniverses[chainID].chainID))
 			if chainToConnect == chainID {
+				fmt.Println("Skipping ", chainID, " to ", chainToConnect)
 				continue // don't connect chain to itself
 			}
 			fmt.Println("Connecting ", chainID, " to ", chainToConnect)
