@@ -35,9 +35,8 @@ contract PingPong_startPingPong is PingPongDappSetup {
 
     bytes memory extraArgs;
     if (isOutOfOrderExecution) {
-      extraArgs = Client._argsToBytes(
-        Client.EVMExtraArgsV2({gasLimit: 2e5, allowOutOfOrderExecution: isOutOfOrderExecution})
-      );
+      extraArgs =
+        Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 2e5, allowOutOfOrderExecution: isOutOfOrderExecution}));
     } else {
       extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}));
     }
