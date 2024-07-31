@@ -1,7 +1,6 @@
 package ccip_integration_tests
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -82,20 +81,12 @@ func initializePingPongContracts(
 	// Set up each ping pong contract to its counterpart on the other chain
 	for chainID, universe := range chainUniverses {
 		for chainToConnect, pingPong := range pingPongs[chainID] {
-			fmt.Println(getSelector(chainUniverses[chainToConnect].chainID))
-			fmt.Println(getSelector(chainUniverses[chainID].chainID))
-			if chainToConnect == chainID {
-				fmt.Println("Skipping ", chainID, " to ", chainToConnect)
-				continue // don't connect chain to itself
-			}
-			fmt.Println("Connecting ", chainID, " to ", chainToConnect)
 			_, err := pingPong.SetCounterpart(
 				universe.owner,
 				getSelector(chainUniverses[chainToConnect].chainID),
 				// This is the address of the ping pong contract on the other chain
 				pingPongs[chainToConnect][chainID].Address(),
 			)
-			fmt.Println(err)
 			require.NoError(t, err)
 			universe.backend.Commit()
 		}

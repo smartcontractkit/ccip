@@ -3,7 +3,6 @@ package ccip_integration_tests
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"math/big"
 	"sort"
 	"strconv"
@@ -577,7 +576,6 @@ func wireRouter(t *testing.T, uni onchainUniverse, universes map[uint64]onchainU
 		routerOfframpUpdates []router.RouterOffRamp
 	)
 	for remoteChainID := range universes {
-		fmt.Println("wiring chain id", remoteChainID, "to chain id", uni.chainID)
 		if remoteChainID == uni.chainID {
 			continue
 		}
@@ -590,7 +588,6 @@ func wireRouter(t *testing.T, uni onchainUniverse, universes map[uint64]onchainU
 			OffRamp:             uni.offramp.Address(),
 		})
 	}
-	fmt.Println(routerOnrampUpdates)
 	_, err := uni.router.ApplyRampUpdates(owner, routerOnrampUpdates, []router.RouterOffRamp{}, routerOfframpUpdates)
 	require.NoErrorf(t, err, "failed to apply ramp updates on router on chain id %d", uni.chainID)
 	uni.backend.Commit()

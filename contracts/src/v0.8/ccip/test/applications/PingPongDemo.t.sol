@@ -105,12 +105,9 @@ contract PingPong_ccipReceive is PingPongDappSetup {
 
 contract PingPong_plumbing is PingPongDappSetup {
   function test_Fuzz_CounterPartChainSelector_Success(uint64 chainSelector) public {
-    _setOnRamp(chainSelector, address(s_onRamp));
-
     s_pingPong.setCounterpartChainSelector(chainSelector);
 
     assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
-    assertEq(s_pingPong.getTxGasLimit(), GAS_LIMIT);
   }
 
   function test_Fuzz_CounterPartAddress_Success(address counterpartAddress) public {
@@ -120,8 +117,6 @@ contract PingPong_plumbing is PingPongDappSetup {
   }
 
   function test_Fuzz_CounterPartAddress_Success(uint64 chainSelector, address counterpartAddress) public {
-    _setOnRamp(chainSelector, address(s_onRamp));
-
     s_pingPong.setCounterpartChainSelector(chainSelector);
 
     s_pingPong.setCounterpart(chainSelector, counterpartAddress);
@@ -144,49 +139,5 @@ contract PingPong_plumbing is PingPongDappSetup {
     s_pingPong.setOutOfOrderExecution(true);
 
     assertTrue(s_pingPong.getOutOfOrderExecution());
-  }
-
-  function test_TxGasLimit_Success() public {
-    uint64 newGasLimit = 1e5;
-
-    s_pingPong.setTxGasLimit(newGasLimit);
-
-    assertEq(s_pingPong.getTxGasLimit(), newGasLimit);
-  }
-
-  function test_DefaultTxGasLimit_Success() public {
-    uint64 newGasLimit = 1e5;
-
-    // Deploy a new onramp with the new gas limit
-    EVM2EVMOnRampHelper newOnramp = new EVM2EVMOnRampHelper(
-      EVM2EVMOnRamp.StaticConfig({
-        linkToken: s_sourceTokens[0],
-        chainSelector: SOURCE_CHAIN_SELECTOR,
-        destChainSelector: DEST_CHAIN_SELECTOR,
-        defaultTxGasLimit: newGasLimit,
-        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-        prevOnRamp: address(0),
-        rmnProxy: address(s_mockRMN),
-        tokenAdminRegistry: address(s_tokenAdminRegistry)
-      }),
-      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
-      getOutboundRateLimiterConfig(),
-      s_feeTokenConfigArgs,
-      s_tokenTransferFeeConfigArgs,
-      getNopsAndWeights()
-    );
-
-    _setOnRamp(DEST_CHAIN_SELECTOR, address(newOnramp));
-
-    s_pingPong.setDefaultTxGasLimit();
-
-    assertEq(s_pingPong.getTxGasLimit(), newGasLimit);
-  }
-
-  // setting an onramp to the new chain
-  function _setOnRamp(uint64 chainSelector, address onramp) internal {
-    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
-    onRampUpdates[0] = Router.OnRamp({destChainSelector: chainSelector, onRamp: onramp});
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
   }
 }

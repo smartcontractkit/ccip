@@ -5,6 +5,7 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
+import {PriceRegistry} from "../PriceRegistry.sol";
 import {Router} from "../Router.sol";
 import {Client} from "../libraries/Client.sol";
 import {EVM2EVMOnRamp} from "../onRamp/EVM2EVMOnRamp.sol";
@@ -17,6 +18,9 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
   event Ping(uint256 pingPongCount);
   event Pong(uint256 pingPongCount);
 
+  // Default gas limit used for EVMExtraArgsV2 construction
+  uint64 private constant DEFAULT_GAS_LIMIT = 200_000;
+
   // The chain ID of the counterpart ping pong contract
   uint64 internal s_counterpartChainSelector;
   // The contract address of the counterpart ping pong contract
@@ -27,8 +31,6 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
   IERC20 internal s_feeToken;
   // Allowing out of order execution
   bool private s_outOfOrderExecution;
-  // The gas limit for the transaction
-  uint64 private s_txGasLimit;
 
   constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
     s_isPaused = false;
@@ -43,8 +45,6 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
   function setCounterpart(uint64 counterpartChainSelector, address counterpartAddress) external onlyOwner {
     s_counterpartChainSelector = counterpartChainSelector;
     s_counterpartAddress = counterpartAddress;
-    // setting the chain selector will reset the gas limit to the default new chain
-    setDefaultTxGasLimit();
   }
 
   function startPingPong() external onlyOwner {
@@ -60,8 +60,10 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
     }
     bytes memory data = abi.encode(pingPongCount);
 
-    Client.EVMExtraArgsV2 memory extraArgs =
-      Client.EVMExtraArgsV2({gasLimit: uint256(s_txGasLimit), allowOutOfOrderExecution: s_outOfOrderExecution});
+    Client.EVMExtraArgsV2 memory extraArgs = Client.EVMExtraArgsV2({
+      gasLimit: uint256(DEFAULT_GAS_LIMIT),
+      allowOutOfOrderExecution: s_outOfOrderExecution
+    });
     bytes memory extraArgsBytes = Client._argsToBytes(extraArgs);
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
@@ -91,8 +93,6 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
 
   function setCounterpartChainSelector(uint64 chainSelector) external onlyOwner {
     s_counterpartChainSelector = chainSelector;
-    // setting the chain selector will reset the gas limit to the default new chain
-    setDefaultTxGasLimit();
   }
 
   function getCounterpartAddress() external view returns (address) {
@@ -121,21 +121,5 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
 
   function setOutOfOrderExecution(bool outOfOrderExecution) external onlyOwner {
     s_outOfOrderExecution = outOfOrderExecution;
-  }
-
-  function getTxGasLimit() external view returns (uint64) {
-    return s_txGasLimit;
-  }
-
-  function setTxGasLimit(uint64 txGasLimit) external onlyOwner {
-    s_txGasLimit = txGasLimit;
-  }
-
-  function setDefaultTxGasLimit() public onlyOwner {
-    // Get the default gas limit using the onramp
-    EVM2EVMOnRamp onramp = EVM2EVMOnRamp(Router(getRouter()).getOnRamp(s_counterpartChainSelector));
-    EVM2EVMOnRamp.StaticConfig memory staticConfig = onramp.getStaticConfig();
-
-    s_txGasLimit = staticConfig.defaultTxGasLimit;
   }
 }
