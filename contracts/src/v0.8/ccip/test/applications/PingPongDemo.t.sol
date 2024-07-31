@@ -37,9 +37,8 @@ contract PingPong_startPingPong is PingPongDappSetup {
 
     bytes memory extraArgs;
     if (isOutOfOrderExecution) {
-      extraArgs = Client._argsToBytes(
-        Client.EVMExtraArgsV2({gasLimit: 2e5, allowOutOfOrderExecution: isOutOfOrderExecution})
-      );
+      extraArgs =
+        Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 2e5, allowOutOfOrderExecution: isOutOfOrderExecution}));
     } else {
       extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}));
     }
@@ -106,7 +105,7 @@ contract PingPong_ccipReceive is PingPongDappSetup {
 
 contract PingPong_plumbing is PingPongDappSetup {
   function test_Fuzz_CounterPartChainSelector_Success(uint64 chainSelector) public {
-    _setOnRamp(chainSelector);
+    _setOnRamp(chainSelector, address(s_onRamp));
 
     s_pingPong.setCounterpartChainSelector(chainSelector);
 
@@ -121,7 +120,7 @@ contract PingPong_plumbing is PingPongDappSetup {
   }
 
   function test_Fuzz_CounterPartAddress_Success(uint64 chainSelector, address counterpartAddress) public {
-    _setOnRamp(chainSelector);
+    _setOnRamp(chainSelector, address(s_onRamp));
 
     s_pingPong.setCounterpartChainSelector(chainSelector);
 
@@ -177,7 +176,7 @@ contract PingPong_plumbing is PingPongDappSetup {
       getNopsAndWeights()
     );
 
-    _setOnRamp(DEST_CHAIN_SELECTOR);
+    _setOnRamp(DEST_CHAIN_SELECTOR, address(newOnramp));
 
     s_pingPong.setDefaultTxGasLimit();
 
@@ -185,9 +184,9 @@ contract PingPong_plumbing is PingPongDappSetup {
   }
 
   // setting an onramp to the new chain
-  function _setOnRamp(uint64 chainSelector) internal {
+  function _setOnRamp(uint64 chainSelector, address onramp) internal {
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
-    onRampUpdates[0] = Router.OnRamp({destChainSelector: chainSelector, onRamp: address(s_onRamp)});
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: chainSelector, onRamp: onramp});
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
   }
 }
