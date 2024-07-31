@@ -140,6 +140,20 @@ func (c *evmTxmClient) BatchGetReceipts(ctx context.Context, attempts []TxAttemp
 	for _, req := range reqs {
 		txErr = append(txErr, req.Error)
 	}
+
+	// TODO: can remove probably, keeping just for visibility
+	// if len(txReceipt) > 0 {
+	// 	for _, receipt := range txReceipt {
+	// 		fmt.Println("got receipt for tx", receipt.TxHash.Hex(), ", on address", receipt.ContractAddress.Hex(), ", with status", receipt.Status, ", with logs", func() []string {
+	// 			var logs []string
+	// 			for _, log := range receipt.Logs {
+	// 				logs = append(logs, fmt.Sprintf("topic:%s|data:%s", log.Topics[0].Hex(), hexutil.Encode(log.Data)))
+	// 			}
+	// 			return logs
+	// 		}())
+	// 	}
+	// }
+
 	return txReceipt, txErr, nil
 }
 

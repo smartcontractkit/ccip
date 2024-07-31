@@ -215,6 +215,11 @@ func createUniverses(
 		)
 	}
 
+	// print out topic hashes of relevant events for debugging purposes
+	t.Logf("Topic hash of CommitReportAccepted: %s", evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReportAccepted{}.Topic().Hex())
+	t.Logf("Topic hash of ExecutionStateChanged: %s", evm_2_evm_multi_offramp.EVM2EVMMultiOffRampExecutionStateChanged{}.Topic().Hex())
+	t.Logf("Topic hash of SkippedAlreadyExecutedMessage: %s", evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSkippedAlreadyExecutedMessage{}.Topic().Hex())
+
 	return homeChainUniverse, universes
 }
 

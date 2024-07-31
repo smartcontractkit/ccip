@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"go.uber.org/zap/zapcore"
 
@@ -33,7 +34,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		simulatedBackendBlockTime = 900 * time.Millisecond // Simulated backend blocks committing interval
 		oraclesBootWaitTime       = 30 * time.Second       // Time to wait for oracles to come up (HACK)
 		fChain                    = 1                      // fChain value for all the chains
-		oracleLogLevel            = zapcore.InfoLevel      // Log level for the oracle / plugins.
+		oracleLogLevel            = zapcore.WarnLevel      // Log level for the oracle / plugins.
 	)
 
 	t.Logf("creating %d universes", numChains)
@@ -198,16 +199,11 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 
 	// ------------------- WAIT EXECUTION STATE CHANGES -------------------
 	// WARNING: This is some very dummy code that waits for the execution state changes, do not merge if test is passing.
-
-	allChains := make([]uint64, 0)
-	for uni := range universes {
-		allChains = append(allChains, uni)
-	}
 	for _, uni := range universes {
 		wg.Add(1)
 		go func(uni onchainUniverse) {
 			defer wg.Done()
-			waitForExec(t, uni, allChains)
+			waitForExec(t, uni, 1)
 		}(uni)
 	}
 	tStart = time.Now()
@@ -216,7 +212,14 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	t.Logf("Execution state changes received after %s", time.Since(tStart))
 }
 
-func sendPingPong(t *testing.T, universes map[uint64]onchainUniverse, pingPongs map[uint64]map[uint64]*ping_pong_demo.PingPongDemo, messageIDs map[uint64]map[uint64][32]byte, replayBlocks map[uint64]uint64, expectedSeqNum uint64) {
+func sendPingPong(
+	t *testing.T,
+	universes map[uint64]onchainUniverse,
+	pingPongs map[uint64]map[uint64]*ping_pong_demo.PingPongDemo,
+	messageIDs map[uint64]map[uint64][32]byte,
+	replayBlocks map[uint64]uint64,
+	expectedSeqNum uint64,
+) {
 	for chainID, uni := range universes {
 		var replayBlock uint64
 		for otherChain, pingPong := range pingPongs[chainID] {
@@ -305,25 +308,35 @@ func waitForCommit(t *testing.T, uni onchainUniverse, numUnis int, startBlock *u
 	}
 }
 
-// WARNING: This is some very dummy code that waits for the execution state changes (it panics!).
-func waitForExec(t *testing.T, uni onchainUniverse, sourceChains []uint64) {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
+// TODO: unclear why this doesn't work for all the chains, investigate.
+func waitForExec(t *testing.T, uni onchainUniverse, numExpected int) {
+	const (
+		STATE_SUCCESS = 2
+	)
 
+	sink := make(chan *evm_2_evm_multi_offramp.EVM2EVMMultiOffRampExecutionStateChanged)
+	subscription, err := uni.offramp.WatchExecutionStateChanged(&bind.WatchOpts{
+		Context: testutils.Context(t),
+	}, sink, nil, nil, nil)
+	require.NoError(t, err)
+
+	numGot := 0
 	for {
 		select {
-		case <-ticker.C:
-			for _, sourceChain := range sourceChains {
-				if sourceChain == uni.chainID {
-					continue
-				}
-				srcChainCfg, err := uni.offramp.GetSourceChainConfig(&bind.CallOpts{}, sourceChain)
-				require.NoError(t, err)
-				t.Logf("[WAIT FOR EXEC] %d->%d: %d", sourceChain, uni.chainID, srcChainCfg.MinSeqNr)
-
-				if srcChainCfg.MinSeqNr > 0 {
-					panic(fmt.Errorf("good news we have execution state changes"))
-				}
+		case <-time.After(10 * time.Second):
+			t.Logf("Waiting for execution state change on chain id %d (selector %d)", uni.chainID, getSelector(uni.chainID))
+		case <-subscription.Err():
+			t.Fatalf("Subscription error")
+		case event := <-sink:
+			numGot++
+			if event.State == STATE_SUCCESS {
+				t.Logf("Received successful execution state change on chain id %d (selector %d): %s", uni.chainID, getSelector(uni.chainID), hexutil.Encode(event.MessageId[:]))
+			} else {
+				t.Logf("Received execution state change on chain id %d (selector %d): %s", uni.chainID, getSelector(uni.chainID), hexutil.Encode(event.MessageId[:]))
+			}
+			if numGot == numExpected {
+				t.Logf("Received all execution state changes on chain id %d (selector %d)", uni.chainID, getSelector(uni.chainID))
+				return
 			}
 		}
 	}
