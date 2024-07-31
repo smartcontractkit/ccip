@@ -5,8 +5,6 @@ import {PingPongDemo} from "../../applications/PingPongDemo.sol";
 import {Client} from "../../libraries/Client.sol";
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 
-import {Router} from "../../Router.sol";
-
 // setup
 contract PingPongDappSetup is EVM2EVMOnRampSetup {
   PingPongDemo internal s_pingPong;
@@ -37,8 +35,9 @@ contract PingPong_startPingPong is PingPongDappSetup {
 
     bytes memory extraArgs;
     if (isOutOfOrderExecution) {
-      extraArgs =
-        Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 2e5, allowOutOfOrderExecution: isOutOfOrderExecution}));
+      extraArgs = Client._argsToBytes(
+        Client.EVMExtraArgsV2({gasLimit: 2e5, allowOutOfOrderExecution: isOutOfOrderExecution})
+      );
     } else {
       extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}));
     }

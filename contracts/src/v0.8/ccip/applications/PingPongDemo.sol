@@ -5,10 +5,7 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
-import {PriceRegistry} from "../PriceRegistry.sol";
-import {Router} from "../Router.sol";
 import {Client} from "../libraries/Client.sol";
-import {EVM2EVMOnRamp} from "../onRamp/EVM2EVMOnRamp.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -60,8 +57,10 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
     }
     bytes memory data = abi.encode(pingPongCount);
 
-    Client.EVMExtraArgsV2 memory extraArgs =
-      Client.EVMExtraArgsV2({gasLimit: uint256(DEFAULT_GAS_LIMIT), allowOutOfOrderExecution: s_outOfOrderExecution});
+    Client.EVMExtraArgsV2 memory extraArgs = Client.EVMExtraArgsV2({
+      gasLimit: uint256(DEFAULT_GAS_LIMIT),
+      allowOutOfOrderExecution: s_outOfOrderExecution
+    });
     bytes memory extraArgsBytes = Client._argsToBytes(extraArgs);
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
