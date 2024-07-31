@@ -60,10 +60,8 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
     }
     bytes memory data = abi.encode(pingPongCount);
 
-    Client.EVMExtraArgsV2 memory extraArgs = Client.EVMExtraArgsV2({
-      gasLimit: uint256(DEFAULT_GAS_LIMIT),
-      allowOutOfOrderExecution: s_outOfOrderExecution
-    });
+    Client.EVMExtraArgsV2 memory extraArgs =
+      Client.EVMExtraArgsV2({gasLimit: uint256(DEFAULT_GAS_LIMIT), allowOutOfOrderExecution: s_outOfOrderExecution});
     bytes memory extraArgsBytes = Client._argsToBytes(extraArgs);
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
