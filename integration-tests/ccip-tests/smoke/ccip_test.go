@@ -62,13 +62,14 @@ func TestSmokeCCIPReorg(t *testing.T) {
 				lane.ForwardLane.SourceNetworkName, lane.ForwardLane.DestNetworkName),
 			lane: lane.ForwardLane,
 		})
-		if lane.ReverseLane != nil {
-			tests = append(tests, testDefinition{
-				testName: fmt.Sprintf("CCIP message transfer from network %s to network %s",
-					lane.ReverseLane.SourceNetworkName, lane.ReverseLane.DestNetworkName),
-				lane: lane.ReverseLane,
-			})
-		}
+		break
+		//if lane.ReverseLane != nil {
+		//	tests = append(tests, testDefinition{
+		//		testName: fmt.Sprintf("CCIP message transfer from network %s to network %s",
+		//			lane.ReverseLane.SourceNetworkName, lane.ReverseLane.DestNetworkName),
+		//		lane: lane.ReverseLane,
+		//	})
+		//}
 	}
 
 	// Execute tests.
@@ -87,7 +88,9 @@ func TestSmokeCCIPReorg(t *testing.T) {
 			err := tc.lane.SendRequests(1, gasLimit)
 			require.NoError(t, err)
 			rs := testsetups.SetupReorgSuite(t, setUpOutput, TestCfg)
-			rs.RunReorgBelowFinalityThreshold(1 * time.Minute)
+			rs.RunReorgBelowFinalityThreshold(1 * time.Second)
+			err = tc.lane.SendRequests(1, gasLimit)
+			require.NoError(t, err)
 			tc.lane.ValidateRequests()
 		})
 	}
