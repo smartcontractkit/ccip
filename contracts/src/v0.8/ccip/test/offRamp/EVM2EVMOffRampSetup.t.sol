@@ -90,9 +90,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       router: router,
       priceRegistry: priceRegistry,
       maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
-      maxDataBytes: MAX_DATA_SIZE,
-      maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
-      maxTokenTransferGas: MAX_TOKEN_POOL_TRANSFER_GAS
+      maxDataBytes: MAX_DATA_SIZE
     });
   }
 
@@ -171,7 +169,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
           sourcePoolAddress: abi.encode(s_sourcePoolByToken[tokenAmounts[i].token]),
           destTokenAddress: abi.encode(s_destTokenBySourceToken[tokenAmounts[i].token]),
           extraData: "",
-          destGasAmount: DEST_TOKEN_GAS
+          destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
         })
       );
     }
@@ -241,8 +239,6 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     assertEq(a.priceRegistry, b.priceRegistry);
     assertEq(a.maxNumberOfTokensPerMsg, b.maxNumberOfTokensPerMsg);
     assertEq(a.maxDataBytes, b.maxDataBytes);
-    assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);
-    assertEq(a.maxTokenTransferGas, b.maxTokenTransferGas);
   }
 
   function _getDefaultSourceTokenData(Client.EVMTokenAmount[] memory srcTokenAmounts)
@@ -257,7 +253,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
           sourcePoolAddress: abi.encode(s_sourcePoolByToken[srcTokenAmounts[i].token]),
           destTokenAddress: abi.encode(s_destTokenBySourceToken[srcTokenAmounts[i].token]),
           extraData: "",
-          destGasAmount: DEST_TOKEN_GAS
+          destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
         })
       );
     }

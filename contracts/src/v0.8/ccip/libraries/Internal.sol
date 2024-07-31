@@ -114,10 +114,20 @@ library Internal {
   /// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 17.
   uint256 public constant MESSAGE_FIXED_BYTES = 32 * 17;
 
-  /// @dev Each token transfer adds 1 EVMTokenAmount and 3 bytes at 3 slots each.
+  /// @dev Each token transfer adds 1 EVMTokenAmount and 3 bytes at 3 slots each and one slot for the destGasAmount.
   /// When abi encoded, each EVMTokenAmount takes 2 slots, each bytes takes 1 slot for length, one slot of data and one
   /// slot for the offset. This results in effectively 3*3 slots per SourceTokenData.
-  uint256 public constant MESSAGE_FIXED_BYTES_PER_TOKEN = 32 * (3 * 3 + 2);
+  /// 0x20
+  /// destGasAmount
+  /// sourcePoolAddress_offset
+  /// destTokenAddress_offset
+  /// extraData_offset
+  /// sourcePoolAddress_length
+  /// sourcePoolAddress_content // assume 1 slot
+  /// destTokenAddress_length
+  /// destTokenAddress_content // assume 1 slot
+  /// extraData_length // contents billed separately
+  uint256 public constant MESSAGE_FIXED_BYTES_PER_TOKEN = 32 * ((1 + 3 * 3) + 2);
 
   /// @dev Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, receiver and tokenAmounts).
   /// Each variable array takes 1 more slot to store its length.
@@ -129,9 +139,9 @@ library Internal {
 
   /// @dev Each token transfer adds 1 RampTokenAmount
   /// RampTokenAmount has 4 fields, including 3 bytes.
-  /// Each bytes takes 1 more slot to store its length.
-  /// When abi encoded, each token transfer takes up 7 slots, excl bytes contents.
-  uint256 public constant ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN = 32 * 7;
+  /// Each bytes takes 1 more slot to store its length, and one slot to store the offset.
+  /// When abi encoded, each token transfer takes up 10 slots, excl bytes contents.
+  uint256 public constant ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN = 32 * 10;
 
   bytes32 internal constant EVM_2_EVM_MESSAGE_HASH = keccak256("EVM2EVMMessageHashV2");
 

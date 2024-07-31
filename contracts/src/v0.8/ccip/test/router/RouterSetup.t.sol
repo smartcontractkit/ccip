@@ -10,7 +10,6 @@ import {WETH9} from "../WETH9.sol";
 contract RouterSetup is BaseTest {
   Router internal s_sourceRouter;
   Router internal s_destRouter;
-  uint32 internal constant DEST_TOKEN_GAS = DEFAULT_TOKEN_DEST_GAS_OVERHEAD;
 
   function setUp() public virtual override {
     BaseTest.setUp();
@@ -43,7 +42,7 @@ contract RouterSetup is BaseTest {
       sourcePoolAddress: abi.encode(address(12312412312)),
       destTokenAddress: abi.encode(address(9809808909)),
       extraData: "",
-      destGasAmount: DEST_TOKEN_GAS
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
   }
 }
