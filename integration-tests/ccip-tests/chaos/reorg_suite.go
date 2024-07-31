@@ -80,8 +80,19 @@ func (r *ReorgSuite) RunReorgBelowFinalityThreshold(startDelay time.Duration) {
 			Str("Case", "below finality").
 			Int("BlocksBack", blocksBackSrc).
 			Msg("Rewinding blocks on src chain")
-		err := r.SrcClient.GethSetHead(blocksBackSrc)
+
+		blockNumber, err := r.SrcClient.BlockNumber()
 		assert.NoError(r.t, err)
+		r.Logger.Info().
+			Int64("Number", blockNumber).
+			Msg("Current block number")
+		err = r.SrcClient.GethSetHead(blocksBackSrc)
+		assert.NoError(r.t, err)
+		blockNumber, err = r.SrcClient.BlockNumber()
+		assert.NoError(r.t, err)
+		r.Logger.Info().
+			Int64("Number", blockNumber).
+			Msg("Block number after rewinding:")
 		err = PostGrafanaAnnotation(
 			r.Logger,
 			r.GrafanaClient,
@@ -90,6 +101,7 @@ func (r *ReorgSuite) RunReorgBelowFinalityThreshold(startDelay time.Duration) {
 			nil,
 		)
 		require.NoError(r.t, err)
+
 		time.Sleep(r.Cfg.ExperimentDuration)
 
 		//blocksBackDst := int(r.Cfg.DstFinalityDepth) - r.Cfg.FinalityDelta

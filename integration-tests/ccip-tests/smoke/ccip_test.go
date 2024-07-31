@@ -89,8 +89,22 @@ func TestSmokeCCIPReorg(t *testing.T) {
 			require.NoError(t, err)
 			rs := testsetups.SetupReorgSuite(t, setUpOutput, TestCfg)
 			rs.RunReorgBelowFinalityThreshold(1 * time.Second)
-			err = tc.lane.SendRequests(1, gasLimit)
+			failedTx, _, _, err := tc.lane.Source.SendRequest(
+				tc.lane.Dest.ReceiverDapp.EthAddress,
+				gasLimit,
+			)
+
+			err = tc.lane.Source.Common.ChainClient.WaitForEvents()
+			require.Error(t, err, "Expected error during sending requests while reorg happens")
+			errReason, v, err := tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
 			require.NoError(t, err)
+			tc.lane.Logger.Info().
+				Str("Revert Reason", errReason).
+				Interface("Args", v).
+				Str("FailedTx", failedTx.Hex()).
+				Msg("Send tx while reorg in flight")
+			time.Sleep(rs.Cfg.ExperimentDuration)
+			err = tc.lane.SendRequests(1, gasLimit)
 			tc.lane.ValidateRequests()
 		})
 	}
