@@ -134,11 +134,16 @@ func createUniverses(
 				TokenAdminRegistry: tokenAdminRegistry.Address(),
 			},
 			evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDynamicConfig{
-				Router:        rout.Address(),
 				PriceRegistry: priceRegistry.Address(),
 				// `withdrawFeeTokens` onRamp function is not part of the message flow
 				// so we can set this to any address
 				FeeAggregator: testutils.NewAddress(),
+			},
+			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
+				{
+					DestChainSelector: getSelector(chainID),
+					Router:            rout.Address(),
+				},
 			},
 		)
 		require.NoErrorf(t, err, "failed to deploy onramp on chain id %d", chainID)
@@ -159,11 +164,15 @@ func createUniverses(
 				NonceManager:       nonceManager.Address(),
 			},
 			evm_2_evm_multi_offramp.EVM2EVMMultiOffRampDynamicConfig{
-				Router:        rout.Address(),
 				PriceRegistry: priceRegistry.Address(),
 			},
 			// Source chain configs will be set up later once we have all chains
-			[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{},
+			[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
+				{
+					SourceChainSelector: getSelector(chainID),
+					Router:              rout.Address(),
+				},
+			},
 		)
 		require.NoErrorf(t, err, "failed to deploy offramp on chain id %d", chainID)
 		backend.Commit()
