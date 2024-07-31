@@ -241,6 +241,66 @@ func (_c *OnRampReader_GetSendRequestsBetweenSeqNums_Call) RunAndReturn(run func
 	return _c
 }
 
+// GetSendRequestsForSeqNums provides a mock function with given fields: ctx, seqNums, finalized
+func (_m *OnRampReader) GetSendRequestsForSeqNums(ctx context.Context, seqNums []ccip.SequenceNumberRange, finalized bool) ([]ccip.EVM2EVMMessageWithTxMeta, error) {
+	ret := _m.Called(ctx, seqNums, finalized)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSendRequestsForSeqNums")
+	}
+
+	var r0 []ccip.EVM2EVMMessageWithTxMeta
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []ccip.SequenceNumberRange, bool) ([]ccip.EVM2EVMMessageWithTxMeta, error)); ok {
+		return rf(ctx, seqNums, finalized)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []ccip.SequenceNumberRange, bool) []ccip.EVM2EVMMessageWithTxMeta); ok {
+		r0 = rf(ctx, seqNums, finalized)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]ccip.EVM2EVMMessageWithTxMeta)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []ccip.SequenceNumberRange, bool) error); ok {
+		r1 = rf(ctx, seqNums, finalized)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// OnRampReader_GetSendRequestsForSeqNums_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSendRequestsForSeqNums'
+type OnRampReader_GetSendRequestsForSeqNums_Call struct {
+	*mock.Call
+}
+
+// GetSendRequestsForSeqNums is a helper method to define mock.On call
+//   - ctx context.Context
+//   - seqNums []ccip.SequenceNumberRange
+//   - finalized bool
+func (_e *OnRampReader_Expecter) GetSendRequestsForSeqNums(ctx interface{}, seqNums interface{}, finalized interface{}) *OnRampReader_GetSendRequestsForSeqNums_Call {
+	return &OnRampReader_GetSendRequestsForSeqNums_Call{Call: _e.mock.On("GetSendRequestsForSeqNums", ctx, seqNums, finalized)}
+}
+
+func (_c *OnRampReader_GetSendRequestsForSeqNums_Call) Run(run func(ctx context.Context, seqNums []ccip.SequenceNumberRange, finalized bool)) *OnRampReader_GetSendRequestsForSeqNums_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]ccip.SequenceNumberRange), args[2].(bool))
+	})
+	return _c
+}
+
+func (_c *OnRampReader_GetSendRequestsForSeqNums_Call) Return(_a0 []ccip.EVM2EVMMessageWithTxMeta, _a1 error) *OnRampReader_GetSendRequestsForSeqNums_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *OnRampReader_GetSendRequestsForSeqNums_Call) RunAndReturn(run func(context.Context, []ccip.SequenceNumberRange, bool) ([]ccip.EVM2EVMMessageWithTxMeta, error)) *OnRampReader_GetSendRequestsForSeqNums_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsSourceChainHealthy provides a mock function with given fields: ctx
 func (_m *OnRampReader) IsSourceChainHealthy(ctx context.Context) (bool, error) {
 	ret := _m.Called(ctx)

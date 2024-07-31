@@ -537,6 +537,66 @@ func (_c *OffRampReader_GetExecutionStateChangesBetweenSeqNums_Call) RunAndRetur
 	return _c
 }
 
+// GetExecutionStateChangesForSeqNums provides a mock function with given fields: ctx, seqNums, confirmations
+func (_m *OffRampReader) GetExecutionStateChangesForSeqNums(ctx context.Context, seqNums []ccip.SequenceNumberRange, confirmations int) ([]ccip.ExecutionStateChangedWithTxMeta, error) {
+	ret := _m.Called(ctx, seqNums, confirmations)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExecutionStateChangesForSeqNums")
+	}
+
+	var r0 []ccip.ExecutionStateChangedWithTxMeta
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []ccip.SequenceNumberRange, int) ([]ccip.ExecutionStateChangedWithTxMeta, error)); ok {
+		return rf(ctx, seqNums, confirmations)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []ccip.SequenceNumberRange, int) []ccip.ExecutionStateChangedWithTxMeta); ok {
+		r0 = rf(ctx, seqNums, confirmations)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]ccip.ExecutionStateChangedWithTxMeta)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []ccip.SequenceNumberRange, int) error); ok {
+		r1 = rf(ctx, seqNums, confirmations)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// OffRampReader_GetExecutionStateChangesForSeqNums_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetExecutionStateChangesForSeqNums'
+type OffRampReader_GetExecutionStateChangesForSeqNums_Call struct {
+	*mock.Call
+}
+
+// GetExecutionStateChangesForSeqNums is a helper method to define mock.On call
+//   - ctx context.Context
+//   - seqNums []ccip.SequenceNumberRange
+//   - confirmations int
+func (_e *OffRampReader_Expecter) GetExecutionStateChangesForSeqNums(ctx interface{}, seqNums interface{}, confirmations interface{}) *OffRampReader_GetExecutionStateChangesForSeqNums_Call {
+	return &OffRampReader_GetExecutionStateChangesForSeqNums_Call{Call: _e.mock.On("GetExecutionStateChangesForSeqNums", ctx, seqNums, confirmations)}
+}
+
+func (_c *OffRampReader_GetExecutionStateChangesForSeqNums_Call) Run(run func(ctx context.Context, seqNums []ccip.SequenceNumberRange, confirmations int)) *OffRampReader_GetExecutionStateChangesForSeqNums_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]ccip.SequenceNumberRange), args[2].(int))
+	})
+	return _c
+}
+
+func (_c *OffRampReader_GetExecutionStateChangesForSeqNums_Call) Return(_a0 []ccip.ExecutionStateChangedWithTxMeta, _a1 error) *OffRampReader_GetExecutionStateChangesForSeqNums_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *OffRampReader_GetExecutionStateChangesForSeqNums_Call) RunAndReturn(run func(context.Context, []ccip.SequenceNumberRange, int) ([]ccip.ExecutionStateChangedWithTxMeta, error)) *OffRampReader_GetExecutionStateChangesForSeqNums_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetRouter provides a mock function with given fields: ctx
 func (_m *OffRampReader) GetRouter(ctx context.Context) (ccip.Address, error) {
 	ret := _m.Called(ctx)
