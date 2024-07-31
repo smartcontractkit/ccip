@@ -3,6 +3,8 @@ package deployment
 import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink/v2/core/environment"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
@@ -13,7 +15,32 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
+	"reflect"
 )
+
+// Adds json tags to a struct
+func applyJsonTags(v interface{}) interface{} {
+	vType := reflect.TypeOf(v)
+	vValue := reflect.ValueOf(v)
+
+	// Create a new struct type with the same fields and add JSON tags
+	fields := make([]reflect.StructField, vType.NumField())
+	for i := 0; i < vType.NumField(); i++ {
+		field := vType.Field(i)
+		field.Tag = reflect.StructTag(fmt.Sprintf(`json:"%s"`, field.Name))
+		fields[i] = field
+	}
+
+	// Create a new struct with the fields
+	newStructType := reflect.StructOf(fields)
+	newStructValue := reflect.New(newStructType).Elem()
+
+	// Copy values from the original struct to the new struct
+	for i := 0; i < vType.NumField(); i++ {
+		newStructValue.Field(i).Set(vValue.Field(i))
+	}
+	return newStructValue
+}
 
 // Onchain state always derivable from an address book.
 // Offchain state always derivable from a list of nodeIds.
@@ -34,6 +61,36 @@ type CCIPOnChainState struct {
 	CapabilityRegistry *capabilities_registry.CapabilitiesRegistry
 }
 
+type CCIPSnapShot struct {
+	Chains map[string]Chain `json:"chains"`
+}
+
+type Chain struct {
+	TokenAdminRegistry       common.Address   `json:"tokenAdminRegistry"`
+	TokenAdminRegistryTokens []common.Address `json:"tokenAdminRegistryTokens"`
+}
+
+func (s CCIPOnChainState) Snapshot(chains []uint64) (CCIPSnapShot, error) {
+	snapshot := CCIPSnapShot{
+		Chains: make(map[string]Chain),
+	}
+	for _, chainSelector := range chains {
+		chainid, _ := chainsel.ChainIdFromSelector(chainSelector)
+		chainName, _ := chainsel.NameFromChainId(chainid)
+		var c Chain
+		if ta, ok := s.TokenAdminRegistries[chainSelector]; ok {
+			tokens, err := ta.GetAllConfiguredTokens(nil, 0, 10)
+			if err != nil {
+				return snapshot, err
+			}
+			c.TokenAdminRegistry = ta.Address()
+			c.TokenAdminRegistryTokens = tokens
+		}
+		snapshot.Chains[chainName] = c
+	}
+	return snapshot, nil
+}
+
 func GenerateOnchainState(e environment.Environment) (CCIPOnChainState, error) {
 	state := CCIPOnChainState{
 		EvmOnRampsV160:       make(map[uint64]*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp),
@@ -45,21 +102,20 @@ func GenerateOnchainState(e environment.Environment) (CCIPOnChainState, error) {
 		Routers:              make(map[uint64]*router.Router),
 	}
 	// Get all the onchain state
-	for chainSelector, addresses := range e.AddressBook.Addresses() {
+	addresses, err := e.AddressBook.Addresses()
+	if err != nil {
+		return state, errors.Wrap(err, "could not get addresses")
+	}
+	for chainSelector, addresses := range addresses {
 		for address := range addresses {
-			// we assume all contract support the type and version interface.
-			// this allow us to load the appropriate binding.
-			// TODO: make this family agnostic.
-			fmt.Println("Reading back", address, chainSelector, e.Chains)
 			tv, err := type_and_version.NewTypeAndVersionInterface(common.HexToAddress(address), e.Chains[chainSelector].Client)
 			if err != nil {
 				return state, err
 			}
 			tvStr, err := tv.TypeAndVersion(nil)
 			if err != nil {
-				// TODO: there are some contracts which dont'
-				// Try other known
-
+				// TODO: there are some contracts which dont like the link token
+				// Handle here.
 				return state, err
 			}
 			switch tvStr {

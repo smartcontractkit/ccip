@@ -14,8 +14,8 @@ func (m *AddressBook) Save(chainSelector uint64, address string) error {
 	return nil
 }
 
-func (m *AddressBook) Addresses() map[uint64]map[string]struct{} {
-	return m.AddressesByChain
+func (m *AddressBook) Addresses() (map[uint64]map[string]struct{}, error) {
+	return m.AddressesByChain, nil
 }
 
 func NewMemoryAddressBook() *AddressBook {

@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/consul/sdk/freeport"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/environment/memory"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -14,7 +15,7 @@ import (
 
 type AddressBook interface {
 	Save(chainSelector uint64, address string) error
-	Addresses() map[uint64]map[string]struct{}
+	Addresses() (map[uint64]map[string]struct{}, error)
 }
 
 type OnchainClient interface {
@@ -42,6 +43,7 @@ type Environment struct {
 	NodeIds     []string
 	AddressBook AddressBook
 	Offchain    OffchainClient
+	Logger      logger.Logger
 }
 
 // To be used by tests and any kind of deployment logic.
@@ -63,10 +65,15 @@ func NewMemoryEnvironment(t *testing.T) Environment {
 	}
 	ports := freeport.GetN(t, 1)
 	node := memory.NewNode(t, ports[0], mchains, zapcore.DebugLevel)
+	lggr, err := logger.New()
+	if err != nil {
+		panic(err)
+	}
 	return Environment{
 		Offchain:    memory.NewMemoryJobClient(node.App),
 		Chains:      chains,
 		NodeIds:     []string{node.Keys.PeerID.String()},
 		AddressBook: memory.NewMemoryAddressBook(),
+		Logger:      lggr,
 	}
 }

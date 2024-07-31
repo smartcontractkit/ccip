@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"fmt"
 	"github.com/smartcontractkit/chainlink/v2/core/environment"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 )
@@ -14,12 +13,15 @@ func DeployCCIPContracts(e environment.Environment) error {
 			chain.DeployerKey,
 			chain.Client)
 		if err != nil {
+			e.Logger.Errorw("Failed to deploy token admin registry", "err", err)
 			return err
 		}
+		e.Logger.Infow("Deployed token admin registry", "address", tokenAdminRegistry.String(), "tx", tx.Hash(), "from", chain.DeployerKey.From.Hex())
 		if err := chain.Confirm(tx.Hash()); err != nil {
+			e.Logger.Errorw("Failed to confirm registry deployment", "err", err)
 			return err
 		}
-		fmt.Println("Saving", chain.Selector, tokenAdminRegistry.String())
+		// Note the address book also serves as checkpointing mechanism for the deployment.
 		err = e.AddressBook.Save(chain.Selector, tokenAdminRegistry.String())
 		if err != nil {
 			return err

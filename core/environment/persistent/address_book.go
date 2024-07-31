@@ -2,7 +2,8 @@ package persistent
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"sync"
@@ -40,7 +41,14 @@ func (m *AddressBook) Addresses() (map[uint64]map[string]struct{}, error) {
 
 // saveToFile writes the address book to the file.
 func (m *AddressBook) saveToFile(addressesByChain map[uint64]map[string]struct{}) error {
-	data, err := json.Marshal(addressesByChain)
+	// Make json friendly
+	addressLists := make(map[uint64][]string)
+	for chain, addressMp := range addressesByChain {
+		for addr := range addressMp {
+			addressLists[chain] = append(addressLists[chain], addr)
+		}
+	}
+	data, err := json.Marshal(addressLists)
 	if err != nil {
 		return err
 	}
@@ -52,7 +60,7 @@ func (m *AddressBook) loadFromFile() (map[uint64]map[string]struct{}, error) {
 	file, err := os.Open(m.filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return make(map[uint64]map[string]struct{}), nil
+			return make(map[uint64]map[string]struct{}), err
 		}
 		return nil, err
 	}
@@ -63,12 +71,18 @@ func (m *AddressBook) loadFromFile() (map[uint64]map[string]struct{}, error) {
 		return nil, err
 	}
 
-	var addressesByChain map[uint64]map[string]struct{}
-	err = json.Unmarshal(data, &addressesByChain)
+	addressLists := make(map[uint64][]string)
+	err = json.Unmarshal(data, &addressLists)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to unmarshal address book %s %s", m.filePath, data))
 	}
-
+	addressesByChain := make(map[uint64]map[string]struct{})
+	for chain, addresses := range addressLists {
+		addressesByChain[chain] = make(map[string]struct{})
+		for _, address := range addresses {
+			addressesByChain[chain][address] = struct{}{}
+		}
+	}
 	return addressesByChain, nil
 }
 
