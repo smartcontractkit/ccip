@@ -48,6 +48,7 @@ const (
 	CapabilityLabelledName = "ccip"
 	CapabilityVersion      = "v1.0.0"
 	NodeOperatorID         = 1
+	FirstBlockAge          = 24 * time.Hour
 )
 
 func e18Mult(amount uint64) *big.Int {
@@ -231,17 +232,33 @@ func createChains(t *testing.T, numChains int) map[uint64]chainBase {
 
 	for chainID := chainsel.TEST_90000001.EvmChainID; len(chains) < numChains && chainID < chainsel.TEST_90000020.EvmChainID; chainID++ {
 		owner := testutils.MustNewSimTransactor(t)
+		backend := backends.NewSimulatedBackend(core.GenesisAlloc{
+			owner.From: core.GenesisAccount{
+				Balance: assets.Ether(10_000).ToInt(),
+			},
+		}, 30e6)
+
+		tweakChainTimestamp(t, backend, FirstBlockAge)
+
 		chains[chainID] = chainBase{
-			owner: owner,
-			backend: backends.NewSimulatedBackend(core.GenesisAlloc{
-				owner.From: core.GenesisAccount{
-					Balance: assets.Ether(10_000).ToInt(),
-				},
-			}, 30e6),
+			owner:   owner,
+			backend: backend,
 		}
 	}
 
 	return chains
+}
+
+// CCIP relies on block timestamps, but SimulatedBackend uses by default clock starting from 1970-01-01
+// This trick is used to move the clock closer to the current time. We set first block to be X hours ago.
+// Tests create plenty of transactions so this number can't be too low, every new block mined will tick the clock,
+// if you mine more than "X hours" transactions, SimulatedBackend will panic because generated timestamps will be in the future.
+// IMPORTANT: Any adjustments to FirstBlockAge will automatically update PermissionLessExecutionThresholdSeconds in tests
+func tweakChainTimestamp(t *testing.T, backend *backends.SimulatedBackend, tweak time.Duration) {
+	blockTime := time.UnixMilli(int64(backend.Blockchain().CurrentHeader().Time))
+	err := backend.AdjustTime(time.Since(blockTime) - tweak)
+	require.NoError(t, err, "unable to adjust time on simulated chain")
+	backend.Commit()
 }
 
 func setupHomeChain(t *testing.T, owner *bind.TransactOpts, backend *backends.SimulatedBackend) homeChain {
