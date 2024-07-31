@@ -47,9 +47,9 @@ contract PriceRegistry is
 
   /// @notice The struct representing the received CCIP feed report from keystone IReceiver.onReport()
   struct ReceivedCCIPFeedReport {
-    address Token;
-    uint224 Price;
-    uint32 Timestamp;
+    address token; // Token address
+    uint224 price;// ─────────╮ Price of the token in USD with 18 decimals
+    uint32 timestamp;// ──────╯ Timestamp of the price update
   }
 
   error TokenNotSupported(address token);
@@ -470,9 +470,9 @@ contract PriceRegistry is
     ReceivedCCIPFeedReport[] memory feeds = abi.decode(report, (ReceivedCCIPFeedReport[]));
 
     for (uint256 i = 0; i < feeds.length; ++i) {
-      s_usdPerToken[feeds[i].Token] =
-        Internal.TimestampedPackedUint224({value: feeds[i].Price, timestamp: feeds[i].Timestamp});
-      emit UsdPerTokenUpdated(feeds[i].Token, feeds[i].Price, feeds[i].Timestamp);
+      s_usdPerToken[feeds[i].token] =
+        Internal.TimestampedPackedUint224({value: feeds[i].price, timestamp: feeds[i].timestamp});
+      emit UsdPerTokenUpdated(feeds[i].token, feeds[i].price, feeds[i].timestamp);
     }
   }
 

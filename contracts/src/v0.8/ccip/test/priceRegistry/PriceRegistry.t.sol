@@ -2571,12 +2571,12 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
 
     PriceRegistry.ReceivedCCIPFeedReport[] memory report = new PriceRegistry.ReceivedCCIPFeedReport[](1);
     report[0] =
-      PriceRegistry.ReceivedCCIPFeedReport({Token: s_sourceTokens[0], Price: 4e18, Timestamp: uint32(block.timestamp)});
+      PriceRegistry.ReceivedCCIPFeedReport({token: s_sourceTokens[0], price: 4e18, timestamp: uint32(block.timestamp)});
 
     bytes memory encodedReport = abi.encode(report);
 
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(report[0].Token, report[0].Price, block.timestamp);
+    emit PriceRegistry.UsdPerTokenUpdated(report[0].token, report[0].price, block.timestamp);
 
     changePrank(FORWARDER_1);
     s_priceRegistry.onReport(encodedPermissionsMetadata, encodedReport);
@@ -2588,7 +2588,7 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
       abi.encodePacked(keccak256(abi.encode("workflowCID")), WORKFLOW_NAME_1, WORKFLOW_OWNER_1, REPORT_NAME_1);
     PriceRegistry.ReceivedCCIPFeedReport[] memory report = new PriceRegistry.ReceivedCCIPFeedReport[](1);
     report[0] =
-      PriceRegistry.ReceivedCCIPFeedReport({Token: s_sourceTokens[0], Price: 4e18, Timestamp: uint32(block.timestamp)});
+      PriceRegistry.ReceivedCCIPFeedReport({token: s_sourceTokens[0], price: 4e18, timestamp: uint32(block.timestamp)});
 
     bytes memory encodedReport = abi.encode(report);
 
