@@ -83,6 +83,11 @@ func initializePingPongContracts(
 	for chainID, universe := range chainUniverses {
 		for chainToConnect, pingPong := range pingPongs[chainID] {
 			fmt.Println(getSelector(chainUniverses[chainToConnect].chainID))
+			fmt.Println(getSelector(chainUniverses[chainID].chainID))
+			if chainToConnect == chainID {
+				continue // don't connect chain to itself
+			}
+			fmt.Println("Connecting ", chainID, " to ", chainToConnect)
 			_, err := pingPong.SetCounterpart(
 				universe.owner,
 				getSelector(chainUniverses[chainToConnect].chainID),
