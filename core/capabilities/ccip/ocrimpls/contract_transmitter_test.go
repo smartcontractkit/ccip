@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	ocrimpls2 "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -243,7 +243,7 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 		for i := 0; i < 4; i++ {
 			kb, err2 := ocr2key.New(kschaintype.EVM)
 			require.NoError(t, err2, "failed to create key")
-			kr := ocrimpls2.NewOnchainKeyring[RI](kb, logger.TestLogger(t))
+			kr := ocrimpls.NewOnchainKeyring[RI](kb, logger.TestLogger(t))
 			signers = append(signers, common.BytesToAddress(kr.PublicKey()))
 			keyrings = append(keyrings, kr)
 		}
@@ -309,21 +309,21 @@ func newTestUniverse[RI any](t *testing.T, ks *keyringsAndSigners[RI]) *testUniv
 	require.NoError(t, chainWriter.Start(testutils.Context(t)), "failed to start chain writer")
 	t.Cleanup(func() { require.NoError(t, chainWriter.Close()) })
 
-	transmitterWithSigs := ocrimpls2.XXXNewContractTransmitterTestsOnly[RI](
+	transmitterWithSigs := ocrimpls.XXXNewContractTransmitterTestsOnly[RI](
 		chainWriter,
 		ocrtypes.Account(transmitters[0].Hex()),
 		contractName,
 		methodTransmitWithSignatures,
 		ocr3HelperAddr.Hex(),
-		ocrimpls2.ToCommitCalldata,
+		ocrimpls.ToCommitCalldata,
 	)
-	transmitterWithoutSigs := ocrimpls2.XXXNewContractTransmitterTestsOnly[RI](
+	transmitterWithoutSigs := ocrimpls.XXXNewContractTransmitterTestsOnly[RI](
 		chainWriter,
 		ocrtypes.Account(transmitters[0].Hex()),
 		contractName,
 		methodTransmitWithoutSignatures,
 		ocr3HelperAddr.Hex(),
-		ocrimpls2.ToExecCalldata,
+		ocrimpls.ToExecCalldata,
 	)
 
 	return &testUniverse[RI]{

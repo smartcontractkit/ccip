@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	ccipevm2 "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
-	evm2 "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
-	ocrimpls2 "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
+	evmconfig "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -111,7 +111,7 @@ func (i *inprocessOracleCreator) CreateBootstrapOracle(config cctypes.OCR3Config
 	bootstrapperArgs := libocr3.BootstrapperArgs{
 		BootstrapperFactory:   i.peerWrapper.Peer2,
 		V2Bootstrappers:       i.bootstrapperLocators,
-		ContractConfigTracker: ocrimpls2.NewConfigTracker(config),
+		ContractConfigTracker: ocrimpls.NewConfigTracker(config),
 		Database:              i.db,
 		LocalConfig:           defaultLocalConfig(),
 		Logger: ocrcommon.NewOCRWrapper(
@@ -128,7 +128,7 @@ func (i *inprocessOracleCreator) CreateBootstrapOracle(config cctypes.OCR3Config
 			hexutil.Encode(config.Config.OfframpAddress),
 			synchronization.OCR3CCIPBootstrap,
 		),
-		OffchainConfigDigester: ocrimpls2.NewConfigDigester(config.ConfigDigest),
+		OffchainConfigDigester: ocrimpls.NewConfigDigester(config.ConfigDigest),
 	}
 	bootstrapper, err := libocr3.NewBootstrapper(bootstrapperArgs)
 	if err != nil {
@@ -154,9 +154,9 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	for _, chain := range i.chains.Slice() {
 		var chainReaderConfig evmrelaytypes.ChainReaderConfig
 		if chain.ID().Uint64() == destChainID {
-			chainReaderConfig = evm2.DestReaderConfig()
+			chainReaderConfig = evmconfig.DestReaderConfig()
 		} else {
-			chainReaderConfig = evm2.SourceReaderConfig()
+			chainReaderConfig = evmconfig.SourceReaderConfig()
 		}
 		cr, err2 := evm.NewChainReaderService(
 			context.Background(),
@@ -208,7 +208,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			chain.Client(),
 			chain.TxManager(),
 			chain.GasEstimator(),
-			evm2.ChainWriterConfigRaw(fromAddress, chain.Config().EVM().GasEstimator().PriceMaxKey(fromAddress)),
+			evmconfig.ChainWriterConfigRaw(fromAddress, chain.Config().EVM().GasEstimator().PriceMaxKey(fromAddress)),
 		)
 		if err2 != nil {
 			return nil, fmt.Errorf("failed to create chain writer for chain %s: %w", chain.ID(), err2)
@@ -235,7 +235,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	if !ok {
 		return nil, fmt.Errorf("no OCR key bundle found for chain family %s, forgot to create one?", destChainFamily)
 	}
-	onchainKeyring := ocrimpls2.NewOnchainKeyring[[]byte](keybundle, i.lggr)
+	onchainKeyring := ocrimpls.NewOnchainKeyring[[]byte](keybundle, i.lggr)
 
 	// build the contract transmitter
 	// assume that we are using the first account in the keybundle as the from account
@@ -262,13 +262,13 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 				Named(fmt.Sprintf("%d", config.Config.ChainSelector)).
 				Named(hexutil.Encode(config.Config.OfframpAddress)),
 			ccipreaderpkg.OCR3ConfigWithMeta(config),
-			ccipevm2.NewCommitPluginCodecV1(),
-			ccipevm2.NewMessageHasherV1(),
+			ccipevm.NewCommitPluginCodecV1(),
+			ccipevm.NewMessageHasherV1(),
 			i.homeChainReader,
 			contractReaders,
 			chainWriters,
 		)
-		transmitter = ocrimpls2.NewCommitContractTransmitter[[]byte](destChainWriter,
+		transmitter = ocrimpls.NewCommitContractTransmitter[[]byte](destChainWriter,
 			ocrtypes.Account(destFromAccounts[0]),
 			hexutil.Encode(config.Config.OfframpAddress), // TODO: this works for evm only, how about non-evm?
 		)
@@ -279,13 +279,13 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 				Named(destRelayID.String()).
 				Named(hexutil.Encode(config.Config.OfframpAddress)),
 			ccipreaderpkg.OCR3ConfigWithMeta(config),
-			ccipevm2.NewExecutePluginCodecV1(),
-			ccipevm2.NewMessageHasherV1(),
+			ccipevm.NewExecutePluginCodecV1(),
+			ccipevm.NewMessageHasherV1(),
 			i.homeChainReader,
 			contractReaders,
 			chainWriters,
 		)
-		transmitter = ocrimpls2.NewExecContractTransmitter[[]byte](destChainWriter,
+		transmitter = ocrimpls.NewExecContractTransmitter[[]byte](destChainWriter,
 			ocrtypes.Account(destFromAccounts[0]),
 			hexutil.Encode(config.Config.OfframpAddress), // TODO: this works for evm only, how about non-evm?
 		)
@@ -297,7 +297,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 		BinaryNetworkEndpointFactory: i.peerWrapper.Peer2,
 		Database:                     i.db,
 		V2Bootstrappers:              i.bootstrapperLocators,
-		ContractConfigTracker:        ocrimpls2.NewConfigTracker(config),
+		ContractConfigTracker:        ocrimpls.NewConfigTracker(config),
 		ContractTransmitter:          transmitter,
 		LocalConfig:                  defaultLocalConfig(),
 		Logger: ocrcommon.NewOCRWrapper(
@@ -314,7 +314,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			string(config.Config.OfframpAddress),
 			synchronization.OCR3CCIPCommit,
 		),
-		OffchainConfigDigester: ocrimpls2.NewConfigDigester(config.ConfigDigest),
+		OffchainConfigDigester: ocrimpls.NewConfigDigester(config.ConfigDigest),
 		OffchainKeyring:        keybundle,
 		OnchainKeyring:         onchainKeyring,
 		ReportingPluginFactory: factory,
