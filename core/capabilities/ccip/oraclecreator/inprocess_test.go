@@ -2,10 +2,11 @@ package oraclecreator_test
 
 import (
 	"fmt"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/oraclecreator"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"testing"
 	"time"
+
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/oraclecreator"
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/google/uuid"

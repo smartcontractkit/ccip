@@ -3,11 +3,12 @@ package oraclecreator
 import (
 	"context"
 	"fmt"
+	"time"
+
 	ccipevm2 "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
 	evm2 "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
 	ocrimpls2 "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"

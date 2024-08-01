@@ -3,13 +3,14 @@ package ccip_integration_tests
 import (
 	"context"
 	"fmt"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/validate"
 	"math/big"
 	"net/http"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/validate"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"

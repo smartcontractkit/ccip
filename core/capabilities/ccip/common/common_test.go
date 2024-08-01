@@ -1,8 +1,9 @@
 package common_test
 
 import (
-	capcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 	"testing"
+
+	capcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"

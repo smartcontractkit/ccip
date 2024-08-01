@@ -2,9 +2,10 @@ package launcher
 
 import (
 	"errors"
+	"testing"
+
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	mocktypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types/mocks"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 

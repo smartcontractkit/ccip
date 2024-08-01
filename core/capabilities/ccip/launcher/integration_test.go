@@ -1,10 +1,11 @@
 package launcher
 
 import (
-	it "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccip_integration_tests/integrationhelpers"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"testing"
 	"time"
+
+	it "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccip_integration_tests/integrationhelpers"
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"

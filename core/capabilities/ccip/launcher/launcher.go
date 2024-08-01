@@ -3,9 +3,10 @@ package launcher
 import (
 	"context"
 	"fmt"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"sync"
 	"time"
+
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 
 	"go.uber.org/multierr"
 

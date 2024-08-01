@@ -2,12 +2,13 @@ package ocrimpls_test
 
 import (
 	"crypto/rand"
-	ocrimpls2 "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"math/big"
 	"net/url"
 	"testing"
 	"time"
+
+	ocrimpls2 "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"

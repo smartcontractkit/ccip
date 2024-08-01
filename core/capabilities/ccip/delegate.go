@@ -3,11 +3,12 @@ package ccip
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 	configsevm "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/launcher"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/oraclecreator"
-	"time"
 
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 

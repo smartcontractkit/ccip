@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	configsevm "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"math/big"
 	"sort"
 	"testing"
 	"time"
+
+	configsevm "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"

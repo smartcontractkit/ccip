@@ -1,8 +1,9 @@
 package validate_test
 
 import (
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/validate"
 	"testing"
+
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/validate"
 
 	"github.com/stretchr/testify/require"
 

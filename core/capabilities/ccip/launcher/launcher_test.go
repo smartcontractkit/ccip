@@ -2,11 +2,12 @@ package launcher
 
 import (
 	"errors"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types/mocks"
 	"math/big"
 	"reflect"
 	"testing"
+
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types/mocks"
 
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/mock"

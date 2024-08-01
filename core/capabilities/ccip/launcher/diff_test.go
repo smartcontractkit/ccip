@@ -2,10 +2,11 @@ package launcher
 
 import (
 	"fmt"
-	capcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 	"math/big"
 	"reflect"
 	"testing"
+
+	capcommon "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/common"
 
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/require"
