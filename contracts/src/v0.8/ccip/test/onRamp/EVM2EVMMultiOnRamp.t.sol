@@ -765,6 +765,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     emit EVM2EVMMultiOnRamp.DestChainConfigSet(
       DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, address(s_sourceRouter))
     );
+    vm.expectEmit();
     emit EVM2EVMMultiOnRamp.DestChainConfigSet(9999, EVM2EVMMultiOnRamp.DestChainConfig(0, address(9999)));
     s_onRamp.applyDestChainConfigUpdates(configArgs);
     assertEq(address(s_sourceRouter), s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).router);
