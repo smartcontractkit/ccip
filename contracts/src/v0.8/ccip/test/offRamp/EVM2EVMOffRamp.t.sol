@@ -590,7 +590,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(fakePoolAddress),
         destTokenAddress: abi.encode(s_destTokenBySourceToken[messages[0].tokenAmounts[0].token]),
-        extraData: ""
+        extraData: "",
+        destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
       })
     );
 
@@ -609,6 +610,27 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     );
 
     s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
+  }
+
+  function test_execute_RouterYULCall_Success() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage();
+
+    // gas limit too high, Router's external call should revert
+    messages[0].gasLimit = 1e36;
+    messages[0].receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+
+    Internal.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
+
+    vm.expectEmit();
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.FAILURE,
+      abi.encodeWithSelector(CallWithExactGas.NotEnoughGasForCall.selector)
+    );
+
+    s_offRamp.execute(executionReport, new uint256[](0));
   }
 
   // Reverts
@@ -719,24 +741,6 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
     vm.expectRevert(
       abi.encodeWithSelector(EVM2EVMOffRamp.MessageTooLarge.selector, MAX_DATA_SIZE, messages[0].data.length)
-    );
-    s_offRamp.execute(executionReport, new uint256[](0));
-  }
-
-  function test_RouterYULCall_Revert() public {
-    Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage();
-
-    // gas limit too high, Router's external call should revert
-    messages[0].gasLimit = 1e36;
-    messages[0].receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
-    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
-
-    Internal.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        EVM2EVMOffRamp.ExecutionError.selector, abi.encodeWithSelector(CallWithExactGas.NotEnoughGasForCall.selector)
-      )
     );
     s_offRamp.execute(executionReport, new uint256[](0));
   }
@@ -1218,7 +1222,8 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(s_sourcePoolByToken[s_sourceFeeToken]),
         destTokenAddress: abi.encode(s_destTokenBySourceToken[s_sourceFeeToken]),
-        extraData: ""
+        extraData: "",
+        destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
       })
     );
 
@@ -1403,7 +1408,8 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(address(0)),
         destTokenAddress: abi.encode(address(0)),
-        extraData: ""
+        extraData: "",
+        destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
       })
     );
 
@@ -1426,7 +1432,8 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(address(0)),
         destTokenAddress: abi.encode(notAContract),
-        extraData: ""
+        extraData: "",
+        destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
       })
     );
 
@@ -1457,7 +1464,8 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
       destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
-      extraData: ""
+      extraData: "",
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     vm.expectCall(
@@ -1493,7 +1501,8 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
       destTokenAddress: abi.encode(destToken),
-      extraData: ""
+      extraData: "",
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     // Address(0) should always revert
@@ -1534,7 +1543,8 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
       destTokenAddress: abi.encode(destToken),
-      extraData: ""
+      extraData: "",
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     bytes memory revertData = "call reverted :o";
@@ -1728,7 +1738,8 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(s_sourcePoolByToken[srcTokenAmounts[0].token]),
         destTokenAddress: wrongAddress,
-        extraData: ""
+        extraData: "",
+        destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
       })
     );
 
@@ -1775,7 +1786,8 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(fakePoolAddress),
         destTokenAddress: abi.encode(fakePoolAddress),
-        extraData: ""
+        extraData: "",
+        destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
       })
     );
 
@@ -1818,7 +1830,8 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
       Internal.SourceTokenData({
         sourcePoolAddress: unusedVar,
         destTokenAddress: abi.encode(destPool),
-        extraData: unusedVar
+        extraData: unusedVar,
+        destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
       })
     );
 
