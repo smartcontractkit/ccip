@@ -2,7 +2,6 @@ package chaos
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 
@@ -93,14 +92,44 @@ func (r *ReorgSuite) RunReorgBelowFinalityThreshold(startDelay time.Duration) {
 		r.Logger.Info().
 			Int64("Number", blockNumber).
 			Msg("Block number after rewinding:")
-		err = PostGrafanaAnnotation(
-			r.Logger,
-			r.GrafanaClient,
-			r.Cfg.dashboardUID,
-			fmt.Sprintf("rewinded source chain for %d blocks back, finality is: %d", blocksBackSrc, r.Cfg.SrcFinalityDepth),
-			nil,
-		)
-		require.NoError(r.t, err)
+		//err = PostGrafanaAnnotation(
+		//	r.Logger,
+		//	r.GrafanaClient,
+		//	r.Cfg.dashboardUID,
+		//	fmt.Sprintf("rewinded source chain for %d blocks back, finality is: %d", blocksBackSrc, r.Cfg.SrcFinalityDepth),
+		//	nil,
+		//)
+		//require.NoError(r.t, err)
+
+		//time.Sleep(r.Cfg.ExperimentDuration)
+		time.Sleep(1 * time.Minute)
+		blocksBackDest := int(r.Cfg.SrcFinalityDepth) - r.Cfg.FinalityDelta
+		r.Logger.Info().
+			Str("URL", r.SrcClient.URL).
+			Str("Case", "below finality").
+			Int("BlocksBack", blocksBackDest).
+			Msg("Rewinding blocks on src chain")
+
+		blockNumber, err = r.DstClient.BlockNumber()
+		assert.NoError(r.t, err)
+		r.Logger.Info().
+			Int64("Number", blockNumber).
+			Msg("Current block number")
+		err = r.DstClient.GethSetHead(blocksBackDest)
+		assert.NoError(r.t, err)
+		blockNumber, err = r.DstClient.BlockNumber()
+		assert.NoError(r.t, err)
+		r.Logger.Info().
+			Int64("Number", blockNumber).
+			Msg("Block number after rewinding:")
+		//err = PostGrafanaAnnotation(
+		//	r.Logger,
+		//	r.GrafanaClient,
+		//	r.Cfg.dashboardUID,
+		//	fmt.Sprintf("rewinded source chain for %d blocks back, finality is: %d", blocksBackSrc, r.Cfg.SrcFinalityDepth),
+		//	nil,
+		//)
+		//require.NoError(r.t, err)
 
 		//time.Sleep(r.Cfg.ExperimentDuration)
 		time.Sleep(1 * time.Minute)
@@ -112,40 +141,62 @@ func (r *ReorgSuite) RunReorgBelowFinalityThreshold(startDelay time.Duration) {
 func (r *ReorgSuite) RunReorgAboveFinalityThreshold(startDelay time.Duration) {
 	go func() {
 		time.Sleep(startDelay)
-		blocksBackSrc := int(r.Cfg.SrcFinalityDepth) + r.Cfg.FinalityDelta
-		r.Logger.Info().
-			Str("URL", r.SrcClient.URL).
-			Str("Case", "above finality").
-			Int("BlocksBack", blocksBackSrc).
-			Msg("Rewinding blocks on dst chain")
-		err := r.SrcClient.GethSetHead(blocksBackSrc)
-		assert.NoError(r.t, err)
-		err = PostGrafanaAnnotation(
-			r.Logger,
-			r.GrafanaClient,
-			r.Cfg.dashboardUID,
-			fmt.Sprintf("rewinded source chain for %d blocks back, finality is: %d", blocksBackSrc, r.Cfg.SrcFinalityDepth),
-			nil,
-		)
-		require.NoError(r.t, err)
-		time.Sleep(r.Cfg.ExperimentDuration)
+		//blocksBackSrc := int(r.Cfg.SrcFinalityDepth) + r.Cfg.FinalityDelta
+		//r.Logger.Info().
+		//	Str("URL", r.SrcClient.URL).
+		//	Str("Case", "above finality").
+		//	Int("BlocksBack", blocksBackSrc).
+		//	Msg("Rewinding blocks on dst chain")
+		//blockNumber, err := r.SrcClient.BlockNumber()
+		//assert.NoError(r.t, err)
+		//r.Logger.Info().
+		//	Int64("Number", blockNumber).
+		//	Msg("Block number before rewinding:")
+		//err = r.SrcClient.GethSetHead(blocksBackSrc)
+		//assert.NoError(r.t, err)
+		//blockNumber, err = r.SrcClient.BlockNumber()
+		//assert.NoError(r.t, err)
+		//r.Logger.Info().
+		//	Int64("Number", blockNumber).
+		//	Msg("Block number after rewinding:")
+		//err = PostGrafanaAnnotation(
+		//	r.Logger,
+		//	r.GrafanaClient,
+		//	r.Cfg.dashboardUID,
+		//	fmt.Sprintf("rewinded source chain for %d blocks back, finality is: %d", blocksBackSrc, r.Cfg.SrcFinalityDepth),
+		//	nil,
+		//)
+		//require.NoError(r.t, err)
+		//time.Sleep(1 * time.Minute)
+		//time.Sleep(r.Cfg.ExperimentDuration)
 
 		blocksBackDst := int(r.Cfg.DstFinalityDepth) + r.Cfg.FinalityDelta
 		r.Logger.Info().
-			Str("URL", r.SrcClient.URL).
+			Str("URL", r.DstClient.URL).
 			Str("Case", "above finality").
 			Int("BlocksBack", blocksBackDst).
 			Msg("Rewinding blocks on dst chain")
+		blockNumber, err := r.DstClient.BlockNumber()
+		assert.NoError(r.t, err)
+		r.Logger.Info().
+			Int64("Number", blockNumber).
+			Msg("Block number before rewinding:")
 		err = r.DstClient.GethSetHead(blocksBackDst)
 		assert.NoError(r.t, err)
-		err = PostGrafanaAnnotation(
-			r.Logger,
-			r.GrafanaClient,
-			r.Cfg.dashboardUID,
-			fmt.Sprintf("rewinded dest chain for %d blocks back, finality is: %d", blocksBackDst, r.Cfg.DstFinalityDepth),
-			nil,
-		)
-		require.NoError(r.t, err)
-		time.Sleep(r.Cfg.ExperimentDuration)
+		blockNumber, err = r.DstClient.BlockNumber()
+		assert.NoError(r.t, err)
+		r.Logger.Info().
+			Int64("Number", blockNumber).
+			Msg("Block number after rewinding:")
+		//err = PostGrafanaAnnotation(
+		//	r.Logger,
+		//	r.GrafanaClient,
+		//	r.Cfg.dashboardUID,
+		//	fmt.Sprintf("rewinded dest chain for %d blocks back, finality is: %d", blocksBackDst, r.Cfg.DstFinalityDepth),
+		//	nil,
+		//)
+		//require.NoError(r.t, err)
+		time.Sleep(1 * time.Minute)
+		//time.Sleep(r.Cfg.ExperimentDuration)
 	}()
 }

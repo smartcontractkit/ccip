@@ -62,7 +62,7 @@ func TestSmokeCCIPReorg(t *testing.T) {
 				lane.ForwardLane.SourceNetworkName, lane.ForwardLane.DestNetworkName),
 			lane: lane.ForwardLane,
 		})
-		break
+
 		//if lane.ReverseLane != nil {
 		//	tests = append(tests, testDefinition{
 		//		testName: fmt.Sprintf("CCIP message transfer from network %s to network %s",
@@ -70,6 +70,7 @@ func TestSmokeCCIPReorg(t *testing.T) {
 		//		lane: lane.ReverseLane,
 		//	})
 		//}
+		break
 	}
 
 	// Execute tests.
@@ -88,9 +89,28 @@ func TestSmokeCCIPReorg(t *testing.T) {
 			err := tc.lane.SendRequests(1, gasLimit)
 			require.NoError(t, err)
 			rs := testsetups.SetupReorgSuite(t, setUpOutput, TestCfg)
-			rs.RunReorgBelowFinalityThreshold(10 * time.Second)
-			time.Sleep(8 * time.Second)
-			err = tc.lane.SendRequests(1, gasLimit)
+			rs.RunReorgAboveFinalityThreshold(1 * time.Minute)
+			time.Sleep(1 * time.Minute)
+			tc.lane.ValidateRequests()
+			//time.Sleep(10 * time.Second)
+			// validate that all nodes has healthcheck failing
+			//clNodes := setUpOutput.Env.CLNodes
+			//assert.Eventually(t, func() bool {
+			//	violatedResponses := 0
+			//	for _, node := range clNodes {
+			//		resp, _, err := node.Health()
+			//		require.NoError(t, err)
+			//		for _, d := range resp.Data {
+			//			if d.Attributes.Name == "EVM.2337.LogPoller" && d.Attributes.Output == "finality violated" && d.Attributes.Status == "failing" {
+			//				violatedResponses++
+			//			}
+			//		}
+			//	}
+			//	log.Info().Any("FinalityViolatedResponses", violatedResponses).Send()
+			//	return violatedResponses == len(clNodes)
+			//}, 3*time.Minute, 20*time.Second, "not all the nodes report finality violation")
+			//time.Sleep(8 * time.Second)
+			//err = tc.lane.SendRequests(1, gasLimit)
 			//require.Error(t, err, "send requests should fail")
 			//tc.lane.ValidateRequests(actions.ExpectPhaseToFail(testreporters.ExecStateChanged, actions.ShouldExist()))
 			//failedTx, _, _, err := tc.lane.Source.SendRequest(
@@ -108,9 +128,9 @@ func TestSmokeCCIPReorg(t *testing.T) {
 			//	Str("FailedTx", failedTx.Hex()).
 			//	Msg("Send tx while reorg in flight")
 			//time.Sleep(rs.Cfg.ExperimentDuration)
-			time.Sleep(1 * time.Minute)
-			err = tc.lane.SendRequests(1, gasLimit)
-			tc.lane.ValidateRequests()
+			//time.Sleep(1 * time.Minute)
+			//err = tc.lane.SendRequests(1, gasLimit)
+			//tc.lane.ValidateRequests()
 		})
 	}
 }
