@@ -561,10 +561,14 @@ func (c *CCIPIntegrationTestHarness) CreatePricesPipeline(t *testing.T) (string,
 		_, err := w.Write([]byte(`{"UsdPerLink": "8000000000000000000"}`))
 		require.NoError(t, err)
 	}))
+	t.Cleanup(linkUSD.Close)
+
 	ethUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte(`{"UsdPerETH": "1700000000000000000000"}`))
 		require.NoError(t, err)
 	}))
+	t.Cleanup(ethUSD.Close)
+
 	sourceWrappedNative, err := c.Source.Router.GetWrappedNative(nil)
 	require.NoError(t, err)
 	destWrappedNative, err := c.Dest.Router.GetWrappedNative(nil)
@@ -635,14 +639,15 @@ func (c *CCIPIntegrationTestHarness) SetupFeedsManager(t *testing.T) {
 			PublicKey: *pkey,
 		}
 
-		_, err = f.RegisterManager(testutils.Context(t), m)
-		require.NoError(t, err)
-
 		connManager := feedsMocks.NewConnectionsManager(t)
+		connManager.On("Connect", mock.Anything).Maybe()
 		connManager.On("GetClient", mock.Anything).Maybe().Return(NoopFeedsClient{}, nil)
 		connManager.On("Close").Maybe().Return()
 		connManager.On("IsConnected", mock.Anything).Maybe().Return(true)
 		f.Unsafe_SetConnectionsManager(connManager)
+
+		_, err = f.RegisterManager(testutils.Context(t), m)
+		require.NoError(t, err)
 	}
 }
 

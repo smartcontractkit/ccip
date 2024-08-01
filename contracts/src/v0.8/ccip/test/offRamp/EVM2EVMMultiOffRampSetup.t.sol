@@ -87,6 +87,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(nonceManager)
       }),
+      _generateDynamicMultiOffRampConfig(address(router), address(s_priceRegistry)),
       sourceChainConfigs
     );
 
@@ -221,9 +222,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
       router: router,
       priceRegistry: priceRegistry,
       maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
-      maxDataBytes: MAX_DATA_SIZE,
-      maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
-      maxTokenTransferGas: MAX_TOKEN_POOL_TRANSFER_GAS
+      maxDataBytes: MAX_DATA_SIZE
     });
   }
 
@@ -399,8 +398,6 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
   ) public pure {
     assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
     assertEq(a.router, b.router);
-    assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);
-    assertEq(a.maxTokenTransferGas, b.maxTokenTransferGas);
     assertEq(a.messageValidator, b.messageValidator);
     assertEq(a.priceRegistry, b.priceRegistry);
   }
@@ -445,10 +442,10 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
+      _generateDynamicMultiOffRampConfig(address(s_destRouter), address(s_priceRegistry)),
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](0)
     );
 
-    s_offRamp.setDynamicConfig(_generateDynamicMultiOffRampConfig(address(s_destRouter), address(s_priceRegistry)));
     address[] memory authorizedCallers = new address[](1);
     authorizedCallers[0] = address(s_offRamp);
     s_inboundNonceManager.applyAuthorizedCallerUpdates(

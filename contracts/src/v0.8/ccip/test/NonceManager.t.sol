@@ -230,7 +230,6 @@ contract NonceManager_OnRampUpgrade is EVM2EVMMultiOnRampSetup {
         maxPerMsgGasLimit: MAX_GAS_LIMIT,
         defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
         defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
-        defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
         enforceOutOfOrder: false
       }),
       RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e15}),
@@ -243,8 +242,6 @@ contract NonceManager_OnRampUpgrade is EVM2EVMMultiOnRampSetup {
     previousRamps[0] =
       NonceManager.PreviousRampsArgs(DEST_CHAIN_SELECTOR, NonceManager.PreviousRamps(address(s_prevOnRamp), address(0)));
     s_outboundNonceManager.applyPreviousRampsUpdates(previousRamps);
-
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
 
     (s_onRamp, s_metadataHash) = _deployOnRamp(
       SOURCE_CHAIN_SELECTOR, address(s_sourceRouter), address(s_outboundNonceManager), address(s_tokenAdminRegistry)

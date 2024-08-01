@@ -41,7 +41,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_transmitter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_v3_aggregator_contract"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
@@ -773,12 +772,12 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 	e.logger.Info().Str("Version", version.String()).Msg("New PriceRegistry")
 	switch version {
 	case Latest:
-		ins, err := price_registry.NewPriceRegistry(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
+		ins, err := price_registry_1_2_0.NewPriceRegistry(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 		if err != nil {
 			return nil, fmt.Errorf("error in creating price registry instance: %w", err)
 		}
 		wrapper = &PriceRegistryWrapper{
-			Latest: ins,
+			V1_2_0: ins,
 		}
 	case V1_2_0:
 		ins, err := price_registry_1_2_0.NewPriceRegistry(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
@@ -818,13 +817,13 @@ func (e *CCIPContractsDeployer) DeployPriceRegistry(tokens []common.Address) (*P
 			auth *bind.TransactOpts,
 			_ bind.ContractBackend,
 		) (common.Address, *types.Transaction, interface{}, error) {
-			return price_registry.DeployPriceRegistry(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), nil, tokens, 60*60*24*14, nil)
+			return price_registry_1_2_0.DeployPriceRegistry(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), nil, tokens, 60*60*24*14)
 		})
 		if err != nil {
 			return nil, err
 		}
 		wrapper = &PriceRegistryWrapper{
-			Latest: instance.(*price_registry.PriceRegistry),
+			V1_2_0: instance.(*price_registry_1_2_0.PriceRegistry),
 		}
 	case V1_2_0:
 		address, _, instance, err = e.evmClient.DeployContract("PriceRegistry", func(
@@ -1044,8 +1043,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 					MaxDataBytes:                      50000,
 					MaxPerMsgGasLimit:                 4_000_000,
 					DefaultTokenFeeUSDCents:           50,
-					DefaultTokenDestGasOverhead:       34_000,
-					DefaultTokenDestBytesOverhead:     500,
+					DefaultTokenDestGasOverhead:       125_000,
 				},
 				evm_2_evm_onramp.RateLimiterConfig{
 					Capacity: opts.Capacity,
@@ -1446,19 +1444,10 @@ func NewExecOnchainConfig(
 	MaxNumberOfTokensPerMsg uint16,
 	MaxDataBytes uint32,
 	MaxPoolReleaseOrMintGas uint32,
-	MaxTokenTransferGas uint32,
 ) (abihelpers.AbiDefined, error) {
 	switch VersionMap[OffRampContract] {
 	case Latest:
-		return testhelpers.NewExecOnchainConfig(
-			PermissionLessExecutionThresholdSeconds,
-			Router,
-			PriceRegistry,
-			MaxNumberOfTokensPerMsg,
-			MaxDataBytes,
-			MaxPoolReleaseOrMintGas,
-			MaxTokenTransferGas,
-		), nil
+		return testhelpers.NewExecOnchainConfig(PermissionLessExecutionThresholdSeconds, Router, PriceRegistry, MaxNumberOfTokensPerMsg, MaxDataBytes), nil
 	case V1_2_0:
 		return testhelpers_1_4_0.NewExecOnchainConfig(
 			PermissionLessExecutionThresholdSeconds,
