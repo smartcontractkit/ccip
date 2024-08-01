@@ -2549,7 +2549,8 @@ contract PriceRegistry_KeystoneSetup is PriceRegistrySetup {
   bytes10 constant WORKFLOW_NAME_1 = "workflow1";
   bytes2 constant REPORT_NAME_1 = "01";
 
-  function setupPriceRegistryAsKeystoneReceiver() internal {
+  function setUp() public virtual override {
+    super.setUp();
     KeystoneFeedsPermissionHandler.Permission[] memory permissions = new KeystoneFeedsPermissionHandler.Permission[](1);
     permissions[0] = KeystoneFeedsPermissionHandler.Permission({
       forwarder: FORWARDER_1,
@@ -2564,8 +2565,7 @@ contract PriceRegistry_KeystoneSetup is PriceRegistrySetup {
 }
 
 contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
-  function test_OnReport_Success() public {
-    setupPriceRegistryAsKeystoneReceiver();
+  function test_onReport_Success() public {
     bytes memory encodedPermissionsMetadata =
       abi.encodePacked(keccak256(abi.encode("workflowCID")), WORKFLOW_NAME_1, WORKFLOW_OWNER_1, REPORT_NAME_1);
 
@@ -2580,10 +2580,12 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
 
     changePrank(FORWARDER_1);
     s_priceRegistry.onReport(encodedPermissionsMetadata, encodedReport);
+
+    vm.assertEq(s_priceRegistry.getTokenPrice(report[0].token).value, report[0].price);
+    vm.assertEq(s_priceRegistry.getTokenPrice(report[0].token).timestamp, report[0].timestamp);
   }
 
-  function test_OnReport_InvalidForwarder_Reverts() public {
-    setupPriceRegistryAsKeystoneReceiver();
+  function test_onReport_InvalidForwarder_Reverts() public {
     bytes memory encodedPermissionsMetadata =
       abi.encodePacked(keccak256(abi.encode("workflowCID")), WORKFLOW_NAME_1, WORKFLOW_OWNER_1, REPORT_NAME_1);
     PriceRegistry.ReceivedCCIPFeedReport[] memory report = new PriceRegistry.ReceivedCCIPFeedReport[](1);
