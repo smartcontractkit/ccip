@@ -746,11 +746,13 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     vm.startPrank(OWNER);
     EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory configArgs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
     configArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
+
     // supports disabling a lane by setting a router to zero
     vm.expectEmit();
     emit EVM2EVMMultiOnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, address(0)));
     s_onRamp.applyDestChainConfigUpdates(configArgs);
     assertEq(address(0), s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).router);
+
     // supports updating and adding lanes simultaneously
     configArgs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](2);
     configArgs[0] =
@@ -764,6 +766,12 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     s_onRamp.applyDestChainConfigUpdates(configArgs);
     assertEq(address(s_sourceRouter), s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).router);
     assertEq(address(9999), s_onRamp.getDestChainConfig(9999).router);
+
+    // handles empty list
+    uint256 numLogs = vm.getRecordedLogs().length;
+    configArgs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](0);
+    s_onRamp.applyDestChainConfigUpdates(configArgs);
+    assertEq(numLogs, vm.getRecordedLogs().length); // indicates no changes made
   }
 
   function test_ApplyDestChainConfigUpdates_WithInalidChainSelector_Revert() external {
