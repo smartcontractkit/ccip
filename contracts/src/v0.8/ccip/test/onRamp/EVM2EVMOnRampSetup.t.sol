@@ -65,19 +65,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         minFeeUSDCents: 1_00, // 1 USD
         maxFeeUSDCents: 1000_00, // 1,000 USD
         deciBps: 2_5, // 2.5 bps, or 0.025%
-        destGasOverhead: 140_000,
+        destGasOverhead: 100_000,
         destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES),
-        aggregateRateLimitEnabled: true
-      })
-    );
-    s_tokenTransferFeeConfigArgs.push(
-      EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
-        token: s_sourceRouter.getWrappedNative(),
-        minFeeUSDCents: 50, // 0.5 USD
-        maxFeeUSDCents: 500_00, // 500 USD
-        deciBps: 5_0, // 5 bps, or 0.05%
-        destGasOverhead: 80_000,
-        destBytesOverhead: 100,
         aggregateRateLimitEnabled: true
       })
     );

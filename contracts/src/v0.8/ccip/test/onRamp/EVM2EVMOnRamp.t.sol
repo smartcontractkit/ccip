@@ -1215,32 +1215,6 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
     assertEq(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES, destBytesOverhead);
   }
 
-  function test_WETHTokenBpsFee_Success() public view {
-    uint256 tokenAmount = 100e18;
-
-    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(OWNER),
-      data: "",
-      tokenAmounts: new Client.EVMTokenAmount[](1),
-      feeToken: s_sourceRouter.getWrappedNative(),
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT}))
-    });
-    message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceRouter.getWrappedNative(), amount: tokenAmount});
-
-    EVM2EVMOnRamp.TokenTransferFeeConfig memory transferFeeConfig =
-      s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[0].token);
-
-    (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
-      s_onRamp.getTokenTransferCost(message.feeToken, s_wrappedTokenPrice, message.tokenAmounts);
-
-    uint256 usdWei = calcUSDValueFromTokenAmount(s_wrappedTokenPrice, tokenAmount);
-    uint256 bpsUSDWei = applyBpsRatio(usdWei, s_tokenTransferFeeConfigArgs[1].deciBps);
-
-    assertEq(bpsUSDWei, feeUSDWei);
-    assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
-    assertEq(transferFeeConfig.destBytesOverhead, destBytesOverhead);
-  }
-
   function test_CustomTokenBpsFee_Success() public view {
     uint256 tokenAmount = 200000e18;
 
@@ -1260,7 +1234,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
       s_onRamp.getTokenTransferCost(message.feeToken, s_feeTokenPrice, message.tokenAmounts);
 
     uint256 usdWei = calcUSDValueFromTokenAmount(s_customTokenPrice, tokenAmount);
-    uint256 bpsUSDWei = applyBpsRatio(usdWei, s_tokenTransferFeeConfigArgs[2].deciBps);
+    uint256 bpsUSDWei = applyBpsRatio(usdWei, s_tokenTransferFeeConfigArgs[1].deciBps);
 
     assertEq(bpsUSDWei, feeUSDWei);
     assertEq(transferFeeConfig.destGasOverhead, destGasOverhead);
@@ -1340,21 +1314,30 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
     // Start with small token transfers, total bps fee is lower than min token transfer fee
     for (uint256 i = 0; i < testTokens.length; ++i) {
       message.tokenAmounts[i] = Client.EVMTokenAmount({token: testTokens[i], amount: 1e14});
-      expectedTotalGas += s_onRamp.getTokenTransferFeeConfig(testTokens[i]).destGasOverhead;
-      uint32 dstBytesOverhead = s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[i].token).destBytesOverhead;
-      expectedTotalBytes += dstBytesOverhead == 0 ? uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) : dstBytesOverhead;
+      EVM2EVMOnRamp.TokenTransferFeeConfig memory tokenTransferFeeConfig =
+        s_onRamp.getTokenTransferFeeConfig(testTokens[i]);
+      expectedTotalGas += tokenTransferFeeConfig.destGasOverhead == 0
+        ? DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+        : tokenTransferFeeConfig.destGasOverhead;
+      expectedTotalBytes += tokenTransferFeeConfig.destBytesOverhead == 0
+        ? uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES)
+        : tokenTransferFeeConfig.destBytesOverhead;
     }
     (uint256 feeUSDWei, uint32 destGasOverhead, uint32 destBytesOverhead) =
       s_onRamp.getTokenTransferCost(message.feeToken, s_wrappedTokenPrice, message.tokenAmounts);
 
     uint256 expectedFeeUSDWei = 0;
     for (uint256 i = 0; i < testTokens.length; ++i) {
-      expectedFeeUSDWei += configUSDCentToWei(tokenTransferFeeConfigs[i].minFeeUSDCents);
+      expectedFeeUSDWei += configUSDCentToWei(
+        tokenTransferFeeConfigs[i].minFeeUSDCents == 0
+          ? DEFAULT_TOKEN_FEE_USD_CENTS
+          : tokenTransferFeeConfigs[i].minFeeUSDCents
+      );
     }
 
-    assertEq(expectedFeeUSDWei, feeUSDWei);
-    assertEq(expectedTotalGas, destGasOverhead);
-    assertEq(expectedTotalBytes, destBytesOverhead);
+    assertEq(expectedFeeUSDWei, feeUSDWei, "wrong feeUSDWei");
+    assertEq(expectedTotalGas, destGasOverhead, "wrong destGasOverhead");
+    assertEq(expectedTotalBytes, destBytesOverhead, "wrong destBytesOverhead");
 
     // Set 1st token transfer to a meaningful amount so its bps fee is now between min and max fee
     message.tokenAmounts[0] = Client.EVMTokenAmount({token: testTokens[0], amount: 10000e18});
@@ -1364,12 +1347,12 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
     expectedFeeUSDWei = applyBpsRatio(
       calcUSDValueFromTokenAmount(tokenPrices[0], message.tokenAmounts[0].amount), tokenTransferFeeConfigs[0].deciBps
     );
-    expectedFeeUSDWei += configUSDCentToWei(tokenTransferFeeConfigs[1].minFeeUSDCents);
+    expectedFeeUSDWei += configUSDCentToWei(DEFAULT_TOKEN_FEE_USD_CENTS);
     expectedFeeUSDWei += configUSDCentToWei(tokenTransferFeeConfigs[2].minFeeUSDCents);
 
-    assertEq(expectedFeeUSDWei, feeUSDWei);
-    assertEq(expectedTotalGas, destGasOverhead);
-    assertEq(expectedTotalBytes, destBytesOverhead);
+    assertEq(expectedFeeUSDWei, feeUSDWei, "wrong feeUSDWei");
+    assertEq(expectedTotalGas, destGasOverhead, "wrong destGasOverhead");
+    assertEq(expectedTotalBytes, destBytesOverhead, "wrong destBytesOverhead");
 
     // Set 2nd token transfer to a large amount that is higher than maxFeeUSD
     message.tokenAmounts[1] = Client.EVMTokenAmount({token: testTokens[1], amount: 1e36});
@@ -1379,12 +1362,12 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
     expectedFeeUSDWei = applyBpsRatio(
       calcUSDValueFromTokenAmount(tokenPrices[0], message.tokenAmounts[0].amount), tokenTransferFeeConfigs[0].deciBps
     );
-    expectedFeeUSDWei += configUSDCentToWei(tokenTransferFeeConfigs[1].maxFeeUSDCents);
+    expectedFeeUSDWei += configUSDCentToWei(DEFAULT_TOKEN_FEE_USD_CENTS);
     expectedFeeUSDWei += configUSDCentToWei(tokenTransferFeeConfigs[2].minFeeUSDCents);
 
-    assertEq(expectedFeeUSDWei, feeUSDWei);
-    assertEq(expectedTotalGas, destGasOverhead);
-    assertEq(expectedTotalBytes, destBytesOverhead);
+    assertEq(expectedFeeUSDWei, feeUSDWei, "wrong feeUSDWei");
+    assertEq(expectedTotalGas, destGasOverhead, "wrong destGasOverhead");
+    assertEq(expectedTotalBytes, destBytesOverhead, "wrong destBytesOverhead");
   }
 
   // reverts
