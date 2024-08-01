@@ -415,6 +415,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     assertEq(config1.isEnabled, config2.isEnabled);
     assertEq(config1.minSeqNr, config2.minSeqNr);
     assertEq(config1.onRamp, config2.onRamp);
+    assertEq(address(config1.router), address(config2.router));
   }
 
   function _getDefaultSourceTokenData(Client.EVMTokenAmount[] memory srcTokenAmounts)
