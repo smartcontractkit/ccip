@@ -495,7 +495,10 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// its execution and enforce atomicity among successful message processing and token transfer.
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts
   /// (for example smart contract wallets) without an associated message.
-  function executeSingleMessage(Internal.Any2EVMRampMessage calldata message, bytes[] calldata offchainTokenData) external {
+  function executeSingleMessage(
+    Internal.Any2EVMRampMessage calldata message,
+    bytes[] calldata offchainTokenData
+  ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
