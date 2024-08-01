@@ -521,6 +521,68 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
 
+  function test_forwardFromRouter_correctSourceTokenData_Success() public {
+    Client.EVM2AnyMessage memory message = _generateTokenMessage();
+
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+      address token = message.tokenAmounts[i].token;
+      deal(token, s_sourcePoolByToken[token], message.tokenAmounts[i].amount * 2);
+    }
+
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount * 2);
+
+    Internal.EVM2EVMMessage memory expectedEvent = _messageToEvent(message, 1, 1, feeAmount, OWNER);
+
+    vm.expectEmit();
+    emit EVM2EVMOnRamp.CCIPSendRequested(expectedEvent);
+
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+
+    // Same message, but we change the onchain config which should be reflected in the event.
+    // We get the event before changing the onRamp config, as the event generation code uses the current
+    // onramp to generate the event. This test checks if it does so correctly.
+    expectedEvent = _messageToEvent(message, 2, 2, feeAmount, OWNER);
+
+    uint256 tokenIndexToChange = 1;
+    address changedToken = message.tokenAmounts[tokenIndexToChange].token;
+
+    // Set token config to change the destGasOverhead
+    vm.startPrank(OWNER);
+    EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
+      new EVM2EVMOnRamp.TokenTransferFeeConfigArgs[](1);
+    tokenTransferFeeConfigArgs[0] = EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
+      token: changedToken,
+      minFeeUSDCents: 0,
+      maxFeeUSDCents: 100,
+      deciBps: 0,
+      destGasOverhead: 1_000_111,
+      destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) + 32,
+      aggregateRateLimitEnabled: false
+    });
+    s_onRamp.setTokenTransferFeeConfig(tokenTransferFeeConfigArgs, new address[](0));
+
+    vm.startPrank(address(s_sourceRouter));
+
+    expectedEvent.sourceTokenData[tokenIndexToChange] = abi.encode(
+      Internal.SourceTokenData({
+        sourcePoolAddress: abi.encode(s_sourcePoolByToken[changedToken]),
+        destTokenAddress: abi.encode(s_destTokenBySourceToken[changedToken]),
+        extraData: "",
+        // The user will be billed either the default or the override, so we send the exact amount that we billed for
+        // to the destination chain to be used for the token releaseOrMint and transfer.
+        destGasAmount: tokenTransferFeeConfigArgs[0].destGasOverhead
+      })
+    );
+    // Update the hash because we manually changed sourceTokenData
+    expectedEvent.messageId = Internal._hash(expectedEvent, s_metadataHash);
+
+    vm.expectEmit();
+    emit EVM2EVMOnRamp.CCIPSendRequested(expectedEvent);
+
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+  }
+
   // Reverts
 
   function test_Paused_Revert() public {
