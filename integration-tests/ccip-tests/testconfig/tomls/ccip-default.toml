@@ -1,5 +1,5 @@
 # this file contains the deafult configuration for the test
-# all secrets must be stored in .env file and sourced before running the test
+# all secrets must be stored in .env file and sourced before running the test 
 [CCIP]
 [CCIP.ContractVersions]
 PriceRegistry = 'latest'
