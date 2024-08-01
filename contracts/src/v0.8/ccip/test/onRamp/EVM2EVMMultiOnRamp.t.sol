@@ -765,4 +765,13 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     assertEq(address(s_sourceRouter), s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).router);
     assertEq(address(9999), s_onRamp.getDestChainConfig(9999).router);
   }
+
+  function test_ApplyDestChainConfigUpdates_WithInalidChainSelector_Revert() external {
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory configArgs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
+    configArgs[0].destChainSelector = 0; // invalid
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOnRamp.InvalidDestChainConfig.selector, 0));
+    s_onRamp.applyDestChainConfigUpdates(configArgs);
+  }
 }
