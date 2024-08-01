@@ -1105,10 +1105,10 @@ func SetupReorgSuite(t *testing.T, setupOutput *CCIPTestSetUpOutputs, testCfg *C
 		finalityDst = setupOutput.Cfg.SelectedNetworks[1].FinalityDepth
 	}
 	rs, err := ch.NewReorgSuite(t, &ch.ReorgConfig{
-		//SrcGethHTTPURL: setupOutput.Env.K8Env.URLs["source-chain_http"][0],
-		//DstGethHTTPURL: setupOutput.Env.K8Env.URLs["dest-chain_http"][0],
-		SrcGethHTTPURL:     setupOutput.Env.LocalCluster.EVMNetworks[0].HTTPURLs[0],
-		DstGethHTTPURL:     setupOutput.Env.LocalCluster.EVMNetworks[1].HTTPURLs[0],
+		SrcGethHTTPURL: setupOutput.Env.K8Env.URLs["source-chain_http"][0],
+		DstGethHTTPURL: setupOutput.Env.K8Env.URLs["dest-chain_http"][0],
+		//SrcGethHTTPURL:     setupOutput.Env.LocalCluster.EVMNetworks[0].HTTPURLs[0],
+		//DstGethHTTPURL:     setupOutput.Env.LocalCluster.EVMNetworks[1].HTTPURLs[0],
 		SrcFinalityDepth:   finalitySrc,
 		DstFinalityDepth:   finalityDst,
 		FinalityDelta:      setupOutput.Cfg.TestGroupInput.ChaosReorgProfile.FinalityDelta,

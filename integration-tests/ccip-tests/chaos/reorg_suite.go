@@ -2,6 +2,7 @@ package chaos
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 
@@ -188,14 +189,14 @@ func (r *ReorgSuite) RunReorgAboveFinalityThreshold(startDelay time.Duration) {
 		r.Logger.Info().
 			Int64("Number", blockNumber).
 			Msg("Block number after rewinding:")
-		//err = PostGrafanaAnnotation(
-		//	r.Logger,
-		//	r.GrafanaClient,
-		//	r.Cfg.dashboardUID,
-		//	fmt.Sprintf("rewinded dest chain for %d blocks back, finality is: %d", blocksBackDst, r.Cfg.DstFinalityDepth),
-		//	nil,
-		//)
-		//require.NoError(r.t, err)
+		err = PostGrafanaAnnotation(
+			r.Logger,
+			r.GrafanaClient,
+			r.Cfg.dashboardUID,
+			fmt.Sprintf("rewinded dest chain for %d blocks back, finality is: %d", blocksBackDst, r.Cfg.DstFinalityDepth),
+			nil,
+		)
+		require.NoError(r.t, err)
 		time.Sleep(1 * time.Minute)
 		//time.Sleep(r.Cfg.ExperimentDuration)
 	}()
