@@ -234,8 +234,6 @@ func createChains(t *testing.T, numChains int) map[uint64]chainBase {
 		},
 	}, 30e6)
 	tweakChainTimestamp(t, homeChainBackend, FirstBlockAge)
-	t.Logf("block timestamp after tweaking for chain %d is %s",
-		homeChainID, time.Unix(int64(homeChainBackend.Blockchain().CurrentHeader().Time), 0))
 
 	chains[homeChainID] = chainBase{
 		owner:   homeChainOwner,
@@ -251,9 +249,6 @@ func createChains(t *testing.T, numChains int) map[uint64]chainBase {
 		}, 30e6)
 
 		tweakChainTimestamp(t, backend, FirstBlockAge)
-
-		t.Logf("block timestamp after tweaking for chain %d is %s",
-			chainID, time.Unix(int64(backend.Blockchain().CurrentHeader().Time), 0))
 
 		chains[chainID] = chainBase{
 			owner:   owner,
