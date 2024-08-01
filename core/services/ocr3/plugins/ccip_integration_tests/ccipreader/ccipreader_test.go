@@ -30,6 +30,7 @@ import (
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -253,7 +254,7 @@ func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 		)
 		require.NoError(t, err)
 		return len(msgs) == 2
-	}, testutils.WaitTimeout(t), 100*time.Millisecond)
+	}, 10*time.Second, 100*time.Millisecond)
 
 	require.Len(t, msgs, 2)
 	require.Equal(t, cciptypes.SeqNum(10), msgs[0].Header.SequenceNumber)
@@ -358,20 +359,21 @@ func testSetup(ctx context.Context, t *testing.T, readerChain, destChain cciptyp
 	assert.Len(t, contractNames, 1, "test setup assumes there is only one contract")
 
 	cr, err := evm.NewChainReaderService(ctx, lggr, lp, headTracker, cl, cfg)
-	assert.NoError(t, err)
-	err = cr.Bind(ctx, []types.BoundContract{
+	require.NoError(t, err)
+	err = cr.Start(ctx)
+	require.NoError(t, err)
+
+	extendedCr := contractreader.NewExtendedContractReader(cr)
+	err = extendedCr.Bind(ctx, []types.BoundContract{
 		{
 			Address: address.String(),
 			Name:    contractNames[0],
 		},
 	})
-	assert.NoError(t, err)
-	err = cr.Start(ctx)
-	assert.NoError(t, err)
 
-	contractReaders := map[cciptypes.ChainSelector]types.ContractReader{readerChain: cr}
+	contractReaders := map[cciptypes.ChainSelector]contractreader.Extended{readerChain: extendedCr}
 	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
-	reader := ccipreaderpkg.NewCCIPReader(lggr, contractReaders, contractWriters, destChain)
+	reader := ccipreaderpkg.NewCCIPReaderWithExtendedContractReaders(lggr, contractReaders, contractWriters, destChain)
 
 	t.Cleanup(func() {
 		require.NoError(t, cr.Close())
