@@ -5,54 +5,117 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/environment"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 )
 
 // TODO: pull up to environment pkg
 func deployContract(
 	lggr logger.Logger,
-	deploy func() (string, common.Hash, error),
+	deploy func() (common.Address, common.Hash, error),
 	confirm func(common.Hash) error,
-	save func(string) error,
-) error {
+	save func(address common.Address) error,
+) (common.Address, error) {
 	contractAddr, tx, err := deploy()
 	if err != nil {
 		lggr.Errorw("Failed to deploy contract", "err", err)
-		return err
+		return common.Address{}, err
 	}
 	err = confirm(tx)
 	if err != nil {
 		lggr.Errorw("Failed to confirm deployment", "err", err)
-		return err
+		return common.Address{}, err
 	}
 	err = save(contractAddr)
 	if err != nil {
 		lggr.Errorw("Failed to save contract address", "err", err)
-		return err
+		return common.Address{}, err
 	}
-	return nil
+	return contractAddr, nil
 }
 
+// TODO: Likely we'll want to further parameterize the deployment
+// For example a list of contracts to skip deploying if they already exist.
+// Or mock vs real RMN.
 func DeployCCIPContracts(e environment.Environment) error {
 	for _, chain := range e.Chains {
-		// For example deploy token admin registry to all chains
-		// And save the address
-		err := deployContract(e.Logger,
-			func() (string, common.Hash, error) {
+		saveToChain := func(addr common.Address) error {
+			return e.AddressBook.Save(chain.Selector, addr.String())
+		}
+
+		// TODO: Still waiting for RMNRemote/RMNHome contracts etc.
+		mockARM, err := deployContract(e.Logger,
+			func() (common.Address, common.Hash, error) {
+				mockARM, tx, _, err := mock_arm_contract.DeployMockARMContract(
+					chain.DeployerKey,
+					chain.Client,
+				)
+				return mockARM, tx.Hash(), err
+			}, chain.Confirm, saveToChain)
+		if err != nil {
+			e.Logger.Errorw("Failed to deploy mockARM", "err", err)
+			return err
+		}
+		e.Logger.Infow("deployed mockARM", "addr", mockARM)
+
+		armProxy, err := deployContract(e.Logger,
+			func() (common.Address, common.Hash, error) {
+				mockARM, tx, _, err := arm_proxy_contract.DeployARMProxyContract(
+					chain.DeployerKey,
+					chain.Client,
+					mockARM,
+				)
+				return mockARM, tx.Hash(), err
+			}, chain.Confirm, saveToChain)
+		if err != nil {
+			e.Logger.Errorw("Failed to deploy armProxy", "err", err)
+			return err
+		}
+		e.Logger.Infow("deployed armProxy", "addr", armProxy)
+
+		//weth9, err := deployContract(e.Logger,
+		//	func() (common.Address, common.Hash, error) {
+		//		weth9, tx, _, err := weth9.DeployWETH9(
+		//			chain.DeployerKey,
+		//			chain.Client,
+		//		)
+		//		return weth9, tx.Hash(), err
+		//	}, chain.Confirm, saveToChain)
+		//if err != nil {
+		//	e.Logger.Errorw("Failed to deploy weth9", "err", err)
+		//	return err
+		//}
+
+		routerAddr, err := deployContract(e.Logger,
+			func() (common.Address, common.Hash, error) {
+				router, tx, _, err := router.DeployRouter(
+					chain.DeployerKey,
+					chain.Client,
+					common.HexToAddress("0x0"),
+					armProxy,
+				)
+				return router, tx.Hash(), err
+			}, chain.Confirm, saveToChain)
+		if err != nil {
+			e.Logger.Errorw("Failed to deploy router", "err", err)
+			return err
+		}
+		e.Logger.Infow("deployed router", "addr", routerAddr)
+
+		tokenAdminRegistry, err := deployContract(e.Logger,
+			func() (common.Address, common.Hash, error) {
 				tokenAdminRegistry, tx, _, err := token_admin_registry.DeployTokenAdminRegistry(
 					chain.DeployerKey,
 					chain.Client)
-				return tokenAdminRegistry.String(), tx.Hash(), err
-			},
-			chain.Confirm,
-			func(addr string) error {
-				return e.AddressBook.Save(chain.Selector, addr)
-			},
-		)
+				return tokenAdminRegistry, tx.Hash(), err
+			}, chain.Confirm, saveToChain)
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy token admin registry", "err", err)
 			return err
 		}
+		e.Logger.Infow("deployed tokenAdminRegistry", "addr", tokenAdminRegistry)
 	}
 	return nil
 }

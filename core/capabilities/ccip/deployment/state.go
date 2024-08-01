@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 )
@@ -33,6 +34,7 @@ type CCIPOnChainState struct {
 	NonceManagers        map[uint64]*nonce_manager.NonceManager
 	TokenAdminRegistries map[uint64]*token_admin_registry.TokenAdminRegistry
 	Routers              map[uint64]*router.Router
+	Weth9s               map[uint64]*weth9.WETH9
 
 	// Only lives on the home chain.
 	CapabilityRegistry *capabilities_registry.CapabilitiesRegistry
@@ -77,6 +79,7 @@ func GenerateOnchainState(e environment.Environment) (CCIPOnChainState, error) {
 		NonceManagers:        make(map[uint64]*nonce_manager.NonceManager),
 		TokenAdminRegistries: make(map[uint64]*token_admin_registry.TokenAdminRegistry),
 		Routers:              make(map[uint64]*router.Router),
+		Weth9s:               make(map[uint64]*weth9.WETH9),
 	}
 	// Get all the onchain state
 	addresses, err := e.AddressBook.Addresses()
@@ -87,13 +90,12 @@ func GenerateOnchainState(e environment.Environment) (CCIPOnChainState, error) {
 		for address := range addresses {
 			tv, err := type_and_version.NewTypeAndVersionInterface(common.HexToAddress(address), e.Chains[chainSelector].Client)
 			if err != nil {
-				return state, err
+				return state, errors.Wrap(err, "could not create tv interface")
 			}
 			tvStr, err := tv.TypeAndVersion(nil)
 			if err != nil {
-				// TODO: there are some contracts which dont like the link token
-				// Handle here.
-				return state, err
+				// TODO: there are some contracts which dont like the link token/weth9
+				return state, errors.Wrap(err, fmt.Sprintf("could not call tv version, does the contract %s implement it?", address))
 			}
 			switch tvStr {
 			case "CapabilitiesRegistry 1.0.0":
