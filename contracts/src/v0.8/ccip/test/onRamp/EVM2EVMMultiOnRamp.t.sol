@@ -144,15 +144,18 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
     uint256 feeAmount = 1234567890;
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+
     // Change the source router for this lane
     address newRouter = makeAddr("NEW ROUTER");
     vm.stopPrank();
     vm.prank(OWNER);
     s_onRamp.applyDestChainConfigUpdates(_generateDestChainConfigArgs(newRouter));
+
     // forward fails from wrong router
     vm.prank(address(s_sourceRouter));
     vm.expectRevert(EVM2EVMMultiOnRamp.MustBeCalledByRouter.selector);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+
     // forward succeeds from correct router
     vm.prank(newRouter);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
