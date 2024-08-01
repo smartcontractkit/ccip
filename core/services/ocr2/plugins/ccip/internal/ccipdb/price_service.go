@@ -224,7 +224,7 @@ func (p *priceService) runCleanup(ctx context.Context) error {
 	eg := new(errgroup.Group)
 
 	eg.Go(func() error {
-		err := p.orm.ClearGasPricesByDestChain(ctx, p.destChainSelector, p.priceExpireSec)
+		_, err := p.orm.ClearGasPricesByDestChain(ctx, p.destChainSelector, p.priceExpireSec)
 		if err != nil {
 			return fmt.Errorf("error clearing gas prices: %w", err)
 		}
@@ -232,7 +232,7 @@ func (p *priceService) runCleanup(ctx context.Context) error {
 	})
 
 	eg.Go(func() error {
-		err := p.orm.ClearTokenPricesByDestChain(ctx, p.destChainSelector, p.priceExpireSec)
+		_, err := p.orm.ClearTokenPricesByDestChain(ctx, p.destChainSelector, p.priceExpireSec)
 		if err != nil {
 			return fmt.Errorf("error clearing token prices: %w", err)
 		}
@@ -359,12 +359,13 @@ func (p *priceService) writePricesToDB(
 
 	if sourceGasPriceUSD != nil {
 		eg.Go(func() error {
-			return p.orm.InsertGasPricesForDestChain(ctx, p.destChainSelector, p.jobId, []cciporm.GasPriceUpdate{
+			_, err1 := p.orm.InsertGasPricesForDestChain(ctx, p.destChainSelector, p.jobId, []cciporm.GasPriceUpdate{
 				{
 					SourceChainSelector: p.sourceChainSelector,
 					GasPrice:            assets.NewWei(sourceGasPriceUSD),
 				},
 			})
+			return err1
 		})
 	}
 
@@ -384,7 +385,8 @@ func (p *priceService) writePricesToDB(
 		})
 
 		eg.Go(func() error {
-			return p.orm.InsertTokenPricesForDestChain(ctx, p.destChainSelector, p.jobId, tokenPrices)
+			_, err1 := p.orm.InsertTokenPricesForDestChain(ctx, p.destChainSelector, p.jobId, tokenPrices)
+			return err1
 		})
 	}
 

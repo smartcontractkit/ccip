@@ -24,21 +24,31 @@ func (_m *ORM) EXPECT() *ORM_Expecter {
 }
 
 // ClearGasPricesByDestChain provides a mock function with given fields: ctx, destChainSelector, expireSec
-func (_m *ORM) ClearGasPricesByDestChain(ctx context.Context, destChainSelector uint64, expireSec int) error {
+func (_m *ORM) ClearGasPricesByDestChain(ctx context.Context, destChainSelector uint64, expireSec int) (int64, error) {
 	ret := _m.Called(ctx, destChainSelector, expireSec)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ClearGasPricesByDestChain")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, int) error); ok {
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, int) (int64, error)); ok {
+		return rf(ctx, destChainSelector, expireSec)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, int) int64); ok {
 		r0 = rf(ctx, destChainSelector, expireSec)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(int64)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, int) error); ok {
+		r1 = rf(ctx, destChainSelector, expireSec)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // ORM_ClearGasPricesByDestChain_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ClearGasPricesByDestChain'
@@ -61,32 +71,42 @@ func (_c *ORM_ClearGasPricesByDestChain_Call) Run(run func(ctx context.Context, 
 	return _c
 }
 
-func (_c *ORM_ClearGasPricesByDestChain_Call) Return(_a0 error) *ORM_ClearGasPricesByDestChain_Call {
-	_c.Call.Return(_a0)
+func (_c *ORM_ClearGasPricesByDestChain_Call) Return(_a0 int64, _a1 error) *ORM_ClearGasPricesByDestChain_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *ORM_ClearGasPricesByDestChain_Call) RunAndReturn(run func(context.Context, uint64, int) error) *ORM_ClearGasPricesByDestChain_Call {
+func (_c *ORM_ClearGasPricesByDestChain_Call) RunAndReturn(run func(context.Context, uint64, int) (int64, error)) *ORM_ClearGasPricesByDestChain_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // ClearTokenPricesByDestChain provides a mock function with given fields: ctx, destChainSelector, expireSec
-func (_m *ORM) ClearTokenPricesByDestChain(ctx context.Context, destChainSelector uint64, expireSec int) error {
+func (_m *ORM) ClearTokenPricesByDestChain(ctx context.Context, destChainSelector uint64, expireSec int) (int64, error) {
 	ret := _m.Called(ctx, destChainSelector, expireSec)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ClearTokenPricesByDestChain")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, int) error); ok {
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, int) (int64, error)); ok {
+		return rf(ctx, destChainSelector, expireSec)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, int) int64); ok {
 		r0 = rf(ctx, destChainSelector, expireSec)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(int64)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, int) error); ok {
+		r1 = rf(ctx, destChainSelector, expireSec)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // ORM_ClearTokenPricesByDestChain_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ClearTokenPricesByDestChain'
@@ -109,12 +129,12 @@ func (_c *ORM_ClearTokenPricesByDestChain_Call) Run(run func(ctx context.Context
 	return _c
 }
 
-func (_c *ORM_ClearTokenPricesByDestChain_Call) Return(_a0 error) *ORM_ClearTokenPricesByDestChain_Call {
-	_c.Call.Return(_a0)
+func (_c *ORM_ClearTokenPricesByDestChain_Call) Return(_a0 int64, _a1 error) *ORM_ClearTokenPricesByDestChain_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *ORM_ClearTokenPricesByDestChain_Call) RunAndReturn(run func(context.Context, uint64, int) error) *ORM_ClearTokenPricesByDestChain_Call {
+func (_c *ORM_ClearTokenPricesByDestChain_Call) RunAndReturn(run func(context.Context, uint64, int) (int64, error)) *ORM_ClearTokenPricesByDestChain_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -238,21 +258,31 @@ func (_c *ORM_GetTokenPricesByDestChain_Call) RunAndReturn(run func(context.Cont
 }
 
 // InsertGasPricesForDestChain provides a mock function with given fields: ctx, destChainSelector, jobId, gasPrices
-func (_m *ORM) InsertGasPricesForDestChain(ctx context.Context, destChainSelector uint64, jobId int32, gasPrices []ccip.GasPriceUpdate) error {
+func (_m *ORM) InsertGasPricesForDestChain(ctx context.Context, destChainSelector uint64, jobId int32, gasPrices []ccip.GasPriceUpdate) (int64, error) {
 	ret := _m.Called(ctx, destChainSelector, jobId, gasPrices)
 
 	if len(ret) == 0 {
 		panic("no return value specified for InsertGasPricesForDestChain")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, int32, []ccip.GasPriceUpdate) error); ok {
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, int32, []ccip.GasPriceUpdate) (int64, error)); ok {
+		return rf(ctx, destChainSelector, jobId, gasPrices)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, int32, []ccip.GasPriceUpdate) int64); ok {
 		r0 = rf(ctx, destChainSelector, jobId, gasPrices)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(int64)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, int32, []ccip.GasPriceUpdate) error); ok {
+		r1 = rf(ctx, destChainSelector, jobId, gasPrices)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // ORM_InsertGasPricesForDestChain_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InsertGasPricesForDestChain'
@@ -276,32 +306,42 @@ func (_c *ORM_InsertGasPricesForDestChain_Call) Run(run func(ctx context.Context
 	return _c
 }
 
-func (_c *ORM_InsertGasPricesForDestChain_Call) Return(_a0 error) *ORM_InsertGasPricesForDestChain_Call {
-	_c.Call.Return(_a0)
+func (_c *ORM_InsertGasPricesForDestChain_Call) Return(_a0 int64, _a1 error) *ORM_InsertGasPricesForDestChain_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *ORM_InsertGasPricesForDestChain_Call) RunAndReturn(run func(context.Context, uint64, int32, []ccip.GasPriceUpdate) error) *ORM_InsertGasPricesForDestChain_Call {
+func (_c *ORM_InsertGasPricesForDestChain_Call) RunAndReturn(run func(context.Context, uint64, int32, []ccip.GasPriceUpdate) (int64, error)) *ORM_InsertGasPricesForDestChain_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // InsertTokenPricesForDestChain provides a mock function with given fields: ctx, destChainSelector, jobId, tokenPrices
-func (_m *ORM) InsertTokenPricesForDestChain(ctx context.Context, destChainSelector uint64, jobId int32, tokenPrices []ccip.TokenPriceUpdate) error {
+func (_m *ORM) InsertTokenPricesForDestChain(ctx context.Context, destChainSelector uint64, jobId int32, tokenPrices []ccip.TokenPriceUpdate) (int64, error) {
 	ret := _m.Called(ctx, destChainSelector, jobId, tokenPrices)
 
 	if len(ret) == 0 {
 		panic("no return value specified for InsertTokenPricesForDestChain")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, int32, []ccip.TokenPriceUpdate) error); ok {
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, int32, []ccip.TokenPriceUpdate) (int64, error)); ok {
+		return rf(ctx, destChainSelector, jobId, tokenPrices)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, int32, []ccip.TokenPriceUpdate) int64); ok {
 		r0 = rf(ctx, destChainSelector, jobId, tokenPrices)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(int64)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, int32, []ccip.TokenPriceUpdate) error); ok {
+		r1 = rf(ctx, destChainSelector, jobId, tokenPrices)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // ORM_InsertTokenPricesForDestChain_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InsertTokenPricesForDestChain'
@@ -325,12 +365,12 @@ func (_c *ORM_InsertTokenPricesForDestChain_Call) Run(run func(ctx context.Conte
 	return _c
 }
 
-func (_c *ORM_InsertTokenPricesForDestChain_Call) Return(_a0 error) *ORM_InsertTokenPricesForDestChain_Call {
-	_c.Call.Return(_a0)
+func (_c *ORM_InsertTokenPricesForDestChain_Call) Return(_a0 int64, _a1 error) *ORM_InsertTokenPricesForDestChain_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *ORM_InsertTokenPricesForDestChain_Call) RunAndReturn(run func(context.Context, uint64, int32, []ccip.TokenPriceUpdate) error) *ORM_InsertTokenPricesForDestChain_Call {
+func (_c *ORM_InsertTokenPricesForDestChain_Call) RunAndReturn(run func(context.Context, uint64, int32, []ccip.TokenPriceUpdate) (int64, error)) *ORM_InsertTokenPricesForDestChain_Call {
 	_c.Call.Return(run)
 	return _c
 }

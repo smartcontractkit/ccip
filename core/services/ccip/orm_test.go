@@ -145,9 +145,9 @@ func TestORM_InsertAndGetGasPrices(t *testing.T) {
 		for selector, updatesPerSelector := range updates {
 			lastIndex := len(updatesPerSelector) - 1
 
-			err := orm.InsertGasPricesForDestChain(ctx, destSelector, int32(i), updatesPerSelector[:lastIndex])
+			_, err := orm.InsertGasPricesForDestChain(ctx, destSelector, int32(i), updatesPerSelector[:lastIndex])
 			assert.NoError(t, err)
-			err = orm.InsertGasPricesForDestChain(ctx, destSelector, int32(i), updatesPerSelector[lastIndex:])
+			_, err = orm.InsertGasPricesForDestChain(ctx, destSelector, int32(i), updatesPerSelector[lastIndex:])
 			assert.NoError(t, err)
 
 			expectedPrices[selector] = updatesPerSelector[lastIndex]
@@ -176,7 +176,7 @@ func TestORM_InsertAndGetGasPrices(t *testing.T) {
 		expectedPrices[selector] = updatesPerSelector[0]
 	}
 
-	err = orm.InsertGasPricesForDestChain(ctx, destSelector, 1, combinedUpdates)
+	_, err = orm.InsertGasPricesForDestChain(ctx, destSelector, 1, combinedUpdates)
 	assert.NoError(t, err)
 	assert.Equal(t, numJobs*numSourceChainSelectors*numUpdatesPerSourceSelector+numSourceChainSelectors, getGasTableRowCount(t, db))
 
@@ -208,7 +208,7 @@ func TestORM_InsertAndDeleteGasPrices(t *testing.T) {
 	}
 
 	for _, updatesPerSelector := range updates {
-		err := orm.InsertGasPricesForDestChain(ctx, destSelector, 1, updatesPerSelector)
+		_, err := orm.InsertGasPricesForDestChain(ctx, destSelector, 1, updatesPerSelector)
 		assert.NoError(t, err)
 	}
 
@@ -217,19 +217,19 @@ func TestORM_InsertAndDeleteGasPrices(t *testing.T) {
 
 	// insert for the 2nd time after interimTimeStamp
 	for _, updatesPerSelector := range updates {
-		err := orm.InsertGasPricesForDestChain(ctx, destSelector, 1, updatesPerSelector)
+		_, err := orm.InsertGasPricesForDestChain(ctx, destSelector, 1, updatesPerSelector)
 		assert.NoError(t, err)
 	}
 
 	assert.Equal(t, 2*numSourceChainSelectors*numUpdatesPerSourceSelector, getGasTableRowCount(t, db))
 
 	// clear by sleepSec should delete rows inserted before it
-	err := orm.ClearGasPricesByDestChain(ctx, destSelector, sleepSec)
+	_, err := orm.ClearGasPricesByDestChain(ctx, destSelector, sleepSec)
 	assert.NoError(t, err)
 	assert.Equal(t, numSourceChainSelectors*numUpdatesPerSourceSelector, getGasTableRowCount(t, db))
 
 	// clear by 0 expiration seconds should delete all rows
-	err = orm.ClearGasPricesByDestChain(ctx, destSelector, 0)
+	_, err = orm.ClearGasPricesByDestChain(ctx, destSelector, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, getGasTableRowCount(t, db))
 }
@@ -258,9 +258,9 @@ func TestORM_InsertAndGetTokenPrices(t *testing.T) {
 		for addr, updatesPerAddr := range updates {
 			lastIndex := len(updatesPerAddr) - 1
 
-			err := orm.InsertTokenPricesForDestChain(ctx, destSelector, int32(i), updatesPerAddr[:lastIndex])
+			_, err := orm.InsertTokenPricesForDestChain(ctx, destSelector, int32(i), updatesPerAddr[:lastIndex])
 			assert.NoError(t, err)
-			err = orm.InsertTokenPricesForDestChain(ctx, destSelector, int32(i), updatesPerAddr[lastIndex:])
+			_, err = orm.InsertTokenPricesForDestChain(ctx, destSelector, int32(i), updatesPerAddr[lastIndex:])
 			assert.NoError(t, err)
 
 			expectedPrices[addr] = updatesPerAddr[lastIndex]
@@ -289,7 +289,7 @@ func TestORM_InsertAndGetTokenPrices(t *testing.T) {
 		expectedPrices[addr] = updatesPerAddr[0]
 	}
 
-	err = orm.InsertTokenPricesForDestChain(ctx, destSelector, 1, combinedUpdates)
+	_, err = orm.InsertTokenPricesForDestChain(ctx, destSelector, 1, combinedUpdates)
 	assert.NoError(t, err)
 	assert.Equal(t, numJobs*numAddresses*numUpdatesPerAddress+numAddresses, getTokenTableRowCount(t, db))
 
@@ -321,7 +321,7 @@ func TestORM_InsertAndDeleteTokenPrices(t *testing.T) {
 	}
 
 	for _, updatesPerAddr := range updates {
-		err := orm.InsertTokenPricesForDestChain(ctx, destSelector, 1, updatesPerAddr)
+		_, err := orm.InsertTokenPricesForDestChain(ctx, destSelector, 1, updatesPerAddr)
 		assert.NoError(t, err)
 	}
 
@@ -330,19 +330,19 @@ func TestORM_InsertAndDeleteTokenPrices(t *testing.T) {
 
 	// insert for the 2nd time after interimTimeStamp
 	for _, updatesPerAddr := range updates {
-		err := orm.InsertTokenPricesForDestChain(ctx, destSelector, 1, updatesPerAddr)
+		_, err := orm.InsertTokenPricesForDestChain(ctx, destSelector, 1, updatesPerAddr)
 		assert.NoError(t, err)
 	}
 
 	assert.Equal(t, 2*numAddresses*numUpdatesPerAddress, getTokenTableRowCount(t, db))
 
 	// clear by sleepSec should delete rows inserted before it
-	err := orm.ClearTokenPricesByDestChain(ctx, destSelector, sleepSec)
+	_, err := orm.ClearTokenPricesByDestChain(ctx, destSelector, sleepSec)
 	assert.NoError(t, err)
 	assert.Equal(t, numAddresses*numUpdatesPerAddress, getTokenTableRowCount(t, db))
 
 	// clear by 0 expiration seconds should delete all rows
-	err = orm.ClearTokenPricesByDestChain(ctx, destSelector, 0)
+	_, err = orm.ClearTokenPricesByDestChain(ctx, destSelector, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, getTokenTableRowCount(t, db))
 }
