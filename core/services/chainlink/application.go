@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip"
 	"math/big"
 	"net/http"
 	"sync"
+
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
