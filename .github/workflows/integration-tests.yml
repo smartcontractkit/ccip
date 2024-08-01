@@ -367,7 +367,7 @@ jobs:
             file: ccip
             run: -run ^TestSmokeCCIPOffRampAggRateLimit$
           - name: ccip-smoke-leader-lane
-            nodes: 1
+            nodes: 15
             dir: ccip-tests/smoke
             os: ubuntu-latest
             file: ccip
