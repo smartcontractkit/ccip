@@ -149,15 +149,20 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     uint256 feeTokenAmount,
     address originalSender
   ) external returns (bytes32) {
+    DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+
     // NOTE: assumes the message has already been validated through the getFee call
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause.
-    if (msg.sender != s_destChainConfigs[destChainSelector].router) revert MustBeCalledByRouter();
+    if (msg.sender != destChainConfig.router) revert MustBeCalledByRouter();
 
-    address messageValidator = s_dynamicConfig.messageValidator;
-    if (messageValidator != address(0)) {
-      IMessageInterceptor(messageValidator).onOutboundMessage(destChainSelector, message);
+    {
+      // scoped to reduce stack usage
+      address messageValidator = s_dynamicConfig.messageValidator;
+      if (messageValidator != address(0)) {
+        IMessageInterceptor(messageValidator).onOutboundMessage(destChainSelector, message);
+      }
     }
 
     // Convert message fee to juels and retrieve converted args
@@ -174,7 +179,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
         sourceChainSelector: i_chainSelector,
         destChainSelector: destChainSelector,
         // We need the next available sequence number so we increment before we use the value
-        sequenceNumber: ++s_destChainConfigs[destChainSelector].sequenceNumber,
+        sequenceNumber: ++destChainConfig.sequenceNumber,
         // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
         // may block ordered message nonces, which is not what we want.
         nonce: isOutOfOrderExecution
