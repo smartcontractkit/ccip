@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/smartcontractkit/chainlink/v2/capabilities/ccipcapability/validate"
 	"testing"
 	"time"
 
@@ -34,7 +35,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/blockhashstore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/blockheaderfeeder"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ccipcapability/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/directrequest"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
