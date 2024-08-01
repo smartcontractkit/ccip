@@ -102,25 +102,8 @@ func (r *ReorgSuite) RunReorgBelowFinalityThreshold(startDelay time.Duration) {
 		)
 		require.NoError(r.t, err)
 
-		time.Sleep(r.Cfg.ExperimentDuration)
-
-		//blocksBackDst := int(r.Cfg.DstFinalityDepth) - r.Cfg.FinalityDelta
-		//r.Logger.Info().
-		//	Str("URL", r.SrcClient.URL).
-		//	Str("Case", "below finality").
-		//	Int("BlocksBack", blocksBackDst).
-		//	Msg("Rewinding blocks on dst chain")
-		//err = r.DstClient.GethSetHead(blocksBackDst)
-		//assert.NoError(r.t, err)
-		//err = PostGrafanaAnnotation(
-		//	r.Logger,
-		//	r.GrafanaClient,
-		//	r.Cfg.dashboardUID,
-		//	fmt.Sprintf("rewinded dest chain for %d blocks back, finality is: %d", blocksBackDst, r.Cfg.DstFinalityDepth),
-		//	nil,
-		//)
-		//require.NoError(r.t, err)
 		//time.Sleep(r.Cfg.ExperimentDuration)
+		time.Sleep(1 * time.Minute)
 	}()
 }
 

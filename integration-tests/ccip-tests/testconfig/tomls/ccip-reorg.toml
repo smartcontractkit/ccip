@@ -66,6 +66,11 @@ WaitBetweenChaosDuringLoad = '2m' # Duration to wait between each chaos injectio
 NetworkChaosDelay = '100ms'       # Duration for network chaos delay; only valid for chaos tests using network chaos
 FailOnFirstErrorInLoad = true
 
-[CCIP.Groups.load.ChaosReorgProfile]
+[CCIP.Groups.smoke.ChaosReorgProfile]
 FinalityDelta = 5
-Duration = '5m'
+Duration = '1m'
+
+[CCIP.Groups.smoke]
+BiDirectionalLane = true
+PhaseTimeout = '5m'       # Duration to wait for the each phase validation(SendRequested, Commit, RMN Blessing, Execution) to time-out.
+LocalCluster = false
