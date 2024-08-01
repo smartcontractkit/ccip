@@ -74,7 +74,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       EVM2EVMOnRamp.TokenTransferFeeConfigArgs({
         token: CUSTOM_TOKEN,
         minFeeUSDCents: 2_00, // 1 USD
-        maxFeeUSDCents: 2000_00, // 1,000 USD
+        maxFeeUSDCents: 500_00, // 500 USD
         deciBps: 10_0, // 10 bps, or 0.1%
         destGasOverhead: 90_000,
         destBytesOverhead: 200,

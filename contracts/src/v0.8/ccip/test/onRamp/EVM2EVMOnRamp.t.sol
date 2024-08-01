@@ -1335,39 +1335,36 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
       );
     }
 
-    assertEq(expectedFeeUSDWei, feeUSDWei, "wrong feeUSDWei");
-    assertEq(expectedTotalGas, destGasOverhead, "wrong destGasOverhead");
-    assertEq(expectedTotalBytes, destBytesOverhead, "wrong destBytesOverhead");
+    assertEq(expectedFeeUSDWei, feeUSDWei, "wrong feeUSDWei 1");
+    assertEq(expectedTotalGas, destGasOverhead, "wrong destGasOverhead 1");
+    assertEq(expectedTotalBytes, destBytesOverhead, "wrong destBytesOverhead 1");
 
     // Set 1st token transfer to a meaningful amount so its bps fee is now between min and max fee
     message.tokenAmounts[0] = Client.EVMTokenAmount({token: testTokens[0], amount: 10000e18});
 
-    (feeUSDWei, destGasOverhead, destBytesOverhead) =
-      s_onRamp.getTokenTransferCost(message.feeToken, s_wrappedTokenPrice, message.tokenAmounts);
-    expectedFeeUSDWei = applyBpsRatio(
+    uint256 token0USDWei = applyBpsRatio(
       calcUSDValueFromTokenAmount(tokenPrices[0], message.tokenAmounts[0].amount), tokenTransferFeeConfigs[0].deciBps
     );
-    expectedFeeUSDWei += configUSDCentToWei(DEFAULT_TOKEN_FEE_USD_CENTS);
-    expectedFeeUSDWei += configUSDCentToWei(tokenTransferFeeConfigs[2].minFeeUSDCents);
+    uint256 token1USDWei = configUSDCentToWei(DEFAULT_TOKEN_FEE_USD_CENTS);
 
-    assertEq(expectedFeeUSDWei, feeUSDWei, "wrong feeUSDWei");
-    assertEq(expectedTotalGas, destGasOverhead, "wrong destGasOverhead");
-    assertEq(expectedTotalBytes, destBytesOverhead, "wrong destBytesOverhead");
+    (feeUSDWei, destGasOverhead, destBytesOverhead) =
+      s_onRamp.getTokenTransferCost(message.feeToken, s_wrappedTokenPrice, message.tokenAmounts);
+    expectedFeeUSDWei = token0USDWei + token1USDWei + configUSDCentToWei(tokenTransferFeeConfigs[2].minFeeUSDCents);
+
+    assertEq(expectedFeeUSDWei, feeUSDWei, "wrong feeUSDWei 2");
+    assertEq(expectedTotalGas, destGasOverhead, "wrong destGasOverhead 2");
+    assertEq(expectedTotalBytes, destBytesOverhead, "wrong destBytesOverhead 2");
 
     // Set 2nd token transfer to a large amount that is higher than maxFeeUSD
-    message.tokenAmounts[1] = Client.EVMTokenAmount({token: testTokens[1], amount: 1e36});
+    message.tokenAmounts[2] = Client.EVMTokenAmount({token: testTokens[2], amount: 1e36});
 
     (feeUSDWei, destGasOverhead, destBytesOverhead) =
       s_onRamp.getTokenTransferCost(message.feeToken, s_wrappedTokenPrice, message.tokenAmounts);
-    expectedFeeUSDWei = applyBpsRatio(
-      calcUSDValueFromTokenAmount(tokenPrices[0], message.tokenAmounts[0].amount), tokenTransferFeeConfigs[0].deciBps
-    );
-    expectedFeeUSDWei += configUSDCentToWei(DEFAULT_TOKEN_FEE_USD_CENTS);
-    expectedFeeUSDWei += configUSDCentToWei(tokenTransferFeeConfigs[2].minFeeUSDCents);
+    expectedFeeUSDWei = token0USDWei + token1USDWei + configUSDCentToWei(tokenTransferFeeConfigs[2].maxFeeUSDCents);
 
-    assertEq(expectedFeeUSDWei, feeUSDWei, "wrong feeUSDWei");
-    assertEq(expectedTotalGas, destGasOverhead, "wrong destGasOverhead");
-    assertEq(expectedTotalBytes, destBytesOverhead, "wrong destBytesOverhead");
+    assertEq(expectedFeeUSDWei, feeUSDWei, "wrong feeUSDWei 3");
+    assertEq(expectedTotalGas, destGasOverhead, "wrong destGasOverhead 3");
+    assertEq(expectedTotalBytes, destBytesOverhead, "wrong destBytesOverhead 3");
   }
 
   // reverts
