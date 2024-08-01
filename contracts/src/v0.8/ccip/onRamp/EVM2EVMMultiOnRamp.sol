@@ -67,14 +67,12 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
   /// @dev Struct to hold the configs for a destination chain
   struct DestChainConfig {
-    uint64 sequenceNumber; // The last used sequence number. This is zero in the case where no messages has been sent yet.
+    // The last used sequence number. This is zero in the case where no messages has been sent yet.
     // 0 is not a valid sequence number for any real transaction.
-    /// @dev metadataHash is a lane-specific prefix for a message hash preimage which ensures global uniqueness
-    /// Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
-    /// Must match the metadataHash used in computing leaf hashes offchain for the root committed in
-    /// the commitStore and i_metadataHash in the offRamp.
-    address router; // This is the local router address that is allowed to send messages to the destination chain.
-      // This is NOT the receiving router address on the destination chain.
+    uint64 sequenceNumber;
+    // This is the local router address that is allowed to send messages to the destination chain.
+    // This is NOT the receiving router address on the destination chain.
+    address router;
   }
 
   /// @dev Same as DestChainConfig but with the destChainSelector so that an array of these
