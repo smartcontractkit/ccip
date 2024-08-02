@@ -808,6 +808,7 @@ jobs:
               echo "Error: The latest_version is empty. The migration tests need a verison to run."
               exit 1
           fi
+          # CCIP uses the `-release` suffix for their versions
           echo "latest_version=${latest_version}-release" >> "$GITHUB_OUTPUT"
       - name: Name Versions
         run: |
