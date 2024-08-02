@@ -370,6 +370,7 @@ func testSetup(ctx context.Context, t *testing.T, readerChain, destChain cciptyp
 			Name:    contractNames[0],
 		},
 	})
+	require.NoError(t, err)
 
 	contractReaders := map[cciptypes.ChainSelector]contractreader.Extended{readerChain: extendedCr}
 	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
