@@ -225,9 +225,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
       router: router,
       priceRegistry: priceRegistry,
       maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
-      maxDataBytes: MAX_DATA_SIZE,
-      maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
-      maxTokenTransferGas: MAX_TOKEN_POOL_TRANSFER_GAS
+      maxDataBytes: MAX_DATA_SIZE
     });
   }
 
