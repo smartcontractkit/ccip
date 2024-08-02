@@ -245,7 +245,7 @@ contract NonceManager_OnRampUpgrade is EVM2EVMMultiOnRampSetup {
     s_outboundNonceManager.applyPreviousRampsUpdates(previousRamps);
 
     (s_onRamp, s_metadataHash) = _deployOnRamp(
-      SOURCE_CHAIN_SELECTOR, address(s_sourceRouter), address(s_outboundNonceManager), address(s_tokenAdminRegistry)
+      SOURCE_CHAIN_SELECTOR, s_sourceRouter, address(s_outboundNonceManager), address(s_tokenAdminRegistry)
     );
 
     vm.startPrank(address(s_sourceRouter));

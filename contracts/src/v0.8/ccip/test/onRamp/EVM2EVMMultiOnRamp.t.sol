@@ -31,12 +31,10 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     emit EVM2EVMMultiOnRamp.ConfigSet(staticConfig, dynamicConfig);
     vm.expectEmit();
     emit EVM2EVMMultiOnRamp.DestChainConfigSet(
-      DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, address(s_sourceRouter))
+      DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, s_sourceRouter)
     );
 
-    _deployOnRamp(
-      SOURCE_CHAIN_SELECTOR, address(s_sourceRouter), address(s_outboundNonceManager), address(s_tokenAdminRegistry)
-    );
+    _deployOnRamp(SOURCE_CHAIN_SELECTOR, s_sourceRouter, address(s_outboundNonceManager), address(s_tokenAdminRegistry));
 
     EVM2EVMMultiOnRamp.StaticConfig memory gotStaticConfig = s_onRamp.getStaticConfig();
     _assertStaticConfigsEqual(staticConfig, gotStaticConfig);
@@ -48,7 +46,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     assertEq("EVM2EVMMultiOnRamp 1.6.0-dev", s_onRamp.typeAndVersion());
     assertEq(OWNER, s_onRamp.owner());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR));
-    assertEq(address(s_sourceRouter), s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).router);
+    assertEq(address(s_sourceRouter), address(s_onRamp.getRouter(DEST_CHAIN_SELECTOR)));
   }
 
   function test_Constructor_InvalidConfigChainSelectorEqZero_Revert() public {
@@ -61,7 +59,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       _generateDynamicMultiOnRampConfig(address(s_priceRegistry)),
-      _generateDestChainConfigArgs(address(0))
+      _generateDestChainConfigArgs(IRouter(address(0)))
     );
   }
 
@@ -75,7 +73,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       _generateDynamicMultiOnRampConfig(address(s_priceRegistry)),
-      _generateDestChainConfigArgs(address(0))
+      _generateDestChainConfigArgs(IRouter(address(0)))
     );
   }
 
@@ -89,7 +87,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       _generateDynamicMultiOnRampConfig(address(s_priceRegistry)),
-      _generateDestChainConfigArgs(address(0))
+      _generateDestChainConfigArgs(IRouter(address(0)))
     );
   }
 
@@ -103,7 +101,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
         tokenAdminRegistry: address(0)
       }),
       _generateDynamicMultiOnRampConfig(address(s_priceRegistry)),
-      _generateDestChainConfigArgs(address(0))
+      _generateDestChainConfigArgs(IRouter(address(0)))
     );
   }
 }
@@ -146,7 +144,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     // Change the source router for this lane
-    address newRouter = makeAddr("NEW ROUTER");
+    IRouter newRouter = IRouter(makeAddr("NEW ROUTER"));
     vm.stopPrank();
     vm.prank(OWNER);
     s_onRamp.applyDestChainConfigUpdates(_generateDestChainConfigArgs(newRouter));
@@ -157,7 +155,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
 
     // forward succeeds from correct router
-    vm.prank(newRouter);
+    vm.prank(address(newRouter));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 
@@ -752,24 +750,26 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
 
     // supports disabling a lane by setting a router to zero
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, address(0)));
+    emit EVM2EVMMultiOnRamp.DestChainConfigSet(
+      DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, IRouter(address(0)))
+    );
     s_onRamp.applyDestChainConfigUpdates(configArgs);
-    assertEq(address(0), s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).router);
+    assertEq(address(0), address(s_onRamp.getRouter(DEST_CHAIN_SELECTOR)));
 
     // supports updating and adding lanes simultaneously
     configArgs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](2);
     configArgs[0] =
-      EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: address(s_sourceRouter)});
-    configArgs[1] = EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: 9999, router: address(9999)});
+      EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter});
+    configArgs[1] = EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999))});
     vm.expectEmit();
     emit EVM2EVMMultiOnRamp.DestChainConfigSet(
-      DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, address(s_sourceRouter))
+      DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, s_sourceRouter)
     );
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.DestChainConfigSet(9999, EVM2EVMMultiOnRamp.DestChainConfig(0, address(9999)));
+    emit EVM2EVMMultiOnRamp.DestChainConfigSet(9999, EVM2EVMMultiOnRamp.DestChainConfig(0, IRouter(address(9999))));
     s_onRamp.applyDestChainConfigUpdates(configArgs);
-    assertEq(address(s_sourceRouter), s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).router);
-    assertEq(address(9999), s_onRamp.getDestChainConfig(9999).router);
+    assertEq(address(s_sourceRouter), address(s_onRamp.getRouter(DEST_CHAIN_SELECTOR)));
+    assertEq(address(9999), address(s_onRamp.getRouter(9999)));
 
     // handles empty list
     uint256 numLogs = vm.getRecordedLogs().length;

@@ -66,7 +66,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
       s_onRamp2,
       s_metadataHash2
     ) = _deployOnRamp(
-      SOURCE_CHAIN_SELECTOR + 1, address(s_sourceRouter2), address(s_nonceManager2), address(s_tokenAdminRegistry2)
+      SOURCE_CHAIN_SELECTOR + 1, s_sourceRouter2, address(s_nonceManager2), address(s_tokenAdminRegistry2)
     );
 
     address[] memory authorizedCallers = new address[](1);

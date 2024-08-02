@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {IPoolV1} from "../../interfaces/IPool.sol";
+import {IRouter} from "../../interfaces/IRouter.sol";
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../NonceManager.sol";
@@ -38,7 +39,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
     s_outboundMessageValidator = new MessageInterceptorHelper();
     s_outboundNonceManager = new NonceManager(new address[](0));
     (s_onRamp, s_metadataHash) = _deployOnRamp(
-      SOURCE_CHAIN_SELECTOR, address(s_sourceRouter), address(s_outboundNonceManager), address(s_tokenAdminRegistry)
+      SOURCE_CHAIN_SELECTOR, s_sourceRouter, address(s_outboundNonceManager), address(s_tokenAdminRegistry)
     );
 
     s_offRamps = new address[](2);
@@ -111,7 +112,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
     return result;
   }
 
-  function _generateDestChainConfigArgs(address router)
+  function _generateDestChainConfigArgs(IRouter router)
     internal
     pure
     returns (EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory)
@@ -124,7 +125,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
 
   function _deployOnRamp(
     uint64 sourceChainSelector,
-    address router,
+    IRouter router,
     address nonceManager,
     address tokenAdminRegistry
   ) internal returns (EVM2EVMMultiOnRampHelper, bytes32 metadataHash) {

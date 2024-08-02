@@ -8,6 +8,7 @@ import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
+import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
@@ -72,7 +73,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     uint64 sequenceNumber;
     // This is the local router address that is allowed to send messages to the destination chain.
     // This is NOT the receiving router address on the destination chain.
-    address router;
+    IRouter router;
   }
 
   /// @dev Same as DestChainConfig but with the destChainSelector so that an array of these
@@ -80,7 +81,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   //solhint-disable gas-struct-packing
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector
-    address router; // Source router address
+    IRouter router; // Source router address
   }
 
   // STATIC CONFIG
@@ -155,7 +156,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause.
-    if (msg.sender != destChainConfig.router) revert MustBeCalledByRouter();
+    if (msg.sender != address(destChainConfig.router)) revert MustBeCalledByRouter();
 
     {
       // scoped to reduce stack usage
@@ -296,6 +297,13 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     _setDynamicConfig(dynamicConfig);
   }
 
+  /// @notice Gets the source router for a destination chain
+  /// @param destChainSelector The destination chain selector
+  /// @return router the router for the provided destination chain
+  function getRouter(uint64 destChainSelector) external view returns (IRouter) {
+    return s_destChainConfigs[destChainSelector].router;
+  }
+
   /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
     if (dynamicConfig.priceRegistry == address(0) || dynamicConfig.feeAggregator == address(0)) revert InvalidConfig();
@@ -311,13 +319,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       }),
       dynamicConfig
     );
-  }
-
-  /// @notice Gets the source router for a destination chain
-  /// @param destChainSelector The destination chain selector
-  /// @return destChainConfig the config for the provided destination chain
-  function getDestChainConfig(uint64 destChainSelector) external view returns (DestChainConfig memory) {
-    return s_destChainConfigs[destChainSelector];
   }
 
   /// @notice Updates the destination chain specific config.
