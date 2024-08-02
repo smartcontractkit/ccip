@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -167,6 +168,10 @@ func TestCCIPReader_ExecutedMessageRanges(t *testing.T) {
 	)
 	assert.NoError(t, err)
 	s.sb.Commit()
+
+	// Need to replay as sometimes the logs are not picked up by the log poller (?)
+	// Maybe another situation where chain reader doesn't register filters as expected.
+	require.NoError(t, s.lp.Replay(ctx, 1))
 
 	var executedRanges []cciptypes.SeqNumRange
 	require.Eventually(t, func() bool {
@@ -325,6 +330,7 @@ func testSetup(ctx context.Context, t *testing.T, readerChain, destChain cciptyp
 	assert.NoError(t, err)
 
 	lggr := logger.TestLogger(t)
+	lggr.SetLogLevel(zapcore.ErrorLevel)
 	db := pgtest.NewSqlxDB(t)
 	lpOpts := logpoller.Opts{
 		PollPeriod:               time.Millisecond,
@@ -360,8 +366,6 @@ func testSetup(ctx context.Context, t *testing.T, readerChain, destChain cciptyp
 
 	cr, err := evm.NewChainReaderService(ctx, lggr, lp, headTracker, cl, cfg)
 	require.NoError(t, err)
-	err = cr.Start(ctx)
-	require.NoError(t, err)
 
 	extendedCr := contractreader.NewExtendedContractReader(cr)
 	err = extendedCr.Bind(ctx, []types.BoundContract{
@@ -370,6 +374,9 @@ func testSetup(ctx context.Context, t *testing.T, readerChain, destChain cciptyp
 			Name:    contractNames[0],
 		},
 	})
+	require.NoError(t, err)
+
+	err = cr.Start(ctx)
 	require.NoError(t, err)
 
 	contractReaders := map[cciptypes.ChainSelector]contractreader.Extended{readerChain: extendedCr}
