@@ -169,13 +169,17 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	}
 
 	// Wait for the commit reports to be generated and reported on all chains.
-	numUnis := len(universes)
+	// Expected min seq nr is numChains-1 because we fire off numChains-1 messages in the first batch
+	// from each chain to the other chains.
+	// i.e each chain is connected to numChains-1 other chains.
+	// We add 1 because the minSeqNr the latest committed sequence number + 1.
+	expectedMinSeqNr := uint64(len(universes)-1) + 1
 	var wg sync.WaitGroup
 	for _, uni := range universes {
 		wg.Add(1)
 		go func(uni onchainUniverse) {
 			defer wg.Done()
-			waitForCommit(t, uni, numUnis, nil)
+			waitForCommit(t, uni, maps.Keys(universes), nil, expectedMinSeqNr)
 		}(uni)
 	}
 
@@ -192,12 +196,15 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	t.Log("Sending ping pong from each chain to each other again for a second time")
 	sendPingPong(t, universes, pingPongs, messageIDs, replayBlocks, 2)
 
+	// Expected min seq nr is multiplied by two because we're again firing numChains-1
+	// messages from each chain to the other chains.
+	expectedMinSeqNr *= 2
 	for _, uni := range universes {
 		startBlock := preRequestBlocks[uni.chainID]
 		wg.Add(1)
 		go func(uni onchainUniverse, startBlock *uint64) {
 			defer wg.Done()
-			waitForCommit(t, uni, numUnis, startBlock)
+			waitForCommit(t, uni, maps.Keys(universes), startBlock, expectedMinSeqNr)
 		}(uni, &startBlock)
 	}
 
@@ -287,7 +294,13 @@ func sendPingPong(
 	}
 }
 
-func waitForCommit(t *testing.T, uni onchainUniverse, numUnis int, startBlock *uint64) {
+func waitForCommit(
+	t *testing.T,
+	uni onchainUniverse,
+	allChainIDs []uint64,
+	startBlock *uint64,
+	expectedMinSeqNr uint64,
+) {
 	sink := make(chan *evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReportAccepted)
 	subscription, err := uni.offramp.WatchCommitReportAccepted(&bind.WatchOpts{
 		Start:   startBlock,
@@ -298,19 +311,38 @@ func waitForCommit(t *testing.T, uni onchainUniverse, numUnis int, startBlock *u
 	for {
 		select {
 		case <-time.After(5 * time.Second):
-			t.Logf("Waiting for commit report on chain id %d (selector %d)", uni.chainID, getSelector(uni.chainID))
+			t.Logf("Waiting for commit report on chain id %d (selector %d), expectedMinSeqNr %d", uni.chainID, getSelector(uni.chainID), expectedMinSeqNr)
 		case subErr := <-subscription.Err():
 			t.Fatalf("Subscription error: %+v", subErr)
 		case report := <-sink:
 			if len(report.Report.MerkleRoots) > 0 {
-				if len(report.Report.MerkleRoots) == numUnis-1 {
-					t.Logf("Received commit report with %d merkle roots on chain id %d (selector %d): %+v",
-						len(report.Report.MerkleRoots), uni.chainID, getSelector(uni.chainID), report)
+				t.Logf("Received commit report with %d merkle roots on chain id %d (selector %d): %+v",
+					len(report.Report.MerkleRoots), uni.chainID, getSelector(uni.chainID), func() []string {
+						var res []string
+						for _, root := range report.Report.MerkleRoots {
+							res = append(res, fmt.Sprintf("MerkleRoot{Root: %s, ChainSelector: %d, Interval: [Min:%d, Max: %d]}",
+								hexutil.Encode(root.MerkleRoot[:]), root.SourceChainSelector, root.Interval.Min, root.Interval.Max))
+						}
+						return res
+					}())
+				gotAll := true
+				for _, remoteChainID := range allChainIDs {
+					if remoteChainID == uni.chainID {
+						continue
+					}
+					scc, err := uni.offramp.GetSourceChainConfig(&bind.CallOpts{
+						Context: testutils.Context(t),
+					}, getSelector(remoteChainID))
+					require.NoError(t, err)
+					gotAll = gotAll && scc.MinSeqNr == expectedMinSeqNr
+				}
+				if gotAll {
+					t.Logf("Expected min seq nr reached on chain id %d (selector %d)",
+						uni.chainID, getSelector(uni.chainID))
 					return
 				}
-				t.Fatalf("Received commit report with %d merkle roots, expected %d", len(report.Report.MerkleRoots), numUnis)
 			} else {
-				t.Logf("Received commit report without merkle roots on chain id %d (selector %d): %+v", uni.chainID, getSelector(uni.chainID), report)
+				t.Logf("Received commit report without merkle roots on chain id %d (selector %d)", uni.chainID, getSelector(uni.chainID))
 			}
 		}
 	}
