@@ -134,7 +134,6 @@ func (p *priceService) Close() error {
 }
 
 func (p *priceService) run() {
-	cleanupTicker := time.NewTicker(p.cleanupInterval)
 	updateTicker := time.NewTicker(p.updateInterval)
 
 	go func() {
@@ -144,11 +143,11 @@ func (p *priceService) run() {
 			select {
 			case <-p.backgroundCtx.Done():
 				return
-			case <-cleanupTicker.C:
-				err := p.runCleanup(p.backgroundCtx)
-				if err != nil {
-					p.lggr.Errorw("Error when cleaning up in-db prices in the background", "err", err)
-				}
+			//case <-cleanupTicker.C:
+			//	err := p.runCleanup(p.backgroundCtx)
+			//	if err != nil {
+			//		p.lggr.Errorw("Error when cleaning up in-db prices in the background", "err", err)
+			//	}
 			case <-updateTicker.C:
 				err := p.runUpdate(p.backgroundCtx)
 				if err != nil {

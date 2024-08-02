@@ -11,16 +11,16 @@ CREATE TABLE ccip.observed_gas_prices(
 );
 
 CREATE TABLE ccip.observed_token_prices(
-     chain_selector NUMERIC(20,0) NOT NULL,
-     job_id INTEGER NOT NULL,
-     token_addr BYTEA NOT NULL,
-     token_price NUMERIC(78,0) NOT NULL,
-     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+       chain_selector NUMERIC(20,0) NOT NULL,
+       job_id INTEGER NOT NULL,
+       token_addr BYTEA NOT NULL,
+       token_price NUMERIC(78,0) NOT NULL,
+       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+       CONSTRAINT unique_token_chain UNIQUE (token_addr, chain_selector)
 );
 
 CREATE INDEX idx_ccip_gas_prices_chain_gas_price_timestamp ON ccip.observed_gas_prices (chain_selector, source_chain_selector, created_at DESC);
 CREATE INDEX idx_ccip_token_prices_token_price_timestamp ON ccip.observed_token_prices (chain_selector, token_addr, created_at DESC);
-
 -- +goose StatementEnd
 
 

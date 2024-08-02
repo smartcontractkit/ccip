@@ -269,7 +269,7 @@ func TestORM_InsertAndGetTokenPrices(t *testing.T) {
 
 	// verify number of rows inserted
 	numRows := getTokenTableRowCount(t, db)
-	assert.Equal(t, numJobs*numAddresses*numUpdatesPerAddress, numRows)
+	assert.Equal(t, numAddresses, numRows)
 
 	prices, err := orm.GetTokenPricesByDestChain(ctx, destSelector)
 	assert.NoError(t, err)
@@ -291,7 +291,7 @@ func TestORM_InsertAndGetTokenPrices(t *testing.T) {
 
 	_, err = orm.InsertTokenPricesForDestChain(ctx, destSelector, 1, combinedUpdates)
 	assert.NoError(t, err)
-	assert.Equal(t, numJobs*numAddresses*numUpdatesPerAddress+numAddresses, getTokenTableRowCount(t, db))
+	assert.Equal(t, numAddresses, getTokenTableRowCount(t, db))
 
 	prices, err = orm.GetTokenPricesByDestChain(ctx, destSelector)
 	assert.NoError(t, err)
@@ -334,12 +334,12 @@ func TestORM_InsertAndDeleteTokenPrices(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	assert.Equal(t, 2*numAddresses*numUpdatesPerAddress, getTokenTableRowCount(t, db))
+	assert.Equal(t, numAddresses, getTokenTableRowCount(t, db))
 
 	// clear by sleepSec should delete rows inserted before it
 	_, err := orm.ClearTokenPricesByDestChain(ctx, destSelector, sleepSec)
 	assert.NoError(t, err)
-	assert.Equal(t, numAddresses*numUpdatesPerAddress, getTokenTableRowCount(t, db))
+	assert.Equal(t, numAddresses, getTokenTableRowCount(t, db))
 
 	// clear by 0 expiration seconds should delete all rows
 	_, err = orm.ClearTokenPricesByDestChain(ctx, destSelector, 0)

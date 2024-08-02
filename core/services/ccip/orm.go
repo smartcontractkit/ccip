@@ -124,8 +124,14 @@ func (o *orm) InsertTokenPricesForDestChain(ctx context.Context, destChainSelect
 		return 0, nil
 	}
 
-	insertData := make([]map[string]interface{}, 0, len(tokenPrices))
-	for _, price := range tokenPrices {
+	uniqueTokenPrices := make(map[string]TokenPriceUpdate)
+	for _, tokenPrice := range tokenPrices {
+		key := fmt.Sprintf("%s-%d", tokenPrice.TokenAddr, destChainSelector)
+		uniqueTokenPrices[key] = tokenPrice
+	}
+
+	insertData := make([]map[string]interface{}, 0, len(uniqueTokenPrices))
+	for _, price := range uniqueTokenPrices {
 		insertData = append(insertData, map[string]interface{}{
 			"chain_selector": destChainSelector,
 			"job_id":         jobId,
@@ -136,10 +142,12 @@ func (o *orm) InsertTokenPricesForDestChain(ctx context.Context, destChainSelect
 
 	// using statement_timestamp() to make testing easier
 	stmt := `INSERT INTO ccip.observed_token_prices (chain_selector, job_id, token_addr, token_price, created_at)
-		VALUES (:chain_selector, :job_id, :token_addr, :token_price, statement_timestamp());`
+		VALUES (:chain_selector, :job_id, :token_addr, :token_price, statement_timestamp())
+		ON CONFLICT (chain_selector, token_addr) 
+		DO UPDATE SET token_price = EXCLUDED.token_price, created_at = EXCLUDED.created_at;`
 	result, err := o.ds.NamedExecContext(ctx, stmt, insertData)
 	if err != nil {
-		err = fmt.Errorf("error inserting token prices for job %d: %w", jobId, err)
+		return 0, fmt.Errorf("error inserting token prices for job %d: %w", jobId, err)
 	}
 
 	return result.RowsAffected()
