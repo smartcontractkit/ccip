@@ -30,7 +30,7 @@ import (
 *   If you want to debug, set log level to info and use the following commands for easier logs filtering.
 *
 *   // Run the test and redirect logs to logs.txt
-*   go test -v -run "^TestIntegration_OCR3Nodes" ./core/services/ocr3/plugins/ccip_integration_tests 2>&1 > logs.txt
+*   go test -v -run "^TestIntegration_OCR3Nodes" ./core/capabilities/ccip/ccip_integration_tests 2>&1 > logs.txt
 *
 *   // Reads logs.txt as a stream and apply filters using grep
 *   tail -fn0 logs.txt | grep "CCIPExecPlugin"
