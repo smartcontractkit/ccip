@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ocr3_config_encoder"
@@ -42,7 +43,10 @@ import (
 )
 
 var (
-	homeChainID = chainsel.GETH_TESTNET.EvmChainID
+	homeChainID                = chainsel.GETH_TESTNET.EvmChainID
+	ccipSendRequestedTopic     = evm_2_evm_multi_onramp.EVM2EVMMultiOnRampCCIPSendRequested{}.Topic()
+	commitReportAcceptedTopic  = evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReportAccepted{}.Topic()
+	executionStateChangedTopic = evm_2_evm_multi_offramp.EVM2EVMMultiOffRampExecutionStateChanged{}.Topic()
 )
 
 const (
@@ -84,6 +88,43 @@ type onchainUniverse struct {
 	priceRegistry      *price_registry.PriceRegistry
 	tokenAdminRegistry *token_admin_registry.TokenAdminRegistry
 	nonceManager       *nonce_manager.NonceManager
+	receiver           *maybe_revert_message_receiver.MaybeRevertMessageReceiver
+}
+
+type requestData struct {
+	destChainSelector uint64
+	receiverAddress   common.Address
+	data              []byte
+}
+
+func (u *onchainUniverse) SendCCIPRequests(t *testing.T, requestDatas []requestData) {
+	for _, reqData := range requestDatas {
+		msg := router.ClientEVM2AnyMessage{
+			Receiver:     common.LeftPadBytes(reqData.receiverAddress.Bytes(), 32),
+			Data:         reqData.data,
+			TokenAmounts: nil, // TODO: no tokens for now
+			FeeToken:     u.weth.Address(),
+			ExtraArgs:    nil, // TODO: no extra args for now, falls back to default
+		}
+		fee, err := u.router.GetFee(&bind.CallOpts{Context: testutils.Context(t)}, reqData.destChainSelector, msg)
+		require.NoError(t, err)
+		_, err = u.weth.Deposit(&bind.TransactOpts{
+			From:   u.owner.From,
+			Signer: u.owner.Signer,
+			Value:  fee,
+		})
+		require.NoError(t, err)
+		u.backend.Commit()
+		_, err = u.weth.Approve(u.owner, u.router.Address(), fee)
+		require.NoError(t, err)
+		u.backend.Commit()
+
+		t.Logf("Sending CCIP request from chain %d (selector %d) to chain selector %d",
+			u.chainID, getSelector(u.chainID), reqData.destChainSelector)
+		_, err = u.router.CcipSend(u.owner, reqData.destChainSelector, msg)
+		require.NoError(t, err)
+		u.backend.Commit()
+	}
 }
 
 type chainBase struct {
@@ -174,6 +215,16 @@ func createUniverses(
 		offramp, err := evm_2_evm_multi_offramp.NewEVM2EVMMultiOffRamp(offrampAddr, backend)
 		require.NoError(t, err)
 
+		receiverAddress, _, _, err := maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(
+			owner,
+			backend,
+			false,
+		)
+		require.NoError(t, err, "failed to deploy MaybeRevertMessageReceiver on chain id %d", chainID)
+		backend.Commit()
+		receiver, err := maybe_revert_message_receiver.NewMaybeRevertMessageReceiver(receiverAddress, backend)
+		require.NoError(t, err)
+
 		universe := onchainUniverse{
 			backend:            backend,
 			owner:              owner,
@@ -188,6 +239,7 @@ func createUniverses(
 			priceRegistry:      priceRegistry,
 			tokenAdminRegistry: tokenAdminRegistry,
 			nonceManager:       nonceManager,
+			receiver:           receiver,
 		}
 		// Set up the initial configurations for the contracts
 		setupUniverseBasics(t, universe)
@@ -217,9 +269,9 @@ func createUniverses(
 	}
 
 	// print out topic hashes of relevant events for debugging purposes
-	t.Logf("Topic hash of CommitReportAccepted: %s", evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReportAccepted{}.Topic().Hex())
-	t.Logf("Topic hash of ExecutionStateChanged: %s", evm_2_evm_multi_offramp.EVM2EVMMultiOffRampExecutionStateChanged{}.Topic().Hex())
-	t.Logf("Topic hash of SkippedAlreadyExecutedMessage: %s", evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSkippedAlreadyExecutedMessage{}.Topic().Hex())
+	t.Logf("Topic hash of CommitReportAccepted: %s", commitReportAcceptedTopic.Hex())
+	t.Logf("Topic hash of ExecutionStateChanged: %s", executionStateChangedTopic.Hex())
+	t.Logf("Topic hash of CCIPSendRequested: %s", ccipSendRequestedTopic.Hex())
 
 	return homeChainUniverse, universes
 }
@@ -268,7 +320,6 @@ func tweakChainTimestamp(t *testing.T, backend *backends.SimulatedBackend, tweak
 	blockTime := time.Unix(int64(backend.Blockchain().CurrentHeader().Time), 0)
 	sinceBlockTime := time.Since(blockTime)
 	diff := sinceBlockTime - tweak
-	t.Logf("block timestamp before tweaking is %s, sinceBlocktime %s, diff %s", blockTime, sinceBlockTime, diff)
 	err := backend.AdjustTime(diff)
 	require.NoError(t, err, "unable to adjust time on simulated chain")
 	backend.Commit()
@@ -391,8 +442,8 @@ func (h *homeChain) AddDON(
 		10*time.Second, // deltaResend
 		20*time.Second, // deltaInitial
 		2*time.Second,  // deltaRound
-		20*time.Second, // deltaGrace
-		10*time.Second, // deltaCertifiedCommitRequest
+		2*time.Second,  // deltaGrace
+		10*time.Second, // deltaCertifiedCommitRequest TODO: whats a good value for this?
 		10*time.Second, // deltaStage
 		3,              // rmax
 		schedule,

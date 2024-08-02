@@ -119,7 +119,6 @@ func setupNodeOCR3(
 		ChainOpts: legacyevm.ChainOpts{
 			AppConfig: cfg,
 			GenEthClient: func(i *big.Int) client.Client {
-				t.Log("genning eth client for chain id:", i.String())
 				client, ok := clients[i.Uint64()]
 				if !ok {
 					t.Fatal("no backend for chainID", i)
