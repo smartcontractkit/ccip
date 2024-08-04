@@ -31,7 +31,6 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @param chainSelector The chain selector.
   event ChainConfigRemoved(uint64 chainSelector);
 
-  error ChainConfigNotSetForChain(uint64 chainSelector);
   error NodeNotInRegistry(bytes32 p2pId);
   error OnlyCapabilitiesRegistryCanCall();
   error ChainSelectorNotFound(uint64 chainSelector);
@@ -55,6 +54,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   error WrongConfigCount(uint64 got, uint64 expected);
   error WrongConfigDigest(bytes32 got, bytes32 expected);
   error WrongConfigDigestBlueGreen(bytes32 got, bytes32 expected);
+  error ZeroAddressNotAllowed();
 
   /// @notice Type and version override.
   string public constant override typeAndVersion = "CCIPConfig 1.6.0-dev";
@@ -75,15 +75,15 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     uint32 donId => mapping(Internal.OCRPluginType pluginType => CCIPConfigTypes.OCR3ConfigWithMeta[] ocr3Configs)
   ) internal s_ocr3Configs;
 
-  /// @notice The DONs that have been configured.
-  EnumerableSet.UintSet internal s_donIds;
-
   uint8 internal constant MAX_OCR3_CONFIGS_PER_PLUGIN = 2;
   uint8 internal constant MAX_OCR3_CONFIGS_PER_DON = 4;
   uint8 internal constant MAX_NUM_ORACLES = 31;
 
   /// @param capabilitiesRegistry the canonical capabilities registry address.
   constructor(address capabilitiesRegistry) {
+    if (capabilitiesRegistry == address(0)) {
+      revert ZeroAddressNotAllowed();
+    }
     i_capabilitiesRegistry = capabilitiesRegistry;
   }
 
@@ -95,6 +95,11 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   // ================================================================
   // │                    Config Getters                            │
   // ================================================================
+  /// @notice Returns the capabilities registry address.
+  /// @return The capabilities registry address.
+  function getCapabilityRegistry() external view returns (address) {
+    return i_capabilitiesRegistry;
+  }
 
   /// @notice Returns all the chain configurations.
   /// @return The chain configurations.
