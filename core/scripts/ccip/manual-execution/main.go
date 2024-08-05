@@ -53,6 +53,7 @@ type execArgs struct {
 	destStartBlock  uint64
 	destLatestBlock uint64
 	OnRamp          common.Address
+	destGasAmounts  []*big.Int
 }
 
 func main() {
@@ -199,7 +200,6 @@ func (args *execArgs) populateValues() error {
 	return nil
 }
 
-// TODO-CCIP-2910
 func (args *execArgs) execute() error {
 	iterator, err := helpers.FilterReportAccepted(args.destChain, &bind.FilterOpts{Start: args.destStartBlock}, args.cfg.CommitStore)
 	if err != nil {
@@ -300,12 +300,16 @@ func (args *execArgs) execute() error {
 		ProofFlagBits:     helpers.ProofFlagsToBits(proof.SourceFlags),
 	}
 
-	// Execute. TODO-CCIP-2910: Add gas limit overrides struct
-	gasLimitOverrides := make([]*big.Int, len(offRampProof.Messages))
+	// Execute. CCIP-2910: Declare a slice for gasLimitOverrides
+	gasLimitOverrides := make([]*helpers.EVM2EVMOffRampGasLimitOverride, len(offRampProof.Messages))
 
-	// TODO-CCIP-2910 initialize and populate the gasLimitOverride struct in loop
-	for i := range offRampProof.Messages {
-		gasLimitOverrides[i] = big.NewInt(int64(args.cfg.GasLimitOverride))
+	//CCIP-2910 initialize and populate the gasLimitOverride struct in loop
+	for range offRampProof.Messages {
+		evm2evmOffRampGasLimitOverride := &helpers.EVM2EVMOffRampGasLimitOverride{
+			ReceiverExecutionGasLimit: big.NewInt(int64(args.cfg.GasLimitOverride)),
+			DestGasAmounts:            args.destGasAmounts,
+		}
+		gasLimitOverrides = append(gasLimitOverrides, evm2evmOffRampGasLimitOverride)
 	}
 
 	// TODO-CCIP-2910: - should take slice of GasLimitOverrides Struct which contain gas limit overrides for each message

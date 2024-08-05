@@ -1436,6 +1436,8 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	var leaves [][32]byte
 	var curr, prove int
 	var msgs []evm_2_evm_offramp.InternalEVM2EVMMessage
+
+	// TODO-CCIP-2910 TestHelper for CCIPContracts and initialisation of EVM2EVMOffRampGasLimitOverride
 	var manualExecGasLimits []*evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride
 	var tokenData [][][]byte
 	sendRequestedIterator, err := onRampContract.FilterCCIPSendRequested(&bind.FilterOpts{
@@ -1482,7 +1484,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 					msg.GasLimit = args.GasLimit
 				}
 
-				// create a new object for evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride
+				// CCIP-2910 create a new object for evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride
 				evm2evmOffRampGasLimitOverride := &evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride{
 					ReceiverExecutionGasLimit: msg.GasLimit,
 					DestGasAmounts:            []*big.Int{},
