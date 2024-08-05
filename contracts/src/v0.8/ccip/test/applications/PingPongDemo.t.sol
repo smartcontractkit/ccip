@@ -27,19 +27,11 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
 }
 
 contract PingPong_startPingPong is PingPongDappSetup {
-  function test_StartPingPong_Success(bool isOutOfOrderExecution) public {
-    s_pingPong.setOutOfOrderExecution(isOutOfOrderExecution);
+  uint256 internal pingPongNumber = 1;
 
-    uint256 pingPongNumber = 1;
+  function test_StartPingPong_With_Sequenced_Ordered_Success() public {
     bytes memory data = abi.encode(pingPongNumber);
-
-    bytes memory extraArgs;
-    if (isOutOfOrderExecution) {
-      extraArgs =
-        Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 2e5, allowOutOfOrderExecution: isOutOfOrderExecution}));
-    } else {
-      extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}));
-    }
+    bytes memory extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}));
 
     Client.EVM2AnyMessage memory sentMessage = Client.EVM2AnyMessage({
       receiver: abi.encode(i_pongContract),
@@ -57,7 +49,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       sender: address(s_pingPong),
       receiver: i_pongContract,
-      nonce: isOutOfOrderExecution ? 0 : 1,
+      nonce: 1,
       data: data,
       tokenAmounts: sentMessage.tokenAmounts,
       sourceTokenData: new bytes[](sentMessage.tokenAmounts.length),
@@ -66,6 +58,46 @@ contract PingPong_startPingPong is PingPongDappSetup {
       strict: false,
       messageId: ""
     });
+
+    _assertPingPongSuccess(message);
+  }
+
+  function test_StartPingPong_With_OOO_Success() public {
+    s_pingPong.setOutOfOrderExecution(true);
+
+    bytes memory data = abi.encode(pingPongNumber);
+    bytes memory extraArgs = Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 2e5, allowOutOfOrderExecution: true}));
+
+    Client.EVM2AnyMessage memory sentMessage = Client.EVM2AnyMessage({
+      receiver: abi.encode(i_pongContract),
+      data: data,
+      tokenAmounts: new Client.EVMTokenAmount[](0),
+      feeToken: s_sourceFeeToken,
+      extraArgs: extraArgs
+    });
+
+    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, sentMessage);
+
+    Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
+      sequenceNumber: 1,
+      feeTokenAmount: expectedFee,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      sender: address(s_pingPong),
+      receiver: i_pongContract,
+      nonce: 0,
+      data: data,
+      tokenAmounts: sentMessage.tokenAmounts,
+      sourceTokenData: new bytes[](sentMessage.tokenAmounts.length),
+      gasLimit: 2e5,
+      feeToken: sentMessage.feeToken,
+      strict: false,
+      messageId: ""
+    });
+
+    _assertPingPongSuccess(message);
+  }
+
+  function _assertPingPongSuccess(Internal.EVM2EVMMessage memory message) internal {
     message.messageId = Internal._hash(message, s_metadataHash);
 
     vm.expectEmit();
