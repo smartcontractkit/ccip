@@ -223,7 +223,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   /// @param gasLimitOverrides New gasLimit for each message in the report.
   /// @dev We permit gas limit overrides so that users may manually execute messages which failed due to
   /// insufficient gas provided.
-  function manuallyExecute(Internal.ExecutionReport memory report, GasLimitOverride[] memory gasLimitOverrides) external {
+  function manuallyExecute(
+    Internal.ExecutionReport memory report,
+    GasLimitOverride[] memory gasLimitOverrides
+  ) external {
     // We do this here because the other _execute path is already covered OCR2BaseXXX.
     _checkChainForked();
 
@@ -368,7 +371,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       );
 
       _setExecutionState(message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-      (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData, destGasAmounts);
+      (Internal.MessageExecutionState newState, bytes memory returnData) =
+        _trialExecute(message, offchainTokenData, destGasAmounts);
       _setExecutionState(message.sequenceNumber, newState);
 
       // Since it's hard to estimate whether manual execution will succeed, we
@@ -459,13 +463,22 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   /// its execution and enforce atomicity among successful message processing and token transfer.
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts
   /// (for example smart contract wallets) without an associated message.
-  function executeSingleMessage(Internal.EVM2EVMMessage memory message, bytes[] memory offchainTokenData, uint256[] memory destGasAmounts) external {
+  function executeSingleMessage(
+    Internal.EVM2EVMMessage memory message,
+    bytes[] memory offchainTokenData,
+    uint256[] memory destGasAmounts
+  ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
     if (message.tokenAmounts.length > 0) {
       destTokenAmounts = _releaseOrMintTokens(
-        message.tokenAmounts, abi.encode(message.sender), message.receiver, message.sourceTokenData, offchainTokenData, destGasAmounts
+        message.tokenAmounts,
+        abi.encode(message.sender),
+        message.receiver,
+        message.sourceTokenData,
+        offchainTokenData,
+        destGasAmounts
       );
     }
     // There are three cases in which we skip calling the receiver:
@@ -695,7 +708,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     destTokenAmounts = sourceTokenAmounts;
     uint256 value = 0;
     bool isManualExecution = destGasAmounts.length != 0;
-  for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
+    for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       destTokenAmounts[i] = _releaseOrMintToken(
         sourceTokenAmounts[i].amount,
         originalSender,

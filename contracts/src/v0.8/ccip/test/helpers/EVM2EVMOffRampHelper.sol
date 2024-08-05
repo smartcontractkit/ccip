@@ -26,7 +26,9 @@ contract EVM2EVMOffRampHelper is EVM2EVMOffRamp, IgnoreContractSize {
     bytes calldata offchainTokenData,
     uint256 destGasAmount
   ) external returns (Client.EVMTokenAmount memory) {
-    return _releaseOrMintToken(sourceTokenAmount, originalSender, receiver, sourceTokenData, offchainTokenData, destGasAmount);
+    return _releaseOrMintToken(
+      sourceTokenAmount, originalSender, receiver, sourceTokenData, offchainTokenData, destGasAmount
+    );
   }
 
   function releaseOrMintTokens(
@@ -37,7 +39,9 @@ contract EVM2EVMOffRampHelper is EVM2EVMOffRamp, IgnoreContractSize {
     bytes[] calldata offchainTokenData,
     uint256[] memory destGasAmounts
   ) external returns (Client.EVMTokenAmount[] memory) {
-    return _releaseOrMintTokens(sourceTokenAmounts, originalSender, receiver, sourceTokenData, offchainTokenData, destGasAmounts);
+    return _releaseOrMintTokens(
+      sourceTokenAmounts, originalSender, receiver, sourceTokenData, offchainTokenData, destGasAmounts
+    );
   }
 
   function trialExecute(
