@@ -184,12 +184,8 @@ func createUniverses(
 				// so we can set this to any address
 				FeeAggregator: testutils.NewAddress(),
 			},
-			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
-				{
-					DestChainSelector: getSelector(chainID),
-					Router:            rout.Address(),
-				},
-			},
+			// Destination chain configs will be set up later once we have all chains
+			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{},
 		)
 		require.NoErrorf(t, err, "failed to deploy onramp on chain id %d", chainID)
 		backend.Commit()
@@ -212,13 +208,7 @@ func createUniverses(
 				PriceRegistry: priceRegistry.Address(),
 			},
 			// Source chain configs will be set up later once we have all chains
-			[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
-				{
-					SourceChainSelector: getSelector(chainID),
-					Router:              rout.Address(),
-					OnRamp:              onramp.Address().Bytes(),
-				},
-			},
+			[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{},
 		)
 		require.NoErrorf(t, err, "failed to deploy offramp on chain id %d", chainID)
 		backend.Commit()
@@ -590,6 +580,7 @@ func connectUniverses(
 	for _, uni := range universes {
 		wireRouter(t, uni, universes)
 		wirePriceRegistry(t, uni, universes)
+		wireOnRamp(t, uni, universes)
 		wireOffRamp(t, uni, universes)
 		initRemoteChainsGasPrices(t, uni, universes)
 	}
@@ -703,6 +694,24 @@ func wirePriceRegistry(t *testing.T, uni onchainUniverse, universes map[uint64]o
 	uni.backend.Commit()
 }
 
+// Setting OnRampDestChainConfigs
+func wireOnRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchainUniverse) {
+	owner := uni.owner
+	var onrampSourceChainConfigArgs []evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs
+	for remoteChainID := range universes {
+		if remoteChainID == uni.chainID {
+			continue
+		}
+		onrampSourceChainConfigArgs = append(onrampSourceChainConfigArgs, evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
+			DestChainSelector: getSelector(remoteChainID), // for each destination chain, add a source chain config
+			Router:            uni.router.Address(),
+		})
+	}
+	_, err := uni.onramp.ApplyDestChainConfigUpdates(owner, onrampSourceChainConfigArgs)
+	require.NoErrorf(t, err, "failed to apply dest chain config updates on onramp with chain id %d", uni.chainID)
+	uni.backend.Commit()
+}
+
 // Setting OffRampSourceChainConfigs
 func wireOffRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchainUniverse) {
 	owner := uni.owner
@@ -714,7 +723,7 @@ func wireOffRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchain
 		offrampSourceChainConfigArgs = append(offrampSourceChainConfigArgs, evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
 			SourceChainSelector: getSelector(remoteChainID), // for each destination chain, add a source chain config
 			IsEnabled:           true,
-			Router:              remoteUniverse.router.Address(),
+			Router:              uni.router.Address(),
 			OnRamp:              remoteUniverse.onramp.Address().Bytes(),
 		})
 	}
