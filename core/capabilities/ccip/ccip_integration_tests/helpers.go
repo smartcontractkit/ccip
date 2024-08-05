@@ -216,6 +216,7 @@ func createUniverses(
 				{
 					SourceChainSelector: getSelector(chainID),
 					Router:              rout.Address(),
+					OnRamp:              onramp.Address().Bytes(),
 				},
 			},
 		)
@@ -713,6 +714,7 @@ func wireOffRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchain
 		offrampSourceChainConfigArgs = append(offrampSourceChainConfigArgs, evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
 			SourceChainSelector: getSelector(remoteChainID), // for each destination chain, add a source chain config
 			IsEnabled:           true,
+			Router:              remoteUniverse.router.Address(),
 			OnRamp:              remoteUniverse.onramp.Address().Bytes(),
 		})
 	}
