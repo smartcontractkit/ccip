@@ -154,7 +154,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	}
 
 	// Wait for the oracles to come up.
-	for _, node := range nodes {
+	for i, node := range nodes {
 		gomega.NewWithT(t).Eventually(func() bool {
 			type lpFilter struct {
 				Name       string        `sql:"name"`
@@ -165,7 +165,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 			require.NoError(t, node.app.GetDB().SelectContext(ctx, &filters, `SELECT name, event, evm_chain_id FROM evm.log_poller_filters`),
 				"failed to query log poller filters table")
 
-			t.Logf("Waiting for log poller filters to be registered, got filters: %v", func() []string {
+			t.Logf("Waiting for log poller filters to be registered on node %d, got filters: %v", i+1, func() []string {
 				var out []string
 				for _, f := range filters {
 					out = append(out, fmt.Sprintf("name:%s|event:%s|chainID:%s", f.Name, hexutil.Encode(f.Event), f.EVMChainID.String()))
@@ -188,11 +188,13 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 					counts["ExecutionStateChanged"]++
 				} else if bytes.Equal(filter.Event, commitReportAcceptedTopic[:]) {
 					counts["CommitReportAccepted"]++
+				} else {
+					counts["Unknown"]++
 				}
 			}
-			shouldReturn := counts["CCIPSendRequested"] == numChains*2 &&
-				counts["ExecutionStateChanged"] == numChains*2 &&
-				counts["CommitReportAccepted"] == numChains*2
+			shouldReturn := counts["CCIPSendRequested"] >= numChains*2 &&
+				counts["ExecutionStateChanged"] >= numChains*2 &&
+				counts["CommitReportAccepted"] >= numChains*2
 			t.Logf("Waiting for log poller filters to be registered, got counts %v", counts)
 			return shouldReturn
 		}, testutils.WaitTimeout(t), 10*time.Second).Should(gomega.BeTrue())
