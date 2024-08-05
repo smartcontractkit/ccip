@@ -79,6 +79,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   uint8 internal constant MAX_OCR3_CONFIGS_PER_DON = 4;
   uint8 internal constant MAX_NUM_ORACLES = 31;
   uint256 internal constant CONFIG_DIGEST_PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..0
+  /// @dev must be equal to libocr multi role: https://github.com/smartcontractkit/libocr/blob/ae747ca5b81236ffdbf1714318c652e923a5ff4d/offchainreporting2plus/types/config_digest.go#L28
   uint256 internal constant CONFIG_DIGEST_PREFIX = 0x000a << (256 - 16); // 0x000a00..00
 
   /// @param capabilitiesRegistry the canonical capabilities registry address.
