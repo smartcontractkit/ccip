@@ -199,6 +199,7 @@ func (args *execArgs) populateValues() error {
 	return nil
 }
 
+// TODO-CCIP-2910
 func (args *execArgs) execute() error {
 	iterator, err := helpers.FilterReportAccepted(args.destChain, &bind.FilterOpts{Start: args.destStartBlock}, args.cfg.CommitStore)
 	if err != nil {
@@ -299,12 +300,15 @@ func (args *execArgs) execute() error {
 		ProofFlagBits:     helpers.ProofFlagsToBits(proof.SourceFlags),
 	}
 
-	// Execute.
+	// Execute. TODO-CCIP-2910: Add gas limit overrides struct
 	gasLimitOverrides := make([]*big.Int, len(offRampProof.Messages))
+
+	// TODO-CCIP-2910 initialize and populate the gasLimitOverride struct in loop
 	for i := range offRampProof.Messages {
 		gasLimitOverrides[i] = big.NewInt(int64(args.cfg.GasLimitOverride))
 	}
 
+	// TODO-CCIP-2910: - should take slice of GasLimitOverrides Struct which contain gas limit overrides for each message
 	tx, err := helpers.ManuallyExecute(args.destChain, args.destUser, args.cfg.OffRamp, offRampProof, gasLimitOverrides)
 	if err != nil {
 		return err
