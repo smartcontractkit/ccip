@@ -957,12 +957,12 @@ func (o *CCIPTestSetUpOutputs) CheckGasUpdateTransaction(lggr *zerolog.Logger) e
 
 	for _, lane := range o.ReadLanes() {
 		if err := filterGasUpdateEventTxBySource(lane.ForwardLane); err != nil {
-			return fmt.Errorf("error in filtering gas update transactions in the lane source: %s and destination: %s, error: %v",
+			return fmt.Errorf("error in filtering gas update transactions in the lane source: %s and destination: %s, error: %w",
 				lane.ForwardLane.SourceNetworkName, lane.ForwardLane.DestNetworkName, err)
 		}
 		if lane.ReverseLane != nil {
 			if err := filterGasUpdateEventTxBySource(lane.ReverseLane); err != nil {
-				return fmt.Errorf("error in filtering gas update transactions in the lane source: %s and destination: %s, error: %v",
+				return fmt.Errorf("error in filtering gas update transactions in the lane source: %s and destination: %s, error: %w",
 					lane.ReverseLane.SourceNetworkName, lane.ReverseLane.DestNetworkName, err)
 			}
 		}
