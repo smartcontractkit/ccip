@@ -1490,10 +1490,17 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 					msg.GasLimit = args.GasLimit
 				}
 
+				destGasAmounts := make([]*big.Int, len(msg.TokenAmounts))
+
+				// Initialize each element in the slice to a new big.Int value in one line using a loop
+				for i := range destGasAmounts {
+					destGasAmounts[i] = new(big.Int)
+				}
+
 				// CCIP-2950 create a new object for evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride
 				evm2evmOffRampGasLimitOverride := &evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride{
 					ReceiverExecutionGasLimit: msg.GasLimit,
-					DestGasAmounts:            args.destGasAmounts,
+					DestGasAmounts:            destGasAmounts,
 				}
 
 				manualExecGasLimits = append(manualExecGasLimits, evm2evmOffRampGasLimitOverride)
