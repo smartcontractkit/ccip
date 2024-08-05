@@ -703,7 +703,7 @@ func wireOnRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchainU
 			continue
 		}
 		onrampSourceChainConfigArgs = append(onrampSourceChainConfigArgs, evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
-			DestChainSelector: getSelector(remoteChainID), // for each destination chain, add a source chain config
+			DestChainSelector: getSelector(remoteChainID),
 			Router:            uni.router.Address(),
 		})
 	}
@@ -721,7 +721,7 @@ func wireOffRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchain
 			continue
 		}
 		offrampSourceChainConfigArgs = append(offrampSourceChainConfigArgs, evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
-			SourceChainSelector: getSelector(remoteChainID), // for each destination chain, add a source chain config
+			SourceChainSelector: getSelector(remoteChainID),
 			IsEnabled:           true,
 			Router:              uni.router.Address(),
 			OnRamp:              remoteUniverse.onramp.Address().Bytes(),
