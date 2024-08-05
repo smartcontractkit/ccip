@@ -78,6 +78,8 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   uint8 internal constant MAX_OCR3_CONFIGS_PER_PLUGIN = 2;
   uint8 internal constant MAX_OCR3_CONFIGS_PER_DON = 4;
   uint8 internal constant MAX_NUM_ORACLES = 31;
+  uint256 internal constant CONFIG_DIGEST_PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..0
+  uint256 internal constant CONFIG_DIGEST_PREFIX = 0x000a << (256 - 16); // 0x000a00..00
 
   /// @param capabilitiesRegistry the canonical capabilities registry address.
   constructor(address capabilitiesRegistry) {
@@ -418,9 +420,8 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
         )
       )
     );
-    uint256 prefixMask = type(uint256).max << (256 - 16); // 0xFFFF00..00
-    uint256 prefix = 0x000a << (256 - 16); // 0x000a00..00
-    return bytes32((prefix & prefixMask) | (h & ~prefixMask));
+
+    return bytes32((CONFIG_DIGEST_PREFIX & CONFIG_DIGEST_PREFIX_MASK) | (h & ~CONFIG_DIGEST_PREFIX_MASK));
   }
 
   // ================================================================
