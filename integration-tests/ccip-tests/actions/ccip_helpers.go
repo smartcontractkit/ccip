@@ -184,15 +184,7 @@ type CCIPCommon struct {
 	tokenPriceUpdateWatcher   map[common.Address]*big.Int // key - token; value - timestamp of update
 	gasUpdateWatcherMu        *sync.Mutex
 	gasUpdateWatcher          map[uint64]*big.Int // key - destchain id; value - timestamp of update
-	GasUpdateEvents           []GasUpdateEvent
-}
-
-type GasUpdateEvent struct {
-	Sender    string
-	Tx        string
-	Value     *big.Int
-	DestChain uint64
-	Source    string
+	GasUpdateEvents           []contracts.GasUpdateEvent
 }
 
 // FreeUpUnusedSpace sets nil to various elements of ccipModule which are only used
@@ -568,7 +560,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr *ze
 		ccipModule.gasUpdateWatcherMu.Lock()
 		ccipModule.gasUpdateWatcher[destChain] = timestamp
 
-		ccipModule.GasUpdateEvents = append(ccipModule.GasUpdateEvents, GasUpdateEvent{
+		ccipModule.GasUpdateEvents = append(ccipModule.GasUpdateEvents, contracts.GasUpdateEvent{
 			Sender:    raw.Address.Hex(),
 			Tx:        raw.TxHash.Hex(),
 			Value:     value,
