@@ -1,6 +1,7 @@
 package ccip_integration_tests
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"sync"
@@ -8,10 +9,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/hashicorp/consul/sdk/freeport"
+	"github.com/onsi/gomega"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	evmutils "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
@@ -42,7 +46,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		simulatedBackendBlockTime = 900 * time.Millisecond // Simulated backend blocks committing interval
 		oraclesBootWaitTime       = 30 * time.Second       // Time to wait for oracles to come up (HACK)
 		fChain                    = 1                      // fChain value for all the chains
-		oracleLogLevel            = zapcore.InfoLevel      // Log level for the oracle / plugins.
+		oracleLogLevel            = zapcore.PanicLevel     // Log level for the oracle / plugins.
 	)
 
 	t.Logf("creating %d universes", numChains)
@@ -150,8 +154,49 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	}
 
 	// Wait for the oracles to come up.
-	// TODO: We need some data driven way to do this e.g. wait until LP filters to be registered.
-	time.Sleep(oraclesBootWaitTime)
+	for _, node := range nodes {
+		gomega.NewWithT(t).Eventually(func() bool {
+			type lpFilter struct {
+				Name       string        `sql:"name"`
+				Event      []byte        `sql:"event"`
+				EVMChainID *evmutils.Big `sql:"evm_chain_id"`
+			}
+			var filters []lpFilter
+			require.NoError(t, node.app.GetDB().SelectContext(ctx, &filters, `SELECT name, event, evm_chain_id FROM evm.log_poller_filters`),
+				"failed to query log poller filters table")
+
+			t.Logf("Waiting for log poller filters to be registered, got filters: %v", func() []string {
+				var out []string
+				for _, f := range filters {
+					out = append(out, fmt.Sprintf("name:%s|event:%s|chainID:%s", f.Name, hexutil.Encode(f.Event), f.EVMChainID.String()))
+				}
+				return out
+			}())
+
+			// we expect to see the log poller filter for:
+			// * CCIPSendRequested
+			// * ExecutionStateChanged
+			// * CommitReportAccepted
+			// for each chain in this test.
+			// they end up being registered twice per chain because each plugin
+			// registers them separately, as they have separate chain reader instances.
+			var counts = make(map[string]int)
+			for _, filter := range filters {
+				if bytes.Equal(filter.Event, ccipSendRequestedTopic[:]) {
+					counts["CCIPSendRequested"]++
+				} else if bytes.Equal(filter.Event, executionStateChangedTopic[:]) {
+					counts["ExecutionStateChanged"]++
+				} else if bytes.Equal(filter.Event, commitReportAcceptedTopic[:]) {
+					counts["CommitReportAccepted"]++
+				}
+			}
+			shouldReturn := counts["CCIPSendRequested"] == numChains*2 &&
+				counts["ExecutionStateChanged"] == numChains*2 &&
+				counts["CommitReportAccepted"] == numChains*2
+			t.Logf("Waiting for log poller filters to be registered, got counts %v", counts)
+			return shouldReturn
+		}, testutils.WaitTimeout(t), 10*time.Second).Should(gomega.BeTrue())
+	}
 
 	// Replay the log poller on all the chains so that the logs are in the db.
 	// otherwise the plugins won't pick them up.
