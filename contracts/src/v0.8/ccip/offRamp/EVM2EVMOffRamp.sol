@@ -280,8 +280,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     uint256 timestampCommitted = ICommitStore(i_commitStore).verify(hashedLeaves, report.proofs, report.proofFlagBits);
     if (timestampCommitted == 0) revert RootNotCommitted();
 
-    // Execute messages
     bool manualExecution = manualExecGasLimits.length != 0;
+
+    // Execute messages
     for (uint256 i = 0; i < numMsgs; ++i) {
       Internal.EVM2EVMMessage memory message = report.messages[i];
       Internal.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
@@ -470,9 +471,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
-
     if (message.tokenAmounts.length > 0) {
-      destTokenAmounts = _releaseOrMintTokens(
+    destTokenAmounts = _releaseOrMintTokens(
         message.tokenAmounts,
         abi.encode(message.sender),
         message.receiver,
@@ -718,7 +718,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         abi.decode(encodedSourceTokenData[i], (Internal.SourceTokenData)),
         offchainTokenData[i],
         // If we are manually executing, we need to account for the gas used in the token transfer.
-        isManualExecution ? 0 : destGasAmounts[i]
+        isManualExecution ? destGasAmounts[i] : 0
       );
 
       if (s_rateLimitedTokensDestToSource.contains(destTokenAmounts[i].token)) {

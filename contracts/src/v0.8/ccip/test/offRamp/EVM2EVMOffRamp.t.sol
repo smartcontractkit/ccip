@@ -235,7 +235,6 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     amounts[1] = uint256(tokenAmount);
 
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageWithTokens(1, amounts);
-    // console.log(message.length);
     message.data = messageData;
 
     IERC20 dstToken0 = IERC20(s_destTokens[0]);
@@ -1239,9 +1238,9 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage();
 
     EVM2EVMOffRamp.GasLimitOverride[] memory gasLimits = _getGasLimitsFromMessages(messages);
-    gasLimits[0].receiverExecutionGasLimit--;
+    gasLimits[0].receiverExecutionGasLimit = gasLimits[0].receiverExecutionGasLimit - 1;
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidManualExecutionGasLimit.selector, 0, gasLimits[0]));
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidManualExecutionGasLimit.selector, 0, gasLimits[0].receiverExecutionGasLimit));
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimits);
   }
 
