@@ -28,10 +28,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   using USDPriceWith18Decimals for uint224;
 
   error CannotSendZeroTokens();
-  error InvalidExtraArgsTag();
-  error ExtraArgOutOfOrderExecutionMustBeTrue();
-  error OnlyCallableByOwnerOrAdmin();
-  error MessageGasLimitTooHigh();
   error UnsupportedToken(address token);
   error MustBeCalledByRouter();
   error RouterMustSetOriginalSender();
@@ -40,7 +36,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   error GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
   error InvalidDestChainConfig(uint64 sourceChainSelector);
 
-  event AdminSet(address newAdmin);
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
   event FeePaid(address indexed feeToken, uint256 feeValueJuels);
@@ -95,8 +90,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   /// @dev The address of the token admin registry
   address internal immutable i_tokenAdminRegistry;
   /// @dev the maximum number of nops that can be configured at the same time.
-  /// Used to bound gas for loops over nops.
-  uint256 private constant MAX_NUMBER_OF_NOPS = 64;
 
   // DYNAMIC CONFIG
   /// @dev The config for the onRamp
@@ -104,12 +97,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
   /// @dev The destination chain specific configs
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfigs;
-
-  // STATE
-  /// @dev The amount of LINK available to pay NOPS
-  uint96 internal s_nopFeesJuels;
-  /// @dev The combined weight of all NOPs weights
-  uint32 internal s_nopWeightsTotal;
 
   constructor(
     StaticConfig memory staticConfig,
