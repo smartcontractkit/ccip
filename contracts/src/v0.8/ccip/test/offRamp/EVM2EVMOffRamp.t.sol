@@ -1240,7 +1240,11 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     EVM2EVMOffRamp.GasLimitOverride[] memory gasLimits = _getGasLimitsFromMessages(messages);
     gasLimits[0].receiverExecutionGasLimit = gasLimits[0].receiverExecutionGasLimit - 1;
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidManualExecutionGasLimit.selector, 0, gasLimits[0].receiverExecutionGasLimit));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        EVM2EVMOffRamp.InvalidManualExecutionGasLimit.selector, 0, gasLimits[0].receiverExecutionGasLimit
+      )
+    );
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimits);
   }
 

@@ -472,7 +472,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
-    destTokenAmounts = _releaseOrMintTokens(
+      destTokenAmounts = _releaseOrMintTokens(
         message.tokenAmounts,
         abi.encode(message.sender),
         message.receiver,
