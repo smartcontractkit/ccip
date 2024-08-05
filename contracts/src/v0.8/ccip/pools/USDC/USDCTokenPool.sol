@@ -141,6 +141,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// specific message that was sent on source.
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
     external
+    virtual
     override
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
