@@ -1274,6 +1274,7 @@ type ManualExecArgs struct {
 	OffRamp         string
 	SeqNr           uint64
 	GasLimit        *big.Int
+	destGasAmounts  []*big.Int
 }
 
 // ApproxDestStartBlock attempts to locate a block in destination chain with timestamp closest to the timestamp of the block
@@ -1416,6 +1417,9 @@ func (args *ManualExecArgs) ExecuteManually() (*types.Transaction, error) {
 		return nil, fmt.Errorf("unable to find seq num %d in commit report", args.SeqNr)
 	}
 
+	// initialize the destGasAmounts in the executeArgs
+	args.destGasAmounts = make([]*big.Int, 1)
+
 	return args.execute(commitReport)
 }
 
@@ -1437,7 +1441,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	var curr, prove int
 	var msgs []evm_2_evm_offramp.InternalEVM2EVMMessage
 
-	// TODO-CCIP-2910 TestHelper for CCIPContracts and initialisation of EVM2EVMOffRampGasLimitOverride
+	// CCIP-2950 TestHelper for CCIPContracts and initialisation of EVM2EVMOffRampGasLimitOverride
 	var manualExecGasLimits []*evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride
 	var tokenData [][][]byte
 	sendRequestedIterator, err := onRampContract.FilterCCIPSendRequested(&bind.FilterOpts{
@@ -1484,10 +1488,10 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 					msg.GasLimit = args.GasLimit
 				}
 
-				// CCIP-2910 create a new object for evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride
+				// CCIP-2950 create a new object for evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride
 				evm2evmOffRampGasLimitOverride := &evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride{
 					ReceiverExecutionGasLimit: msg.GasLimit,
-					DestGasAmounts:            []*big.Int{},
+					DestGasAmounts:            args.destGasAmounts,
 				}
 
 				manualExecGasLimits = append(manualExecGasLimits, evm2evmOffRampGasLimitOverride)

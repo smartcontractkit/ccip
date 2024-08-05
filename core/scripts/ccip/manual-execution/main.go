@@ -300,10 +300,8 @@ func (args *execArgs) execute() error {
 		ProofFlagBits:     helpers.ProofFlagsToBits(proof.SourceFlags),
 	}
 
-	// Execute. CCIP-2910: Declare a slice for gasLimitOverrides
 	gasLimitOverrides := make([]*helpers.EVM2EVMOffRampGasLimitOverride, len(offRampProof.Messages))
 
-	//CCIP-2910 initialize and populate the gasLimitOverride struct in loop
 	for range offRampProof.Messages {
 		evm2evmOffRampGasLimitOverride := &helpers.EVM2EVMOffRampGasLimitOverride{
 			ReceiverExecutionGasLimit: big.NewInt(int64(args.cfg.GasLimitOverride)),
@@ -312,7 +310,6 @@ func (args *execArgs) execute() error {
 		gasLimitOverrides = append(gasLimitOverrides, evm2evmOffRampGasLimitOverride)
 	}
 
-	// TODO-CCIP-2910: - should take slice of GasLimitOverrides Struct which contain gas limit overrides for each message
 	tx, err := helpers.ManuallyExecute(args.destChain, args.destUser, args.cfg.OffRamp, offRampProof, gasLimitOverrides)
 	if err != nil {
 		return err
