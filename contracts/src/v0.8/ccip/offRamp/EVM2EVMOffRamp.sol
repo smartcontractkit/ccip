@@ -694,7 +694,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     // Creating a copy is more gas efficient than initializing a new array.
     destTokenAmounts = sourceTokenAmounts;
     uint256 value = 0;
-    bool isManualExecution = destGasAmounts.length > 0;
+    bool isManualExecution = destGasAmounts.length != 0;
   for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       destTokenAmounts[i] = _releaseOrMintToken(
         sourceTokenAmounts[i].amount,
