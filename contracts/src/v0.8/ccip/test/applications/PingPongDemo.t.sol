@@ -31,14 +31,13 @@ contract PingPong_startPingPong is PingPongDappSetup {
 
   function test_StartPingPong_With_Sequenced_Ordered_Success() public {
     bytes memory data = abi.encode(pingPongNumber);
-    bytes memory extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}));
 
     Client.EVM2AnyMessage memory sentMessage = Client.EVM2AnyMessage({
       receiver: abi.encode(i_pongContract),
       data: data,
       tokenAmounts: new Client.EVMTokenAmount[](0),
       feeToken: s_sourceFeeToken,
-      extraArgs: extraArgs
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}))
     });
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, sentMessage);
@@ -66,14 +65,13 @@ contract PingPong_startPingPong is PingPongDappSetup {
     s_pingPong.setOutOfOrderExecution(true);
 
     bytes memory data = abi.encode(pingPongNumber);
-    bytes memory extraArgs = Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 2e5, allowOutOfOrderExecution: true}));
 
     Client.EVM2AnyMessage memory sentMessage = Client.EVM2AnyMessage({
       receiver: abi.encode(i_pongContract),
       data: data,
       tokenAmounts: new Client.EVMTokenAmount[](0),
       feeToken: s_sourceFeeToken,
-      extraArgs: extraArgs
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 2e5, allowOutOfOrderExecution: true}))
     });
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, sentMessage);
