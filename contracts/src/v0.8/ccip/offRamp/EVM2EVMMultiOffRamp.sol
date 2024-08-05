@@ -621,7 +621,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice Returns the sequence number of the last price update.
   /// @return the latest price update sequence number.
-  function getLatestPriceSequenceNumber() public view returns (uint64) {
+  function getLatestPriceSequenceNumber() external view returns (uint64) {
     return s_latestPriceSequenceNumber;
   }
 
