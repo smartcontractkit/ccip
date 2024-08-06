@@ -160,10 +160,10 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	}
 	var execBatchGasLimit uint64
 	if pluginType == cctypes.PluginTypeCCIPExec {
-		execOffchainConfig, err := pluginconfig.DecodeExecuteOffchainConfig(publicConfig.ReportingPluginConfig)
-		if err != nil {
+		execOffchainConfig, err2 := pluginconfig.DecodeExecuteOffchainConfig(publicConfig.ReportingPluginConfig)
+		if err2 != nil {
 			return nil, fmt.Errorf("failed to decode execute offchain config: %w, raw: %s",
-				err, string(publicConfig.ReportingPluginConfig))
+				err2, string(publicConfig.ReportingPluginConfig))
 		}
 		if execOffchainConfig.BatchGasLimit == 0 && destChainFamily == relay.NetworkEVM {
 			return nil, fmt.Errorf("BatchGasLimit not set in execute offchain config, must be > 0")

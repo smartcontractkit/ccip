@@ -492,7 +492,7 @@ func (h *homeChain) AddDON(
 			})
 			require.NoError(t, err2)
 		}
-		signers, transmitters, f, _, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
+		signers, transmitters, configF, _, offchainConfigVersion, offchainConfig, err2 := ocr3confighelper.ContractSetConfigArgsForTests(
 			DeltaProgress,
 			DeltaResend,
 			DeltaInitial,
@@ -511,7 +511,7 @@ func (h *homeChain) AddDON(
 			int(f),
 			[]byte{}, // empty OnChainConfig
 		)
-		require.NoError(t, err, "failed to create contract config")
+		require.NoError(t, err2, "failed to create contract config")
 
 		signersBytes := make([][]byte, len(signers))
 		for i, signer := range signers {
@@ -529,7 +529,7 @@ func (h *homeChain) AddDON(
 		ocr3Configs = append(ocr3Configs, ocr3_config_encoder.CCIPConfigTypesOCR3Config{
 			PluginType:            uint8(pluginType),
 			ChainSelector:         chainSelector,
-			F:                     f,
+			F:                     configF,
 			OffchainConfigVersion: offchainConfigVersion,
 			OfframpAddress:        uni.offramp.Address().Bytes(),
 			BootstrapP2PIds:       [][32]byte{bootstrapP2PID},
