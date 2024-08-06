@@ -233,8 +233,10 @@ func (o *DSORM) SelectLatestLogByEventSigWithConfs(ctx context.Context, eventSig
 			ORDER BY block_number desc, log_index DESC
 			LIMIT 1
 		`, nestedBlockNumberQuery(confs))
-	var l Log
 
+	o.withAnalyze(ctx, "SelectLatestLogByEventSigWithConfs", query, args)
+
+	var l Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
 	if err != nil {
 		return nil, err
@@ -388,7 +390,7 @@ func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []Log, tx sqlutil.D
 			end = len(logs)
 		}
 
-		query := `INSERT INTO evm.logs
+		query := `explain (analyze, buffers) INSERT INTO evm.logs
 					(evm_chain_id, log_index, block_hash, block_number, block_timestamp, address, event_sig, topics, tx_hash, data, created_at)
 				VALUES
 					(:evm_chain_id, :log_index, :block_hash, :block_number, :block_timestamp, :address, :event_sig, :topics, :tx_hash, :data, NOW())
