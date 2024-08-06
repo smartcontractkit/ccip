@@ -1226,7 +1226,7 @@ func CCIPDefaultTestSetUp(
 }
 
 // SetupReorgSuite defines the setup required to perform re-org step
-func SetupReorgSuite(t *testing.T, setupOutput *CCIPTestSetUpOutputs, testCfg *CCIPTestConfig) *ch.ReorgSuite {
+func SetupReorgSuite(t *testing.T, lggr *zerolog.Logger, setupOutput *CCIPTestSetUpOutputs, testCfg *CCIPTestConfig) *ch.ReorgSuite {
 	var finalitySrc uint64
 	var finalityDst uint64
 	if setupOutput.Cfg.SelectedNetworks[0].FinalityTag {
@@ -1239,11 +1239,11 @@ func SetupReorgSuite(t *testing.T, setupOutput *CCIPTestSetUpOutputs, testCfg *C
 	} else {
 		finalityDst = setupOutput.Cfg.SelectedNetworks[1].FinalityDepth
 	}
-	rs, err := ch.NewReorgSuite(t, &ch.ReorgConfig{
-		SrcGethHTTPURL: setupOutput.Env.K8Env.URLs["source-chain_http"][0],
-		DstGethHTTPURL: setupOutput.Env.K8Env.URLs["dest-chain_http"][0],
-		//SrcGethHTTPURL:     setupOutput.Env.LocalCluster.EVMNetworks[0].HTTPURLs[0],
-		//DstGethHTTPURL:     setupOutput.Env.LocalCluster.EVMNetworks[1].HTTPURLs[0],
+	rs, err := ch.NewReorgSuite(t, lggr, &ch.ReorgConfig{
+		//SrcGethHTTPURL: setupOutput.Env.K8Env.URLs["source-chain_http"][0],
+		//DstGethHTTPURL: setupOutput.Env.K8Env.URLs["dest-chain_http"][0],
+		SrcGethHTTPURL:     setupOutput.Env.LocalCluster.EVMNetworks[0].HTTPURLs[0],
+		DstGethHTTPURL:     setupOutput.Env.LocalCluster.EVMNetworks[1].HTTPURLs[0],
 		SrcFinalityDepth:   finalitySrc,
 		DstFinalityDepth:   finalityDst,
 		FinalityDelta:      setupOutput.Cfg.TestGroupInput.ChaosReorgProfile.FinalityDelta,

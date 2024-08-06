@@ -4,9 +4,6 @@ import (
 	"testing"
 	"time"
 
-	ch "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/chaos"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
@@ -18,36 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 )
-
-func setupReorgSuite(t *testing.T, loadArgs *LoadArgs) *ch.ReorgSuite {
-	var finalitySrc uint64
-	var finalityDst uint64
-	if loadArgs.TestSetupArgs.Cfg.SelectedNetworks[0].FinalityTag {
-		finalitySrc = 10
-	} else {
-		finalitySrc = loadArgs.TestSetupArgs.Cfg.SelectedNetworks[0].FinalityDepth
-	}
-	if loadArgs.TestSetupArgs.Cfg.SelectedNetworks[1].FinalityTag {
-		finalityDst = 10
-	} else {
-		finalityDst = loadArgs.TestSetupArgs.Cfg.SelectedNetworks[1].FinalityDepth
-	}
-	rs, err := ch.NewReorgSuite(t, &ch.ReorgConfig{
-		SrcGethHTTPURL:     loadArgs.TestSetupArgs.Env.K8Env.URLs["source-chain_http"][0],
-		DstGethHTTPURL:     loadArgs.TestSetupArgs.Env.K8Env.URLs["dest-chain_http"][0],
-		SrcFinalityDepth:   finalitySrc,
-		DstFinalityDepth:   finalityDst,
-		FinalityDelta:      loadArgs.TestSetupArgs.Cfg.TestGroupInput.ChaosReorgProfile.FinalityDelta,
-		ExperimentDuration: loadArgs.TestSetupArgs.Cfg.TestGroupInput.ChaosReorgProfile.Duration.Duration(),
-		GrafanaConfig: &ch.GrafanaConfig{
-			GrafanaURL:   *loadArgs.TestCfg.EnvInput.Logging.Grafana.BaseUrl,
-			GrafanaToken: *loadArgs.TestCfg.EnvInput.Logging.Grafana.BearerToken,
-			DashboardURL: *loadArgs.TestCfg.EnvInput.Logging.Grafana.DashboardUrl,
-		},
-	})
-	require.NoError(t, err)
-	return rs
-}
 
 // TestLoadCCIPStableRPS clean and stable load test
 func TestLoadCCIPStableRPS(t *testing.T) {
@@ -65,70 +32,6 @@ func TestLoadCCIPStableRPS(t *testing.T) {
 	})
 	testArgs.TriggerLoadByLane()
 	testArgs.Wait()
-}
-
-// TestLoadCCIPStableRPSReorgsBelowFinality we run default stable RPS load test and
-// measure how below-finality reorgs are slowing us down
-func TestLoadCCIPStableRPSReorgsBelowFinality(t *testing.T) {
-	t.Parallel()
-	lggr := logging.GetTestLogger(t)
-	testArgs := NewLoadArgs(t, lggr)
-	testArgs.Setup()
-	// if the test runs on remote runner
-	if len(testArgs.TestSetupArgs.Lanes) == 0 {
-		return
-	}
-	t.Cleanup(func() {
-		log.Info().Msg("Tearing down the environment")
-		require.NoError(t, testArgs.TestSetupArgs.TearDown())
-	})
-	rs := setupReorgSuite(t, testArgs)
-	testArgs.TriggerLoadByLane()
-	testArgs.WaitForLoadStart()
-	rs.RunReorgBelowFinalityThreshold(1 * time.Minute)
-	testArgs.ExpectFailures()
-	testArgs.Wait()
-}
-
-// TestLoadCCIPStableRPSReorgsAboveFinality we run a short stable load test and assert
-// that finality violation is detected
-func TestLoadCCIPStableRPSReorgsAboveFinality(t *testing.T) {
-	t.Parallel()
-	lggr := logging.GetTestLogger(t)
-	testArgs := NewLoadArgs(t, lggr)
-	testArgs.Setup()
-	// if the test runs on remote runner
-	if len(testArgs.TestSetupArgs.Lanes) == 0 {
-		return
-	}
-	t.Cleanup(func() {
-		log.Info().Msg("Tearing down the environment")
-		err := testArgs.TestSetupArgs.TearDown()
-		require.Error(t, err)
-		// we should see 'crit' message there because finality was violated
-		t.Logf("error teardown: %s", err.Error())
-		require.Contains(t, err.Error(), "found log at level 'crit'")
-		require.Contains(t, err.Error(), "one of the RPC nodes has gotten far out of sync")
-	})
-	rs := setupReorgSuite(t, testArgs)
-	rs.RunReorgAboveFinalityThreshold(1 * time.Second)
-	testArgs.TriggerLoadByLane()
-	clNodes := testArgs.TestSetupArgs.Env.CLNodes
-	// validate that all nodes has healthcheck failing
-	assert.Eventually(t, func() bool {
-		violatedResponses := 0
-		for _, node := range clNodes {
-			resp, _, err := node.Health()
-			require.NoError(t, err)
-			for _, d := range resp.Data {
-				if d.Attributes.Name == "EVM.1337.LogPoller" && d.Attributes.Output == "finality violated" && d.Attributes.Status == "failing" {
-					violatedResponses++
-				}
-			}
-		}
-		lggr.Info().Any("FinalityViolatedResponses", violatedResponses).Send()
-		return violatedResponses == len(clNodes)
-	}, 3*time.Minute, 20*time.Second, "not all the nodes report finality violation")
 }
 
 // TestLoadCCIPWithUpgradeNodeVersion starts all nodes with a specific version, triggers load and then upgrades the node version as the load is running

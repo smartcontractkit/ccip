@@ -2,6 +2,7 @@ package smoke
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"math/big"
 	"testing"
 	"time"
@@ -26,93 +27,6 @@ import (
 type testDefinition struct {
 	testName string
 	lane     *actions.CCIPLane
-}
-
-func TestSmokeCCIPReorg(t *testing.T) {
-	t.Parallel()
-	log := logging.GetTestLogger(t)
-	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
-	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
-	gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
-	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
-	if len(setUpOutput.Lanes) == 0 {
-		log.Info().Msg("No lanes found")
-		return
-	}
-
-	t.Cleanup(func() {
-		// If we are running a test that is a token transfer, we need to verify the balance.
-		// skip the balance check for existing deployment, there can be multiple external requests in progress for existing deployments
-		// other than token transfer initiated by the test, which can affect the balance check
-		// therefore we check the balance only for the ccip environment created by the test
-		if TestCfg.TestGroupInput.MsgDetails.IsTokenTransfer() &&
-			!pointer.GetBool(TestCfg.TestGroupInput.USDCMockDeployment) &&
-			!pointer.GetBool(TestCfg.TestGroupInput.ExistingDeployment) {
-			setUpOutput.Balance.Verify(t)
-		}
-		require.NoError(t, setUpOutput.TearDown())
-	})
-
-	// Create test definitions for each lane.
-	var tests []testDefinition
-
-	for _, lane := range setUpOutput.Lanes {
-		tests = append(tests, testDefinition{
-			testName: fmt.Sprintf("CCIP message transfer from network %s to network %s",
-				lane.ForwardLane.SourceNetworkName, lane.ForwardLane.DestNetworkName),
-			lane: lane.ForwardLane,
-		})
-		break
-		//if lane.ReverseLane != nil {
-		//	tests = append(tests, testDefinition{
-		//		testName: fmt.Sprintf("CCIP message transfer from network %s to network %s",
-		//			lane.ReverseLane.SourceNetworkName, lane.ReverseLane.DestNetworkName),
-		//		lane: lane.ReverseLane,
-		//	})
-		//}
-	}
-
-	// Execute tests.
-	log.Info().Int("Total Lanes", len(tests)).Msg("Starting CCIP test")
-	for _, test := range tests {
-		tc := test
-		t.Run(tc.testName, func(t *testing.T) {
-			t.Parallel()
-			tc.lane.Test = t
-			log.Info().
-				Str("Source", tc.lane.SourceNetworkName).
-				Str("Destination", tc.lane.DestNetworkName).
-				Msgf("Starting lane %s -> %s", tc.lane.SourceNetworkName, tc.lane.DestNetworkName)
-
-			tc.lane.RecordStateBeforeTransfer()
-			err := tc.lane.SendRequests(1, gasLimit)
-			require.NoError(t, err)
-			rs := testsetups.SetupReorgSuite(t, setUpOutput, TestCfg)
-			rs.RunReorgBelowFinalityThreshold(10 * time.Second)
-			time.Sleep(8 * time.Second)
-			err = tc.lane.SendRequests(1, gasLimit)
-			//require.Error(t, err, "send requests should fail")
-			//tc.lane.ValidateRequests(actions.ExpectPhaseToFail(testreporters.ExecStateChanged, actions.ShouldExist()))
-			//failedTx, _, _, err := tc.lane.Source.SendRequest(
-			//	tc.lane.Dest.ReceiverDapp.EthAddress,
-			//	gasLimit,
-			//)
-			//
-			//err = tc.lane.Source.Common.ChainClient.WaitForEvents()
-			//require.Error(t, err, "Expected error during sending requests while reorg happens")
-			//errReason, v, err := tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
-			//require.NoError(t, err)
-			//tc.lane.Logger.Info().
-			//	Str("Revert Reason", errReason).
-			//	Interface("Args", v).
-			//	Str("FailedTx", failedTx.Hex()).
-			//	Msg("Send tx while reorg in flight")
-			//time.Sleep(rs.Cfg.ExperimentDuration)
-			time.Sleep(1 * time.Minute)
-			err = tc.lane.SendRequests(1, gasLimit)
-			tc.lane.ValidateRequests()
-		})
-	}
 }
 
 func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
@@ -940,6 +854,102 @@ func TestSmokeCCIPManuallyExecuteAfterExecutionFailingDueToInsufficientGas(t *te
 			}
 		})
 	}
+}
+
+// Test expects to generate below finality reorg in both source and destination and
+// expect CCIP transactions to go through successful.
+func TestSmokeCCIPReorgBelowFinality(t *testing.T) {
+	t.Parallel()
+	log := logging.GetTestLogger(t)
+	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
+	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
+	gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
+	if len(setUpOutput.Lanes) == 0 {
+		log.Info().Msg("No lanes found")
+		return
+	}
+
+	t.Cleanup(func() {
+		require.NoError(t, setUpOutput.TearDown())
+	})
+
+	lane := setUpOutput.Lanes[0].ForwardLane
+	log.Info().
+		Str("Source", lane.SourceNetworkName).
+		Str("Destination", lane.DestNetworkName).
+		Msg("Starting CCIP reorg test")
+	t.Run(fmt.Sprintf("CCIP reorg below finality test from network %s to network %s",
+		lane.SourceNetworkName, lane.DestNetworkName), func(t *testing.T) {
+		t.Parallel()
+		lane.Test = t
+		lane.RecordStateBeforeTransfer()
+		// sending multiple request and expect all should go through though there is below finality reorg
+		err := lane.SendRequests(5, gasLimit)
+		require.NoError(t, err)
+		rs := testsetups.SetupReorgSuite(t, &log, setUpOutput, TestCfg)
+		// run below finality reorg in both source and destination chain
+		blocksBackSrc := int(rs.Cfg.SrcFinalityDepth) - rs.Cfg.FinalityDelta
+		blocksBackDst := int(rs.Cfg.DstFinalityDepth) - rs.Cfg.FinalityDelta
+		rs.RunReorg(rs.DstClient, blocksBackSrc, "Source", 2*time.Second)
+		rs.RunReorg(rs.DstClient, blocksBackDst, "Destination", 2*time.Second)
+		time.Sleep(1 * time.Minute)
+		lane.ValidateRequests()
+	})
+}
+
+// Test expects to generate above finality reorg in both destination and
+// expect CCIP transaction doesn't go through successful and node detects reorg successfully
+func TestSmokeCCIPReorgAboveFinality(t *testing.T) {
+	t.Parallel()
+	log := logging.GetTestLogger(t)
+	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
+	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
+	gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
+	if len(setUpOutput.Lanes) == 0 {
+		log.Info().Msg("No lanes found")
+		return
+	}
+
+	t.Cleanup(func() {
+		require.NoError(t, setUpOutput.TearDown())
+	})
+
+	lane := setUpOutput.Lanes[0].ForwardLane
+	log.Info().
+		Str("Source", lane.SourceNetworkName).
+		Str("Destination", lane.DestNetworkName).
+		Msg("Starting CCIP reorg test")
+	t.Run(fmt.Sprintf("CCIP reorg above finality test from network %s to network %s",
+		lane.SourceNetworkName, lane.DestNetworkName), func(t *testing.T) {
+		t.Parallel()
+		lane.Test = t
+		lane.RecordStateBeforeTransfer()
+		rs := testsetups.SetupReorgSuite(t, &log, setUpOutput, TestCfg)
+		err := lane.SendRequests(1, gasLimit)
+		require.NoError(t, err)
+		// run above finality reorg in destination chain
+		blocksBackDst := int(rs.Cfg.DstFinalityDepth) + rs.Cfg.FinalityDelta
+		//blocksBackSrc := int(rs.Cfg.SrcFinalityDepth) + rs.Cfg.FinalityDelta
+		//rs.RunReorg(rs.SrcClient, blocksBackSrc, "Source", 2*time.Second)
+		rs.RunReorg(rs.DstClient, blocksBackDst, "Destination", time.Minute)
+		clNodes := setUpOutput.Env.CLNodes
+		assert.Eventually(t, func() bool {
+			for _, node := range clNodes {
+				resp, _, err := node.Health()
+				require.NoError(t, err)
+				for _, d := range resp.Data {
+					if d.Attributes.Name == "EVM.2337.LogPoller" && d.Attributes.Output == "finality violated" && d.Attributes.Status == "failing" {
+						log.Info().Msg("Finality violated is reported by node")
+						return true
+					}
+				}
+			}
+			return false
+		}, 3*time.Minute, 20*time.Second, "Reorg above finality depth is not detected by node")
+		lane.ValidateRequests(actions.ExpectAnyPhaseToFail(actions.WithTimeout(time.Minute)))
+	})
 }
 
 // add liquidity to pools on both networks

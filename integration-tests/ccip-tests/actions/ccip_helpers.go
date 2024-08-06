@@ -3046,6 +3046,7 @@ func (lane *CCIPLane) ExecuteManually(options ...ManualExecutionOption) error {
 
 // validationOptions are used in the ValidateRequests function to specify which phase is expected to fail and how
 type validationOptions struct {
+	expectAnyPhaseToFail bool
 	phaseExpectedToFail  testreporters.Phase // the phase expected to fail
 	expectedErrorMessage string              // if provided, we're looking for a specific error message
 	timeout              time.Duration       // timeout for the validation
@@ -3079,6 +3080,18 @@ func WithTimeout(timeout time.Duration) PhaseSpecificValidationOptionFunc {
 func ExpectPhaseToFail(phase testreporters.Phase, phaseSpecificOptions ...PhaseSpecificValidationOptionFunc) ValidationOptionFunc {
 	return func(opts *validationOptions) {
 		opts.phaseExpectedToFail = phase
+		for _, f := range phaseSpecificOptions {
+			if f != nil {
+				f(opts)
+			}
+		}
+	}
+}
+
+// ExpectAnyPhaseToFail expects any phase in CCIP transaction to fail.
+func ExpectAnyPhaseToFail(phaseSpecificOptions ...PhaseSpecificValidationOptionFunc) ValidationOptionFunc {
+	return func(opts *validationOptions) {
+		opts.expectAnyPhaseToFail = true
 		for _, f := range phaseSpecificOptions {
 			if f != nil {
 				f(opts)
@@ -3132,7 +3145,7 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 		reqStats = append(reqStats, req.RequestStat)
 	}
 
-	if opts.phaseExpectedToFail == testreporters.CCIPSendRe && opts.timeout != 0 {
+	if (opts.phaseExpectedToFail == testreporters.CCIPSendRe || opts.expectAnyPhaseToFail) && opts.timeout != 0 {
 		timeout = opts.timeout
 	}
 	msgLogs, ccipSendReqGenAt, err := lane.Source.AssertEventCCIPSendRequested(
@@ -3158,6 +3171,10 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 		}
 		if reqStat == nil {
 			return fmt.Errorf("could not find request stat for seq number %d", seqNumber)
+		}
+
+		if opts.expectAnyPhaseToFail && opts.timeout != 0 {
+			timeout = opts.timeout
 		}
 
 		if opts.phaseExpectedToFail == testreporters.Commit && opts.timeout != 0 {
@@ -3199,6 +3216,9 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 			return phaseErr
 		}
 	}
+	if opts.expectAnyPhaseToFail {
+		return fmt.Errorf("expected at least any one phase to fail but no phase got failed")
+	}
 	return nil
 }
 
@@ -3210,6 +3230,11 @@ func isPhaseValid(
 	opts validationOptions,
 	err error,
 ) (shouldComplete bool, validationError error) {
+	if opts.expectAnyPhaseToFail && err != nil {
+		logmsg := logger.Info().Str("Failed with Error", err.Error()).Str("Phase", string(currentPhase))
+		logmsg.Msg("As expected it failed in one of the phase")
+		return true, nil
+	}
 	// If no phase is expected to fail or the current phase is not the one expected to fail, we just return what we were given
 	if opts.phaseExpectedToFail == "" || currentPhase != opts.phaseExpectedToFail {
 		return err != nil, err
@@ -3218,6 +3243,7 @@ func isPhaseValid(
 		return true, fmt.Errorf("expected phase '%s' to fail, but it passed", opts.phaseExpectedToFail)
 	}
 	logmsg := logger.Info().Str("Failed with Error", err.Error()).Str("Phase", string(currentPhase))
+
 	if opts.expectedErrorMessage != "" {
 		if !strings.Contains(err.Error(), opts.expectedErrorMessage) {
 			return true, fmt.Errorf("expected phase '%s' to fail with error message '%s' but got error '%s'", currentPhase, opts.expectedErrorMessage, err.Error())
