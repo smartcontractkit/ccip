@@ -14,6 +14,7 @@ on:
         description: 'Key to run tests with custom test secrets'
         required: false
         type: string        
+  pull_request: # DEBUG: Checking run conditions
 
 # Only run 1 of this workflow at a time per PR
 concurrency:
@@ -21,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
+  CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip
   CHAINLINK_VERSION: ${{ github.sha}}
   INPUT_CHAINLINK_TEST_VERSION: ${{ github.sha}}
   ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:${{ github.sha }}
@@ -111,7 +112,6 @@ jobs:
       contents: read
     env:
       CHAINLINK_ENV_USER: ${{ github.actor }}
-      SLACK_USER: ${{ inputs.slackMemberID }}
       SLACK_API_KEY: ${{ secrets.QA_SLACK_API_KEY }}
       SLACK_CHANNEL: ${{ secrets.QA_SLACK_CHANNEL }}
       TEST_LOG_LEVEL: info
