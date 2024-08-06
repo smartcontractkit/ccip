@@ -57,7 +57,7 @@ jobs:
         with:
           cl_repo: smartcontractkit/chainlink-ccip
           cl_ref: ${{ env.CHAINLINK_VERSION }}
-          push_tag: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:${{ env.CHAINLINK_VERSION }}
+          push_tag: ${{ env.CHAINLINK_IMAGE }}:${{ env.CHAINLINK_VERSION }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Collect Metrics
