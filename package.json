@@ -1,6 +1,6 @@
 {
   "name": "ccip",
-  "version": "2.12.0-ccip1.4.19",
+  "version": "2.12.0-ccip1.4.20",
   "description": "node of the decentralized oracle network, bridging on and off-chain computation",
   "main": "index.js",
   "scripts": {
