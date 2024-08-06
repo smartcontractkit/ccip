@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
@@ -433,6 +434,8 @@ func (o *DSORM) SelectLogsByBlockRange(ctx context.Context, start, end int64) ([
         	AND block_number <= :end_block
         	ORDER BY block_number, log_index`
 
+	o.withAnalyze(ctx, "SelectLogsByBlockRange", query, args)
+
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
 	if err != nil {
@@ -463,6 +466,8 @@ func (o *DSORM) SelectLogs(ctx context.Context, start, end int64, address common
 			AND block_number >= :start_block
 			AND block_number <= :end_block
 			ORDER BY block_number, log_index`
+
+	o.withAnalyze(ctx, "SelectLogs", query, args)
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -496,6 +501,8 @@ func (o *DSORM) SelectLogsCreatedAfter(ctx context.Context, address common.Addre
 				AND block_number <= %s
 				ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
 
+	o.withAnalyze(ctx, "SelectLogsCreatedAfter", query, args)
+
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
 	if err != nil {
@@ -528,6 +535,8 @@ func (o *DSORM) SelectLogsWithSigs(ctx context.Context, start, end int64, addres
 				AND block_number BETWEEN :start_block AND :end_block
 				ORDER BY block_number, log_index`
 
+	o.withAnalyze(ctx, "SelectLogsWithSigs", query, args)
+
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
 	if err != nil {
 		return nil, err
@@ -554,6 +563,8 @@ func (o *DSORM) GetBlocksRange(ctx context.Context, start int64, end int64) ([]L
 			AND block_number <= :end_block
 			AND evm_chain_id = :evm_chain_id
 			ORDER BY block_number ASC`
+
+	o.withAnalyze(ctx, "GetBlocksRange", query, args)
 
 	var blocks []LogPollerBlock
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -592,6 +603,8 @@ func (o *DSORM) SelectLatestLogEventSigsAddrsWithConfs(ctx context.Context, from
 		)
 		ORDER BY block_number ASC`, nestedBlockNumberQuery(confs))
 
+	o.withAnalyze(ctx, "SelectLatestLogEventSigsAddrsWithConfs", query, args)
+
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
 	if err != nil {
@@ -622,6 +635,8 @@ func (o *DSORM) SelectLatestBlockByEventSigsAddrsWithConfs(ctx context.Context, 
 			AND address = ANY(:address_array)
 			AND block_number > :start_block
 			AND block_number <= %s`, nestedBlockNumberQuery(confs))
+
+	o.withAnalyze(ctx, "SelectLatestBlockByEventSigsAddrsWithConfs", query, args)
 
 	var blockNumber int64
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -655,6 +670,8 @@ func (o *DSORM) SelectLogsDataWordRange(ctx context.Context, address common.Addr
 			AND block_number <= %s
 			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
 
+	o.withAnalyze(ctx, "SelectLogsDataWordRange", query, args)
+
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
 	if err != nil {
@@ -685,6 +702,8 @@ func (o *DSORM) SelectLogsDataWordGreaterThan(ctx context.Context, address commo
 			AND substring(data from 32*:word_index+1 for 32) >= :word_value_min
 			AND block_number <= %s
 			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
+
+	o.withAnalyze(ctx, "SelectLogsDataWordGreaterThan", query, args)
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -717,6 +736,7 @@ func (o *DSORM) SelectLogsDataWordBetween(ctx context.Context, address common.Ad
 			AND substring(data from 32*:word_index_max+1 for 32) >= :word_value
 			AND block_number <= %s
 			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
+	o.withAnalyze(ctx, "SelectLogsDataWordBetween", query, args)
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -748,6 +768,8 @@ func (o *DSORM) SelectIndexedLogsTopicGreaterThan(ctx context.Context, address c
 			AND topics[:topic_index] >= :topic_value_min
 			AND block_number <= %s
 			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
+
+	o.withAnalyze(ctx, "SelectIndexedLogsTopicGreaterThan", query, args)
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -782,6 +804,8 @@ func (o *DSORM) SelectIndexedLogsTopicRange(ctx context.Context, address common.
 				AND block_number <= %s
 			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
 
+	o.withAnalyze(ctx, "SelectIndexedLogsTopicRange", query, args)
+
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
 	if err != nil {
@@ -812,6 +836,8 @@ func (o *DSORM) SelectIndexedLogs(ctx context.Context, address common.Address, e
 			AND topics[:topic_index] = ANY(:topic_values)
 			AND block_number <= %s
 			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
+
+	o.withAnalyze(ctx, "SelectIndexedLogs", query, args)
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -845,6 +871,8 @@ func (o *DSORM) SelectIndexedLogsByBlockRange(ctx context.Context, start, end in
 				AND block_number >= :start_block
 				AND block_number <= :end_block
 				ORDER BY block_number, log_index`
+
+	o.withAnalyze(ctx, "SelectIndexedLogsByBlockRange", query, args)
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -881,6 +909,8 @@ func (o *DSORM) SelectIndexedLogsCreatedAfter(ctx context.Context, address commo
 			ORDER BY block_number, log_index
 		`, nestedBlockNumberQuery(confs))
 
+	o.withAnalyze(ctx, "SelectIndexedLogsCreatedAfter", query, args)
+
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
 	if err != nil {
@@ -909,6 +939,8 @@ func (o *DSORM) SelectIndexedLogsByTxHash(ctx context.Context, address common.Ad
 			AND event_sig = :event_sig
 			AND tx_hash = :tx_hash
 			ORDER BY block_number, log_index`
+
+	o.withAnalyze(ctx, "SelectIndexedLogsByTxHash", query, args)
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -971,7 +1003,7 @@ func (o *DSORM) SelectIndexedLogsWithSigsExcluding(ctx context.Context, sigA, si
 }
 
 // TODO flaky BCF-3258
-func (o *DSORM) FilteredLogs(ctx context.Context, filter query.KeyFilter, limitAndSort query.LimitAndSort, _ string) ([]Log, error) {
+func (o *DSORM) FilteredLogs(ctx context.Context, filter query.KeyFilter, limitAndSort query.LimitAndSort, queryName string) ([]Log, error) {
 	qs, args, err := (&pgDSLParser{}).buildQuery(o.chainID, filter.Expressions, limitAndSort)
 	if err != nil {
 		return nil, err
@@ -981,6 +1013,8 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter query.KeyFilter, limitA
 	if err != nil {
 		return nil, err
 	}
+
+	o.withAnalyze(ctx, queryName, qs, values)
 
 	query, sqlArgs, err := o.ds.BindNamed(qs, values)
 	if err != nil {
@@ -1010,4 +1044,20 @@ func nestedBlockNumberQuery(confs evmtypes.Confirmations) string {
 			FROM evm.log_poller_blocks
 			WHERE evm_chain_id = :evm_chain_id
 			ORDER BY block_number DESC LIMIT 1) `
+}
+
+func (o *DSORM) withAnalyze(ctx context.Context, queryName string, query string, args map[string]any) {
+	query, sqlArgs, err := o.ds.BindNamed("EXPLAIN (ANALYZE, BUFFERS) "+query, args)
+	if err != nil {
+		return
+	}
+
+	var response []string
+	err = o.ds.SelectContext(ctx, &response, query, sqlArgs...)
+	if err != nil {
+		return
+	}
+	if len(response) > 0 {
+		o.lggr.Infow("Analyze query", "query", queryName, "response", strings.Join(response, "\n"))
+	}
 }
