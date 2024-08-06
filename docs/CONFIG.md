@@ -2745,7 +2745,6 @@ NonceAutoSync = true
 NoNewHeadsThreshold = '3m0s'
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
 
 [Transactions]
 ForwardersEnabled = false
@@ -2767,7 +2766,7 @@ PriceDefault = '20 gwei'
 PriceMax = '100 micro'
 PriceMin = '1 gwei'
 LimitDefault = 8000000
-LimitMax = 8000000
+LimitMax = 500000
 LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
@@ -2800,8 +2799,6 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
 
 [OCR]
 ContractConfirmations = 4
@@ -4009,7 +4006,6 @@ NonceAutoSync = true
 NoNewHeadsThreshold = '3m0s'
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
 
 [Transactions]
 ForwardersEnabled = false
@@ -4031,7 +4027,7 @@ PriceDefault = '20 gwei'
 PriceMax = '100 micro'
 PriceMin = '1 gwei'
 LimitDefault = 8000000
-LimitMax = 8000000
+LimitMax = 500000
 LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
@@ -4064,8 +4060,6 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
 
 [OCR]
 ContractConfirmations = 4
@@ -5452,7 +5446,6 @@ NonceAutoSync = true
 NoNewHeadsThreshold = '0s'
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
 
 [Transactions]
 ForwardersEnabled = false
@@ -5473,7 +5466,7 @@ Mode = 'Arbitrum'
 PriceDefault = '100 mwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
 PriceMin = '0'
-LimitDefault = 8000000
+LimitDefault = 500000
 LimitMax = 1000000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
@@ -5507,8 +5500,6 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
 
 [OCR]
 ContractConfirmations = 1
@@ -5546,7 +5537,6 @@ NonceAutoSync = true
 NoNewHeadsThreshold = '0s'
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
 
 [Transactions]
 ForwardersEnabled = false
@@ -5567,7 +5557,7 @@ Mode = 'Arbitrum'
 PriceDefault = '100 mwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
 PriceMin = '0'
-LimitDefault = 8000000
+LimitDefault = 500000
 LimitMax = 1000000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
@@ -5601,8 +5591,6 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
 
 [OCR]
 ContractConfirmations = 1
