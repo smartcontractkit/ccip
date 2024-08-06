@@ -310,7 +310,7 @@ func (c *CommitStore) GetCommitReport(ctx context.Context, root [32]byte) (ccipt
 		c.address.String(),
 		logpoller.NewAddressFilter(c.address),
 		logpoller.NewEventSigFilter(c.reportAcceptedSig),
-		logpoller.NewEventByTopicFilter(uint64(c.reportAcceptedMaxSeqIndex+1), []primitives.ValueComparator{
+		logpoller.NewEventByWordFilter(c.reportAcceptedSig, uint8(c.reportAcceptedMaxSeqIndex+1), []primitives.ValueComparator{
 			{Value: common.BytesToHash(root[:]).Hex(), Operator: primitives.Eq},
 		}),
 	)
