@@ -18,6 +18,19 @@ import {EVM2EVMOnRampHelper} from "./helpers/EVM2EVMOnRampHelper.sol";
 import {MockCommitStore} from "./mocks/MockCommitStore.sol";
 import {EVM2EVMMultiOffRampSetup} from "./offRamp/EVM2EVMMultiOffRampSetup.t.sol";
 import {EVM2EVMMultiOnRampSetup} from "./onRamp/EVM2EVMMultiOnRampSetup.t.sol";
+import {Test} from "forge-std/Test.sol";
+
+contract NonceManager_typeAndVersion is Test {
+  NonceManager private s_nonceManager;
+
+  function setUp() public {
+    s_nonceManager = new NonceManager(new address[](0));
+  }
+
+  function test_typeAndVersion() public view {
+    assertEq(s_nonceManager.typeAndVersion(), "NonceManager 1.6.0-dev");
+  }
+}
 
 contract NonceManager_NonceIncrementation is BaseTest {
   NonceManager private s_nonceManager;
@@ -230,7 +243,6 @@ contract NonceManager_OnRampUpgrade is EVM2EVMMultiOnRampSetup {
         maxPerMsgGasLimit: MAX_GAS_LIMIT,
         defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
         defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
-        defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
         enforceOutOfOrder: false
       }),
       RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e15}),
@@ -244,10 +256,8 @@ contract NonceManager_OnRampUpgrade is EVM2EVMMultiOnRampSetup {
       NonceManager.PreviousRampsArgs(DEST_CHAIN_SELECTOR, NonceManager.PreviousRamps(address(s_prevOnRamp), address(0)));
     s_outboundNonceManager.applyPreviousRampsUpdates(previousRamps);
 
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigArgs = _generateDestChainConfigArgs();
-
     (s_onRamp, s_metadataHash) = _deployOnRamp(
-      SOURCE_CHAIN_SELECTOR, address(s_sourceRouter), address(s_outboundNonceManager), address(s_tokenAdminRegistry)
+      SOURCE_CHAIN_SELECTOR, s_sourceRouter, address(s_outboundNonceManager), address(s_tokenAdminRegistry)
     );
 
     vm.startPrank(address(s_sourceRouter));
@@ -360,16 +370,19 @@ contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
       new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](3);
     sourceChainConfigs[0] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
+      router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
       isEnabled: true,
       onRamp: ON_RAMP_ADDRESS_1
     });
     sourceChainConfigs[1] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
+      router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_2,
       isEnabled: true,
       onRamp: ON_RAMP_ADDRESS_2
     });
     sourceChainConfigs[2] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
+      router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_3,
       isEnabled: true,
       onRamp: ON_RAMP_ADDRESS_3

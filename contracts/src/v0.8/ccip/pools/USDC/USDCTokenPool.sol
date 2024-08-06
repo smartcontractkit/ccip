@@ -94,8 +94,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   }
 
   /// @notice Burn the token in the pool
-  /// @dev Burn is not rate limited at per-pool level. Burn does not contribute to honey pot risk.
-  /// Benefits of rate limiting here does not justify the extra gas cost.
   /// @dev emits ITokenMessenger.DepositForBurn
   /// @dev Assumes caller has validated destinationReceiver
   function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
@@ -108,9 +106,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
     Domain memory domain = s_chainToDomain[lockOrBurnIn.remoteChainSelector];
     if (!domain.enabled) revert UnknownDomain(lockOrBurnIn.remoteChainSelector);
-    if (lockOrBurnIn.receiver.length != 32) {
-      revert InvalidReceiver(lockOrBurnIn.receiver);
-    }
 
     // Since this pool is the msg sender of the CCTP transaction, only this contract
     // is able to call replaceDepositForBurn. Since this contract does not implement
@@ -146,6 +141,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// specific message that was sent on source.
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
     external
+    virtual
     override
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
@@ -160,8 +156,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     if (!i_messageTransmitter.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation)) {
       revert UnlockingUSDCFailed();
     }
-    // Since the tokens are minted to the pool, the pool has to send it to the offRamp
-    getToken().safeTransfer(msg.sender, releaseOrMintIn.amount);
+    // Since the tokens are minted to the pool, the pool has to approve it for the offRamp
+    getToken().approve(msg.sender, releaseOrMintIn.amount);
 
     emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
