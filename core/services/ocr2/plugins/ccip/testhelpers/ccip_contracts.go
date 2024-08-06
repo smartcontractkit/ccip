@@ -1419,9 +1419,6 @@ func (args *ManualExecArgs) ExecuteManually() (*types.Transaction, error) {
 		return nil, fmt.Errorf("unable to find seq num %d in commit report", args.SeqNr)
 	}
 
-	// initialize the destGasAmounts in the executeArgs
-	args.destGasAmounts = make([]*big.Int, 1)
-
 	return args.execute(commitReport)
 }
 
@@ -1492,9 +1489,15 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 
 				destGasAmounts := make([]*big.Int, len(msg.TokenAmounts))
 
-				// Initialize each element in the slice to a new big.Int value in one line using a loop
-				for i := range destGasAmounts {
-					destGasAmounts[i] = new(big.Int)
+				if args.destGasAmounts != nil && len(args.destGasAmounts) == len(msg.TokenAmounts) {
+					for i, destGasAmount := range args.destGasAmounts {
+						destGasAmounts[i].Set(destGasAmount)
+					}
+				} else {
+					// Initialize each element in the slice to a new big.Int value in one line using a loop
+					for i := range destGasAmounts {
+						destGasAmounts[i] = new(big.Int)
+					}
 				}
 
 				// CCIP-2950 create a new object for evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride
