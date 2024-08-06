@@ -490,6 +490,7 @@ func (h *homeChain) AddDON(
 				RootSnoozeTime:            *commonconfig.MustNewDuration(RootSnoozeTime),
 				BatchingStrategyID:        BatchingStrategyID,
 			})
+			require.NoError(t, err2)
 		}
 		signers, transmitters, f, _, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
 			DeltaProgress,
