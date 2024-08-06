@@ -30,7 +30,7 @@ func (rc *GrafanaConfig) Validate() error {
 }
 
 // PostGrafanaAnnotation sets Grafana dashboard annotation with text and tags
-func PostGrafanaAnnotation(l zerolog.Logger, grafanaClient *grafana.Client, dashboardUID string, text string, tags []string) error {
+func PostGrafanaAnnotation(l *zerolog.Logger, grafanaClient *grafana.Client, dashboardUID string, text string, tags []string) error {
 	res, _, err := grafanaClient.PostAnnotation(grafana.PostAnnotation{
 		DashboardUID: dashboardUID,
 		Tags:         tags,

@@ -68,33 +68,35 @@ func NewReorgSuite(t *testing.T, lggr *zerolog.Logger, cfg *ReorgConfig) (*Reorg
 
 // RunReorg rollbacks given chain, for N blocks back
 func (r *ReorgSuite) RunReorg(client *client.RPCClient, blocksBack int, network string, startDelay time.Duration) {
-	time.Sleep(startDelay)
-	r.Logger.Info().
-		Str("Network", network).
-		Str("URL", client.URL).
-		Int("BlocksBack", blocksBack).
-		Msg(fmt.Sprintf("Rewinding blocks on %s chain", network))
-	blockNumber, err := client.BlockNumber()
-	assert.NoError(r.t, err)
-	r.Logger.Info().
-		Int64("Number", blockNumber).
-		Str("Network", network).
-		Msg("Block number before rewinding")
-	err = client.GethSetHead(blocksBack)
-	assert.NoError(r.t, err)
-	blockNumber, err = client.BlockNumber()
-	assert.NoError(r.t, err)
-	r.Logger.Info().
-		Int64("Number", blockNumber).
-		Str("Network", network).
-		Msg("Block number after rewinding")
-	//err = PostGrafanaAnnotation(
-	//	r.Logger,
-	//	r.GrafanaClient,
-	//	r.Cfg.dashboardUID,
-	//	fmt.Sprintf("rewinded %s chain for %d blocks back, finality in source is: %d and finality in destination is: %d",
-	//		network, blocksBack, r.Cfg.SrcFinalityDepth, r.Cfg.SrcFinalityDepth),
-	//	nil,
-	//)
-	//assert.NoError(r.t, err)
+	go func() {
+		time.Sleep(startDelay)
+		r.Logger.Info().
+			Str("Network", network).
+			Str("URL", client.URL).
+			Int("BlocksBack", blocksBack).
+			Msg(fmt.Sprintf("Rewinding blocks on %s chain", network))
+		blockNumber, err := client.BlockNumber()
+		assert.NoError(r.t, err)
+		r.Logger.Info().
+			Int64("Number", blockNumber).
+			Str("Network", network).
+			Msg("Block number before rewinding")
+		err = client.GethSetHead(blocksBack)
+		assert.NoError(r.t, err)
+		blockNumber, err = client.BlockNumber()
+		assert.NoError(r.t, err)
+		r.Logger.Info().
+			Int64("Number", blockNumber).
+			Str("Network", network).
+			Msg("Block number after rewinding")
+		err = PostGrafanaAnnotation(
+			r.Logger,
+			r.GrafanaClient,
+			r.Cfg.dashboardUID,
+			fmt.Sprintf("rewinded %s chain for %d blocks back, finality in source is: %d and finality in destination is: %d",
+				network, blocksBack, r.Cfg.SrcFinalityDepth, r.Cfg.SrcFinalityDepth),
+			nil,
+		)
+		assert.NoError(r.t, err)
+	}()
 }

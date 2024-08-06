@@ -148,27 +148,6 @@ func (l *LoadArgs) SanityCheck() {
 	}
 }
 
-func (l *LoadArgs) ExpectFailures() {
-	var allLanes []*actions.CCIPLane
-	for _, lane := range l.TestSetupArgs.Lanes {
-		allLanes = append(allLanes, lane.ForwardLane)
-		if lane.ReverseLane != nil {
-			allLanes = append(allLanes, lane.ReverseLane)
-		}
-	}
-	for _, lane := range allLanes {
-		ccipLoad := NewCCIPLoad(
-			l.TestCfg.Test, lane,
-			l.TestCfg.TestGroupInput.PhaseTimeout.Duration(),
-			5, l.TestCfg.TestGroupInput.LoadProfile.MsgProfile,
-			0, nil,
-		)
-		ccipLoad.BeforeAllCall()
-		resp := ccipLoad.Call(nil)
-		require.True(l.t, resp.Failed, "request doesn't failed")
-	}
-}
-
 // ValidateCurseFollowedByUncurse assumes the lanes under test are bi-directional.
 // It assumes requests in both direction are in flight when this is called.
 // It assumes the ARM is not already cursed, it will fail the test if it is in cursed state.

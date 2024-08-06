@@ -933,7 +933,7 @@ func TestSmokeCCIPReorgAboveFinality(t *testing.T) {
 		blocksBackDst := int(rs.Cfg.DstFinalityDepth) + rs.Cfg.FinalityDelta
 		//blocksBackSrc := int(rs.Cfg.SrcFinalityDepth) + rs.Cfg.FinalityDelta
 		//rs.RunReorg(rs.SrcClient, blocksBackSrc, "Source", 2*time.Second)
-		rs.RunReorg(rs.DstClient, blocksBackDst, "Destination", time.Minute)
+		rs.RunReorg(rs.DstClient, blocksBackDst, "Destination", 2*time.Second)
 		clNodes := setUpOutput.Env.CLNodes
 		assert.Eventually(t, func() bool {
 			for _, node := range clNodes {
@@ -946,6 +946,7 @@ func TestSmokeCCIPReorgAboveFinality(t *testing.T) {
 					}
 				}
 			}
+			log.Info().Msg("Finality violated is not yet reported by node")
 			return false
 		}, 3*time.Minute, 20*time.Second, "Reorg above finality depth is not detected by node")
 		lane.ValidateRequests(actions.ExpectAnyPhaseToFail(actions.WithTimeout(time.Minute)))
