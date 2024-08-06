@@ -70,7 +70,15 @@ func (s CCIPOnChainState) Snapshot(chains []uint64) (CCIPSnapShot, error) {
 	return snapshot, nil
 }
 
-func GenerateOnchainState(e environment.Environment) (CCIPOnChainState, error) {
+func SnapshotState(e environment.Environment, ab environment.AddressBook) (CCIPSnapShot, error) {
+	state, err := GenerateOnchainState(e, ab)
+	if err != nil {
+		return CCIPSnapShot{}, err
+	}
+	return state.Snapshot(e.AllChainSelectors())
+}
+
+func GenerateOnchainState(e environment.Environment, ab environment.AddressBook) (CCIPOnChainState, error) {
 	state := CCIPOnChainState{
 		EvmOnRampsV160:       make(map[uint64]*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp),
 		EvmOffRampsV160:      make(map[uint64]*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp),
@@ -82,7 +90,7 @@ func GenerateOnchainState(e environment.Environment) (CCIPOnChainState, error) {
 		Weth9s:               make(map[uint64]*weth9.WETH9),
 	}
 	// Get all the onchain state
-	addresses, err := e.AddressBook.Addresses()
+	addresses, err := ab.Addresses()
 	if err != nil {
 		return state, errors.Wrap(err, "could not get addresses")
 	}

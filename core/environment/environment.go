@@ -15,11 +15,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/environment/memory"
 )
 
-type AddressBook interface {
-	// TODO: Need manualTV override
-	Save(chainSelector uint64, address string) error
-	Addresses() (map[uint64]map[string]struct{}, error)
-}
+const (
+	Memory = "memory"
+)
 
 type OnchainClient interface {
 	// For EVM specifically we can use existing geth interface
@@ -43,11 +41,11 @@ type Chain struct {
 }
 
 type Environment struct {
-	Chains      map[uint64]Chain
-	NodeIds     []string
-	AddressBook AddressBook
-	Offchain    OffchainClient
-	Logger      logger.Logger
+	Name     string
+	Chains   map[uint64]Chain
+	NodeIds  []string
+	Offchain OffchainClient
+	Logger   logger.Logger
 }
 
 func (e Environment) AllChainSelectors() []uint64 {
@@ -92,10 +90,10 @@ func NewMemoryEnvironment(t *testing.T, config MemoryEnvironmentConfig) Environm
 	lggr, err := logger.New()
 	require.NoError(t, err)
 	return Environment{
-		Offchain:    memory.NewMemoryJobClient(nodesByPeerID),
-		Chains:      chains,
-		NodeIds:     keys,
-		AddressBook: memory.NewMemoryAddressBook(),
-		Logger:      lggr,
+		Name:     Memory,
+		Offchain: memory.NewMemoryJobClient(nodesByPeerID),
+		Chains:   chains,
+		NodeIds:  keys,
+		Logger:   lggr,
 	}
 }

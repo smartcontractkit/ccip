@@ -57,13 +57,20 @@ func GenerateJobSpecs(capReg common.Address) CCIPSpec {
 	return CCIPSpec{}
 }
 
+type DeployCCIPContractConfig struct {
+	Weth9s map[uint64]common.Address
+	// TODO: More params as needed
+}
+
 // TODO: Likely we'll want to further parameterize the deployment
 // For example a list of contracts to skip deploying if they already exist.
 // Or mock vs real RMN.
-func DeployCCIPContracts(e environment.Environment) error {
+// Deployment produces an address book of everything it deployed.
+func DeployCCIPContracts(e environment.Environment, c DeployCCIPContractConfig) (environment.AddressBook, error) {
+	ab := environment.NewMemoryAddressBook()
 	for _, chain := range e.Chains {
 		saveToChain := func(addr common.Address) error {
-			return e.AddressBook.Save(chain.Selector, addr.String())
+			return ab.Save(chain.Selector, addr.String())
 		}
 
 		// TODO: Still waiting for RMNRemote/RMNHome contracts etc.
@@ -77,7 +84,7 @@ func DeployCCIPContracts(e environment.Environment) error {
 			}, chain.Confirm, saveToChain)
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy mockARM", "err", err)
-			return err
+			return ab, err
 		}
 		e.Logger.Infow("deployed mockARM", "addr", mockARM)
 
@@ -92,7 +99,7 @@ func DeployCCIPContracts(e environment.Environment) error {
 			}, chain.Confirm, saveToChain)
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy armProxy", "err", err)
-			return err
+			return ab, err
 		}
 		e.Logger.Infow("deployed armProxy", "addr", armProxy)
 
@@ -121,7 +128,7 @@ func DeployCCIPContracts(e environment.Environment) error {
 			}, chain.Confirm, saveToChain)
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy router", "err", err)
-			return err
+			return ab, err
 		}
 		e.Logger.Infow("deployed router", "addr", routerAddr)
 
@@ -134,9 +141,9 @@ func DeployCCIPContracts(e environment.Environment) error {
 			}, chain.Confirm, saveToChain)
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy token admin registry", "err", err)
-			return err
+			return ab, err
 		}
 		e.Logger.Infow("deployed tokenAdminRegistry", "addr", tokenAdminRegistry)
 	}
-	return nil
+	return ab, nil
 }
