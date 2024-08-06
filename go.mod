@@ -14,13 +14,17 @@ require (
 	github.com/cometbft/cometbft v0.37.5
 	github.com/cosmos/cosmos-sdk v0.47.11
 	github.com/danielkov/gin-helmet v0.0.0-20171108135313-1387e224435e
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/dominikbraun/graph v0.23.0
 	github.com/esote/minmaxheap v1.0.0
 	github.com/ethereum/go-ethereum v1.13.8
 	github.com/fatih/color v1.16.0
 	github.com/fxamacker/cbor/v2 v2.5.0
+	github.com/gagliardetto/binary v0.7.7
+	github.com/gagliardetto/gofuzz v1.2.2
 	github.com/gagliardetto/solana-go v1.8.4
+	github.com/gagliardetto/treeout v0.1.4
 	github.com/getsentry/sentry-go v0.23.0
 	github.com/gin-contrib/cors v1.5.0
 	github.com/gin-contrib/expvar v0.0.1
@@ -116,6 +120,7 @@ require (
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/guregu/null.v4 v4.0.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
+	gotest.tools/v3 v3.5.1
 	k8s.io/utils v0.0.0-20230711102312-30195339c3c7
 )
 
@@ -181,7 +186,6 @@ require (
 	github.com/crate-crypto/go-ipa v0.0.0-20231025140028-3c0104f4b233 // indirect
 	github.com/crate-crypto/go-kzg-4844 v0.7.0 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/dfuse-io/logging v0.0.0-20210109005628-b97a57253f70 // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
@@ -193,8 +197,6 @@ require (
 	github.com/ethereum/c-kzg-4844 v0.4.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
-	github.com/gagliardetto/binary v0.7.7 // indirect
-	github.com/gagliardetto/treeout v0.1.4 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/gballet/go-verkle v0.1.1-0.20231031103413-a67434b50f46 // indirect
 	github.com/gedex/inflector v0.0.0-20170307190818-16278e9db813 // indirect

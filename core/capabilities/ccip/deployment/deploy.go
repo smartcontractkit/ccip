@@ -11,6 +11,17 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 )
 
+type Proposal struct {
+}
+
+func (p Proposal) String() string {
+	return ""
+}
+
+func GenerateAcceptOwnershipProposal(e environment.Environment, state CCIPOnChainState) Proposal {
+	return Proposal{}
+}
+
 // TODO: pull up to environment pkg
 func deployContract(
 	lggr logger.Logger,
@@ -34,6 +45,16 @@ func deployContract(
 		return common.Address{}, err
 	}
 	return contractAddr, nil
+}
+
+type CCIPSpec struct{}
+
+func (s CCIPSpec) String() string {
+	return ""
+}
+
+func GenerateJobSpecs(capReg common.Address) CCIPSpec {
+	return CCIPSpec{}
 }
 
 // TODO: Likely we'll want to further parameterize the deployment
