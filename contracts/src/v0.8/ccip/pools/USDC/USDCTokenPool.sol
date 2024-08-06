@@ -28,7 +28,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   error InvalidNonce(uint64 expected, uint64 got);
   error InvalidSourceDomain(uint32 expected, uint32 got);
   error InvalidDestinationDomain(uint32 expected, uint32 got);
-  error InvalidReceiver(bytes receiver);
 
   // This data is supplied from offchain and contains everything needed
   // to receive the USDC tokens.
