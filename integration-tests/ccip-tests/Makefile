@@ -6,6 +6,8 @@ set_config:
   			echo "Overriding config with $(override_toml)"; \
 			echo "export BASE64_CCIP_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" > ./testconfig/override/.env; \
         	echo "export TEST_BASE64_CCIP_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" >> ./testconfig/override/.env; \
+			echo "BASE64_CCIP_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" > ./testconfig/override/debug.env; \
+			echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" >> ./testconfig/override/debug.env; \
     else \
       		echo "No override config found, using default config"; \
         	echo  > ./testconfig/override/.env; \
