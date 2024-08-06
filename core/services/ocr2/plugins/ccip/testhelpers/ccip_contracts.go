@@ -1276,6 +1276,7 @@ type ManualExecArgs struct {
 	OffRamp         string
 	SeqNr           uint64
 	GasLimit        *big.Int
+	destGasAmounts  []*big.Int
 }
 
 // ApproxDestStartBlock attempts to locate a block in destination chain with timestamp closest to the timestamp of the block
@@ -1438,7 +1439,9 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	var leaves [][32]byte
 	var curr, prove int
 	var msgs []evm_2_evm_offramp.InternalEVM2EVMMessage
-	var manualExecGasLimits []*big.Int
+
+	// CCIP-2950 TestHelper for CCIPContracts and initialisation of EVM2EVMOffRampGasLimitOverride
+	var manualExecGasLimits []*evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride
 	var tokenData [][][]byte
 	sendRequestedIterator, err := onRampContract.FilterCCIPSendRequested(&bind.FilterOpts{
 		Start: args.SourceStartBlock.Uint64(),
@@ -1483,7 +1486,28 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 				if args.GasLimit != nil {
 					msg.GasLimit = args.GasLimit
 				}
-				manualExecGasLimits = append(manualExecGasLimits, msg.GasLimit)
+
+				destGasAmounts := make([]*big.Int, len(msg.TokenAmounts))
+
+				if args.destGasAmounts != nil && len(args.destGasAmounts) == len(msg.TokenAmounts) {
+					for i, destGasAmount := range args.destGasAmounts {
+						destGasAmounts[i].Set(destGasAmount)
+					}
+				} else {
+					// Initialize each element in the slice to a new big.Int value in one line using a loop
+					for i := range destGasAmounts {
+						destGasAmounts[i] = new(big.Int)
+					}
+				}
+
+				// CCIP-2950 create a new object for evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride
+				evm2evmOffRampGasLimitOverride := &evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride{
+					ReceiverExecutionGasLimit: msg.GasLimit,
+					DestGasAmounts:            destGasAmounts,
+				}
+
+				manualExecGasLimits = append(manualExecGasLimits, evm2evmOffRampGasLimitOverride)
+
 				var msgTokenData [][]byte
 				for range sendRequestedIterator.Event.Message.TokenAmounts {
 					msgTokenData = append(msgTokenData, []byte{})
@@ -1522,8 +1546,17 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	if err != nil {
 		return nil, err
 	}
+
+	// Convert manualExecGasLimits to a slice of structs before calling ManuallyExecute
+	manualExecGasLimitsStructs := make([]evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride, len(manualExecGasLimits))
+	for i, limitOverride := range manualExecGasLimits {
+		if limitOverride != nil { // Check if the pointer is not nil
+			manualExecGasLimitsStructs[i] = *limitOverride
+		}
+	}
+
 	// Execute.
-	return offRamp.ManuallyExecute(args.DestUser, offRampProof, manualExecGasLimits)
+	return offRamp.ManuallyExecute(args.DestUser, offRampProof, manualExecGasLimitsStructs)
 }
 
 func (c *CCIPContracts) ExecuteMessage(

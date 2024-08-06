@@ -223,14 +223,16 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
   function _getGasLimitsFromMessages(Internal.EVM2EVMMessage[] memory messages)
     internal
     pure
-    returns (uint256[] memory)
+    returns (EVM2EVMOffRamp.GasLimitOverride[] memory)
   {
-    uint256[] memory gasLimits = new uint256[](messages.length);
+    EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = new EVM2EVMOffRamp.GasLimitOverride[](messages.length);
     for (uint256 i = 0; i < messages.length; ++i) {
-      gasLimits[i] = messages[i].gasLimit;
+      gasLimitOverrides[i].receiverExecutionGasLimit = messages[i].gasLimit;
+      //create an array for destinationGasAmounts
+      gasLimitOverrides[i].destGasAmounts = new uint256[](messages[i].tokenAmounts.length);
     }
 
-    return gasLimits;
+    return gasLimitOverrides;
   }
 
   function _assertSameConfig(EVM2EVMOffRamp.DynamicConfig memory a, EVM2EVMOffRamp.DynamicConfig memory b) public pure {
