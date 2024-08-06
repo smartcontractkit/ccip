@@ -41,6 +41,7 @@ type IncompleteDestCommitStoreReader interface {
 	DecodeCommitReport(ctx context.Context, report []byte) (cciptypes.CommitStoreReport, error)
 	EncodeCommitReport(ctx context.Context, report cciptypes.CommitStoreReport) ([]byte, error)
 	GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error)
+	GetCommitReport(ctx context.Context, root [32]byte) (cciptypes.CommitStoreReportWithTxMeta, error)
 	GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error)
 	GetCommitStoreStaticConfig(ctx context.Context) (cciptypes.CommitStoreStaticConfig, error)
 	GetExpectedNextSequenceNumber(ctx context.Context) (uint64, error)
@@ -84,6 +85,10 @@ func (p *ProviderProxyCommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ct
 
 func (p *ProviderProxyCommitStoreReader) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 	return p.dstCommitStoreReader.GetCommitReportMatchingSeqNum(ctx, seqNum, confirmations)
+}
+
+func (p *ProviderProxyCommitStoreReader) GetCommitReport(ctx context.Context, root [32]byte) (cciptypes.CommitStoreReportWithTxMeta, error) {
+	return p.dstCommitStoreReader.GetCommitReport(ctx, root)
 }
 
 func (p *ProviderProxyCommitStoreReader) GetCommitStoreStaticConfig(ctx context.Context) (cciptypes.CommitStoreStaticConfig, error) {

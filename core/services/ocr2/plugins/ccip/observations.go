@@ -49,6 +49,7 @@ func (o CommitObservation) Marshal() ([]byte, error) {
 // know what you are doing.
 type ExecutionObservation struct {
 	Messages map[uint64]MsgData `json:"messages"`
+	Root     [32]byte           `json:"root"`
 }
 
 type MsgData struct {
@@ -63,12 +64,12 @@ type ObservedMessage struct {
 	MsgData
 }
 
-func NewExecutionObservation(observations []ObservedMessage) ExecutionObservation {
+func NewExecutionObservation(observations []ObservedMessage, root [32]byte) ExecutionObservation {
 	denormalized := make(map[uint64]MsgData, len(observations))
 	for _, o := range observations {
 		denormalized[o.SeqNr] = MsgData{TokenData: o.TokenData}
 	}
-	return ExecutionObservation{Messages: denormalized}
+	return ExecutionObservation{Messages: denormalized, Root: root}
 }
 
 func NewObservedMessage(seqNr uint64, tokenData [][]byte) ObservedMessage {

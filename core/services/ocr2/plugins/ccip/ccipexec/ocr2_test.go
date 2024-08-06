@@ -414,14 +414,12 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	commitStore.On("VerifyExecutionReport", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).
 		Return(executionReport.Messages[len(executionReport.Messages)-1].SequenceNumber+1, nil)
-	commitStore.On("GetCommitReportMatchingSeqNum", ctx, observations[0].SeqNr, 0).
-		Return([]cciptypes.CommitStoreReportWithTxMeta{
-			{
-				CommitStoreReport: cciptypes.CommitStoreReport{
-					Interval: cciptypes.CommitStoreInterval{
-						Min: observations[0].SeqNr,
-						Max: observations[len(observations)-1].SeqNr,
-					},
+	commitStore.On("GetCommitReport", ctx, mock.Anything).
+		Return(cciptypes.CommitStoreReportWithTxMeta{
+			CommitStoreReport: cciptypes.CommitStoreReport{
+				Interval: cciptypes.CommitStoreInterval{
+					Min: observations[0].SeqNr,
+					Max: observations[len(observations)-1].SeqNr,
 				},
 			},
 		}, nil)
@@ -456,7 +454,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 		ctx, observations[0].SeqNr, observations[len(observations)-1].SeqNr, false).Return(sendReqs, nil)
 	p.onRampReader = sourceReader
 
-	execReport, err := p.buildReport(ctx, p.lggr, observations)
+	execReport, err := p.buildReport(ctx, p.lggr, observations, utils.RandomBytes32())
 	assert.NoError(t, err)
 	assert.LessOrEqual(t, len(execReport), MaxExecutionReportLength, "built execution report length")
 }
@@ -689,7 +687,7 @@ func Test_calculateObservedMessagesConsensus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res, err := calculateObservedMessagesConsensus(
+			res, _, err := calculateObservedMessagesConsensus(
 				tt.args.observations,
 				tt.args.f,
 			)

@@ -292,6 +292,10 @@ func (c *CommitStore) parseReport(log types.Log) (*cciptypes.CommitStoreReport, 
 	}, nil
 }
 
+func (c *CommitStore) GetCommitReport(ctx context.Context, root [32]byte) (cciptypes.CommitStoreReportWithTxMeta, error) {
+	return cciptypes.CommitStoreReportWithTxMeta{}, nil
+}
+
 func (c *CommitStore) GetCommitReportMatchingSeqNum(ctx context.Context, seqNr uint64, confs int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 	logs, err := c.lp.LogsDataWordBetween(
 		ctx,

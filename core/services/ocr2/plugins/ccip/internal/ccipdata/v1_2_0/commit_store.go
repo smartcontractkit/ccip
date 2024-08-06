@@ -305,6 +305,54 @@ func (c *CommitStore) parseReport(log types.Log) (*cciptypes.CommitStoreReport, 
 	}, nil
 }
 
+func (c *CommitStore) GetCommitReport(ctx context.Context, root [32]byte) (cciptypes.CommitStoreReportWithTxMeta, error) {
+	reportsQuery, err := query.Where(
+		c.address.String(),
+		logpoller.NewAddressFilter(c.address),
+		logpoller.NewEventSigFilter(c.reportAcceptedSig),
+		logpoller.NewEventByTopicFilter(uint64(c.reportAcceptedMaxSeqIndex+1), []primitives.ValueComparator{
+			{Value: common.BytesToHash(root[:]).Hex(), Operator: primitives.Eq},
+		}),
+	)
+	if err != nil {
+		return cciptypes.CommitStoreReportWithTxMeta{}, err
+	}
+
+	logs, err := c.lp.FilteredLogs(
+		ctx,
+		reportsQuery,
+		query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Asc)),
+		"GetCommitReport",
+	)
+	if err != nil {
+		return cciptypes.CommitStoreReportWithTxMeta{}, err
+	}
+
+	parsedLogs, err := ccipdata.ParseLogs[cciptypes.CommitStoreReport](
+		logs,
+		c.lggr,
+		c.parseReport,
+	)
+	if err != nil {
+		return cciptypes.CommitStoreReportWithTxMeta{}, err
+	}
+
+	res := make([]cciptypes.CommitStoreReportWithTxMeta, 0, len(parsedLogs))
+	for _, log := range parsedLogs {
+		res = append(res, cciptypes.CommitStoreReportWithTxMeta{
+			TxMeta:            log.TxMeta,
+			CommitStoreReport: log.Data,
+		})
+	}
+
+	if len(res) == 0 {
+		return cciptypes.CommitStoreReportWithTxMeta{}, fmt.Errorf("no roots found %x", root)
+	} else if len(res) == 1 {
+		return res[0], nil
+	}
+	return cciptypes.CommitStoreReportWithTxMeta{}, fmt.Errorf("more than one report found for root %x", root)
+}
+
 func (c *CommitStore) GetCommitReportMatchingSeqNum(ctx context.Context, seqNr uint64, confs int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 	logs, err := c.lp.LogsDataWordBetween(
 		ctx,

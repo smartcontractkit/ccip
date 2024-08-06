@@ -366,6 +366,63 @@ func (_c *CommitStoreReader_GetAcceptedCommitReportsGteTimestamp_Call) RunAndRet
 	return _c
 }
 
+// GetCommitReport provides a mock function with given fields: ctx, root
+func (_m *CommitStoreReader) GetCommitReport(ctx context.Context, root [32]byte) (ccip.CommitStoreReportWithTxMeta, error) {
+	ret := _m.Called(ctx, root)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCommitReport")
+	}
+
+	var r0 ccip.CommitStoreReportWithTxMeta
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, [32]byte) (ccip.CommitStoreReportWithTxMeta, error)); ok {
+		return rf(ctx, root)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, [32]byte) ccip.CommitStoreReportWithTxMeta); ok {
+		r0 = rf(ctx, root)
+	} else {
+		r0 = ret.Get(0).(ccip.CommitStoreReportWithTxMeta)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, [32]byte) error); ok {
+		r1 = rf(ctx, root)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CommitStoreReader_GetCommitReport_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCommitReport'
+type CommitStoreReader_GetCommitReport_Call struct {
+	*mock.Call
+}
+
+// GetCommitReport is a helper method to define mock.On call
+//   - ctx context.Context
+//   - root [32]byte
+func (_e *CommitStoreReader_Expecter) GetCommitReport(ctx interface{}, root interface{}) *CommitStoreReader_GetCommitReport_Call {
+	return &CommitStoreReader_GetCommitReport_Call{Call: _e.mock.On("GetCommitReport", ctx, root)}
+}
+
+func (_c *CommitStoreReader_GetCommitReport_Call) Run(run func(ctx context.Context, root [32]byte)) *CommitStoreReader_GetCommitReport_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([32]byte))
+	})
+	return _c
+}
+
+func (_c *CommitStoreReader_GetCommitReport_Call) Return(_a0 ccip.CommitStoreReportWithTxMeta, _a1 error) *CommitStoreReader_GetCommitReport_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *CommitStoreReader_GetCommitReport_Call) RunAndReturn(run func(context.Context, [32]byte) (ccip.CommitStoreReportWithTxMeta, error)) *CommitStoreReader_GetCommitReport_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetCommitReportMatchingSeqNum provides a mock function with given fields: ctx, seqNum, confirmations
 func (_m *CommitStoreReader) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confirmations int) ([]ccip.CommitStoreReportWithTxMeta, error) {
 	ret := _m.Called(ctx, seqNum, confirmations)

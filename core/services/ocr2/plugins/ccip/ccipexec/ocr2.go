@@ -17,6 +17,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
@@ -118,14 +119,14 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	r.inflightReports.expire(lggr)
 	inFlight := r.inflightReports.getAll()
 
-	executableObservations, err := r.getExecutableObservations(ctx, lggr, inFlight)
+	executableObservations, merkleRoot, err := r.getExecutableObservations(ctx, lggr, inFlight)
 	if err != nil {
 		return nil, err
 	}
 	// cap observations which fits MaxObservationLength (after serialized)
 	capped := sort.Search(len(executableObservations), func(i int) bool {
 		var encoded []byte
-		encoded, err = ccip.NewExecutionObservation(executableObservations[:i+1]).Marshal()
+		encoded, err = ccip.NewExecutionObservation(executableObservations[:i+1], merkleRoot).Marshal()
 		if err != nil {
 			// false makes Search keep looking to the right, always including any "erroring" ObservedMessage and allowing us to detect in the bottom
 			return false
@@ -139,18 +140,18 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	r.metricsCollector.NumberOfMessagesProcessed(ccip.Observation, len(executableObservations))
 	lggr.Infow("Observation", "executableMessages", executableObservations)
 	// Note can be empty
-	return ccip.NewExecutionObservation(executableObservations).Marshal()
+	return ccip.NewExecutionObservation(executableObservations, merkleRoot).Marshal()
 }
 
-func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, inflight []InflightInternalExecutionReport) ([]ccip.ObservedMessage, error) {
+func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, inflight []InflightInternalExecutionReport) ([]ccip.ObservedMessage, [32]byte, error) {
 	unexpiredReports, err := r.commitRootsCache.RootsEligibleForExecution(ctx)
 	if err != nil {
-		return nil, err
+		return nil, [32]byte{}, err
 	}
 	r.metricsCollector.UnexpiredCommitRoots(len(unexpiredReports))
 
 	if len(unexpiredReports) == 0 {
-		return []ccip.ObservedMessage{}, nil
+		return []ccip.ObservedMessage{}, [32]byte{}, nil
 	}
 
 	getExecTokenData := cache.LazyFunction[execTokenData](func() (execTokenData, error) {
@@ -163,7 +164,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 
 		unexpiredReportsWithSendReqs, err := r.getReportsWithSendRequests(ctx, unexpiredReportsPart)
 		if err != nil {
-			return nil, err
+			return nil, [32]byte{}, err
 		}
 
 		for _, unexpiredReport := range unexpiredReportsWithSendReqs {
@@ -198,7 +199,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 
 			blessed, err := r.commitStoreReader.IsBlessed(ctx, merkleRoot)
 			if err != nil {
-				return nil, err
+				return nil, [32]byte{}, err
 			}
 			if !blessed {
 				rootLggr.Infow("Report is accepted but not blessed")
@@ -207,7 +208,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 
 			tokenExecData, err := getExecTokenData()
 			if err != nil {
-				return nil, err
+				return nil, [32]byte{}, err
 			}
 
 			batch, msgExecStates := r.buildBatch(
@@ -222,12 +223,12 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				tokenExecData.sourceToDestTokens)
 			if len(batch) != 0 {
 				lggr.Infow("Execution batch created", "batchSize", len(batch), "messageStates", msgExecStates)
-				return batch, nil
+				return batch, merkleRoot, nil
 			}
 			r.commitRootsCache.Snooze(merkleRoot)
 		}
 	}
-	return []ccip.ObservedMessage{}, nil
+	return []ccip.ObservedMessage{}, [32]byte{}, nil
 }
 
 // Calculates a map that indicates whether a sequence number has already been executed.
@@ -406,11 +407,11 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 
 // Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
 // sequence number.
-func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.Logger, observedMessages []ccip.ObservedMessage) ([]byte, error) {
+func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.Logger, observedMessages []ccip.ObservedMessage, root [32]byte) ([]byte, error) {
 	if err := validateSeqNumbers(ctx, r.commitStoreReader, observedMessages); err != nil {
 		return nil, err
 	}
-	commitReport, err := getCommitReportForSeqNum(ctx, r.commitStoreReader, observedMessages[0].SeqNr)
+	commitReport, err := getCommitReportForRoot(ctx, r.commitStoreReader, root)
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +483,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return false, nil, nil
 	}
 
-	observedMessages, err := calculateObservedMessagesConsensus(parsableObservations, r.F)
+	observedMessages, root, err := calculateObservedMessagesConsensus(parsableObservations, r.F)
 	if err != nil {
 		return false, nil, err
 	}
@@ -490,7 +491,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return false, nil, nil
 	}
 
-	report, err := r.buildReport(ctx, lggr, observedMessages)
+	report, err := r.buildReport(ctx, lggr, observedMessages, root)
 	if err != nil {
 		return false, nil, err
 	}
@@ -508,13 +509,13 @@ type tallyVal struct {
 	tokenData [][]byte
 }
 
-func calculateObservedMessagesConsensus(observations []ccip.ExecutionObservation, f int) ([]ccip.ObservedMessage, error) {
+func calculateObservedMessagesConsensus(observations []ccip.ExecutionObservation, f int) ([]ccip.ObservedMessage, [32]byte, error) {
 	tally := make(map[tallyKey]tallyVal)
 	for _, obs := range observations {
 		for seqNr, msgData := range obs.Messages {
 			tokenDataHash, err := hashutil.BytesOfBytesKeccak(msgData.TokenData)
 			if err != nil {
-				return nil, fmt.Errorf("bytes of bytes keccak: %w", err)
+				return nil, [32]byte{}, fmt.Errorf("bytes of bytes keccak: %w", err)
 			}
 
 			key := tallyKey{seqNr: seqNr, tokenDataHash: tokenDataHash}
@@ -555,7 +556,18 @@ func calculateObservedMessagesConsensus(observations []ccip.ExecutionObservation
 	sort.Slice(finalSequenceNumbers, func(i, j int) bool {
 		return finalSequenceNumbers[i].SeqNr < finalSequenceNumbers[j].SeqNr
 	})
-	return finalSequenceNumbers, nil
+
+	root := [32]byte{}
+	for _, seqNr := range finalSequenceNumbers {
+		for _, obs := range observations {
+			if _, ok := obs.Messages[seqNr.SeqNr]; ok {
+				root = obs.Root
+				break
+			}
+		}
+	}
+
+	return finalSequenceNumbers, root, nil
 }
 
 func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {

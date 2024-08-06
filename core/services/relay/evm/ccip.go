@@ -87,6 +87,10 @@ func (i *IncompleteSourceCommitStoreReader) GetAcceptedCommitReportsGteTimestamp
 	return nil, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
 
+func (i *IncompleteSourceCommitStoreReader) GetCommitReport(ctx context.Context, root [32]byte) (cciptypes.CommitStoreReportWithTxMeta, error) {
+	return cciptypes.CommitStoreReportWithTxMeta{}, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
+}
+
 func (i *IncompleteSourceCommitStoreReader) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 	return nil, fmt.Errorf("invalid usage of IncompleteSourceCommitStoreReader")
 }
@@ -162,6 +166,10 @@ func (i *IncompleteDestCommitStoreReader) GasPriceEstimator(ctx context.Context)
 
 func (i *IncompleteDestCommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 	return i.cs.GetAcceptedCommitReportsGteTimestamp(ctx, ts, confirmations)
+}
+
+func (i *IncompleteDestCommitStoreReader) GetCommitReport(ctx context.Context, root [32]byte) (cciptypes.CommitStoreReportWithTxMeta, error) {
+	return i.cs.GetCommitReport(ctx, root)
 }
 
 func (i *IncompleteDestCommitStoreReader) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
