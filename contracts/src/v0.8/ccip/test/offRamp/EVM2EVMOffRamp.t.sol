@@ -1501,7 +1501,7 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
       )
     );
 
-    s_offRamp.releaseOrMintToken(amount, originalSender, OWNER, sourceTokenData, offchainTokenData, 0);
+    s_offRamp.releaseOrMintToken(amount, originalSender, OWNER, sourceTokenData, offchainTokenData);
 
     assertEq(startingBalance + amount, dstToken1.balanceOf(OWNER));
   }
@@ -1532,7 +1532,7 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.NotACompatiblePool.selector, returnedPool));
 
-    s_offRamp.releaseOrMintToken(amount, originalSender, OWNER, sourceTokenData, offchainTokenData, 0);
+    s_offRamp.releaseOrMintToken(amount, originalSender, OWNER, sourceTokenData, offchainTokenData);
 
     // A contract that doesn't support the interface should also revert
     returnedPool = address(s_offRamp);
@@ -1545,7 +1545,7 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.NotACompatiblePool.selector, returnedPool));
 
-    s_offRamp.releaseOrMintToken(amount, originalSender, OWNER, sourceTokenData, offchainTokenData, 0);
+    s_offRamp.releaseOrMintToken(amount, originalSender, OWNER, sourceTokenData, offchainTokenData);
   }
 
   function test__releaseOrMintToken_TokenHandlingError_revert_Revert() public {
@@ -1568,7 +1568,7 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
     vm.mockCallRevert(destToken, abi.encodeWithSelector(IERC20.transfer.selector, receiver, amount), revertData);
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.TokenHandlingError.selector, revertData));
-    s_offRamp.releaseOrMintToken(amount, originalSender, receiver, sourceTokenData, offchainTokenData, 0);
+    s_offRamp.releaseOrMintToken(amount, originalSender, receiver, sourceTokenData, offchainTokenData);
   }
 }
 

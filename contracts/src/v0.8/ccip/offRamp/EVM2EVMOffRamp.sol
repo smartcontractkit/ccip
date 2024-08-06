@@ -280,8 +280,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     uint256 timestampCommitted = ICommitStore(i_commitStore).verify(hashedLeaves, report.proofs, report.proofFlagBits);
     if (timestampCommitted == 0) revert RootNotCommitted();
 
-    bool manualExecution = manualExecGasLimits.length != 0;
-
     // Execute messages
     for (uint256 i = 0; i < numMsgs; ++i) {
       Internal.EVM2EVMMessage memory message = report.messages[i];
@@ -301,10 +299,11 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         emit SkippedAlreadyExecutedMessage(message.sequenceNumber);
         continue;
       }
-
-      uint256[] memory destGasAmounts = manualExecution ? manualExecGasLimits[i].destGasAmounts : new uint256[](0);
+      uint256[] memory destGasAmounts;
+      bool manualExecution = manualExecGasLimits.length != 0;
 
       if (manualExecution) {
+        destGasAmounts = manualExecGasLimits[i].destGasAmounts;
         bool isOldCommitReport =
           (block.timestamp - timestampCommitted) > s_dynamicConfig.permissionLessExecutionThresholdSeconds;
         // Manually execution is fine if we previously failed or if the commit report is just too old
@@ -619,8 +618,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     bytes memory originalSender,
     address receiver,
     Internal.SourceTokenData memory sourceTokenData,
-    bytes memory offchainTokenData,
-    uint256 destGasAmount
+    bytes memory offchainTokenData
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
     // We need to safely decode the token address from the sourceTokenData, as it could be wrong,
     // in which case it doesn't have to be a valid EVM address.
@@ -634,8 +632,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     if (localPoolAddress == address(0) || !localPoolAddress.supportsInterface(Pool.CCIP_POOL_V1)) {
       revert NotACompatiblePool(localPoolAddress);
     }
-
-    uint256 destinationGasAmount = destGasAmount > 0 ? destGasAmount : sourceTokenData.destGasAmount;
 
     // We determined that the pool address is a valid EVM address, but that does not mean the code at this
     // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location
@@ -658,7 +654,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         })
       ),
       localPoolAddress,
-      destinationGasAmount,
+      sourceTokenData.destGasAmount,
       Internal.GAS_FOR_CALL_EXACT_CHECK,
       Internal.MAX_RET_BYTES
     );
@@ -677,7 +673,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     (success, returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
       abi.encodeCall(IERC20.transfer, (receiver, localAmount)),
       localToken,
-      destinationGasAmount - gasUsedReleaseOrMint,
+      sourceTokenData.destGasAmount - gasUsedReleaseOrMint,
       Internal.GAS_FOR_CALL_EXACT_CHECK,
       Internal.MAX_RET_BYTES
     );
@@ -707,18 +703,22 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     // Creating a copy is more gas efficient than initializing a new array.
     destTokenAmounts = sourceTokenAmounts;
     uint256 value = 0;
-    bool isManualExecution = destGasAmounts.length != 0;
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
+      Internal.SourceTokenData memory sourceTokenData =
+        abi.decode(encodedSourceTokenData[i], (Internal.SourceTokenData));
+      if (destGasAmounts.length != 0) {
+        if (destGasAmounts[i] != 0) {
+          sourceTokenData.destGasAmount = uint32(destGasAmounts[i]);
+        }
+      }
       destTokenAmounts[i] = _releaseOrMintToken(
         sourceTokenAmounts[i].amount,
         originalSender,
         receiver,
         // This should never revert as the onRamp encodes the sourceTokenData struct. Only the inner components from
         // this struct come from untrusted sources.
-        abi.decode(encodedSourceTokenData[i], (Internal.SourceTokenData)),
-        offchainTokenData[i],
-        // If we are manually executing, we need to account for the gas used in the token transfer.
-        isManualExecution ? destGasAmounts[i] : 0
+        sourceTokenData,
+        offchainTokenData[i]
       );
 
       if (s_rateLimitedTokensDestToSource.contains(destTokenAmounts[i].token)) {
