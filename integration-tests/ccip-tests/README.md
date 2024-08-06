@@ -42,8 +42,9 @@ For example, if you want to override the `Network` input in test and want to run
 
 **Please note that the secrets should NOT be checked in to the repo and should be kept locally.**
 
-We recommend against changing the content of [sample-secrets.toml](./testconfig/examples/secrets.toml.example). Please create a new file and set it as the secrets file.
-You can run the command to ignore the changes to the file.
+We recommend against changing the content of [secrets.toml.example](./testconfig/examples/secrets.toml.example). Please create a new file and set it as the secrets file.
+
+You can run this command to ignore any changes to the file.
 
 ```bash
 git update-index --skip-worktree <path-to-secrets-file>
