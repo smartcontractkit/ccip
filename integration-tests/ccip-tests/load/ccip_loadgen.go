@@ -248,10 +248,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
 	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
 	if err != nil {
-		res.Error = fmt.Sprintf("reqNo %d err %s - while getting fee from router - msg Data %x FeeToken %s TokenAmounts %+v ExtraArgs %x Receiver %x",
-			msgSerialNo, err.Error(),
-			msg.Data, msg.FeeToken, msg.TokenAmounts, msg.ExtraArgs, msg.Receiver)
-
+		res.Error = fmt.Sprintf("reqNo %d err %s - while getting fee from router", msgSerialNo, err.Error())
 		res.Failed = true
 		return res
 	}
@@ -270,9 +267,11 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		return res
 	}
 
+	// the msg is no longer needed, so we can clear it to avoid holding extra data during load
+	// nolint:ineffassign,staticcheck
+	msg = router.ClientEVM2AnyMessage{}
+
 	txConfirmationTime := time.Now().UTC()
-	// wait for the tx to be mined, timeout is set to 10 minutes
-	lggr.Info().Str("tx", sendTx.Hash().Hex()).Msg("waiting for tx to be mined")
 	lggr = lggr.With().Str("Msg Tx", sendTx.Hash().String()).Logger()
 
 	stats.UpdateState(&lggr, 0, testreporters.TX, txConfirmationTime.Sub(startTime), testreporters.Success, nil)
@@ -300,13 +299,13 @@ func (c *CCIPE2ELoad) Validate(lggr zerolog.Logger, sendTx *types.Transaction, t
 	// if the finality tag is enabled and the last finalized block is greater than the block number of the message
 	// consider the message finalized
 	if c.Lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 &&
-		lstFinalizedBlock != 0 && lstFinalizedBlock > msgLogs[0].Raw.BlockNumber {
+		lstFinalizedBlock != 0 && lstFinalizedBlock > msgLogs[0].LogInfo.BlockNumber {
 		sourceLogFinalizedAt = c.LastFinalizedTimestamp.Load()
 		for i, stat := range stats {
 			stat.UpdateState(&lggr, stat.SeqNum, testreporters.SourceLogFinalized,
 				sourceLogFinalizedAt.Sub(sourceLogTime), testreporters.Success,
 				&testreporters.TransactionStats{
-					TxHash:             msgLogs[i].Raw.TxHash.Hex(),
+					TxHash:             msgLogs[i].LogInfo.TxHash.Hex(),
 					FinalizedByBlock:   strconv.FormatUint(lstFinalizedBlock, 10),
 					FinalizedAt:        sourceLogFinalizedAt.String(),
 					Fee:                msgLogs[i].Fee.String(),
@@ -318,7 +317,7 @@ func (c *CCIPE2ELoad) Validate(lggr zerolog.Logger, sendTx *types.Transaction, t
 	} else {
 		var finalizingBlock uint64
 		sourceLogFinalizedAt, finalizingBlock, err = c.Lane.Source.AssertSendRequestedLogFinalized(
-			&lggr, msgLogs[0].Raw.TxHash, msgLogs, sourceLogTime, stats)
+			&lggr, msgLogs[0].LogInfo.TxHash, msgLogs, sourceLogTime, stats)
 		if err != nil {
 			return err
 		}
