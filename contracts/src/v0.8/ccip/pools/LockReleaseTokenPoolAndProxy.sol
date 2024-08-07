@@ -20,7 +20,7 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
   error InsufficientLiquidity();
   error LiquidityNotAccepted();
 
-  string public constant override typeAndVersion = "LockReleaseTokenPoolAndProxy 1.5.0-dev";
+  string public constant override typeAndVersion = "LockReleaseTokenPoolAndProxy 1.5.0";
 
   /// @dev Whether or not the pool accepts liquidity.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
@@ -70,8 +70,7 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
     _validateReleaseOrMint(releaseOrMintIn);
 
     if (!_hasLegacyPool()) {
-      // Release to the offRamp, which forwards it to the recipient
-      getToken().safeTransfer(msg.sender, releaseOrMintIn.amount);
+      getToken().approve(msg.sender, releaseOrMintIn.amount);
     } else {
       _releaseOrMintLegacy(releaseOrMintIn);
     }

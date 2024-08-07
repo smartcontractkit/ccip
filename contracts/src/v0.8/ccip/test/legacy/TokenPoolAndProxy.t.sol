@@ -455,6 +455,9 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
     // releaseOrMint, assert normal path is taken
     deal(address(s_token), address(s_pool), amount);
 
+    vm.expectEmit(address(s_token));
+    emit IERC20.Approval(address(s_pool), address(s_fakeOffRamp), amount);
+
     s_pool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         receiver: OWNER,
@@ -467,6 +470,9 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
         offchainTokenData: ""
       })
     );
+
+    // Transfer the tokens like the offRamp would
+    s_token.transferFrom(address(s_pool), OWNER, amount);
 
     // set legacy pool
 
