@@ -237,11 +237,11 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     for (uint256 i = 0; i < messages.length; ++i) {
       gasLimitOverrides[i].receiverExecutionGasLimit = messages[i].gasLimit;
       //create an array for destinationGasAmounts
-      gasLimitOverrides[i].destGasAmounts = new uint256[](messages[i].tokenAmounts.length);
+      gasLimitOverrides[i].tokenGasOverrides = new uint256[](messages[i].tokenAmounts.length);
 
-      // initialize destGasAmounts
+      // initialize tokenGasOverrides
       for (uint256 j = 0; j < messages[i].tokenAmounts.length; ++j) {
-        gasLimitOverrides[i].destGasAmounts[j] = DEFAULT_TOKEN_DEST_GAS_OVERHEAD + 1;
+        gasLimitOverrides[i].tokenGasOverrides[j] = DEFAULT_TOKEN_DEST_GAS_OVERHEAD + 1;
       }
     }
 
@@ -254,7 +254,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     returns (EVM2EVMOffRamp.GasLimitOverride[] memory)
   {
     EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides =
-      _prepareGasLimitsAndDestGasAmountOverridesForMessages(messages);
+      _prepareGasLimitsAndTokenGasOverridesForMessages(messages);
 
     for (uint256 i = 0; i < gasLimitOverrides.length; i++) {
       gasLimitOverrides[i].receiverExecutionGasLimit = gasLimitOverrides[i].receiverExecutionGasLimit - 10;
@@ -263,7 +263,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     return gasLimitOverrides;
   }
 
-  function _prepareGasLimitsAndDestGasAmountOverridesForMessages(Internal.EVM2EVMMessage[] memory messages)
+  function _prepareGasLimitsAndTokenGasOverridesForMessages(Internal.EVM2EVMMessage[] memory messages)
     public
     pure
     returns (EVM2EVMOffRamp.GasLimitOverride[] memory)
@@ -271,11 +271,11 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = new EVM2EVMOffRamp.GasLimitOverride[](messages.length);
     for (uint256 i = 0; i < messages.length; ++i) {
       gasLimitOverrides[i].receiverExecutionGasLimit = messages[i].gasLimit;
-      gasLimitOverrides[i].destGasAmounts = new uint256[](messages[i].tokenAmounts.length);
+      gasLimitOverrides[i].tokenGasOverrides = new uint256[](messages[i].tokenAmounts.length);
       for (uint256 j = 0; j < messages[i].sourceTokenData.length; ++j) {
         Internal.SourceTokenData memory sourceTokenData =
           abi.decode(messages[i].sourceTokenData[j], (Internal.SourceTokenData));
-        gasLimitOverrides[i].destGasAmounts[j] = sourceTokenData.destGasAmount;
+        gasLimitOverrides[i].tokenGasOverrides[j] = sourceTokenData.destGasAmount;
       }
     }
 

@@ -81,5 +81,5 @@ type EVM2EVMOffRampExecutionStateChanged struct {
 
 type EVM2EVMOffRampGasLimitOverride struct {
 	ReceiverExecutionGasLimit *big.Int
-	DestGasAmounts            []*big.Int
+	TokenGasOverrides         []*big.Int
 }

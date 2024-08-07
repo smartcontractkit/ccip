@@ -41,19 +41,19 @@ type Config struct {
 }
 
 type execArgs struct {
-	cfg             Config
-	seqNum          uint64
-	msgID           [32]byte
-	sourceChain     *ethclient.Client
-	sourceChainId   *big.Int
-	destChain       *ethclient.Client
-	destUser        *bind.TransactOpts
-	destChainId     *big.Int
-	srcStartBlock   *big.Int
-	destStartBlock  uint64
-	destLatestBlock uint64
-	OnRamp          common.Address
-	destGasAmounts  []*big.Int
+	cfg               Config
+	seqNum            uint64
+	msgID             [32]byte
+	sourceChain       *ethclient.Client
+	sourceChainId     *big.Int
+	destChain         *ethclient.Client
+	destUser          *bind.TransactOpts
+	destChainId       *big.Int
+	srcStartBlock     *big.Int
+	destStartBlock    uint64
+	destLatestBlock   uint64
+	OnRamp            common.Address
+	tokenGasOverrides []*big.Int
 }
 
 func main() {
@@ -305,7 +305,7 @@ func (args *execArgs) execute() error {
 	for range offRampProof.Messages {
 		evm2evmOffRampGasLimitOverride := &helpers.EVM2EVMOffRampGasLimitOverride{
 			ReceiverExecutionGasLimit: big.NewInt(int64(args.cfg.GasLimitOverride)),
-			DestGasAmounts:            args.destGasAmounts,
+			TokenGasOverrides:         args.tokenGasOverrides,
 		}
 		gasLimitOverrides = append(gasLimitOverrides, evm2evmOffRampGasLimitOverride)
 	}

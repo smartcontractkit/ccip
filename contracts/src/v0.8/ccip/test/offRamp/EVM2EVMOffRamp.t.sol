@@ -1148,7 +1148,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
   }
 
-  function test_ManualExecWithDestGasAmountOverride_Failure() public {
+  function test_ManualExecWithTokenGasOverride_Failure() public {
     Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessageWithTokens();
     messages[0].receiver = address(s_reverting_receiver);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
@@ -1156,16 +1156,16 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
 
     s_reverting_receiver.setRevert(false);
     EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = _getGasLimitsFromMessages(messages);
-    gasLimitOverrides[0].destGasAmounts[0] = gasLimitOverrides[0].destGasAmounts[0] - 2;
+    gasLimitOverrides[0].tokenGasOverrides[0] = gasLimitOverrides[0].tokenGasOverrides[0] - 2;
 
     vm.expectRevert(
-      abi.encodeWithSelector(EVM2EVMOffRamp.InvalidDestGasAmount.selector, 0, gasLimitOverrides[0].destGasAmounts[0])
+      abi.encodeWithSelector(EVM2EVMOffRamp.InvalidTokenGasOverride.selector, 0, gasLimitOverrides[0].tokenGasOverrides[0])
     );
 
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
   }
 
-  function test_ManualExecWithDestGasAmountOverride_Mismatch_Failure() public {
+  function test_ManualExecWithTokenGasOverride_Mismatch_Failure() public {
     Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessageWithTokens();
     messages[0].receiver = address(s_reverting_receiver);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
@@ -1173,7 +1173,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
 
     s_reverting_receiver.setRevert(false);
     EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = _getGasLimitsFromMessages(messages);
-    gasLimitOverrides[0].destGasAmounts = new uint256[](0);
+    gasLimitOverrides[0].tokenGasOverrides = new uint256[](0);
 
     vm.expectRevert(
       abi.encodeWithSelector(EVM2EVMOffRamp.DestinationGasAmountCountMismatch.selector, messages[0].messageId, 1)

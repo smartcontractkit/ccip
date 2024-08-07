@@ -1269,14 +1269,14 @@ type ManualExecArgs struct {
 	DestDeployedAt     uint64 // destination block number for the initial destination contract deployment.
 	// Can be any number before the tx was reverted in destination chain. Preferably this needs to be set up with
 	// a value greater than zero to avoid performance issue in locating approximate destination block
-	SendReqLogIndex uint   // log index of the CCIPSendRequested log in source chain
-	SendReqTxHash   string // tx hash of the ccip-send transaction for which execution was reverted
-	CommitStore     string
-	OnRamp          string
-	OffRamp         string
-	SeqNr           uint64
-	GasLimit        *big.Int
-	destGasAmounts  []*big.Int
+	SendReqLogIndex   uint   // log index of the CCIPSendRequested log in source chain
+	SendReqTxHash     string // tx hash of the ccip-send transaction for which execution was reverted
+	CommitStore       string
+	OnRamp            string
+	OffRamp           string
+	SeqNr             uint64
+	GasLimit          *big.Int
+	tokenGasOverrides []*big.Int
 }
 
 // ApproxDestStartBlock attempts to locate a block in destination chain with timestamp closest to the timestamp of the block
@@ -1487,23 +1487,23 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 					msg.GasLimit = args.GasLimit
 				}
 
-				destGasAmounts := make([]*big.Int, len(msg.TokenAmounts))
+				tokenGasOverrides := make([]*big.Int, len(msg.TokenAmounts))
 
-				if args.destGasAmounts != nil && len(args.destGasAmounts) == len(msg.TokenAmounts) {
-					for i, destGasAmount := range args.destGasAmounts {
-						destGasAmounts[i].Set(destGasAmount)
+				if args.tokenGasOverrides != nil && len(args.tokenGasOverrides) == len(msg.TokenAmounts) {
+					for i, tokenGasOverride := range args.tokenGasOverrides {
+						tokenGasOverrides[i].Set(tokenGasOverride)
 					}
 				} else {
 					// Initialize each element in the slice to a new big.Int value in one line using a loop
-					for i := range destGasAmounts {
-						destGasAmounts[i] = new(big.Int)
+					for i := range tokenGasOverrides {
+						tokenGasOverrides[i] = new(big.Int)
 					}
 				}
 
 				// CCIP-2950 create a new object for evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride
 				evm2evmOffRampGasLimitOverride := &evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride{
 					ReceiverExecutionGasLimit: msg.GasLimit,
-					DestGasAmounts:            destGasAmounts,
+					TokenGasOverrides:         tokenGasOverrides,
 				}
 
 				manualExecGasLimits = append(manualExecGasLimits, evm2evmOffRampGasLimitOverride)
