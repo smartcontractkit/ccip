@@ -18,13 +18,14 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"go.uber.org/multierr"
+
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	"manual-execution/helpers"
 )
 
-const NumberOfBlocks = 5000
+const NumberOfBlocks = 20000
 
 // Config represents configuration fields
 type Config struct {
