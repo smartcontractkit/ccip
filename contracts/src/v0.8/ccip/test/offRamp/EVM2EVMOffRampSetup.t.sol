@@ -190,6 +190,14 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     return messages;
   }
 
+  function _generateSingleBasicMessageWithTokens() internal view returns (Internal.EVM2EVMMessage[] memory) {
+    Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](1);
+    Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    tokenAmounts[0].amount = 1e18;
+    messages[0] = _generateAny2EVMMessage(1, tokenAmounts, false);
+    return messages;
+  }
+
   function _generateMessagesWithTokens() internal view returns (Internal.EVM2EVMMessage[] memory) {
     Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](2);
     Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
@@ -222,15 +230,56 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
 
   function _getGasLimitsFromMessages(Internal.EVM2EVMMessage[] memory messages)
     internal
-    pure
-    returns (uint256[] memory)
+    view
+    returns (EVM2EVMOffRamp.GasLimitOverride[] memory)
   {
-    uint256[] memory gasLimits = new uint256[](messages.length);
+    EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = new EVM2EVMOffRamp.GasLimitOverride[](messages.length);
     for (uint256 i = 0; i < messages.length; ++i) {
-      gasLimits[i] = messages[i].gasLimit;
+      gasLimitOverrides[i].receiverExecutionGasLimit = messages[i].gasLimit;
+      //create an array for destinationGasAmounts
+      gasLimitOverrides[i].destGasAmounts = new uint256[](messages[i].tokenAmounts.length);
+
+      // initialize destGasAmounts
+      for (uint256 j = 0; j < messages[i].tokenAmounts.length; ++j) {
+        gasLimitOverrides[i].destGasAmounts[j] = DEFAULT_TOKEN_DEST_GAS_OVERHEAD + 1;
+      }
     }
 
-    return gasLimits;
+    return gasLimitOverrides;
+  }
+
+  function _prepareInvalidGasLimitsFromMessages(Internal.EVM2EVMMessage[] memory messages)
+    public
+    view
+    returns (EVM2EVMOffRamp.GasLimitOverride[] memory)
+  {
+    EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides =
+      _prepareGasLimitsAndDestGasAmountOverridesForMessages(messages);
+
+    for (uint256 i = 0; i < gasLimitOverrides.length; i++) {
+      gasLimitOverrides[i].receiverExecutionGasLimit = gasLimitOverrides[i].receiverExecutionGasLimit - 10;
+    }
+
+    return gasLimitOverrides;
+  }
+
+  function _prepareGasLimitsAndDestGasAmountOverridesForMessages(Internal.EVM2EVMMessage[] memory messages)
+    public
+    pure
+    returns (EVM2EVMOffRamp.GasLimitOverride[] memory)
+  {
+    EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = new EVM2EVMOffRamp.GasLimitOverride[](messages.length);
+    for (uint256 i = 0; i < messages.length; ++i) {
+      gasLimitOverrides[i].receiverExecutionGasLimit = messages[i].gasLimit;
+      gasLimitOverrides[i].destGasAmounts = new uint256[](messages[i].tokenAmounts.length);
+      for (uint256 j = 0; j < messages[i].sourceTokenData.length; ++j) {
+        Internal.SourceTokenData memory sourceTokenData =
+          abi.decode(messages[i].sourceTokenData[j], (Internal.SourceTokenData));
+        gasLimitOverrides[i].destGasAmounts[j] = sourceTokenData.destGasAmount;
+      }
+    }
+
+    return gasLimitOverrides;
   }
 
   function _assertSameConfig(EVM2EVMOffRamp.DynamicConfig memory a, EVM2EVMOffRamp.DynamicConfig memory b) public pure {

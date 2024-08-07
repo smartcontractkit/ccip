@@ -53,6 +53,7 @@ type execArgs struct {
 	destStartBlock  uint64
 	destLatestBlock uint64
 	OnRamp          common.Address
+	destGasAmounts  []*big.Int
 }
 
 func main() {
@@ -299,10 +300,14 @@ func (args *execArgs) execute() error {
 		ProofFlagBits:     helpers.ProofFlagsToBits(proof.SourceFlags),
 	}
 
-	// Execute.
-	gasLimitOverrides := make([]*big.Int, len(offRampProof.Messages))
-	for i := range offRampProof.Messages {
-		gasLimitOverrides[i] = big.NewInt(int64(args.cfg.GasLimitOverride))
+	gasLimitOverrides := make([]*helpers.EVM2EVMOffRampGasLimitOverride, len(offRampProof.Messages))
+
+	for range offRampProof.Messages {
+		evm2evmOffRampGasLimitOverride := &helpers.EVM2EVMOffRampGasLimitOverride{
+			ReceiverExecutionGasLimit: big.NewInt(int64(args.cfg.GasLimitOverride)),
+			DestGasAmounts:            args.destGasAmounts,
+		}
+		gasLimitOverrides = append(gasLimitOverrides, evm2evmOffRampGasLimitOverride)
 	}
 
 	tx, err := helpers.ManuallyExecute(args.destChain, args.destUser, args.cfg.OffRamp, offRampProof, gasLimitOverrides)

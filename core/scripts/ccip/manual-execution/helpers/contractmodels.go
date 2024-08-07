@@ -78,3 +78,8 @@ type EVM2EVMOffRampExecutionStateChanged struct {
 	ReturnData     []byte
 	Raw            types.Log
 }
+
+type EVM2EVMOffRampGasLimitOverride struct {
+	ReceiverExecutionGasLimit *big.Int
+	DestGasAmounts            []*big.Int
+}
