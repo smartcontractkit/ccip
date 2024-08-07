@@ -1548,15 +1548,15 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	}
 
 	// Convert manualExecGasLimits to a slice of structs before calling ManuallyExecute
-	manualExecGasLimitsStructs := make([]evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride, len(manualExecGasLimits))
+	manualExecGasLimitOverrides := make([]evm_2_evm_offramp.EVM2EVMOffRampGasLimitOverride, len(manualExecGasLimits))
 	for i, limitOverride := range manualExecGasLimits {
-		if limitOverride != nil { // Check if the pointer is not nil
-			manualExecGasLimitsStructs[i] = *limitOverride
+		if limitOverride != nil {
+			manualExecGasLimitOverrides[i] = *limitOverride
 		}
 	}
 
 	// Execute.
-	return offRamp.ManuallyExecute(args.DestUser, offRampProof, manualExecGasLimitsStructs)
+	return offRamp.ManuallyExecute(args.DestUser, offRampProof, manualExecGasLimitOverrides)
 }
 
 func (c *CCIPContracts) ExecuteMessage(

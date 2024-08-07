@@ -99,7 +99,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     address destToken;
   }
 
-  /// @notice GasLimitOverride struct containing the receiverExecutionGasLimit and destGasAmounts
   struct GasLimitOverride {
     uint256 receiverExecutionGasLimit;
     uint256[] destGasAmounts;

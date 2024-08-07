@@ -25,9 +25,6 @@ contract ReentrancyAbuser is CCIPReceiver {
     // Use original message gas limits in manual execution
     uint256 numMsgs = s_payload.messages.length;
     EVM2EVMOffRamp.GasLimitOverride[] memory gasOverrides = new EVM2EVMOffRamp.GasLimitOverride[](numMsgs);
-    // for (uint256 i = 0; i < numMsgs; ++i) {
-    //   gasOverrides[i] = 0;
-    // }
 
     if (!s_ReentrancyDone) {
       // Could do more rounds but a PoC one is enough
