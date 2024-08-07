@@ -49,8 +49,9 @@ contract BurnMintTokenPoolAndProxy is ITypeAndVersion, LegacyPoolWrapper {
     _validateReleaseOrMint(releaseOrMintIn);
 
     if (!_hasLegacyPool()) {
-      // Mint to the offRamp, which forwards it to the recipient
-      IBurnMintERC20(address(i_token)).mint(msg.sender, releaseOrMintIn.amount);
+      // Mint to the this contract and approve the msg.sender to send it to the recipient
+      IBurnMintERC20(address(i_token)).mint(address(this), releaseOrMintIn.amount);
+      IBurnMintERC20(address(i_token)).approve(msg.sender, releaseOrMintIn.amount);
     } else {
       _releaseOrMintLegacy(releaseOrMintIn);
     }

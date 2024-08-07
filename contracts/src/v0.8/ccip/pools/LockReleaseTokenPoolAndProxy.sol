@@ -70,8 +70,7 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
     _validateReleaseOrMint(releaseOrMintIn);
 
     if (!_hasLegacyPool()) {
-      // Release to the offRamp, which forwards it to the recipient
-      getToken().safeTransfer(msg.sender, releaseOrMintIn.amount);
+      getToken().approve(msg.sender, releaseOrMintIn.amount);
     } else {
       _releaseOrMintLegacy(releaseOrMintIn);
     }

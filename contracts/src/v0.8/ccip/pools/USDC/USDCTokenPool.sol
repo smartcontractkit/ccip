@@ -111,7 +111,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // replaceDepositForBurn, the tokens cannot be maliciously re-routed to another address.
     uint64 nonce = i_tokenMessenger.depositForBurnWithCaller(
       // We set the domain.allowedCaller as the receiver of the funds, as this is the token pool. Since 1.5 the
-      // token pools receiver the funds to hop them through the offRamps.
+      // token pools receiver the funds are transferred by the offRamp through a transferFrom.
       lockOrBurnIn.amount,
       domain.domainIdentifier,
       domain.allowedCaller,
