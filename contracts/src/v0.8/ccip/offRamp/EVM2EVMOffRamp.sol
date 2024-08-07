@@ -252,10 +252,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         Internal.SourceTokenData memory sourceTokenData =
           abi.decode(encodedSourceTokenData[i], (Internal.SourceTokenData));
         uint256 destGasAmount = gasLimitOverrides[i].destGasAmounts[j];
-        if (destGasAmount != 0) {
-          if (destGasAmount < sourceTokenData.destGasAmount) {
-            revert InvalidDestGasAmount(j, destGasAmount);
-          }
+        if (destGasAmount != 0 && destGasAmount < sourceTokenData.destGasAmount) {
+          revert InvalidDestGasAmount(j, destGasAmount);
         }
       }
     }

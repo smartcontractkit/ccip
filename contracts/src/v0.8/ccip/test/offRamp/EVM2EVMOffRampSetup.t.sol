@@ -191,10 +191,9 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
   }
 
   function _generateSingleBasicMessageWithTokens() internal view returns (Internal.EVM2EVMMessage[] memory) {
-    Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](2);
+    Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](1);
     Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     tokenAmounts[0].amount = 1e18;
-    tokenAmounts[1].amount = 5e18;
     messages[0] = _generateAny2EVMMessage(1, tokenAmounts, false);
     return messages;
   }
@@ -250,21 +249,22 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
   }
 
   function _prepareInvalidGasLimitsFromMessages(Internal.EVM2EVMMessage[] memory messages)
-    internal
-    pure
+    public
+    view
     returns (EVM2EVMOffRamp.GasLimitOverride[] memory)
   {
-    EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = new EVM2EVMOffRamp.GasLimitOverride[](messages.length);
-    for (uint256 i = 0; i < messages.length; ++i) {
-      gasLimitOverrides[i].receiverExecutionGasLimit = messages[i].gasLimit;
-      gasLimitOverrides[i].destGasAmounts = new uint256[](messages[i].tokenAmounts.length - 1);
+    EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides =
+      _prepareGasLimitsAndDestGasAmountOverridesForMessages(messages);
+
+    for (uint256 i = 0; i < gasLimitOverrides.length; i++) {
+      gasLimitOverrides[i].receiverExecutionGasLimit = gasLimitOverrides[i].receiverExecutionGasLimit - 10;
     }
 
     return gasLimitOverrides;
   }
 
   function _prepareGasLimitsAndDestGasAmountOverridesForMessages(Internal.EVM2EVMMessage[] memory messages)
-    internal
+    public
     pure
     returns (EVM2EVMOffRamp.GasLimitOverride[] memory)
   {
