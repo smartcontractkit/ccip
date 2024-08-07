@@ -236,29 +236,15 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     return gasLimitOverrides;
   }
 
-//  function _getGasLimitsFromMessages(Internal.EVM2EVMMessage[] memory messages)
-//    internal
-//    pure
-//    returns (EVM2EVMOffRamp.GasLimitOverride[] memory)
-//  {
-//    EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = new EVM2EVMOffRamp.GasLimitOverride[](messages.length);
-//    for (uint256 i = 0; i < messages.length; ++i) {
-//      gasLimitOverrides[i].receiverExecutionGasLimit = messages[i].gasLimit;
-//      gasLimitOverrides[i].destGasAmounts = new uint256[](messages[i].tokenAmounts.length);
-//    }
-//
-//    return gasLimitOverrides;
-//  }
-
   function _prepareInvalidGasLimitsFromMessages(Internal.EVM2EVMMessage[] memory messages)
-  internal
-  returns (EVM2EVMOffRamp.GasLimitOverride[] memory)
+    internal
+    returns (EVM2EVMOffRamp.GasLimitOverride[] memory)
   {
     EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = new EVM2EVMOffRamp.GasLimitOverride[](messages.length);
     for (uint256 i = 0; i < messages.length; ++i) {
       gasLimitOverrides[i].receiverExecutionGasLimit = messages[i].gasLimit;
       console.log("tokenAmounts length is: ", messages[i].tokenAmounts.length);
-      gasLimitOverrides[i].destGasAmounts = new uint256[](messages[i].tokenAmounts.length-1);
+      gasLimitOverrides[i].destGasAmounts = new uint256[](messages[i].tokenAmounts.length - 1);
       console.log("destGasAmounts array length after reduction is: ", gasLimitOverrides[i].destGasAmounts.length);
     }
 
@@ -276,7 +262,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       gasLimitOverrides[i].destGasAmounts = new uint256[](messages[i].tokenAmounts.length);
       for (uint256 j = 0; j < messages[i].sourceTokenData.length; ++j) {
         Internal.SourceTokenData memory sourceTokenData =
-                  abi.decode(messages[i].sourceTokenData[j], (Internal.SourceTokenData));
+          abi.decode(messages[i].sourceTokenData[j], (Internal.SourceTokenData));
         gasLimitOverrides[i].destGasAmounts[j] = sourceTokenData.destGasAmount;
       }
     }
