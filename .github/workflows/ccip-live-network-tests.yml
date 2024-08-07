@@ -145,7 +145,7 @@ jobs:
       - name: Prepare Base64 TOML override
         shell: bash
         run: |
-          BASE64_NETWORK_CONFIG=$(echo $BASE64_NETWORK_CONFIG | base64 -w 0 -d | sed -e 's/evm_key/${{ secrets.QA_EVM_KEYS }}/g' | base64 -w 0)
+          BASE64_NETWORK_CONFIG=$(echo $BASE64_NETWORK_CONFIG | base64 -w 0 -d | sed -e 's/evm_key/${{ secrets.QA_SHARED_803C_KEY }}/g' | base64 -w 0)
           echo ::add-mask::$BASE64_NETWORK_CONFIG
           echo "BASE64_NETWORK_CONFIG=$BASE64_NETWORK_CONFIG" >> "$GITHUB_ENV"
           SLACK_USER=$(jq -r '.inputs.slackMemberID' $GITHUB_EVENT_PATH)
@@ -251,7 +251,7 @@ jobs:
       - name: Prepare Base64 TOML override
         shell: bash
         run: |
-          BASE64_NETWORK_CONFIG=$(echo $BASE64_NETWORK_CONFIG | base64 -w 0 -d | sed -e 's/evm_key/${{ secrets.QA_EVM_KEYS }}/g' | base64 -w 0)
+          BASE64_NETWORK_CONFIG=$(echo $BASE64_NETWORK_CONFIG | base64 -w 0 -d | sed -e 's/evm_key/${{ secrets.QA_SHARED_803C_KEY }}/g' | base64 -w 0)
           echo ::add-mask::$BASE64_NETWORK_CONFIG
           echo "BASE64_NETWORK_CONFIG=$BASE64_NETWORK_CONFIG" >> "$GITHUB_ENV"
           SLACK_USER=$(jq -r '.inputs.slackMemberID' $GITHUB_EVENT_PATH)
