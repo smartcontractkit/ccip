@@ -1,4 +1,4 @@
-package environment
+package deployment
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/environment/memory"
+	"github.com/smartcontractkit/chainlink/v2/core/deployment/memory"
 )
 
 const (

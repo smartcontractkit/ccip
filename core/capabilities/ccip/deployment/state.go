@@ -7,16 +7,16 @@ import (
 	"github.com/pkg/errors"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink/v2/core/environment"
+	"github.com/smartcontractkit/chainlink/v2/core/deployment"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
-	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 )
 
@@ -35,6 +35,7 @@ type CCIPOnChainState struct {
 	TokenAdminRegistries map[uint64]*token_admin_registry.TokenAdminRegistry
 	Routers              map[uint64]*router.Router
 	Weth9s               map[uint64]*weth9.WETH9
+	MockArms             map[uint64]*mock_arm_contract.MockARMContract
 
 	// Only lives on the home chain.
 	CapabilityRegistry *capabilities_registry.CapabilitiesRegistry
@@ -70,7 +71,7 @@ func (s CCIPOnChainState) Snapshot(chains []uint64) (CCIPSnapShot, error) {
 	return snapshot, nil
 }
 
-func SnapshotState(e environment.Environment, ab environment.AddressBook) (CCIPSnapShot, error) {
+func SnapshotState(e deployment.Environment, ab deployment.AddressBook) (CCIPSnapShot, error) {
 	state, err := GenerateOnchainState(e, ab)
 	if err != nil {
 		return CCIPSnapShot{}, err
@@ -78,7 +79,7 @@ func SnapshotState(e environment.Environment, ab environment.AddressBook) (CCIPS
 	return state.Snapshot(e.AllChainSelectors())
 }
 
-func GenerateOnchainState(e environment.Environment, ab environment.AddressBook) (CCIPOnChainState, error) {
+func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (CCIPOnChainState, error) {
 	state := CCIPOnChainState{
 		EvmOnRampsV160:       make(map[uint64]*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp),
 		EvmOffRampsV160:      make(map[uint64]*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp),
@@ -87,6 +88,7 @@ func GenerateOnchainState(e environment.Environment, ab environment.AddressBook)
 		NonceManagers:        make(map[uint64]*nonce_manager.NonceManager),
 		TokenAdminRegistries: make(map[uint64]*token_admin_registry.TokenAdminRegistry),
 		Routers:              make(map[uint64]*router.Router),
+		MockArms:             make(map[uint64]*mock_arm_contract.MockARMContract),
 		Weth9s:               make(map[uint64]*weth9.WETH9),
 	}
 	// Get all the onchain state
@@ -95,60 +97,63 @@ func GenerateOnchainState(e environment.Environment, ab environment.AddressBook)
 		return state, errors.Wrap(err, "could not get addresses")
 	}
 	for chainSelector, addresses := range addresses {
-		for address := range addresses {
-			tv, err := type_and_version.NewTypeAndVersionInterface(common.HexToAddress(address), e.Chains[chainSelector].Client)
-			if err != nil {
-				return state, errors.Wrap(err, "could not create tv interface")
-			}
-			tvStr, err := tv.TypeAndVersion(nil)
-			if err != nil {
-				// TODO: there are some contracts which dont like the link token/weth9
-				return state, errors.Wrap(err, fmt.Sprintf("could not call tv version, does the contract %s implement it?", address))
-			}
+		for address, tvStr := range addresses {
 			switch tvStr {
-			case "CapabilitiesRegistry 1.0.0":
+			case CapabilitiesRegistry_1_0_0:
 				cr, err := capabilities_registry.NewCapabilitiesRegistry(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.CapabilityRegistry = cr
-			case "EVM2EVMMultiOnRamp 1.6.0-dev":
+			case EVM2EVMMultiOnRamp_1_6_0:
 				onRamp, err := evm_2_evm_multi_onramp.NewEVM2EVMMultiOnRamp(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.EvmOnRampsV160[chainSelector] = onRamp
-			case "EVM2EVMMultiOffRamp 1.6.0-dev":
+			case EVM2EVMMultiOffRamp_1_6_0:
 				offRamp, err := evm_2_evm_multi_offramp.NewEVM2EVMMultiOffRamp(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.EvmOffRampsV160[chainSelector] = offRamp
-			case "ARMProxy 1.0.0":
+			case ARMProxy_1_1_0:
 				armProxy, err := arm_proxy_contract.NewARMProxyContract(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.ArmProxies[chainSelector] = armProxy
-			case "NonceManager 1.6.0-dev":
+			case MockARM_1_0_0:
+				mockARM, err := mock_arm_contract.NewMockARMContract(common.HexToAddress(address), e.Chains[chainSelector].Client)
+				if err != nil {
+					return state, err
+				}
+				state.MockArms[chainSelector] = mockARM
+			case WETH9_1_0_0:
+				weth9, err := weth9.NewWETH9(common.HexToAddress(address), e.Chains[chainSelector].Client)
+				if err != nil {
+					return state, err
+				}
+				state.Weth9s[chainSelector] = weth9
+			case NonceManager_1_0_0:
 				nm, err := nonce_manager.NewNonceManager(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.NonceManagers[chainSelector] = nm
-			case "TokenAdminRegistry 1.5.0-dev":
+			case TokenAdminRegistry_1_0_0:
 				tm, err := token_admin_registry.NewTokenAdminRegistry(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.TokenAdminRegistries[chainSelector] = tm
-			case "Router 1.2.0":
+			case Router_1_0_0:
 				r, err := router.NewRouter(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.Routers[chainSelector] = r
-			case "PriceRegistry 1.6.0-dev":
+			case PriceRegistry_1_0_0:
 				pr, err := price_registry.NewPriceRegistry(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err

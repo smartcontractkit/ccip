@@ -1,0 +1,50 @@
+package deployment
+
+import "fmt"
+
+type AddressBook interface {
+	Save(chainSelector uint64, address string, typeAndVersion string) error
+	Addresses() (map[uint64]map[string]string, error)
+	// Allows for merging address books (e.g. new deployments with existing ones)
+	Merge(other AddressBook) error
+}
+
+type AddressBookMap struct {
+	AddressesByChain map[uint64]map[string]string
+}
+
+func (m *AddressBookMap) Save(chainSelector uint64, address string, typeAndVersion string) error {
+	if _, exists := m.AddressesByChain[chainSelector]; !exists {
+		// First time chain add, create map
+		m.AddressesByChain[chainSelector] = make(map[string]string)
+	}
+	if _, exists := m.AddressesByChain[chainSelector][address]; exists {
+		return fmt.Errorf("address %s already exists for chain %d", address, chainSelector)
+	}
+	m.AddressesByChain[chainSelector][address] = typeAndVersion
+	return nil
+}
+
+func (m *AddressBookMap) Addresses() (map[uint64]map[string]string, error) {
+	return m.AddressesByChain, nil
+}
+
+// Attention this will mutate existing book
+func (m *AddressBookMap) Merge(ab AddressBook) error {
+	addresses, err := ab.Addresses()
+	if err != nil {
+		return err
+	}
+	for chain, chainAddresses := range addresses {
+		for address, typeAndVersions := range chainAddresses {
+			return m.Save(chain, address, typeAndVersions)
+		}
+	}
+	return nil
+}
+
+func NewMemoryAddressBook() *AddressBookMap {
+	return &AddressBookMap{
+		AddressesByChain: make(map[uint64]map[string]string),
+	}
+}

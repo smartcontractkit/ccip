@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/environment"
+	"github.com/smartcontractkit/chainlink/v2/core/deployment"
 )
 
 func TestDeployCCIPContracts(t *testing.T) {
-	e := environment.NewMemoryEnvironment(t, environment.MemoryEnvironmentConfig{
+	e := deployment.NewMemoryEnvironment(t, deployment.MemoryEnvironmentConfig{
 		Chains: 1,
 		Nodes:  1,
 	})
