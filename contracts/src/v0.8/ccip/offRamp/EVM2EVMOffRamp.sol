@@ -45,7 +45,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error UnsupportedNumberOfTokens(uint64 sequenceNumber);
   error ManualExecutionNotYetEnabled();
   error ManualExecutionGasLimitMismatch();
+  error DestinationGasAmountCountMismatch(bytes32 messageId, uint64 sequenceNumber);
   error InvalidManualExecutionGasLimit(uint256 index, uint256 newLimit);
+  error InvalidDestGasAmount(uint256 index, uint256 destGasAmount);
   error RootNotCommitted();
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
@@ -237,6 +239,23 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       if (newLimit != 0) {
         if (newLimit < report.messages[i].gasLimit) {
           revert InvalidManualExecutionGasLimit(i, newLimit);
+        }
+      }
+
+      if (report.messages[i].tokenAmounts.length != gasLimitOverrides[i].destGasAmounts.length) {
+        revert DestinationGasAmountCountMismatch(report.messages[i].messageId, report.messages[i].sequenceNumber);
+      }
+
+      bytes[] memory encodedSourceTokenData = report.messages[i].sourceTokenData;
+
+      for (uint256 j = 0; j < report.messages[i].tokenAmounts.length; ++j) {
+        Internal.SourceTokenData memory sourceTokenData =
+          abi.decode(encodedSourceTokenData[i], (Internal.SourceTokenData));
+        uint256 destGasAmount = gasLimitOverrides[i].destGasAmounts[j];
+        if (destGasAmount != 0) {
+          if (destGasAmount < sourceTokenData.destGasAmount) {
+            revert InvalidDestGasAmount(j, destGasAmount);
+          }
         }
       }
     }

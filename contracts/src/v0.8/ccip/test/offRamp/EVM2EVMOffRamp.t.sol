@@ -1204,7 +1204,8 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
       messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
-    s_offRamp.manuallyExecute(report, _getGasLimitsFromMessages(messages));
+    EVM2EVMOffRamp.GasLimitOverride[] memory gasLimits = _getGasLimitsFromMessages(messages);
+    s_offRamp.manuallyExecute(report, gasLimits);
 
     // Assert that they only got the tokens once, not twice
     assertEq(tokenToAbuse.balanceOf(address(receiver)), balancePre + tokenAmount);
