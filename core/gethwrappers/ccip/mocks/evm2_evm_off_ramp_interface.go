@@ -240,9 +240,9 @@ func (_c *EVM2EVMOffRampInterface_CurrentRateLimiterState_Call) RunAndReturn(run
 	return _c
 }
 
-// ExecuteSingleMessage provides a mock function with given fields: opts, message, offchainTokenData, destGasAmounts
-func (_m *EVM2EVMOffRampInterface) ExecuteSingleMessage(opts *bind.TransactOpts, message evm_2_evm_offramp.InternalEVM2EVMMessage, offchainTokenData [][]byte, destGasAmounts []*big.Int) (*types.Transaction, error) {
-	ret := _m.Called(opts, message, offchainTokenData, destGasAmounts)
+// ExecuteSingleMessage provides a mock function with given fields: opts, message, offchainTokenData, tokenGasOverrides
+func (_m *EVM2EVMOffRampInterface) ExecuteSingleMessage(opts *bind.TransactOpts, message evm_2_evm_offramp.InternalEVM2EVMMessage, offchainTokenData [][]byte, tokenGasOverrides []*big.Int) (*types.Transaction, error) {
+	ret := _m.Called(opts, message, offchainTokenData, tokenGasOverrides)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExecuteSingleMessage")
@@ -251,10 +251,10 @@ func (_m *EVM2EVMOffRampInterface) ExecuteSingleMessage(opts *bind.TransactOpts,
 	var r0 *types.Transaction
 	var r1 error
 	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalEVM2EVMMessage, [][]byte, []*big.Int) (*types.Transaction, error)); ok {
-		return rf(opts, message, offchainTokenData, destGasAmounts)
+		return rf(opts, message, offchainTokenData, tokenGasOverrides)
 	}
 	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalEVM2EVMMessage, [][]byte, []*big.Int) *types.Transaction); ok {
-		r0 = rf(opts, message, offchainTokenData, destGasAmounts)
+		r0 = rf(opts, message, offchainTokenData, tokenGasOverrides)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Transaction)
@@ -262,7 +262,7 @@ func (_m *EVM2EVMOffRampInterface) ExecuteSingleMessage(opts *bind.TransactOpts,
 	}
 
 	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalEVM2EVMMessage, [][]byte, []*big.Int) error); ok {
-		r1 = rf(opts, message, offchainTokenData, destGasAmounts)
+		r1 = rf(opts, message, offchainTokenData, tokenGasOverrides)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -279,12 +279,12 @@ type EVM2EVMOffRampInterface_ExecuteSingleMessage_Call struct {
 //   - opts *bind.TransactOpts
 //   - message evm_2_evm_offramp.InternalEVM2EVMMessage
 //   - offchainTokenData [][]byte
-//   - destGasAmounts []*big.Int
-func (_e *EVM2EVMOffRampInterface_Expecter) ExecuteSingleMessage(opts interface{}, message interface{}, offchainTokenData interface{}, destGasAmounts interface{}) *EVM2EVMOffRampInterface_ExecuteSingleMessage_Call {
-	return &EVM2EVMOffRampInterface_ExecuteSingleMessage_Call{Call: _e.mock.On("ExecuteSingleMessage", opts, message, offchainTokenData, destGasAmounts)}
+//   - tokenGasOverrides []*big.Int
+func (_e *EVM2EVMOffRampInterface_Expecter) ExecuteSingleMessage(opts interface{}, message interface{}, offchainTokenData interface{}, tokenGasOverrides interface{}) *EVM2EVMOffRampInterface_ExecuteSingleMessage_Call {
+	return &EVM2EVMOffRampInterface_ExecuteSingleMessage_Call{Call: _e.mock.On("ExecuteSingleMessage", opts, message, offchainTokenData, tokenGasOverrides)}
 }
 
-func (_c *EVM2EVMOffRampInterface_ExecuteSingleMessage_Call) Run(run func(opts *bind.TransactOpts, message evm_2_evm_offramp.InternalEVM2EVMMessage, offchainTokenData [][]byte, destGasAmounts []*big.Int)) *EVM2EVMOffRampInterface_ExecuteSingleMessage_Call {
+func (_c *EVM2EVMOffRampInterface_ExecuteSingleMessage_Call) Run(run func(opts *bind.TransactOpts, message evm_2_evm_offramp.InternalEVM2EVMMessage, offchainTokenData [][]byte, tokenGasOverrides []*big.Int)) *EVM2EVMOffRampInterface_ExecuteSingleMessage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(*bind.TransactOpts), args[1].(evm_2_evm_offramp.InternalEVM2EVMMessage), args[2].([][]byte), args[3].([]*big.Int))
 	})
