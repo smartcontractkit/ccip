@@ -1133,7 +1133,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
   }
 
-  function test_ManualExecWithReceiverExecutionGasOverride_Failure() public {
+  function test_ManualExecWithInvalidReceiverExecutionGasOverride_Failure() public {
     Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage();
     messages[0].receiver = address(s_reverting_receiver);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
@@ -1148,7 +1148,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
   }
 
-  function test_ManualExecWithTokenGasOverride_Failure() public {
+  function test_ManualExecWithInvalidTokenGasOverride_Failure() public {
     Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessageWithTokens();
     messages[0].receiver = address(s_reverting_receiver);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
