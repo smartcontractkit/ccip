@@ -5,9 +5,6 @@ import os
 import tempfile
 import json
 
-# go build -o ccipmanuaalexec
-# ./batchrun.py
-
 binary_name = "./manual-execution"
 input_msgs = "msgs.csv"
 
