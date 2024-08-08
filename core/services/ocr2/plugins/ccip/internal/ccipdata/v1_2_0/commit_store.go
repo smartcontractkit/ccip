@@ -321,7 +321,7 @@ func (c *CommitStore) GetCommitReport(ctx context.Context, root [32]byte) (ccipt
 	logs, err := c.lp.FilteredLogs(
 		ctx,
 		reportsQuery,
-		query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Asc)),
+		query.NewLimitAndSort(query.Limit{Count: 1}),
 		"GetCommitReport",
 	)
 	if err != nil {
