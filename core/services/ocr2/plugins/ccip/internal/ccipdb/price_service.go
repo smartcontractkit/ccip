@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -277,15 +276,7 @@ func (p *priceService) observePriceUpdates(
 		return nil, nil, fmt.Errorf("gasPriceEstimator and/or destPriceRegistry is not set yet")
 	}
 
-	sortedLaneTokens, filteredLaneTokens, err := ccipcommon.GetFilteredSortedLaneTokens(ctx, p.offRampReader, p.destPriceRegistryReader, p.priceGetter)
-
-	lggr.Debugw("Filtered bridgeable tokens with no configured price getter", "filteredLaneTokens", filteredLaneTokens)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("get destination tokens: %w", err)
-	}
-
-	return p.generatePriceUpdates(ctx, lggr, sortedLaneTokens)
+	return p.generatePriceUpdates(ctx, lggr)
 }
 
 // All prices are USD ($1=1e18) denominated. All prices must be not nil.
@@ -293,37 +284,51 @@ func (p *priceService) observePriceUpdates(
 func (p *priceService) generatePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
-	sortedLaneTokens []cciptypes.Address,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
-	// Include wrapped native in our token query as way to identify the source native USD price.
-	// notice USD is in 1e18 scale, i.e. $1 = 1e18
-	queryTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{p.sourceNative}, sortedLaneTokens)
+	// logic here would be
+	// 1. get the token prices (this one should have both wrapped source native token + other tokens) {token1: priceToken1, token2: priceToken2, token3: priceToken3, token1Dest: priceToken1Dest}
+	// 2. get all the tokens addresses in jobspec per chain {chainSrc: [token1, token2, token3], chainDest: [token1]} (we can sort them)
+	// 3. get the list of tokens for chainDest [token1, token2, token3]
+	// 4. get the token decimals for 3. [18, 6, 18] --> check if guaranteed to be in the same order as 3 and have the same length
+	// 5. Calculate tokenPricesUSD using the decimals and the token prices.
+	// 6. calculate sourceGasPriceUSD using sourceGasPrice and sourceNativePriceUSD
 
-	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, queryTokens)
+	// Wrapped native should already be included as Price Getter is fetching all the prices for tokens in the jobspec
+	// notice USD is in 1e18 scale, i.e. $1 = 1e18
+	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, []cciptypes.Address{})
 	if err != nil {
 		return nil, nil, err
 	}
 	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
-
-	// make sure that we got prices for all the tokens of our query
-	for _, token := range queryTokens {
-		if rawTokenPricesUSD[token] == nil {
-			return nil, nil, fmt.Errorf("missing token price: %+v", token)
-		}
-	}
 
 	sourceNativePriceUSD, exists := rawTokenPricesUSD[p.sourceNative]
 	if !exists {
 		return nil, nil, fmt.Errorf("missing source native (%s) price", p.sourceNative)
 	}
 
-	destTokensDecimals, err := p.destPriceRegistryReader.GetTokensDecimals(ctx, sortedLaneTokens)
+	// Filter out source native token from token prices to get only the destination tokens
+	var destTokens []cciptypes.Address
+	for key := range rawTokenPricesUSD {
+		if key != p.sourceNative {
+			destTokens = append(destTokens, key)
+		}
+	}
+
+	sort.Slice(destTokens, func(i, j int) bool {
+		return destTokens[i] < destTokens[j]
+	})
+
+	destTokensDecimals, err := p.destPriceRegistryReader.GetTokensDecimals(ctx, destTokens)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get tokens decimals: %w", err)
 	}
 
+	if len(destTokensDecimals) != len(destTokens) {
+		return nil, nil, fmt.Errorf("mismatched token decimals and tokens")
+	}
+
 	tokenPricesUSD = make(map[cciptypes.Address]*big.Int, len(rawTokenPricesUSD))
-	for i, token := range sortedLaneTokens {
+	for i, token := range destTokens {
 		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], destTokensDecimals[i])
 	}
 
@@ -346,6 +351,7 @@ func (p *priceService) generatePriceUpdates(
 		"sourceNativePriceUSD", sourceNativePriceUSD,
 		"sourceGasPriceUSD", sourceGasPriceUSD,
 		"tokenPricesUSD", tokenPricesUSD,
+		"destTokens", destTokens,
 	)
 	return sourceGasPriceUSD, tokenPricesUSD, nil
 }

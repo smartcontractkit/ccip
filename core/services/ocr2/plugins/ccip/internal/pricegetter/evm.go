@@ -81,6 +81,7 @@ func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[u
 	return &priceGetter, nil
 }
 
+// todo: to remove most probably
 // FilterConfiguredTokens implements the PriceGetter interface.
 // It filters a list of token addresses for only those that have a price resolution rule configured on the PriceGetterConfig
 func (d *DynamicPriceGetter) FilterConfiguredTokens(ctx context.Context, tokens []cciptypes.Address) (configured []cciptypes.Address, unconfigured []cciptypes.Address, err error) {
@@ -103,10 +104,26 @@ func (d *DynamicPriceGetter) FilterConfiguredTokens(ctx context.Context, tokens 
 	return configured, unconfigured, nil
 }
 
+// func (d *DynamicPriceGetter) GetDestinationTokens(ctx context.Context) (tokens map[uint64][]cciptypes.Address) {
+// 	tokens = make(map[uint64][]cciptypes.Address)
+// 	for _, aggCfg := range d.cfg.AggregatorPrices {
+// 		tokens[aggCfg.ChainID] = append(tokens[aggCfg.ChainID], ccipcalc.EvmAddrToGeneric(aggCfg.AggregatorContractAddress))
+// 	}
+
+// 	// sort the result for deterministic order
+// 	for _, tokensPerChain := range tokens {
+// 		sort.Slice(tokensPerChain, func(i, j int) bool {
+// 			return tokensPerChain[i] < tokensPerChain[j]
+// 		})
+// 	}
+
+// 	return tokens
+// }
+
 // TokenPricesUSD implements the PriceGetter interface.
-// It returns static prices stored in the price getter, and batch calls aggregators (one per chain) to retrieve aggregator-based prices.
+// It retrieves token prices in USD for all configured tokens in the job spec.
 func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
-	prices, batchCallsPerChain, err := d.preparePricesAndBatchCallsPerChain(tokens)
+	prices, batchCallsPerChain, err := d.preparePricesAndBatchCallsPerChain()
 	if err != nil {
 		return nil, err
 	}
@@ -185,45 +202,40 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	return nil
 }
 
-// preparePricesAndBatchCallsPerChain uses this price getter to prepare for a list of tokens:
-// - the map of token address to their prices (static prices)
-// - the map of and batch calls per chain for the given tokens (dynamic prices)
-func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, map[uint64]*batchCallsForChain, error) {
-	prices := make(map[cciptypes.Address]*big.Int, len(tokens))
+// todo: can we change the name as we are preparing from config/jobspec
+func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain() (map[cciptypes.Address]*big.Int, map[uint64]*batchCallsForChain, error) {
+	prices := make(map[cciptypes.Address]*big.Int)
 	batchCallsPerChain := make(map[uint64]*batchCallsForChain)
-	evmAddrs, err := ccipcalc.GenericAddrsToEvm(tokens...)
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, tk := range evmAddrs {
-		if aggCfg, isAgg := d.cfg.AggregatorPrices[tk]; isAgg {
+
+	for tokenAddress, aggCfg := range d.cfg.AggregatorPrices {
+		if _, exists := batchCallsPerChain[aggCfg.ChainID]; !exists {
 			// Batch calls for aggregator-based token prices (one per chain).
-			if _, exists := batchCallsPerChain[aggCfg.ChainID]; !exists {
-				batchCallsPerChain[aggCfg.ChainID] = &batchCallsForChain{
-					decimalCalls:         []rpclib.EvmCall{},
-					latestRoundDataCalls: []rpclib.EvmCall{},
-					tokenOrder:           []common.Address{},
-				}
+			batchCallsPerChain[aggCfg.ChainID] = &batchCallsForChain{
+				decimalCalls:         []rpclib.EvmCall{},
+				latestRoundDataCalls: []rpclib.EvmCall{},
+				tokenOrder:           []common.Address{},
 			}
-			chainCalls := batchCallsPerChain[aggCfg.ChainID]
-			chainCalls.decimalCalls = append(chainCalls.decimalCalls, rpclib.NewEvmCall(
-				d.aggregatorAbi,
-				decimalsMethodName,
-				aggCfg.AggregatorContractAddress,
-			))
-			chainCalls.latestRoundDataCalls = append(chainCalls.latestRoundDataCalls, rpclib.NewEvmCall(
-				d.aggregatorAbi,
-				latestRoundDataMethodName,
-				aggCfg.AggregatorContractAddress,
-			))
-			chainCalls.tokenOrder = append(chainCalls.tokenOrder, tk)
-		} else if staticCfg, isStatic := d.cfg.StaticPrices[tk]; isStatic {
-			// Fill static prices.
-			prices[ccipcalc.EvmAddrToGeneric(tk)] = staticCfg.Price
-		} else {
-			return nil, nil, fmt.Errorf("no price resolution rule for token %s", tk.Hex())
 		}
+
+		chainCalls := batchCallsPerChain[aggCfg.ChainID]
+		chainCalls.decimalCalls = append(chainCalls.decimalCalls, rpclib.NewEvmCall(
+			d.aggregatorAbi,
+			decimalsMethodName,
+			aggCfg.AggregatorContractAddress,
+		))
+		chainCalls.latestRoundDataCalls = append(chainCalls.latestRoundDataCalls, rpclib.NewEvmCall(
+			d.aggregatorAbi,
+			latestRoundDataMethodName,
+			aggCfg.AggregatorContractAddress,
+		))
+		chainCalls.tokenOrder = append(chainCalls.tokenOrder, tokenAddress)
 	}
+
+	for tokenAddress, staticCfg := range d.cfg.StaticPrices {
+		// Fill static prices.
+		prices[ccipcalc.EvmAddrToGeneric(tokenAddress)] = staticCfg.Price
+	}
+
 	return prices, batchCallsPerChain, nil
 }
 

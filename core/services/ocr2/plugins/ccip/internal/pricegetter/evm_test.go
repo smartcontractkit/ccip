@@ -15,19 +15,30 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib/rpclibmocks"
 )
 
 type testParameters struct {
-	cfg                          config.DynamicPriceGetterConfig
-	evmClients                   map[uint64]DynamicPriceGetterClient
-	tokens                       []common.Address
-	expectedTokenPrices          map[common.Address]big.Int
-	evmCallErr                   bool
-	invalidConfigErrorExpected   bool
-	priceResolutionErrorExpected bool
+	cfg                        config.DynamicPriceGetterConfig
+	evmClients                 map[uint64]DynamicPriceGetterClient
+	expectedTokenPrices        map[common.Address]big.Int
+	evmCallErr                 bool
+	invalidConfigErrorExpected bool
+}
+
+var (
+	TK1 common.Address
+	TK2 common.Address
+	TK3 common.Address
+	TK4 common.Address
+)
+
+func init() {
+	TK1 = utils.RandomAddress()
+	TK2 = utils.RandomAddress()
+	TK3 = utils.RandomAddress()
+	TK4 = utils.RandomAddress()
 }
 
 func TestDynamicPriceGetter(t *testing.T) {
@@ -56,10 +67,6 @@ func TestDynamicPriceGetter(t *testing.T) {
 			param: testParamAggregatorAndStaticTokenCollision(t),
 		},
 		{
-			name:  "no_aggregator_for_token",
-			param: testParamNoAggregatorForToken(t),
-		},
-		{
 			name:  "batchCall_returns_err",
 			param: testParamBatchCallReturnsErr(t),
 		},
@@ -74,32 +81,16 @@ func TestDynamicPriceGetter(t *testing.T) {
 			}
 			require.NoError(t, err)
 			ctx := testutils.Context(t)
-			// Check configured token
-			unconfiguredTk := cciptypes.Address(utils.RandomAddress().String())
-			cfgTokens, uncfgTokens, err := pg.FilterConfiguredTokens(ctx, []cciptypes.Address{unconfiguredTk})
-			require.NoError(t, err)
-			assert.Equal(t, []cciptypes.Address{}, cfgTokens)
-			assert.Equal(t, []cciptypes.Address{unconfiguredTk}, uncfgTokens)
-			// Build list of tokens to query.
-			tokens := make([]cciptypes.Address, 0, len(test.param.tokens))
-			for _, tk := range test.param.tokens {
-				tokenAddr := ccipcalc.EvmAddrToGeneric(tk)
-				tokens = append(tokens, tokenAddr)
-			}
-			prices, err := pg.TokenPricesUSD(ctx, tokens)
+			prices, err := pg.TokenPricesUSD(ctx, []cciptypes.Address{})
 
 			if test.param.evmCallErr {
 				require.Error(t, err)
 				return
 			}
 
-			if test.param.priceResolutionErrorExpected {
-				require.Error(t, err)
-				return
-			}
 			require.NoError(t, err)
-			// we expect prices for at least all queried tokens (it is possible that additional tokens are returned).
-			assert.True(t, len(prices) >= len(test.param.expectedTokenPrices))
+			// Ensure all expected prices are present.
+			assert.True(t, len(prices) == len(test.param.expectedTokenPrices))
 			// Check prices are matching expected result.
 			for tk, expectedPrice := range test.param.expectedTokenPrices {
 				if prices[cciptypes.Address(tk.String())] == nil {
@@ -113,25 +104,21 @@ func TestDynamicPriceGetter(t *testing.T) {
 }
 
 func testParamAggregatorOnly(t *testing.T) testParameters {
-	tk1 := utils.RandomAddress()
-	tk2 := utils.RandomAddress()
-	tk3 := utils.RandomAddress()
-	tk4 := utils.RandomAddress()
 	cfg := config.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
-			tk1: {
+			TK1: {
 				ChainID:                   101,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
-			tk2: {
+			TK2: {
 				ChainID:                   102,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
-			tk3: {
+			TK3: {
 				ChainID:                   103,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
-			tk4: {
+			TK4: {
 				ChainID:                   104,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
@@ -177,15 +164,14 @@ func testParamAggregatorOnly(t *testing.T) testParameters {
 		uint64(104): mockClient(t, []uint8{20}, []aggregator_v3_interface.LatestRoundData{round4}),
 	}
 	expectedTokenPrices := map[common.Address]big.Int{
-		tk1: *multExp(round1.Answer, 10),         // expected in 1e18 format.
-		tk2: *multExp(round2.Answer, 10),         // expected in 1e18 format.
-		tk3: *round3.Answer,                      // already in 1e18 format (contract decimals==18).
-		tk4: *multExp(big.NewInt(1234567890), 8), // expected in 1e18 format.
+		TK1: *multExp(round1.Answer, 10),         // expected in 1e18 format.
+		TK2: *multExp(round2.Answer, 10),         // expected in 1e18 format.
+		TK3: *round3.Answer,                      // already in 1e18 format (contract decimals==18).
+		TK4: *multExp(big.NewInt(1234567890), 8), // expected in 1e18 format.
 	}
 	return testParameters{
 		cfg:                        cfg,
 		evmClients:                 evmClients,
-		tokens:                     []common.Address{tk1, tk2, tk3, tk4},
 		expectedTokenPrices:        expectedTokenPrices,
 		invalidConfigErrorExpected: false,
 	}
@@ -193,20 +179,17 @@ func testParamAggregatorOnly(t *testing.T) testParameters {
 
 // testParamAggregatorOnlyMulti test with several tokens on chain 102.
 func testParamAggregatorOnlyMulti(t *testing.T) testParameters {
-	tk1 := utils.RandomAddress()
-	tk2 := utils.RandomAddress()
-	tk3 := utils.RandomAddress()
 	cfg := config.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
-			tk1: {
+			TK1: {
 				ChainID:                   101,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
-			tk2: {
+			TK2: {
 				ChainID:                   102,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
-			tk3: {
+			TK3: {
 				ChainID:                   102,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
@@ -241,35 +224,31 @@ func testParamAggregatorOnlyMulti(t *testing.T) testParameters {
 		uint64(102): mockClient(t, []uint8{8, 8}, []aggregator_v3_interface.LatestRoundData{round2, round3}),
 	}
 	expectedTokenPrices := map[common.Address]big.Int{
-		tk1: *multExp(round1.Answer, 10),
-		tk2: *multExp(round2.Answer, 10),
-		tk3: *multExp(round3.Answer, 10),
+		TK1: *multExp(round1.Answer, 10),
+		TK2: *multExp(round2.Answer, 10),
+		TK3: *multExp(round3.Answer, 10),
 	}
 	return testParameters{
 		cfg:                        cfg,
 		evmClients:                 evmClients,
 		invalidConfigErrorExpected: false,
-		tokens:                     []common.Address{tk1, tk2, tk3},
 		expectedTokenPrices:        expectedTokenPrices,
 	}
 }
 
 func testParamStaticOnly() testParameters {
-	tk1 := utils.RandomAddress()
-	tk2 := utils.RandomAddress()
-	tk3 := utils.RandomAddress()
 	cfg := config.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{},
 		StaticPrices: map[common.Address]config.StaticPriceConfig{
-			tk1: {
+			TK1: {
 				ChainID: 101,
 				Price:   big.NewInt(1_234_000),
 			},
-			tk2: {
+			TK2: {
 				ChainID: 102,
 				Price:   big.NewInt(2_234_000),
 			},
-			tk3: {
+			TK3: {
 				ChainID: 103,
 				Price:   big.NewInt(3_234_000),
 			},
@@ -278,35 +257,31 @@ func testParamStaticOnly() testParameters {
 	// Real LINK/USD example from OP.
 	evmClients := map[uint64]DynamicPriceGetterClient{}
 	expectedTokenPrices := map[common.Address]big.Int{
-		tk1: *cfg.StaticPrices[tk1].Price,
-		tk2: *cfg.StaticPrices[tk2].Price,
-		tk3: *cfg.StaticPrices[tk3].Price,
+		TK1: *cfg.StaticPrices[TK1].Price,
+		TK2: *cfg.StaticPrices[TK2].Price,
+		TK3: *cfg.StaticPrices[TK3].Price,
 	}
 	return testParameters{
 		cfg:                 cfg,
 		evmClients:          evmClients,
-		tokens:              []common.Address{tk1, tk2, tk3},
 		expectedTokenPrices: expectedTokenPrices,
 	}
 }
 
 func testParamAggregatorAndStaticValid(t *testing.T) testParameters {
-	tk1 := utils.RandomAddress()
-	tk2 := utils.RandomAddress()
-	tk3 := utils.RandomAddress()
 	cfg := config.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
-			tk1: {
+			TK1: {
 				ChainID:                   101,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
-			tk2: {
+			TK2: {
 				ChainID:                   102,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
 		},
 		StaticPrices: map[common.Address]config.StaticPriceConfig{
-			tk3: {
+			TK3: {
 				ChainID: 103,
 				Price:   big.NewInt(1_234_000),
 			},
@@ -333,39 +308,35 @@ func testParamAggregatorAndStaticValid(t *testing.T) testParameters {
 		uint64(102): mockClient(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round2}),
 	}
 	expectedTokenPrices := map[common.Address]big.Int{
-		tk1: *multExp(round1.Answer, 10),
-		tk2: *multExp(round2.Answer, 10),
-		tk3: *cfg.StaticPrices[tk3].Price,
+		TK1: *multExp(round1.Answer, 10),
+		TK2: *multExp(round2.Answer, 10),
+		TK3: *cfg.StaticPrices[TK3].Price,
 	}
 	return testParameters{
 		cfg:                 cfg,
 		evmClients:          evmClients,
-		tokens:              []common.Address{tk1, tk2, tk3},
 		expectedTokenPrices: expectedTokenPrices,
 	}
 }
 
 func testParamAggregatorAndStaticTokenCollision(t *testing.T) testParameters {
-	tk1 := utils.RandomAddress()
-	tk2 := utils.RandomAddress()
-	tk3 := utils.RandomAddress()
 	cfg := config.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
-			tk1: {
+			TK1: {
 				ChainID:                   101,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
-			tk2: {
+			TK2: {
 				ChainID:                   102,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
-			tk3: {
+			TK3: {
 				ChainID:                   103,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
 		},
 		StaticPrices: map[common.Address]config.StaticPriceConfig{
-			tk3: {
+			TK3: {
 				ChainID: 103,
 				Price:   big.NewInt(1_234_000),
 			},
@@ -402,86 +373,24 @@ func testParamAggregatorAndStaticTokenCollision(t *testing.T) testParameters {
 	return testParameters{
 		cfg:                        cfg,
 		evmClients:                 evmClients,
-		tokens:                     []common.Address{tk1, tk2, tk3},
 		invalidConfigErrorExpected: true,
 	}
 }
 
-func testParamNoAggregatorForToken(t *testing.T) testParameters {
-	tk1 := utils.RandomAddress()
-	tk2 := utils.RandomAddress()
-	tk3 := utils.RandomAddress()
-	tk4 := utils.RandomAddress()
-	cfg := config.DynamicPriceGetterConfig{
-		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
-			tk1: {
-				ChainID:                   101,
-				AggregatorContractAddress: utils.RandomAddress(),
-			},
-			tk2: {
-				ChainID:                   102,
-				AggregatorContractAddress: utils.RandomAddress(),
-			},
-		},
-		StaticPrices: map[common.Address]config.StaticPriceConfig{
-			tk3: {
-				ChainID: 103,
-				Price:   big.NewInt(1_234_000),
-			},
-		},
-	}
-	// Real LINK/USD example from OP.
-	round1 := aggregator_v3_interface.LatestRoundData{
-		RoundId:         big.NewInt(1000),
-		Answer:          big.NewInt(1396818990),
-		StartedAt:       big.NewInt(1704896575),
-		UpdatedAt:       big.NewInt(1704896575),
-		AnsweredInRound: big.NewInt(1000),
-	}
-	// Real ETH/USD example from OP.
-	round2 := aggregator_v3_interface.LatestRoundData{
-		RoundId:         big.NewInt(2000),
-		Answer:          big.NewInt(238879815123),
-		StartedAt:       big.NewInt(1704897197),
-		UpdatedAt:       big.NewInt(1704897197),
-		AnsweredInRound: big.NewInt(2000),
-	}
-	evmClients := map[uint64]DynamicPriceGetterClient{
-		uint64(101): mockClient(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round1}),
-		uint64(102): mockClient(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round2}),
-	}
-	expectedTokenPrices := map[common.Address]big.Int{
-		tk1: *round1.Answer,
-		tk2: *round2.Answer,
-		tk3: *cfg.StaticPrices[tk3].Price,
-		tk4: *big.NewInt(0),
-	}
-	return testParameters{
-		cfg:                          cfg,
-		evmClients:                   evmClients,
-		tokens:                       []common.Address{tk1, tk2, tk3, tk4},
-		expectedTokenPrices:          expectedTokenPrices,
-		priceResolutionErrorExpected: true,
-	}
-}
-
 func testParamBatchCallReturnsErr(t *testing.T) testParameters {
-	tk1 := utils.RandomAddress()
-	tk2 := utils.RandomAddress()
-	tk3 := utils.RandomAddress()
 	cfg := config.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
-			tk1: {
+			TK1: {
 				ChainID:                   101,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
-			tk2: {
+			TK2: {
 				ChainID:                   102,
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
 		},
 		StaticPrices: map[common.Address]config.StaticPriceConfig{
-			tk3: {
+			TK3: {
 				ChainID: 103,
 				Price:   big.NewInt(1_234_000),
 			},
@@ -504,7 +413,6 @@ func testParamBatchCallReturnsErr(t *testing.T) testParameters {
 	return testParameters{
 		cfg:        cfg,
 		evmClients: evmClients,
-		tokens:     []common.Address{tk1, tk2, tk3},
 		evmCallErr: true,
 	}
 }

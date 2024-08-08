@@ -57,34 +57,12 @@ func TestDataSource(t *testing.T) {
 
 	priceGetter := newTestPipelineGetter(t, source)
 
-	// USDC & LINK are configured
-	confTokens, _, err := priceGetter.FilterConfiguredTokens(context.Background(), []cciptypes.Address{linkTokenAddress, usdcTokenAddress})
-	require.NoError(t, err)
-	assert.Equal(t, linkTokenAddress, confTokens[0])
-	assert.Equal(t, usdcTokenAddress, confTokens[1])
-
 	// Ask for all prices present in spec.
-	prices, err := priceGetter.TokenPricesUSD(context.Background(), []cciptypes.Address{
-		linkTokenAddress,
-		usdcTokenAddress,
-	})
+	prices, err := priceGetter.TokenPricesUSD(context.Background(), []cciptypes.Address{})
 	require.NoError(t, err)
 	assert.Equal(t, prices, map[cciptypes.Address]*big.Int{
 		linkTokenAddress: big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1000000000000000000)),
 		usdcTokenAddress: big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1000000000000000000)),
-	})
-
-	// Ask a non-existent price.
-	_, err = priceGetter.TokenPricesUSD(context.Background(), []cciptypes.Address{
-		ccipcalc.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e11"),
-	})
-	require.Error(t, err)
-
-	// Ask only one price
-	prices, err = priceGetter.TokenPricesUSD(context.Background(), []cciptypes.Address{linkTokenAddress})
-	require.NoError(t, err)
-	assert.Equal(t, prices, map[cciptypes.Address]*big.Int{
-		linkTokenAddress: big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1000000000000000000)),
 	})
 }
 
@@ -149,7 +127,7 @@ func TestParsingDifferentFormats(t *testing.T) {
 			`, token.URL, strings.ToLower(address.String()))
 
 			prices, err := newTestPipelineGetter(t, source).
-				TokenPricesUSD(context.Background(), []cciptypes.Address{ccipcalc.EvmAddrToGeneric(address)})
+				TokenPricesUSD(context.Background(), []cciptypes.Address{})
 
 			if tt.expectedError {
 				require.Error(t, err)

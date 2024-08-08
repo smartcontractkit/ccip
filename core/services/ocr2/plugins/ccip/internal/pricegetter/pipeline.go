@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
@@ -84,7 +83,6 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.
 		return nil, errors.Errorf("expected map output of price pipeline, got %T", finalResult.Values[0])
 	}
 
-	providedTokensSet := mapset.NewSet(tokens...)
 	tokenPrices := make(map[cciptypes.Address]*big.Int)
 	for tokenAddressStr, rawPrice := range prices {
 		tokenAddressStr := ccipcalc.HexToAddress(tokenAddressStr)
@@ -93,9 +91,7 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.
 			return nil, err
 		}
 
-		if providedTokensSet.Contains(tokenAddressStr) {
-			tokenPrices[tokenAddressStr] = castedPrice
-		}
+		tokenPrices[tokenAddressStr] = castedPrice
 	}
 
 	// The mapping of token address to source of token price has to live offchain.

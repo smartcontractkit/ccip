@@ -231,24 +231,24 @@ func TestPriceService_generatePriceUpdates(t *testing.T) {
 	}{
 		{
 			name: "base",
-			tokenDecimals: map[cciptypes.Address]uint8{
-				tokens[0]: 18,
-				tokens[1]: 12,
+			tokenDecimals: map[cciptypes.Address]uint8{ // only destination tokens (source native token should not be included)
+				tokens[1]: 18,
+				tokens[2]: 12,
 			},
 			sourceNativeToken: tokens[0],
-			priceGetterRespData: map[cciptypes.Address]*big.Int{
+			priceGetterRespData: map[cciptypes.Address]*big.Int{ // should return all tokens (including source native token)
 				tokens[0]: val1e18(100),
 				tokens[1]: val1e18(200),
-				tokens[2]: val1e18(300), // price getter returned a price for this token even though we didn't request it (should be skipped)
+				tokens[2]: val1e18(300),
 			},
 			priceGetterRespErr:   nil,
 			feeEstimatorRespFee:  big.NewInt(10),
 			feeEstimatorRespErr:  nil,
 			maxGasPrice:          1e18,
 			expSourceGasPriceUSD: big.NewInt(1000),
-			expTokenPricesUSD: map[cciptypes.Address]*big.Int{
-				tokens[0]: val1e18(100),
-				tokens[1]: val1e18(200 * 1e6),
+			expTokenPricesUSD: map[cciptypes.Address]*big.Int{ // should only return the tokens in destination chain
+				tokens[1]: val1e18(200),
+				tokens[2]: val1e18(300 * 1e6),
 			},
 			expErr: false,
 		},
@@ -293,14 +293,12 @@ func TestPriceService_generatePriceUpdates(t *testing.T) {
 		{
 			name: "dynamic fee cap overrides legacy",
 			tokenDecimals: map[cciptypes.Address]uint8{
-				tokens[0]: 18,
 				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[0],
 			priceGetterRespData: map[cciptypes.Address]*big.Int{
 				tokens[0]: val1e18(100),
 				tokens[1]: val1e18(200),
-				tokens[2]: val1e18(300), // price getter returned a price for this token even though we didn't request it (should be skipped)
 			},
 			priceGetterRespErr:   nil,
 			feeEstimatorRespFee:  big.NewInt(20),
@@ -308,7 +306,6 @@ func TestPriceService_generatePriceUpdates(t *testing.T) {
 			maxGasPrice:          1e18,
 			expSourceGasPriceUSD: big.NewInt(2000),
 			expTokenPricesUSD: map[cciptypes.Address]*big.Int{
-				tokens[0]: val1e18(100),
 				tokens[1]: val1e18(200),
 			},
 			expErr: false,
@@ -316,14 +313,14 @@ func TestPriceService_generatePriceUpdates(t *testing.T) {
 		{
 			name: "nil gas price",
 			tokenDecimals: map[cciptypes.Address]uint8{
-				tokens[0]: 18,
 				tokens[1]: 18,
+				tokens[2]: 18,
 			},
 			sourceNativeToken: tokens[0],
 			priceGetterRespData: map[cciptypes.Address]*big.Int{
 				tokens[0]: val1e18(100),
 				tokens[1]: val1e18(200),
-				tokens[2]: val1e18(300), // price getter returned a price for this token even though we didn't request it (should be skipped)
+				tokens[2]: val1e18(300),
 			},
 			feeEstimatorRespFee: nil,
 			maxGasPrice:         1e18,
@@ -354,13 +351,13 @@ func TestPriceService_generatePriceUpdates(t *testing.T) {
 			queryTokens := ccipcommon.FlattenUniqueSlice([]cciptypes.Address{tc.sourceNativeToken}, destTokens)
 
 			if len(queryTokens) > 0 {
-				priceGetter.On("TokenPricesUSD", mock.Anything, queryTokens).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
+				priceGetter.On("TokenPricesUSD", mock.Anything, mock.Anything).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
 			}
 
 			if tc.maxGasPrice > 0 {
 				gasPriceEstimator.On("GetGasPrice", mock.Anything).Return(tc.feeEstimatorRespFee, tc.feeEstimatorRespErr)
 				if tc.feeEstimatorRespFee != nil {
-					pUSD := ccipcalc.CalculateUsdPerUnitGas(tc.feeEstimatorRespFee, tc.expTokenPricesUSD[tc.sourceNativeToken])
+					pUSD := ccipcalc.CalculateUsdPerUnitGas(tc.feeEstimatorRespFee, tc.priceGetterRespData[tc.sourceNativeToken])
 					gasPriceEstimator.On("DenoteInUSD", mock.Anything, mock.Anything).Return(pUSD, nil)
 				}
 			}
@@ -381,7 +378,7 @@ func TestPriceService_generatePriceUpdates(t *testing.T) {
 			priceService.gasPriceEstimator = gasPriceEstimator
 			priceService.destPriceRegistryReader = destPriceReg
 
-			sourceGasPriceUSD, tokenPricesUSD, err := priceService.generatePriceUpdates(context.Background(), lggr, destTokens)
+			sourceGasPriceUSD, tokenPricesUSD, err := priceService.generatePriceUpdates(context.Background(), lggr)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
