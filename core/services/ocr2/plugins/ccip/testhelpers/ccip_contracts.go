@@ -1490,9 +1490,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 				tokenGasOverrides := make([]uint32, len(msg.TokenAmounts))
 
 				if args.TokenGasOverrides != nil && len(args.TokenGasOverrides) == len(msg.TokenAmounts) {
-					for i, tokenGasOverride := range args.TokenGasOverrides {
-						tokenGasOverrides[i] = tokenGasOverride
-					}
+					copy(tokenGasOverrides, args.TokenGasOverrides)
 				} else {
 					// Initialize each element in the slice to a new big.Int value in one line using a loop
 					for i := range tokenGasOverrides {
