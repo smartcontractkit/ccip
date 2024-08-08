@@ -62,7 +62,7 @@ runs:
         LOGSTREAM_LOG_TARGETS: ${{ inputs.logstreamLogTargets }}
         GRAFANA_URL: ${{ inputs.grafanaUrl }}
         GRAFANA_DASHBOARD_URL: ${{ inputs.grafanaDashboardUrl }}
-        GRAFANA_TOKEN: ${{ inputs.grafanaBearerToken }}
+        GRAFANA_BEARER_TOKEN: ${{ inputs.grafanaBearerToken }}
         CUSTOM_EVM_NODES: ${{ inputs.customEvmNodes }}
         EVM_NODE_LOG_LEVEL: ${{ inputs.evmNodeLogLevel }}
       run: |
@@ -134,8 +134,8 @@ runs:
         fi
 
         grafana_bearer_token=""
-        if [ -n "$GRAFANA_TOKEN" ]; then
-          grafana_bearer_token="bearer_token_secret=\"$GRAFANA_TOKEN\""
+        if [ -n "$GRAFANA_BEARER_TOKEN" ]; then
+          grafana_bearer_token="bearer_token_secret=\"$GRAFANA_BEARER_TOKEN\""
         fi
 
         cat << EOF > config.toml
@@ -178,17 +178,6 @@ runs:
 
         [CCIP.Groups.smoke]
         TestRunName = '$EXISTING_NAMESPACE'
-        
-        [CCIP.Groups.load.ChaosGasProfile]
-        TargetChain = "dst"
-        StartGasPrice = 2000000000
-        GasRaisePercentage = 0.7
-        Spike = true
-        Duration = '3m'
-        
-        [CCIP.Groups.load.ChaosGasLimitProfile]
-        TargetChain = "src"
-        BlockGasLimitPercentage = 0.1
 
         EOF
 

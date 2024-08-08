@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 )
 
-// TestLoadCCIPStableRPS clean and stable load test
 func TestLoadCCIPStableRPS(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)

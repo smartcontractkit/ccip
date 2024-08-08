@@ -1161,7 +1161,7 @@ func SetupReorgSuite(t *testing.T, lggr *zerolog.Logger, setupOutput *testsetups
 		DstGethHTTPURL:   dstGethHTTPURL,
 		SrcFinalityDepth: finalitySrc,
 		DstFinalityDepth: finalityDst,
-		FinalityDelta:    setupOutput.Cfg.TestGroupInput.ChaosReorgProfile.FinalityDelta,
+		FinalityDelta:    setupOutput.Cfg.TestGroupInput.ReorgProfile.FinalityDelta,
 	})
 	require.NoError(t, err)
 	return rs

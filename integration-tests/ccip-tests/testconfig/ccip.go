@@ -251,12 +251,12 @@ func (l *LoadProfile) SetTestRunName(name string) {
 	}
 }
 
-type ChaosReorgProfile struct {
+type ReorgProfile struct {
 	FinalityDelta int              `toml:",omitempty"`
 	Duration      *config.Duration `toml:",omitempty"`
 }
 
-func (gp *ChaosReorgProfile) Validate() error {
+func (gp *ReorgProfile) Validate() error {
 	// FinalityDelta can be validated only relatively to CL nodes settings, see setupReorgSuite method
 	return nil
 }
@@ -290,7 +290,7 @@ type CCIPTestGroupConfig struct {
 	CommitInflightExpiry            *config.Duration                      `toml:",omitempty"`
 	StoreLaneConfig                 *bool                                 `toml:",omitempty"`
 	LoadProfile                     *LoadProfile                          `toml:",omitempty"`
-	ChaosReorgProfile               *ChaosReorgProfile                    `toml:",omitempty"`
+	ReorgProfile                    *ReorgProfile                         `toml:",omitempty"`
 }
 
 func (c *CCIPTestGroupConfig) Validate() error {
@@ -307,8 +307,8 @@ func (c *CCIPTestGroupConfig) Validate() error {
 				return fmt.Errorf("test run name should be set if existing deployment is true and test is running in k8s")
 			}
 		}
-		if c.ChaosReorgProfile != nil {
-			if err := c.ChaosReorgProfile.Validate(); err != nil {
+		if c.ReorgProfile != nil {
+			if err := c.ReorgProfile.Validate(); err != nil {
 				return err
 			}
 		}

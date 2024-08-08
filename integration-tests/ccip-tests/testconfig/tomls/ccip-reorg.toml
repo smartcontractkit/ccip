@@ -61,9 +61,9 @@ FeeCapDefault = '200 gwei'
 [CCIP.Groups.smoke]
 BiDirectionalLane = true
 PhaseTimeout = '3m'       # Duration to wait for the each phase validation(SendRequested, Commit, RMN Blessing, Execution) to time-out.
-LocalCluster = false
+LocalCluster = true
 
-[CCIP.Groups.smoke.ChaosReorgProfile]
+[CCIP.Groups.smoke.ReorgProfile]
 FinalityDelta = 5
 Duration = '1m'
 
