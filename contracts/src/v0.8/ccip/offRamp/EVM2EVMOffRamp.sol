@@ -451,7 +451,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   /// its execution and enforce atomicity among successful message processing and token transfer.
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts
   /// (for example smart contract wallets) without an associated message.
-  function executeSingleMessage(Internal.EVM2EVMMessage memory message, bytes[] memory offchainTokenData) external {
+  function executeSingleMessage(Internal.EVM2EVMMessage calldata message, bytes[] calldata offchainTokenData) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
@@ -696,11 +696,11 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   /// any non-rate limiting errors that may occur. If we encounter a rate limiting related error
   /// we bubble it up. If we encounter a non-rate limiting error we wrap it in a TokenHandlingError.
   function _releaseOrMintTokens(
-    Client.EVMTokenAmount[] memory sourceTokenAmounts,
+    Client.EVMTokenAmount[] calldata sourceTokenAmounts,
     bytes memory originalSender,
     address receiver,
-    bytes[] memory encodedSourceTokenData,
-    bytes[] memory offchainTokenData
+    bytes[] calldata encodedSourceTokenData,
+    bytes[] calldata offchainTokenData
   ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
     // Creating a copy is more gas efficient than initializing a new array.
     destTokenAmounts = sourceTokenAmounts;
