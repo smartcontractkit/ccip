@@ -1,6 +1,6 @@
 -- +goose Up
 
-drop index if exists evm.evm_logs_idx_topic_two;
+drop index if exists evm.logs_idx_topic_two;
 
 drop index if exists evm.idx_evm_logs_ordered_by_block_and_created_at;
 
