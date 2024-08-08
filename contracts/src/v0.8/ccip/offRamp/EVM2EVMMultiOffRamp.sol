@@ -862,11 +862,15 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
     }
 
-    (uint256 balancePost,) = _getBalanceOfReceiver(receiver, localToken, gasLeft - gasUsedReleaseOrMint);
-
     uint256 localAmount = abi.decode(returnData, (uint256));
-    if (balancePost - balancePre != localAmount) {
-      revert ReleaseOrMintBalanceMismatch(localAmount, balancePost - balancePre);
+    // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case
+    // of a lockRelease pool.
+    if (receiver != localPoolAddress) {
+      (uint256 balancePost,) = _getBalanceOfReceiver(receiver, localToken, gasLeft - gasUsedReleaseOrMint);
+
+      if (balancePost - balancePre != localAmount) {
+        revert ReleaseOrMintBalanceMismatch(localAmount, balancePost - balancePre);
+      }
     }
 
     return Client.EVMTokenAmount({token: localToken, amount: localAmount});
@@ -886,7 +890,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     );
     if (!success) revert TokenHandlingError(returnData);
 
-    // If the call was successful, the returnData should contain only the pre-balance.
+    // If the call was successful, the returnData should contain only the balance.
     if (returnData.length != Internal.MAX_BALANCE_OF_RET_BYTES) {
       revert InvalidDataLength(Internal.MAX_BALANCE_OF_RET_BYTES, returnData.length);
     }
