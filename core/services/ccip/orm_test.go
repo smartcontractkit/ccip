@@ -15,13 +15,18 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
+)
+
+var (
+	r = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
 func setupORM(t *testing.T) (ORM, sqlutil.DataSource) {
 	t.Helper()
 
 	db := pgtest.NewSqlxDB(t)
-	orm, err := NewORM(db)
+	orm, err := NewORM(db, logger.TestLogger(t))
 
 	require.NoError(t, err)
 
@@ -37,12 +42,12 @@ func generateChainSelectors(n int) []uint64 {
 	return selectors
 }
 
-func generateGasPriceUpdates(chainSelector uint64, n int) []GasPriceUpdate {
-	updates := make([]GasPriceUpdate, n)
+func generateGasPrices(chainSelector uint64, n int) []GasPrice {
+	updates := make([]GasPrice, n)
 	for i := 0; i < n; i++ {
 		// gas prices can take up whole range of uint256
 		uint256Max := new(big.Int).Sub(new(big.Int).Exp(big.NewInt(2), big.NewInt(256), nil), big.NewInt(1))
-		row := GasPriceUpdate{
+		row := GasPrice{
 			SourceChainSelector: chainSelector,
 			GasPrice:            assets.NewWei(new(big.Int).Sub(uint256Max, big.NewInt(int64(i)))),
 		}
@@ -61,10 +66,21 @@ func generateTokenAddresses(n int) []string {
 	return addrs
 }
 
-func generateTokenPriceUpdates(tokenAddr string, n int) []TokenPriceUpdate {
-	updates := make([]TokenPriceUpdate, n)
+func generateRandomTokenPrices(tokenAddrs []string) []TokenPrice {
+	updates := make([]TokenPrice, 0, len(tokenAddrs))
+	for _, addr := range tokenAddrs {
+		updates = append(updates, TokenPrice{
+			TokenAddr:  addr,
+			TokenPrice: assets.NewWei(new(big.Int).Rand(r, big.NewInt(1e18))),
+		})
+	}
+	return updates
+}
+
+func generateTokenPrices(tokenAddr string, n int) []TokenPrice {
+	updates := make([]TokenPrice, n)
 	for i := 0; i < n; i++ {
-		row := TokenPriceUpdate{
+		row := TokenPrice{
 			TokenAddr:  tokenAddr,
 			TokenPrice: assets.NewWei(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(int64(i)))),
 		}
@@ -134,20 +150,20 @@ func TestORM_InsertAndGetGasPrices(t *testing.T) {
 
 	sourceSelectors := generateChainSelectors(numSourceChainSelectors)
 
-	updates := make(map[uint64][]GasPriceUpdate)
+	updates := make(map[uint64][]GasPrice)
 	for _, selector := range sourceSelectors {
-		updates[selector] = generateGasPriceUpdates(selector, numUpdatesPerSourceSelector)
+		updates[selector] = generateGasPrices(selector, numUpdatesPerSourceSelector)
 	}
 
 	// 5 jobs, each inserting prices for 10 chains, with 20 updates per chain.
-	expectedPrices := make(map[uint64]GasPriceUpdate)
+	expectedPrices := make(map[uint64]GasPrice)
 	for i := 0; i < numJobs; i++ {
 		for selector, updatesPerSelector := range updates {
 			lastIndex := len(updatesPerSelector) - 1
 
-			err := orm.InsertGasPricesForDestChain(ctx, destSelector, updatesPerSelector[:lastIndex])
+			_, err := orm.UpsertGasPricesForDestChain(ctx, destSelector, updatesPerSelector[:lastIndex])
 			assert.NoError(t, err)
-			err = orm.InsertGasPricesForDestChain(ctx, destSelector, updatesPerSelector[lastIndex:])
+			_, err = orm.UpsertGasPricesForDestChain(ctx, destSelector, updatesPerSelector[lastIndex:])
 			assert.NoError(t, err)
 
 			expectedPrices[selector] = updatesPerSelector[lastIndex]
@@ -170,13 +186,13 @@ func TestORM_InsertAndGetGasPrices(t *testing.T) {
 	}
 
 	// after the initial inserts, insert new round of prices, 1 price per selector this time
-	var combinedUpdates []GasPriceUpdate
+	var combinedUpdates []GasPrice
 	for selector, updatesPerSelector := range updates {
 		combinedUpdates = append(combinedUpdates, updatesPerSelector[0])
 		expectedPrices[selector] = updatesPerSelector[0]
 	}
 
-	err = orm.InsertGasPricesForDestChain(ctx, destSelector, combinedUpdates)
+	_, err = orm.UpsertGasPricesForDestChain(ctx, destSelector, combinedUpdates)
 	assert.NoError(t, err)
 	assert.Equal(t, numSourceChainSelectors, getGasTableRowCount(t, db))
 
@@ -190,7 +206,7 @@ func TestORM_InsertAndGetGasPrices(t *testing.T) {
 	}
 }
 
-func TestORM_InsertAndDeleteGasPrices(t *testing.T) {
+func TestORM_UpsertGasPrices(t *testing.T) {
 	t.Parallel()
 	ctx := testutils.Context(t)
 
@@ -202,13 +218,13 @@ func TestORM_InsertAndDeleteGasPrices(t *testing.T) {
 
 	sourceSelectors := generateChainSelectors(numSourceChainSelectors)
 
-	updates := make(map[uint64][]GasPriceUpdate)
+	updates := make(map[uint64][]GasPrice)
 	for _, selector := range sourceSelectors {
-		updates[selector] = generateGasPriceUpdates(selector, numUpdatesPerSourceSelector)
+		updates[selector] = generateGasPrices(selector, numUpdatesPerSourceSelector)
 	}
 
 	for _, updatesPerSelector := range updates {
-		err := orm.InsertGasPricesForDestChain(ctx, destSelector, updatesPerSelector)
+		_, err := orm.UpsertGasPricesForDestChain(ctx, destSelector, updatesPerSelector)
 		assert.NoError(t, err)
 	}
 
@@ -217,7 +233,7 @@ func TestORM_InsertAndDeleteGasPrices(t *testing.T) {
 
 	// insert for the 2nd time after interimTimeStamp
 	for _, updatesPerSelector := range updates {
-		err := orm.InsertGasPricesForDestChain(ctx, destSelector, updatesPerSelector)
+		_, err := orm.UpsertGasPricesForDestChain(ctx, destSelector, updatesPerSelector)
 		assert.NoError(t, err)
 	}
 
@@ -237,20 +253,20 @@ func TestORM_InsertAndGetTokenPrices(t *testing.T) {
 
 	addrs := generateTokenAddresses(numAddresses)
 
-	updates := make(map[string][]TokenPriceUpdate)
+	updates := make(map[string][]TokenPrice)
 	for _, addr := range addrs {
-		updates[addr] = generateTokenPriceUpdates(addr, numUpdatesPerAddress)
+		updates[addr] = generateTokenPrices(addr, numUpdatesPerAddress)
 	}
 
 	// 5 jobs, each inserting prices for 10 chains, with 20 updates per chain.
-	expectedPrices := make(map[string]TokenPriceUpdate)
+	expectedPrices := make(map[string]TokenPrice)
 	for i := 0; i < numJobs; i++ {
 		for addr, updatesPerAddr := range updates {
 			lastIndex := len(updatesPerAddr) - 1
 
-			err := orm.InsertTokenPricesForDestChain(ctx, destSelector, updatesPerAddr[:lastIndex])
+			_, err := orm.UpsertTokenPricesForDestChain(ctx, destSelector, updatesPerAddr[:lastIndex], 0)
 			assert.NoError(t, err)
-			err = orm.InsertTokenPricesForDestChain(ctx, destSelector, updatesPerAddr[lastIndex:])
+			_, err = orm.UpsertTokenPricesForDestChain(ctx, destSelector, updatesPerAddr[lastIndex:], 0)
 			assert.NoError(t, err)
 
 			expectedPrices[addr] = updatesPerAddr[lastIndex]
@@ -273,13 +289,13 @@ func TestORM_InsertAndGetTokenPrices(t *testing.T) {
 	}
 
 	// after the initial inserts, insert new round of prices, 1 price per selector this time
-	var combinedUpdates []TokenPriceUpdate
+	var combinedUpdates []TokenPrice
 	for addr, updatesPerAddr := range updates {
 		combinedUpdates = append(combinedUpdates, updatesPerAddr[0])
 		expectedPrices[addr] = updatesPerAddr[0]
 	}
 
-	err = orm.InsertTokenPricesForDestChain(ctx, destSelector, combinedUpdates)
+	_, err = orm.UpsertTokenPricesForDestChain(ctx, destSelector, combinedUpdates, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, numAddresses, getTokenTableRowCount(t, db))
 
@@ -293,36 +309,74 @@ func TestORM_InsertAndGetTokenPrices(t *testing.T) {
 	}
 }
 
-func TestORM_InsertAndDeleteTokenPrices(t *testing.T) {
+func TestORM_InsertTokenPricesWhenExpired(t *testing.T) {
 	t.Parallel()
 	ctx := testutils.Context(t)
-
-	orm, db := setupORM(t)
+	orm, _ := setupORM(t)
 
 	numAddresses := 10
-	numUpdatesPerAddress := 20
-	destSelector := uint64(1)
-
+	destSelector := rand.Uint64()
 	addrs := generateTokenAddresses(numAddresses)
+	initTokenUpdates := generateRandomTokenPrices(addrs)
 
-	updates := make(map[string][]TokenPriceUpdate)
-	for _, addr := range addrs {
-		updates[addr] = generateTokenPriceUpdates(addr, numUpdatesPerAddress)
+	// Insert the first time, table is initialized
+	rowsUpdated, err := orm.UpsertTokenPricesForDestChain(ctx, destSelector, initTokenUpdates, time.Minute)
+	require.NoError(t, err)
+	assert.Equal(t, int64(numAddresses), rowsUpdated)
+
+	//time.Sleep(100 * time.Millisecond)
+
+	// Insert the second time, no updates, because prices haven't changed
+	rowsUpdated, err = orm.UpsertTokenPricesForDestChain(ctx, destSelector, initTokenUpdates, time.Minute)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rowsUpdated)
+
+	// There are new prices, but we still haven't reached interval
+	newPrices := generateRandomTokenPrices(addrs)
+	rowsUpdated, err = orm.UpsertTokenPricesForDestChain(ctx, destSelector, newPrices, time.Minute)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), rowsUpdated)
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Again with the same new prices, but this time interval is reached
+	rowsUpdated, err = orm.UpsertTokenPricesForDestChain(ctx, destSelector, newPrices, time.Millisecond)
+	require.NoError(t, err)
+	assert.Equal(t, int64(numAddresses), rowsUpdated)
+
+	dbTokenPrices, err := orm.GetTokenPricesByDestChain(ctx, destSelector)
+	require.NoError(t, err)
+	assert.Len(t, dbTokenPrices, numAddresses)
+
+	dbTokenPricesByAddr := toTokensByAddress(dbTokenPrices)
+	for _, tkPrice := range newPrices {
+		dbToken, ok := dbTokenPricesByAddr[tkPrice.TokenAddr]
+		assert.True(t, ok)
+		assert.Equal(t, dbToken, tkPrice.TokenPrice)
 	}
 
-	for _, updatesPerAddr := range updates {
-		err := orm.InsertTokenPricesForDestChain(ctx, destSelector, updatesPerAddr)
-		assert.NoError(t, err)
+	// Single token gets an update
+	newPrices[0].TokenPrice = assets.NewWei(new(big.Int).Add(newPrices[0].TokenPrice.ToInt(), big.NewInt(1)))
+	rowsUpdated, err = orm.UpsertTokenPricesForDestChain(ctx, destSelector, newPrices, time.Nanosecond)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), rowsUpdated)
+}
+
+func Benchmark_UpsertsTheSameTokenPrices(b *testing.B) {
+	db := pgtest.NewSqlxDB(b)
+	orm, err := NewORM(db, logger.NullLogger)
+	require.NoError(b, err)
+
+	ctx := testutils.Context(b)
+	numAddresses := 50
+	destSelector := rand.Uint64()
+	addrs := generateTokenAddresses(numAddresses)
+	tokenUpdates := generateRandomTokenPrices(addrs)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err1 := orm.UpsertTokenPricesForDestChain(ctx, destSelector, tokenUpdates, time.Second)
+		require.NoError(b, err1)
 	}
-
-	sleepSec := 2
-	time.Sleep(time.Duration(sleepSec) * time.Second)
-
-	// insert for the 2nd time after interimTimeStamp
-	for _, updatesPerAddr := range updates {
-		err := orm.InsertTokenPricesForDestChain(ctx, destSelector, updatesPerAddr)
-		assert.NoError(t, err)
-	}
-
-	assert.Equal(t, numAddresses, getTokenTableRowCount(t, db))
 }

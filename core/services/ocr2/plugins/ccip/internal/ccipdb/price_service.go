@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
@@ -22,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 // PriceService manages DB access for gas and token price data.
@@ -42,17 +42,11 @@ type PriceService interface {
 var _ PriceService = (*priceService)(nil)
 
 const (
-	// Prices should expire after 10 minutes in DB. Prices should be fresh in the Commit plugin.
-	// 10 min provides sufficient buffer for the Commit plugin to withstand transient price update outages, while
-	// surfacing price update outages quickly enough.
-	priceExpireSec = 600
-
 	// Prices are refreshed every 1 minute, they are sufficiently accurate, and consistent with Commit OCR round time.
 	priceUpdateInterval = 60 * time.Second
 )
 
 type priceService struct {
-	priceExpireSec int
 	updateInterval time.Duration
 
 	lggr              logger.Logger
@@ -88,8 +82,7 @@ func NewPriceService(
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pw := &priceService{
-		priceExpireSec: priceExpireSec,
-		updateInterval: utils.WithJitter(priceUpdateInterval),
+		updateInterval: priceUpdateInterval,
 
 		lggr:              lggr,
 		orm:               orm,
@@ -128,7 +121,7 @@ func (p *priceService) Close() error {
 }
 
 func (p *priceService) run() {
-	updateTicker := time.NewTicker(p.updateInterval)
+	updateTicker := time.NewTicker(utils.WithJitter(p.updateInterval))
 
 	go func() {
 		defer p.wg.Done()
@@ -325,20 +318,21 @@ func (p *priceService) writePricesToDB(
 
 	if sourceGasPriceUSD != nil {
 		eg.Go(func() error {
-			return p.orm.InsertGasPricesForDestChain(ctx, p.destChainSelector, []cciporm.GasPriceUpdate{
+			_, err1 := p.orm.UpsertGasPricesForDestChain(ctx, p.destChainSelector, []cciporm.GasPrice{
 				{
 					SourceChainSelector: p.sourceChainSelector,
 					GasPrice:            assets.NewWei(sourceGasPriceUSD),
 				},
 			})
+			return err1
 		})
 	}
 
 	if tokenPricesUSD != nil {
-		var tokenPrices []cciporm.TokenPriceUpdate
+		var tokenPrices []cciporm.TokenPrice
 
 		for token, price := range tokenPricesUSD {
-			tokenPrices = append(tokenPrices, cciporm.TokenPriceUpdate{
+			tokenPrices = append(tokenPrices, cciporm.TokenPrice{
 				TokenAddr:  string(token),
 				TokenPrice: assets.NewWei(price),
 			})
@@ -350,7 +344,8 @@ func (p *priceService) writePricesToDB(
 		})
 
 		eg.Go(func() error {
-			return p.orm.InsertTokenPricesForDestChain(ctx, p.destChainSelector, tokenPrices)
+			_, err1 := p.orm.UpsertTokenPricesForDestChain(ctx, p.destChainSelector, tokenPrices, p.updateInterval)
+			return err1
 		})
 	}
 

@@ -18,7 +18,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
@@ -42,13 +41,13 @@ func TestPriceService_priceWrite(t *testing.T) {
 		"0x234": big.NewInt(3e18),
 	}
 
-	expectedGasPriceUpdate := []cciporm.GasPriceUpdate{
+	expectedGasPriceUpdate := []cciporm.GasPrice{
 		{
 			SourceChainSelector: sourceChainSelector,
 			GasPrice:            assets.NewWei(gasPrice),
 		},
 	}
-	expectedTokenPriceUpdate := []cciporm.TokenPriceUpdate{
+	expectedTokenPriceUpdate := []cciporm.TokenPrice{
 		{
 			TokenAddr:  "0x123",
 			TokenPrice: assets.NewWei(big.NewInt(2e18)),
@@ -105,8 +104,10 @@ func TestPriceService_priceWrite(t *testing.T) {
 			}
 
 			mockOrm := ccipmocks.NewORM(t)
-			mockOrm.On("InsertGasPricesForDestChain", ctx, destChainSelector, jobId, expectedGasPriceUpdate).Return(gasPricesError).Once()
-			mockOrm.On("InsertTokenPricesForDestChain", ctx, destChainSelector, jobId, expectedTokenPriceUpdate).Return(tokenPricesError).Once()
+			mockOrm.On("UpsertGasPricesForDestChain", ctx, destChainSelector, expectedGasPriceUpdate).
+				Return(int64(len(expectedGasPriceUpdate)), gasPricesError).Once()
+			mockOrm.On("UpsertTokenPricesForDestChain", ctx, destChainSelector, expectedTokenPriceUpdate, priceUpdateInterval).
+				Return(int64(len(expectedTokenPriceUpdate)), tokenPricesError).Once()
 
 			priceService := NewPriceService(
 				lggr,
@@ -555,7 +556,7 @@ func setupORM(t *testing.T) cciporm.ORM {
 	t.Helper()
 
 	db := pgtest.NewSqlxDB(t)
-	orm, err := cciporm.NewORM(db)
+	orm, err := cciporm.NewORM(db, logger.TestLogger(t))
 
 	require.NoError(t, err)
 
@@ -577,7 +578,7 @@ func checkResultLen(t *testing.T, priceService PriceService, destChainSelector u
 	return nil
 }
 
-func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
+func TestPriceService_priceWriteInBackground(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	jobId := int32(1)
 	destChainSelector := uint64(12345)
@@ -640,8 +641,6 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 
 	// run write task every 2 second
 	priceService.updateInterval = updateInterval
-	// expire all prices during every cleanup
-	priceService.priceExpireSec = 0
 
 	// initially, db is empty
 	assert.NoError(t, checkResultLen(t, priceService, destChainSelector, 0, 0))
@@ -654,23 +653,5 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, checkResultLen(t, priceService, destChainSelector, 1, len(laneTokens)))
 
-	// eventually prices will be cleaned
-	assert.Eventually(t, func() bool {
-		err := checkResultLen(t, priceService, destChainSelector, 0, 0)
-		return err == nil
-	}, testutils.WaitTimeout(t), testutils.TestInterval)
-
-	// then prices will be updated again
-	assert.Eventually(t, func() bool {
-		err := checkResultLen(t, priceService, destChainSelector, 1, len(laneTokens))
-		return err == nil
-	}, testutils.WaitTimeout(t), testutils.TestInterval)
-
 	assert.NoError(t, priceService.Close())
-
-	// after stopping PriceService and runCleanup, no more updates are inserted
-	for i := 0; i < 5; i++ {
-		time.Sleep(time.Second)
-		assert.NoError(t, checkResultLen(t, priceService, destChainSelector, 0, 0))
-	}
 }
