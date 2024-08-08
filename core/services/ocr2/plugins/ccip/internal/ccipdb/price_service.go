@@ -280,20 +280,13 @@ func (p *priceService) observePriceUpdates(
 }
 
 // All prices are USD ($1=1e18) denominated. All prices must be not nil.
+// Jobspec should have the list of destTokens (ARL, Bips, etc) and the sourceNative token.
+// Not respecting this will error out as we need to fetch the token decimals for all tokens expect sourceNative.
 // Return token prices should contain the exact same tokens as in tokenDecimals.
 func (p *priceService) generatePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
-	// logic here would be
-	// 1. get the token prices (this one should have both wrapped source native token + other tokens) {token1: priceToken1, token2: priceToken2, token3: priceToken3, token1Dest: priceToken1Dest}
-	// 2. get all the tokens addresses in jobspec per chain {chainSrc: [token1, token2, token3], chainDest: [token1]} (we can sort them)
-	// 3. get the list of tokens for chainDest [token1, token2, token3]
-	// 4. get the token decimals for 3. [18, 6, 18] --> check if guaranteed to be in the same order as 3 and have the same length
-	// 5. Calculate tokenPricesUSD using the decimals and the token prices.
-	// 6. calculate sourceGasPriceUSD using sourceGasPrice and sourceNativePriceUSD
-
-	// Wrapped native should already be included as Price Getter is fetching all the prices for tokens in the jobspec
 	// notice USD is in 1e18 scale, i.e. $1 = 1e18
 	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, []cciptypes.Address{})
 	if err != nil {

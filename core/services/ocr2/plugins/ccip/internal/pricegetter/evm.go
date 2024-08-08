@@ -81,7 +81,6 @@ func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[u
 	return &priceGetter, nil
 }
 
-// todo: to remove most probably
 // FilterConfiguredTokens implements the PriceGetter interface.
 // It filters a list of token addresses for only those that have a price resolution rule configured on the PriceGetterConfig
 func (d *DynamicPriceGetter) FilterConfiguredTokens(ctx context.Context, tokens []cciptypes.Address) (configured []cciptypes.Address, unconfigured []cciptypes.Address, err error) {
@@ -103,22 +102,6 @@ func (d *DynamicPriceGetter) FilterConfiguredTokens(ctx context.Context, tokens 
 	}
 	return configured, unconfigured, nil
 }
-
-// func (d *DynamicPriceGetter) GetDestinationTokens(ctx context.Context) (tokens map[uint64][]cciptypes.Address) {
-// 	tokens = make(map[uint64][]cciptypes.Address)
-// 	for _, aggCfg := range d.cfg.AggregatorPrices {
-// 		tokens[aggCfg.ChainID] = append(tokens[aggCfg.ChainID], ccipcalc.EvmAddrToGeneric(aggCfg.AggregatorContractAddress))
-// 	}
-
-// 	// sort the result for deterministic order
-// 	for _, tokensPerChain := range tokens {
-// 		sort.Slice(tokensPerChain, func(i, j int) bool {
-// 			return tokensPerChain[i] < tokensPerChain[j]
-// 		})
-// 	}
-
-// 	return tokens
-// }
 
 // TokenPricesUSD implements the PriceGetter interface.
 // It retrieves token prices in USD for all configured tokens in the job spec.
@@ -202,7 +185,6 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	return nil
 }
 
-// todo: can we change the name as we are preparing from config/jobspec
 func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain() (map[cciptypes.Address]*big.Int, map[uint64]*batchCallsForChain, error) {
 	prices := make(map[cciptypes.Address]*big.Int)
 	batchCallsPerChain := make(map[uint64]*batchCallsForChain)

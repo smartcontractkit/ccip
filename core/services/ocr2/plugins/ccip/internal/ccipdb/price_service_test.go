@@ -363,7 +363,7 @@ func TestPriceService_generatePriceUpdates(t *testing.T) {
 			}
 
 			destPriceReg := ccipdatamocks.NewPriceRegistryReader(t)
-			destPriceReg.On("GetTokensDecimals", mock.Anything, destTokens).Return(destDecimals, nil).Maybe()
+			destPriceReg.On("GetTokensDecimals", mock.Anything, mock.Anything).Return(destDecimals, nil).Maybe()
 
 			priceService := NewPriceService(
 				lggr,
@@ -659,8 +659,8 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 	sourceNative := cciptypes.Address("0x123")
 	feeTokens := []cciptypes.Address{"0x234"}
 	rampTokens := []cciptypes.Address{"0x345", "0x456"}
-	rampFilteredTokens := []cciptypes.Address{"0x345"}
-	rampFilterOutTokens := []cciptypes.Address{"0x456"}
+	// rampFilteredTokens := []cciptypes.Address{"0x345"}
+	// rampFilterOutTokens := []cciptypes.Address{"0x456"}
 
 	laneTokens := []cciptypes.Address{"0x234", "0x345"}
 	laneTokenDecimals := []uint8{18, 18}
@@ -677,12 +677,12 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 	gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
 	defer gasPriceEstimator.AssertExpectations(t)
 
-	priceGetter.On("TokenPricesUSD", mock.Anything, tokens).Return(map[cciptypes.Address]*big.Int{
+	priceGetter.On("TokenPricesUSD", mock.Anything, mock.Anything).Return(map[cciptypes.Address]*big.Int{
 		tokens[0]: val1e18(tokenPrices[0]),
 		tokens[1]: val1e18(tokenPrices[1]),
 		tokens[2]: val1e18(tokenPrices[2]),
 	}, nil)
-	priceGetter.On("FilterConfiguredTokens", mock.Anything, rampTokens).Return(rampFilteredTokens, rampFilterOutTokens, nil)
+	// priceGetter.On("FilterConfiguredTokens", mock.Anything, rampTokens).Return(rampFilteredTokens, rampFilterOutTokens, nil)
 
 	offRampReader := ccipdatamocks.NewOffRampReader(t)
 	offRampReader.On("GetTokens", mock.Anything).Return(cciptypes.OffRampTokens{
