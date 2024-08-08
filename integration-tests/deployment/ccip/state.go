@@ -5,9 +5,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	deployment2 "github.com/smartcontractkit/ccip/integration-tests/deployment"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink/v2/core/deployment"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
@@ -72,7 +72,7 @@ func (s CCIPOnChainState) Snapshot(chains []uint64) (CCIPSnapShot, error) {
 	return snapshot, nil
 }
 
-func SnapshotState(e deployment.Environment, ab deployment.AddressBook) (CCIPSnapShot, error) {
+func SnapshotState(e deployment2.Environment, ab deployment2.AddressBook) (CCIPSnapShot, error) {
 	state, err := GenerateOnchainState(e, ab)
 	if err != nil {
 		return CCIPSnapShot{}, err
@@ -80,7 +80,7 @@ func SnapshotState(e deployment.Environment, ab deployment.AddressBook) (CCIPSna
 	return state.Snapshot(e.AllChainSelectors())
 }
 
-func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (CCIPOnChainState, error) {
+func GenerateOnchainState(e deployment2.Environment, ab deployment2.AddressBook) (CCIPOnChainState, error) {
 	state := CCIPOnChainState{
 		EvmOnRampsV160:       make(map[uint64]*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp),
 		EvmOffRampsV160:      make(map[uint64]*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp),

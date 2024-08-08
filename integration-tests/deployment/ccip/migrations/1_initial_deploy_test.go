@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/smartcontractkit/ccip/integration-tests/deployment"
 	"github.com/stretchr/testify/require"
 
-	ccipdeployment "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/deployment"
-	"github.com/smartcontractkit/chainlink/v2/core/deployment"
+	ccipdeployment "github.com/smartcontractkit/chainlink/integration-tests/deployment/ccip"
 )
 
 func Test0001_InitialDeploy(t *testing.T) {

@@ -9,11 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 )
 
 type EVMChain struct {
@@ -22,9 +21,9 @@ type EVMChain struct {
 }
 
 func fundAddress(t *testing.T, from *bind.TransactOpts, to common.Address, amount *big.Int, backend *backends.SimulatedBackend) {
-	nonce, err := backend.PendingNonceAt(testutils.Context(t), from.From)
+	nonce, err := backend.PendingNonceAt(Context(t), from.From)
 	require.NoError(t, err)
-	gp, err := backend.SuggestGasPrice(testutils.Context(t))
+	gp, err := backend.SuggestGasPrice(Context(t))
 	require.NoError(t, err)
 	rawTx := gethtypes.NewTx(&gethtypes.LegacyTx{
 		Nonce:    nonce,
@@ -35,7 +34,7 @@ func fundAddress(t *testing.T, from *bind.TransactOpts, to common.Address, amoun
 	})
 	signedTx, err := from.Signer(from.From, rawTx)
 	require.NoError(t, err)
-	err = backend.SendTransaction(testutils.Context(t), signedTx)
+	err = backend.SendTransaction(Context(t), signedTx)
 	require.NoError(t, err)
 	backend.Commit()
 }
@@ -44,7 +43,10 @@ func GenerateChains(t *testing.T, numChains int) map[uint64]EVMChain {
 	chains := make(map[uint64]EVMChain)
 	for i := 0; i < numChains; i++ {
 		chainID := chainsel.TEST_90000001.EvmChainID + uint64(i)
-		owner := testutils.MustNewSimTransactor(t)
+		key, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		owner, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
+		require.NoError(t, err)
 		backend := backends.NewSimulatedBackend(core.GenesisAlloc{
 			owner.From: {Balance: big.NewInt(0).Mul(big.NewInt(100), big.NewInt(params.Ether))}}, 10000000)
 		chains[chainID] = EVMChain{

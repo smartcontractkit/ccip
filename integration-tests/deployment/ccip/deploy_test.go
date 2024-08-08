@@ -3,11 +3,10 @@ package deployment
 import (
 	"testing"
 
+	"github.com/smartcontractkit/ccip/integration-tests/deployment"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink/v2/core/deployment"
 )
 
 func TestDeployCCIPContracts(t *testing.T) {
