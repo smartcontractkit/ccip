@@ -498,7 +498,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts
   /// (for example smart contract wallets) without an associated message.
   function executeSingleMessage(
-    Internal.Any2EVMRampMessage calldata message,
+    Internal.Any2EVMRampMessage memory message,
     bytes[] calldata offchainTokenData
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
@@ -808,7 +808,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @param offchainTokenData Data fetched offchain by the DON.
   /// @return destTokenAmount local token address with amount
   function _releaseOrMintSingleToken(
-    Internal.RampTokenAmount calldata sourceTokenAmount,
+    Internal.RampTokenAmount memory sourceTokenAmount,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
@@ -914,8 +914,8 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// any non-rate limiting errors that may occur. If we encounter a rate limiting related error
   /// we bubble it up. If we encounter a non-rate limiting error we wrap it in a TokenHandlingError.
   function _releaseOrMintTokens(
-    Internal.RampTokenAmount[] calldata sourceTokenAmounts,
-    bytes calldata originalSender,
+    Internal.RampTokenAmount[] memory sourceTokenAmounts,
+    bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
     bytes[] calldata offchainTokenData
