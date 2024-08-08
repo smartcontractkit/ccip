@@ -2570,7 +2570,7 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
     report[0] =
       PriceRegistry.ReceivedCCIPFeedReport({token: onReportTestToken1, price: 4e18, timestamp: uint32(block.timestamp)});
     report[1] =
-        PriceRegistry.ReceivedCCIPFeedReport({token: onReportTestToken2, price: 4e18, timestamp: uint32(block.timestamp)});
+      PriceRegistry.ReceivedCCIPFeedReport({token: onReportTestToken2, price: 4e18, timestamp: uint32(block.timestamp)});
 
     bytes memory encodedReport = abi.encode(report);
     uint224 expectedStoredToken1Price = rebaseTokenPrice(report[0].price, 18);
