@@ -118,3 +118,5 @@ if (process.env.NETWORK_NAME && process.env.EXPLORER_API_KEY) {
     },
   }
 }
+
+export default config
