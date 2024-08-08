@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/evm_gas"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccipevm"
 	evmconfig "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
@@ -17,9 +18,6 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocr3 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -29,7 +27,9 @@ import (
 
 	commitocr3 "github.com/smartcontractkit/chainlink-ccip/commit"
 	execocr3 "github.com/smartcontractkit/chainlink-ccip/execute"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
@@ -310,6 +310,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			ccipevm.NewExecutePluginCodecV1(),
 			ccipevm.NewMessageHasherV1(),
 			i.homeChainReader,
+			evm_gas.EstimateProvider{}, // TODO: this works for evm only, how about non-evm?
 			contractReaders,
 			chainWriters,
 		)
