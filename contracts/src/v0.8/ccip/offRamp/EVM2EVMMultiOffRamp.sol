@@ -809,10 +809,10 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @return destTokenAmount local token address with amount
   function _releaseOrMintSingleToken(
     Internal.RampTokenAmount calldata sourceTokenAmount,
-    bytes calldata originalSender,
+    bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
-    bytes calldata offchainTokenData
+    bytes memory offchainTokenData
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
     // We need to safely decode the token address from the sourceTokenData, as it could be wrong,
     // in which case it doesn't have to be a valid EVM address.
