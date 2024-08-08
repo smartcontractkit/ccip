@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/smartcontractkit/ccip/integration-tests/deployment"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 
 	ccipdeployment "github.com/smartcontractkit/chainlink/integration-tests/deployment/ccip"
 )

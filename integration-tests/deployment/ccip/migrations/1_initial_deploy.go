@@ -2,35 +2,37 @@ package migrations
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	deployment2 "github.com/smartcontractkit/ccip/integration-tests/deployment"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 
 	ccipdeployment "github.com/smartcontractkit/chainlink/integration-tests/deployment/ccip"
 )
 
 // We expect the migration input to be unique per migration.
 // TODO: Maybe there's a generics approach here?
-func Apply0001(env deployment2.Environment, c ccipdeployment.DeployCCIPContractConfig) (deployment2.MigrationOutput, error) {
+// Note if the migration is a deployment and it fails we have 2 options:
+// - Just throw away the addresses, fix issue and try again (potentially expensive on mainnet)
+// - Roll forward with another migration completing the deployment
+func Apply0001(env deployment.Environment, c ccipdeployment.DeployCCIPContractConfig) (deployment.MigrationOutput, error) {
 	ab, err := ccipdeployment.DeployCCIPContracts(env, c)
 	if err != nil {
-		// If we fail here, just throw away the addresses.
-		// TODO: if expensive could consider partial recovery
 		env.Logger.Errorw("Failed to deploy CCIP contracts", "err", err, "addresses", ab)
-		return deployment2.MigrationOutput{}, err
+		return deployment.MigrationOutput{}, err
 	}
 	state, err := ccipdeployment.GenerateOnchainState(env, ab)
 	if err != nil {
-		return deployment2.MigrationOutput{}, err
+		return deployment.MigrationOutput{}, err
 	}
 	js, err := ccipdeployment.GenerateJobSpecs(common.Address{})
 	if err != nil {
-		return deployment2.MigrationOutput{}, err
+		return deployment.MigrationOutput{}, err
 	}
 	proposal, err := ccipdeployment.GenerateAcceptOwnershipProposal(env, env.AllChainSelectors(), state)
 	if err != nil {
-		return deployment2.MigrationOutput{}, err
+		return deployment.MigrationOutput{}, err
 	}
-	return deployment2.MigrationOutput{
-		Proposals:   []deployment2.Proposal{proposal},
+	return deployment.MigrationOutput{
+		Proposals:   []deployment.Proposal{proposal},
 		AddressBook: ab,
 		JobSpecs: map[string][]string{
 			"chain-layer": {js.String()},

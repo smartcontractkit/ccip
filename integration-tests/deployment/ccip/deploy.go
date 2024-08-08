@@ -2,7 +2,8 @@ package deployment
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/ccip/integration-tests/deployment"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
@@ -62,6 +63,7 @@ func GenerateJobSpecs(capReg common.Address) (CCIPSpec, error) {
 }
 
 type DeployCCIPContractConfig struct {
+	// Existing addresses which we want to skip deployment
 	Weth9s map[uint64]common.Address
 	// TODO: More params as needed
 }

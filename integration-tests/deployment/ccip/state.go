@@ -5,8 +5,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	deployment2 "github.com/smartcontractkit/ccip/integration-tests/deployment"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
+	deployment2 "github.com/smartcontractkit/chainlink/integration-tests/deployment"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"

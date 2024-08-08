@@ -5,8 +5,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	deployment2 "github.com/smartcontractkit/ccip/integration-tests/deployment"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
+	deployment2 "github.com/smartcontractkit/chainlink/integration-tests/deployment"
 )
 
 func GenerateAcceptOwnershipProposal(

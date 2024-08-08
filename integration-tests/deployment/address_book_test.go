@@ -37,5 +37,4 @@ func TestAddressBook(t *testing.T) {
 		},
 	})
 
-	// TODO: Further testing of merge etc.
 }

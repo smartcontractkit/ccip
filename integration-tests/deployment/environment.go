@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/smartcontractkit/ccip/integration-tests/deployment/memory"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/memory"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
