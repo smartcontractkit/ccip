@@ -306,6 +306,7 @@ func (args *execArgs) execute() error {
 		gasLimitOverrides[i] = big.NewInt(int64(args.cfg.GasLimitOverride))
 	}
 
+	args.destUser.GasLimit = 5000000
 	tx, err := helpers.ManuallyExecute(args.destChain, args.destUser, args.cfg.OffRamp, offRampProof, gasLimitOverrides)
 	if err != nil {
 		return err
