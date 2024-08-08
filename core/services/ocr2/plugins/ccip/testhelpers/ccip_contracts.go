@@ -1276,7 +1276,7 @@ type ManualExecArgs struct {
 	OffRamp           string
 	SeqNr             uint64
 	GasLimit          *big.Int
-	TokenGasOverrides []*big.Int
+	TokenGasOverrides []uint32
 }
 
 // ApproxDestStartBlock attempts to locate a block in destination chain with timestamp closest to the timestamp of the block
@@ -1487,16 +1487,16 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 					msg.GasLimit = args.GasLimit
 				}
 
-				tokenGasOverrides := make([]*big.Int, len(msg.TokenAmounts))
+				tokenGasOverrides := make([]uint32, len(msg.TokenAmounts))
 
 				if args.TokenGasOverrides != nil && len(args.TokenGasOverrides) == len(msg.TokenAmounts) {
 					for i, tokenGasOverride := range args.TokenGasOverrides {
-						tokenGasOverrides[i].Set(tokenGasOverride)
+						tokenGasOverrides[i] = tokenGasOverride
 					}
 				} else {
 					// Initialize each element in the slice to a new big.Int value in one line using a loop
 					for i := range tokenGasOverrides {
-						tokenGasOverrides[i] = new(big.Int)
+						tokenGasOverrides[i] = 0
 					}
 				}
 
