@@ -105,7 +105,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   struct GasLimitOverride {
     uint256 receiverExecutionGasLimit;
-    uint256[] tokenGasOverrides;
+    uint32[] tokenGasOverrides;
   }
 
   // STATIC CONFIG
@@ -320,7 +320,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         emit SkippedAlreadyExecutedMessage(message.sequenceNumber);
         continue;
       }
-      uint256[] memory tokenGasOverrides;
+      uint32[] memory tokenGasOverrides;
       bool manualExecution = manualExecGasLimits.length != 0;
 
       if (manualExecution) {
@@ -465,7 +465,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   function _trialExecute(
     Internal.EVM2EVMMessage memory message,
     bytes[] memory offchainTokenData,
-    uint256[] memory tokenGasOverrides
+    uint32[] memory tokenGasOverrides
   ) internal returns (Internal.MessageExecutionState, bytes memory) {
     try this.executeSingleMessage(message, offchainTokenData, tokenGasOverrides) {}
     catch (bytes memory err) {
@@ -487,7 +487,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   function executeSingleMessage(
     Internal.EVM2EVMMessage memory message,
     bytes[] memory offchainTokenData,
-    uint256[] memory tokenGasOverrides
+    uint32[] memory tokenGasOverrides
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
@@ -719,7 +719,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     address receiver,
     bytes[] memory encodedSourceTokenData,
     bytes[] memory offchainTokenData,
-    uint256[] memory tokenGasOverrides
+    uint32[] memory tokenGasOverrides
   ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
     // Creating a copy is more gas efficient than initializing a new array.
     destTokenAmounts = sourceTokenAmounts;
@@ -729,7 +729,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         abi.decode(encodedSourceTokenData[i], (Internal.SourceTokenData));
       if (tokenGasOverrides.length != 0) {
         if (tokenGasOverrides[i] != 0) {
-          sourceTokenData.destGasAmount = uint32(tokenGasOverrides[i]);
+          sourceTokenData.destGasAmount = tokenGasOverrides[i];
         }
       }
       destTokenAmounts[i] = _releaseOrMintToken(

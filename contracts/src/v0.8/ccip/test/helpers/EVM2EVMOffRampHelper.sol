@@ -34,7 +34,7 @@ contract EVM2EVMOffRampHelper is EVM2EVMOffRamp, IgnoreContractSize {
     address receiver,
     bytes[] calldata sourceTokenData,
     bytes[] calldata offchainTokenData,
-    uint256[] memory tokenGasOverrides
+    uint32[] memory tokenGasOverrides
   ) external returns (Client.EVMTokenAmount[] memory) {
     return _releaseOrMintTokens(
       sourceTokenAmounts, originalSender, receiver, sourceTokenData, offchainTokenData, tokenGasOverrides
@@ -44,7 +44,7 @@ contract EVM2EVMOffRampHelper is EVM2EVMOffRamp, IgnoreContractSize {
   function trialExecute(
     Internal.EVM2EVMMessage memory message,
     bytes[] memory offchainTokenData,
-    uint256[] memory tokenGasOverrides
+    uint32[] memory tokenGasOverrides
   ) external returns (Internal.MessageExecutionState, bytes memory) {
     return _trialExecute(message, offchainTokenData, tokenGasOverrides);
   }

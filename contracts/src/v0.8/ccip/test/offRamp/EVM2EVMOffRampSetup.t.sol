@@ -237,7 +237,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     for (uint256 i = 0; i < messages.length; ++i) {
       gasLimitOverrides[i].receiverExecutionGasLimit = messages[i].gasLimit;
       //create an array for destinationGasAmounts
-      gasLimitOverrides[i].tokenGasOverrides = new uint256[](messages[i].tokenAmounts.length);
+      gasLimitOverrides[i].tokenGasOverrides = new uint32[](messages[i].tokenAmounts.length);
 
       // initialize tokenGasOverrides
       for (uint256 j = 0; j < messages[i].tokenAmounts.length; ++j) {
