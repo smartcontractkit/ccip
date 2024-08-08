@@ -4,7 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	deployment2 "github.com/smartcontractkit/ccip/integration-tests/deployment"
 
-	ccipdeployment "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/deployment"
+	ccipdeployment "github.com/smartcontractkit/chainlink/integration-tests/deployment/ccip"
 )
 
 // We expect the migration input to be unique per migration.
