@@ -5,10 +5,13 @@ import (
 	"encoding/hex"
 	"math/big"
 	"sort"
-	"strconv"
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccip_integration_tests/integrationhelpers"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 
@@ -53,9 +56,27 @@ const (
 	CapabilityLabelledName = "ccip"
 	CapabilityVersion      = "v1.0.0"
 	NodeOperatorID         = 1
-	// TODO: this is 8 hours now to match what is hardcoded in the exec plugin.
-	// Eventually this should drive what is set in the exec plugin.
-	FirstBlockAge = 8 * time.Hour
+
+	// These constants drive what is set in the plugin offchain configs.
+	FirstBlockAge                           = 8 * time.Hour
+	RemoteGasPriceBatchWriteFrequency       = 30 * time.Minute
+	BatchGasLimit                           = 6_500_000
+	RelativeBoostPerWaitHour                = 1.5
+	InflightCacheExpiry                     = 10 * time.Minute
+	RootSnoozeTime                          = 30 * time.Minute
+	BatchingStrategyID                      = 0
+	DeltaProgress                           = 30 * time.Second
+	DeltaResend                             = 10 * time.Second
+	DeltaInitial                            = 20 * time.Second
+	DeltaRound                              = 2 * time.Second
+	DeltaGrace                              = 2 * time.Second
+	DeltaCertifiedCommitRequest             = 10 * time.Second
+	DeltaStage                              = 10 * time.Second
+	Rmax                                    = 3
+	MaxDurationQuery                        = 50 * time.Millisecond
+	MaxDurationObservation                  = 5 * time.Second
+	MaxDurationShouldAcceptAttestedReport   = 10 * time.Second
+	MaxDurationShouldTransmitAcceptedReport = 10 * time.Second
 )
 
 func e18Mult(amount uint64) *big.Int {
@@ -179,12 +200,13 @@ func createUniverses(
 				TokenAdminRegistry: tokenAdminRegistry.Address(),
 			},
 			evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDynamicConfig{
-				Router:        rout.Address(),
 				PriceRegistry: priceRegistry.Address(),
 				// `withdrawFeeTokens` onRamp function is not part of the message flow
 				// so we can set this to any address
 				FeeAggregator: testutils.NewAddress(),
 			},
+			// Destination chain configs will be set up later once we have all chains
+			[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{},
 		)
 		require.NoErrorf(t, err, "failed to deploy onramp on chain id %d", chainID)
 		backend.Commit()
@@ -204,7 +226,6 @@ func createUniverses(
 				NonceManager:       nonceManager.Address(),
 			},
 			evm_2_evm_multi_offramp.EVM2EVMMultiOffRampDynamicConfig{
-				Router:        rout.Address(),
 				PriceRegistry: priceRegistry.Address(),
 			},
 			// Source chain configs will be set up later once we have all chains
@@ -412,11 +433,18 @@ func AddChainConfig(
 	// Need to sort, otherwise _checkIsValidUniqueSubset onChain will fail
 	sortP2PIDS(p2pIDs)
 	// First Add ChainConfig that includes all p2pIDs as readers
-	chainConfig := integrationhelpers.SetupConfigInfo(chainSelector, p2pIDs, f, []byte(strconv.FormatUint(chainSelector, 10)))
+	encodedExtraChainConfig, err := chainconfig.EncodeChainConfig(chainconfig.ChainConfig{
+		GasPriceDeviationPPB:    ccipocr3.NewBigIntFromInt64(1000),
+		DAGasPriceDeviationPPB:  ccipocr3.NewBigIntFromInt64(0),
+		FinalityDepth:           10,
+		OptimisticConfirmations: 1,
+	})
+	require.NoError(t, err)
+	chainConfig := integrationhelpers.SetupConfigInfo(chainSelector, p2pIDs, f, encodedExtraChainConfig)
 	inputConfig := []ccip_config.CCIPConfigTypesChainConfigInfo{
 		chainConfig,
 	}
-	_, err := h.ccipConfig.ApplyChainConfigUpdates(h.owner, nil, inputConfig)
+	_, err = h.ccipConfig.ApplyChainConfigUpdates(h.owner, nil, inputConfig)
 	require.NoError(t, err)
 	h.backend.Commit()
 	return chainConfig
@@ -437,49 +465,71 @@ func (h *homeChain) AddDON(
 	for range oracles {
 		schedule = append(schedule, 1)
 	}
-	signers, transmitters, f, _, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
-		30*time.Second, // deltaProgress
-		10*time.Second, // deltaResend
-		20*time.Second, // deltaInitial
-		2*time.Second,  // deltaRound
-		2*time.Second,  // deltaGrace
-		10*time.Second, // deltaCertifiedCommitRequest TODO: whats a good value for this?
-		10*time.Second, // deltaStage
-		3,              // rmax
-		schedule,
-		oracles,
-		[]byte{},            // empty offchain config
-		50*time.Millisecond, // maxDurationQuery
-		5*time.Second,       // maxDurationObservation
-		10*time.Second,      // maxDurationShouldAcceptAttestedReport
-		10*time.Second,      // maxDurationShouldTransmitAcceptedReport
-		int(f),
-		[]byte{}) // empty OnChainConfig
-	require.NoError(t, err, "failed to create contract config")
 
 	tabi, err := ocr3_config_encoder.IOCR3ConfigEncoderMetaData.GetAbi()
 	require.NoError(t, err)
 
-	signersBytes := make([][]byte, len(signers))
-	for i, signer := range signers {
-		signersBytes[i] = signer
-	}
-
-	transmittersBytes := make([][]byte, len(transmitters))
-	for i, transmitter := range transmitters {
-		// anotherErr because linting doesn't want to shadow err
-		parsed, anotherErr := common.ParseHexOrString(string(transmitter))
-		require.NoError(t, anotherErr)
-		transmittersBytes[i] = parsed
-	}
-
 	// Add DON on capability registry contract
 	var ocr3Configs []ocr3_config_encoder.CCIPConfigTypesOCR3Config
 	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
+		var encodedOffchainConfig []byte
+		var err2 error
+		if pluginType == cctypes.PluginTypeCCIPCommit {
+			encodedOffchainConfig, err2 = pluginconfig.EncodeCommitOffchainConfig(pluginconfig.CommitOffchainConfig{
+				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(RemoteGasPriceBatchWriteFrequency),
+				// TODO: implement token price writes
+				// TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(tokenPriceBatchWriteFrequency),
+			})
+			require.NoError(t, err2)
+		} else {
+			encodedOffchainConfig, err2 = pluginconfig.EncodeExecuteOffchainConfig(pluginconfig.ExecuteOffchainConfig{
+				BatchGasLimit:             BatchGasLimit,
+				RelativeBoostPerWaitHour:  RelativeBoostPerWaitHour,
+				MessageVisibilityInterval: *commonconfig.MustNewDuration(FirstBlockAge),
+				InflightCacheExpiry:       *commonconfig.MustNewDuration(InflightCacheExpiry),
+				RootSnoozeTime:            *commonconfig.MustNewDuration(RootSnoozeTime),
+				BatchingStrategyID:        BatchingStrategyID,
+			})
+			require.NoError(t, err2)
+		}
+		signers, transmitters, configF, _, offchainConfigVersion, offchainConfig, err2 := ocr3confighelper.ContractSetConfigArgsForTests(
+			DeltaProgress,
+			DeltaResend,
+			DeltaInitial,
+			DeltaRound,
+			DeltaGrace,
+			DeltaCertifiedCommitRequest,
+			DeltaStage,
+			Rmax,
+			schedule,
+			oracles,
+			encodedOffchainConfig,
+			MaxDurationQuery,
+			MaxDurationObservation,
+			MaxDurationShouldAcceptAttestedReport,
+			MaxDurationShouldTransmitAcceptedReport,
+			int(f),
+			[]byte{}, // empty OnChainConfig
+		)
+		require.NoError(t, err2, "failed to create contract config")
+
+		signersBytes := make([][]byte, len(signers))
+		for i, signer := range signers {
+			signersBytes[i] = signer
+		}
+
+		transmittersBytes := make([][]byte, len(transmitters))
+		for i, transmitter := range transmitters {
+			// anotherErr because linting doesn't want to shadow err
+			parsed, anotherErr := common.ParseHexOrString(string(transmitter))
+			require.NoError(t, anotherErr)
+			transmittersBytes[i] = parsed
+		}
+
 		ocr3Configs = append(ocr3Configs, ocr3_config_encoder.CCIPConfigTypesOCR3Config{
 			PluginType:            uint8(pluginType),
 			ChainSelector:         chainSelector,
-			F:                     f,
+			F:                     configF,
 			OffchainConfigVersion: offchainConfigVersion,
 			OfframpAddress:        uni.offramp.Address().Bytes(),
 			BootstrapP2PIds:       [][32]byte{bootstrapP2PID},
@@ -522,13 +572,13 @@ func (h *homeChain) AddDON(
 	require.NotZero(t, donID, "failed to get donID from config set event")
 
 	var signerAddresses []common.Address
-	for _, signer := range signers {
-		signerAddresses = append(signerAddresses, common.BytesToAddress(signer))
+	for _, oracle := range oracles {
+		signerAddresses = append(signerAddresses, common.BytesToAddress(oracle.OnchainPublicKey))
 	}
 
 	var transmitterAddresses []common.Address
-	for _, transmitter := range transmitters {
-		transmitterAddresses = append(transmitterAddresses, common.HexToAddress(string(transmitter)))
+	for _, oracle := range oracles {
+		transmitterAddresses = append(transmitterAddresses, common.HexToAddress(string(oracle.TransmitAccount)))
 	}
 
 	// get the config digest from the ccip config contract and set config on the offramp.
@@ -580,6 +630,7 @@ func connectUniverses(
 	for _, uni := range universes {
 		wireRouter(t, uni, universes)
 		wirePriceRegistry(t, uni, universes)
+		wireOnRamp(t, uni, universes)
 		wireOffRamp(t, uni, universes)
 		initRemoteChainsGasPrices(t, uni, universes)
 	}
@@ -693,6 +744,24 @@ func wirePriceRegistry(t *testing.T, uni onchainUniverse, universes map[uint64]o
 	uni.backend.Commit()
 }
 
+// Setting OnRampDestChainConfigs
+func wireOnRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchainUniverse) {
+	owner := uni.owner
+	var onrampSourceChainConfigArgs []evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs
+	for remoteChainID := range universes {
+		if remoteChainID == uni.chainID {
+			continue
+		}
+		onrampSourceChainConfigArgs = append(onrampSourceChainConfigArgs, evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
+			DestChainSelector: getSelector(remoteChainID),
+			Router:            uni.router.Address(),
+		})
+	}
+	_, err := uni.onramp.ApplyDestChainConfigUpdates(owner, onrampSourceChainConfigArgs)
+	require.NoErrorf(t, err, "failed to apply dest chain config updates on onramp with chain id %d", uni.chainID)
+	uni.backend.Commit()
+}
+
 // Setting OffRampSourceChainConfigs
 func wireOffRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchainUniverse) {
 	owner := uni.owner
@@ -702,8 +771,9 @@ func wireOffRamp(t *testing.T, uni onchainUniverse, universes map[uint64]onchain
 			continue
 		}
 		offrampSourceChainConfigArgs = append(offrampSourceChainConfigArgs, evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
-			SourceChainSelector: getSelector(remoteChainID), // for each destination chain, add a source chain config
+			SourceChainSelector: getSelector(remoteChainID),
 			IsEnabled:           true,
+			Router:              uni.router.Address(),
 			OnRamp:              remoteUniverse.onramp.Address().Bytes(),
 		})
 	}
