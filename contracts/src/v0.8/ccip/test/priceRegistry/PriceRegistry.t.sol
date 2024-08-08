@@ -2525,12 +2525,10 @@ contract PriceRegistry_KeystoneSetup is PriceRegistrySetup {
       isAllowed: true
     });
     PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeeds = new PriceRegistry.TokenPriceFeedUpdate[](1);
-    tokenPriceFeeds[0] =  PriceRegistry.TokenPriceFeedUpdate(
-      {
-        sourceToken: s_sourceTokens[0],
-        feedConfig:  IPriceRegistry.TokenPriceFeedConfig({dataFeedAddress: address(0x0), tokenDecimals: 18})
-      }
-    );
+    tokenPriceFeeds[0] = PriceRegistry.TokenPriceFeedUpdate({
+      sourceToken: s_sourceTokens[0],
+      feedConfig: IPriceRegistry.TokenPriceFeedConfig({dataFeedAddress: address(0x0), tokenDecimals: 18})
+    });
     s_priceRegistry.setReportPermissions(permissions);
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeeds);
   }
@@ -2595,19 +2593,14 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
 
   function test_onReport_UnsupportedToken_Reverts() public {
     bytes memory encodedPermissionsMetadata =
-              abi.encodePacked(keccak256(abi.encode("workflowCID")), WORKFLOW_NAME_1, WORKFLOW_OWNER_1, REPORT_NAME_1);
+      abi.encodePacked(keccak256(abi.encode("workflowCID")), WORKFLOW_NAME_1, WORKFLOW_OWNER_1, REPORT_NAME_1);
     PriceRegistry.ReceivedCCIPFeedReport[] memory report = new PriceRegistry.ReceivedCCIPFeedReport[](1);
     report[0] =
-              PriceRegistry.ReceivedCCIPFeedReport({token: s_sourceTokens[1], price: 4e18, timestamp: uint32(block.timestamp)});
+      PriceRegistry.ReceivedCCIPFeedReport({token: s_sourceTokens[1], price: 4e18, timestamp: uint32(block.timestamp)});
 
     bytes memory encodedReport = abi.encode(report);
 
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        PriceRegistry.TokenNotSupported.selector,
-        s_sourceTokens[1]
-      )
-    );
+    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.TokenNotSupported.selector, s_sourceTokens[1]));
     changePrank(FORWARDER_1);
     s_priceRegistry.onReport(encodedPermissionsMetadata, encodedReport);
   }

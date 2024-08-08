@@ -475,11 +475,8 @@ contract PriceRegistry is
       } else {
         rebasedValue *= 10 ** (18 - tokenDecimals);
       }
-      if (rebasedValue > type(uint224).max) {
-        revert DataFeedValueOutOfUint224Range();
-      }
       s_usdPerToken[feeds[i].token] =
-                Internal.TimestampedPackedUint224({value: uint224(rebasedValue), timestamp: feeds[i].timestamp});
+        Internal.TimestampedPackedUint224({value: uint224(rebasedValue), timestamp: feeds[i].timestamp});
       emit UsdPerTokenUpdated(feeds[i].token, uint224(rebasedValue), feeds[i].timestamp);
     }
   }
