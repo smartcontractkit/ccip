@@ -1,11 +1,13 @@
 package memory
 
 import (
+	"testing"
+
 	"github.com/hashicorp/consul/sdk/freeport"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
-	"testing"
+
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 )
 
 func TestNode(t *testing.T) {

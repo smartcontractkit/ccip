@@ -1,6 +1,9 @@
 package memory
 
 import (
+	"math/big"
+	"testing"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
@@ -8,10 +11,9 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/stretchr/testify/require"
-	"math/big"
-	"testing"
+
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 )
 
 type EVMChain struct {

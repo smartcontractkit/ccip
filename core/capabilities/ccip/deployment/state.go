@@ -55,6 +55,7 @@ func (s CCIPOnChainState) Snapshot(chains []uint64) (CCIPSnapShot, error) {
 		Chains: make(map[string]Chain),
 	}
 	for _, chainSelector := range chains {
+		// TODO: Need a utility for this
 		chainid, _ := chainsel.ChainIdFromSelector(chainSelector)
 		chainName, _ := chainsel.NameFromChainId(chainid)
 		var c Chain

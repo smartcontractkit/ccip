@@ -3,8 +3,16 @@ package memory
 import (
 	"context"
 	"fmt"
+	"math/big"
+	"net/http"
+	"testing"
+	"time"
+
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
@@ -25,12 +33,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
-	"math/big"
-	"net/http"
-	"testing"
-	"time"
 )
 
 type Node struct {

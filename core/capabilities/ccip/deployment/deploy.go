@@ -80,11 +80,11 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 		// TODO: Still waiting for RMNRemote/RMNHome contracts etc.
 		mockARM, err := deployContract(e.Logger,
 			func() (common.Address, string, common.Hash, error) {
-				mockARM, tx, _, err := mock_arm_contract.DeployMockARMContract(
+				mockARM, tx, _, err2 := mock_arm_contract.DeployMockARMContract(
 					chain.DeployerKey,
 					chain.Client,
 				)
-				return mockARM, MockARM_1_0_0, tx.Hash(), err
+				return mockARM, MockARM_1_0_0, tx.Hash(), err2
 			}, chain.Confirm, saveToChain)
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy mockARM", "err", err)
@@ -94,12 +94,12 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 
 		armProxy, err := deployContract(e.Logger,
 			func() (common.Address, string, common.Hash, error) {
-				armProxy, tx, _, err := arm_proxy_contract.DeployARMProxyContract(
+				armProxy, tx, _, err2 := arm_proxy_contract.DeployARMProxyContract(
 					chain.DeployerKey,
 					chain.Client,
 					mockARM,
 				)
-				return armProxy, ARMProxy_1_1_0, tx.Hash(), err
+				return armProxy, ARMProxy_1_1_0, tx.Hash(), err2
 			}, chain.Confirm, saveToChain)
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy armProxy", "err", err)
@@ -109,11 +109,11 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 
 		weth9, err := deployContract(e.Logger,
 			func() (common.Address, string, common.Hash, error) {
-				weth9, tx, _, err := weth9.DeployWETH9(
+				weth9, tx, _, err2 := weth9.DeployWETH9(
 					chain.DeployerKey,
 					chain.Client,
 				)
-				return weth9, WETH9_1_0_0, tx.Hash(), err
+				return weth9, WETH9_1_0_0, tx.Hash(), err2
 			}, chain.Confirm, saveToChain)
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy weth9", "err", err)
@@ -122,13 +122,13 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 
 		routerAddr, err := deployContract(e.Logger,
 			func() (common.Address, string, common.Hash, error) {
-				router, tx, _, err := router.DeployRouter(
+				router, tx, _, err2 := router.DeployRouter(
 					chain.DeployerKey,
 					chain.Client,
 					weth9,
 					armProxy,
 				)
-				return router, Router_1_0_0, tx.Hash(), err
+				return router, Router_1_0_0, tx.Hash(), err2
 			}, chain.Confirm, saveToChain)
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy router", "err", err)
@@ -138,10 +138,10 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 
 		tokenAdminRegistry, err := deployContract(e.Logger,
 			func() (common.Address, string, common.Hash, error) {
-				tokenAdminRegistry, tx, _, err := token_admin_registry.DeployTokenAdminRegistry(
+				tokenAdminRegistry, tx, _, err2 := token_admin_registry.DeployTokenAdminRegistry(
 					chain.DeployerKey,
 					chain.Client)
-				return tokenAdminRegistry, TokenAdminRegistry_1_0_0, tx.Hash(), err
+				return tokenAdminRegistry, TokenAdminRegistry_1_0_0, tx.Hash(), err2
 			}, chain.Confirm, saveToChain)
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy token admin registry", "err", err)
