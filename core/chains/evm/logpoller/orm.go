@@ -390,7 +390,7 @@ func (o *DSORM) insertLogsWithinTx(ctx context.Context, logs []Log, tx sqlutil.D
 			end = len(logs)
 		}
 
-		query := `explain (analyze, buffers) INSERT INTO evm.logs
+		query := `INSERT INTO evm.logs
 					(evm_chain_id, log_index, block_hash, block_number, block_timestamp, address, event_sig, topics, tx_hash, data, created_at)
 				VALUES
 					(:evm_chain_id, :log_index, :block_hash, :block_number, :block_timestamp, :address, :event_sig, :topics, :tx_hash, :data, NOW())
