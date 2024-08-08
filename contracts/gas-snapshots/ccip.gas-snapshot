@@ -718,7 +718,7 @@ PriceRegistry_getValidatedTokenPrice:test_TokenNotSupportedFeed_Revert() (gas: 1
 PriceRegistry_getValidatedTokenPrice:test_TokenNotSupported_Revert() (gas: 13841)
 PriceRegistry_getValidatedTokenPrice:test_UnderflowFeedPrice_Revert() (gas: 2092692)
 PriceRegistry_onReport:test_onReport_InvalidForwarder_Reverts() (gas: 23249)
-PriceRegistry_onReport:test_onReport_Success() (gas: 44039)
+PriceRegistry_onReport:test_onReport_Success() (gas: 76476)
 PriceRegistry_onReport:test_onReport_UnsupportedToken_Reverts() (gas: 26762)
 PriceRegistry_parseEVMExtraArgsFromBytes:test_EVMExtraArgsDefault_Success() (gas: 17316)
 PriceRegistry_parseEVMExtraArgsFromBytes:test_EVMExtraArgsEnforceOutOfOrder_Revert() (gas: 21410)

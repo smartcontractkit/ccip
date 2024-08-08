@@ -2513,9 +2513,14 @@ contract PriceRegistry_KeystoneSetup is PriceRegistrySetup {
   address constant WORKFLOW_OWNER_1 = address(0x3);
   bytes10 constant WORKFLOW_NAME_1 = "workflow1";
   bytes2 constant REPORT_NAME_1 = "01";
+  address onReportTestToken1;
+  address onReportTestToken2;
 
   function setUp() public virtual override {
     super.setUp();
+    onReportTestToken1 = s_sourceTokens[0];
+    onReportTestToken2 = _deploySourceToken("onReportTestToken2", 0, 20);
+
     KeystoneFeedsPermissionHandler.Permission[] memory permissions = new KeystoneFeedsPermissionHandler.Permission[](1);
     permissions[0] = KeystoneFeedsPermissionHandler.Permission({
       forwarder: FORWARDER_1,
@@ -2524,10 +2529,14 @@ contract PriceRegistry_KeystoneSetup is PriceRegistrySetup {
       reportName: REPORT_NAME_1,
       isAllowed: true
     });
-    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeeds = new PriceRegistry.TokenPriceFeedUpdate[](1);
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeeds = new PriceRegistry.TokenPriceFeedUpdate[](2);
     tokenPriceFeeds[0] = PriceRegistry.TokenPriceFeedUpdate({
-      sourceToken: s_sourceTokens[0],
+      sourceToken: onReportTestToken1,
       feedConfig: IPriceRegistry.TokenPriceFeedConfig({dataFeedAddress: address(0x0), tokenDecimals: 18})
+    });
+    tokenPriceFeeds[1] = PriceRegistry.TokenPriceFeedUpdate({
+      sourceToken: onReportTestToken2,
+      feedConfig: IPriceRegistry.TokenPriceFeedConfig({dataFeedAddress: address(0x0), tokenDecimals: 20})
     });
     s_priceRegistry.setReportPermissions(permissions);
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeeds);
@@ -2557,20 +2566,27 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
     bytes memory encodedPermissionsMetadata =
       abi.encodePacked(keccak256(abi.encode("workflowCID")), WORKFLOW_NAME_1, WORKFLOW_OWNER_1, REPORT_NAME_1);
 
-    PriceRegistry.ReceivedCCIPFeedReport[] memory report = new PriceRegistry.ReceivedCCIPFeedReport[](1);
+    PriceRegistry.ReceivedCCIPFeedReport[] memory report = new PriceRegistry.ReceivedCCIPFeedReport[](2);
     report[0] =
-      PriceRegistry.ReceivedCCIPFeedReport({token: s_sourceTokens[0], price: 4e18, timestamp: uint32(block.timestamp)});
+      PriceRegistry.ReceivedCCIPFeedReport({token: onReportTestToken1, price: 4e18, timestamp: uint32(block.timestamp)});
+    report[1] =
+        PriceRegistry.ReceivedCCIPFeedReport({token: onReportTestToken2, price: 4e18, timestamp: uint32(block.timestamp)});
 
     bytes memory encodedReport = abi.encode(report);
-    uint256 expectedStoredTokenPrice = rebaseTokenPrice(report[0].price, BurnMintERC677(s_sourceTokens[0]).decimals());
+    uint224 expectedStoredToken1Price = rebaseTokenPrice(report[0].price, 18);
+    uint224 expectedStoredToken2Price = rebaseTokenPrice(report[1].price, 20);
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(report[0].token, expectedStoredTokenPrice, block.timestamp);
+    emit PriceRegistry.UsdPerTokenUpdated(onReportTestToken1, expectedStoredToken1Price, block.timestamp);
+    emit PriceRegistry.UsdPerTokenUpdated(onReportTestToken1, expectedStoredToken2Price, block.timestamp);
 
     changePrank(FORWARDER_1);
     s_priceRegistry.onReport(encodedPermissionsMetadata, encodedReport);
 
-    vm.assertEq(s_priceRegistry.getTokenPrice(report[0].token).value, expectedStoredTokenPrice);
+    vm.assertEq(s_priceRegistry.getTokenPrice(report[0].token).value, expectedStoredToken1Price);
     vm.assertEq(s_priceRegistry.getTokenPrice(report[0].token).timestamp, report[0].timestamp);
+
+    vm.assertEq(s_priceRegistry.getTokenPrice(report[1].token).value, expectedStoredToken2Price);
+    vm.assertEq(s_priceRegistry.getTokenPrice(report[1].token).timestamp, report[1].timestamp);
   }
 
   function test_onReport_InvalidForwarder_Reverts() public {
