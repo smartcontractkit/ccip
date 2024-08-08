@@ -29,6 +29,7 @@ import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {OCR2Base} from "../ocr/OCR2Base.t.sol";
 import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.t.sol";
 import {EVM2EVMOffRampSetup} from "./EVM2EVMOffRampSetup.t.sol";
+import {stdError} from "forge-std/Test.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
@@ -1085,6 +1086,55 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     s_offRamp.manuallyExecute(
       _generateReportFromMessages(messages), new EVM2EVMOffRamp.GasLimitOverride[](messages.length)
     );
+  }
+
+  function test_ManualExecWithSourceTokens_Success() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessageWithTokens();
+    messages[0].receiver = address(s_reverting_receiver);
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+
+    s_reverting_receiver.setRevert(false);
+
+    vm.expectEmit();
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
+      messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
+    );
+    EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = _getGasLimitsFromMessages(messages);
+    s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
+  }
+
+  function test_ManualExecWithInvalidSourceTokenDataCount_Failure() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessageWithTokens();
+    messages[0].receiver = address(s_reverting_receiver);
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+
+    EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = _getGasLimitsFromMessages(messages);
+
+    // make sourceTokenData as empty array in messages[0]
+    messages[0].sourceTokenData = new bytes[](0);
+
+    vm.expectRevert(stdError.indexOOBError);
+    s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
+  }
+
+  function test_ManualExecWithMultipleMessagesAndSourceTokens_Success() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateMessagesWithTokens();
+    messages[0].receiver = address(s_reverting_receiver);
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+    messages[1].receiver = address(s_reverting_receiver);
+    messages[1].messageId = Internal._hash(messages[1], s_offRamp.metadataHash());
+
+    s_reverting_receiver.setRevert(false);
+
+    vm.expectEmit();
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
+      messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
+    );
+    emit EVM2EVMOffRamp.ExecutionStateChanged(
+      messages[1].sequenceNumber, messages[1].messageId, Internal.MessageExecutionState.SUCCESS, ""
+    );
+    EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = _getGasLimitsFromMessages(messages);
+    s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
   }
 
   function test_manuallyExecute_DoesNotRevertIfUntouched_Success() public {
