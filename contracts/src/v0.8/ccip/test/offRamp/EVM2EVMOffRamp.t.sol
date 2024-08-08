@@ -1534,6 +1534,26 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
     s_offRamp.releaseOrMintToken(amount, abi.encode(OWNER), OWNER, sourceTokenData, "");
   }
 
+  function test_releaseOrMintToken_ReleaseOrMintBalanceMismatch_Revert() public {
+    uint256 amount = 123123;
+    address token = s_sourceTokens[0];
+
+    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
+      sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
+      destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
+      extraData: "",
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+    });
+
+    vm.mockCall(
+      s_destTokenBySourceToken[token], abi.encodeWithSelector(IERC20.balanceOf.selector, OWNER), abi.encode(0)
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.ReleaseOrMintBalanceMismatch.selector, amount, 0));
+
+    s_offRamp.releaseOrMintToken(amount, abi.encode(OWNER), OWNER, sourceTokenData, "");
+  }
+
   function test__releaseOrMintToken_NotACompatiblePool_Revert() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];

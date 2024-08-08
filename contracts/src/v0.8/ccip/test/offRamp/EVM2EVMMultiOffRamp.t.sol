@@ -2382,6 +2382,26 @@ contract EVM2EVMMultiOffRamp__releaseOrMintSingleToken is EVM2EVMMultiOffRampSet
     s_offRamp.releaseOrMintSingleToken(tokenAmount, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR, "");
   }
 
+  function test_releaseOrMintToken_ReleaseOrMintBalanceMismatch_Revert() public {
+    uint256 amount = 123123;
+    address token = s_sourceTokens[0];
+
+    Internal.RampTokenAmount memory tokenAmount = Internal.RampTokenAmount({
+      sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
+      destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
+      extraData: "",
+      amount: amount
+    });
+
+    vm.mockCall(
+      s_destTokenBySourceToken[token], abi.encodeWithSelector(IERC20.balanceOf.selector, OWNER), abi.encode(0)
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.ReleaseOrMintBalanceMismatch.selector, amount, 0));
+
+    s_offRamp.releaseOrMintSingleToken(tokenAmount, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR, "");
+  }
+
   function test__releaseOrMintSingleToken_NotACompatiblePool_Revert() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
