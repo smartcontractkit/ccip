@@ -48,6 +48,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
   error TokenHandlingError(bytes err);
+  error ReleaseOrMintBalanceMismatch(uint256 expected, uint256 actual);
   error EmptyReport();
   error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
@@ -823,12 +824,28 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       revert NotACompatiblePool(localPoolAddress);
     }
 
+    (bool success, bytes memory returnData, uint256 gasUsed) = CallWithExactGas._callWithExactGasSafeReturnData(
+      abi.encodeCall(IERC20.balanceOf, (receiver)),
+      localToken,
+      s_dynamicConfig.maxPoolReleaseOrMintGas,
+      Internal.GAS_FOR_CALL_EXACT_CHECK,
+      Internal.MAX_RET_BYTES
+    );
+    if (!success) revert TokenHandlingError(returnData);
+
+    // If the call was successful, the returnData should contain only the pre-balance.
+    if (returnData.length != Internal.MAX_BALANCE_OF_RET_BYTES) {
+      revert InvalidDataLength(Internal.MAX_BALANCE_OF_RET_BYTES, returnData.length);
+    }
+    uint256 balancePre = abi.decode(returnData, (uint256));
+
     // We determined that the pool address is a valid EVM address, but that does not mean the code at this
     // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location
     // contains a contract. If it doesn't it reverts with a known error, which we catch gracefully.
     // We call the pool with exact gas to increase resistance against malicious tokens or token pools.
     // We protects against return data bombs by capping the return data size at MAX_RET_BYTES.
-    (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
+    uint256 gasUsedReleaseOrMint;
+    (success, returnData, gasUsedReleaseOrMint) = CallWithExactGas._callWithExactGasSafeReturnData(
       abi.encodeCall(
         IPoolV1.releaseOrMint,
         Pool.ReleaseOrMintInV1({
@@ -843,7 +860,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         })
       ),
       localPoolAddress,
-      s_dynamicConfig.maxPoolReleaseOrMintGas,
+      s_dynamicConfig.maxPoolReleaseOrMintGas - gasUsed,
       Internal.GAS_FOR_CALL_EXACT_CHECK,
       Internal.MAX_RET_BYTES
     );
@@ -856,18 +873,24 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
     }
     uint256 localAmount = abi.decode(returnData, (uint256));
-    // Since token pools send the tokens to the msg.sender, which is this offRamp, we need to
-    // transfer them to the final receiver. We use the _callWithExactGasSafeReturnData function because
-    // the token contracts are not considered trusted.
+
     (success, returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
-      abi.encodeCall(IERC20.transferFrom, (localPoolAddress, receiver, localAmount)),
+      abi.encodeCall(IERC20.balanceOf, (receiver)),
       localToken,
-      s_dynamicConfig.maxTokenTransferGas,
+      s_dynamicConfig.maxPoolReleaseOrMintGas - gasUsed - gasUsedReleaseOrMint,
       Internal.GAS_FOR_CALL_EXACT_CHECK,
       Internal.MAX_RET_BYTES
     );
 
     if (!success) revert TokenHandlingError(returnData);
+    // If the call was successful, the returnData should contain only the post-balance.
+    if (returnData.length != Internal.MAX_BALANCE_OF_RET_BYTES) {
+      revert InvalidDataLength(Internal.MAX_BALANCE_OF_RET_BYTES, returnData.length);
+    }
+    uint256 transferredAmount = abi.decode(returnData, (uint256)) - balancePre;
+    if (transferredAmount != localAmount) {
+      revert ReleaseOrMintBalanceMismatch(localAmount, transferredAmount);
+    }
 
     return Client.EVMTokenAmount({token: localToken, amount: localAmount});
   }
