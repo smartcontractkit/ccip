@@ -18,6 +18,7 @@ require (
 	github.com/go-resty/resty/v2 v2.11.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
+	github.com/hashicorp/consul/sdk v0.16.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/manifoldco/promptui v0.9.0
@@ -57,6 +58,7 @@ require (
 	gopkg.in/guregu/null.v4 v4.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
+	gotest.tools/v3 v3.5.1
 	k8s.io/apimachinery v0.28.2
 )
 
@@ -258,7 +260,6 @@ require (
 	github.com/gtank/merlin v0.1.1 // indirect
 	github.com/gtank/ristretto255 v0.1.2 // indirect
 	github.com/hashicorp/consul/api v1.25.1 // indirect
-	github.com/hashicorp/consul/sdk v0.16.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-envparse v0.1.0 // indirect
