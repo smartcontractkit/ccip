@@ -1103,7 +1103,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
   }
 
-  function test_ManualExecWithInvalidSourceTokenDataCount_Failure() public {
+  function test_ManualExecWithInvalidSourceTokenDataCount_Revert() public {
     Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessageWithTokens();
     messages[0].receiver = address(s_reverting_receiver);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
@@ -1183,7 +1183,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
   }
 
-  function test_ManualExecWithInvalidReceiverExecutionGasOverride_Failure() public {
+  function test_ManualExecWithInvalidReceiverExecutionGasOverride_Revert() public {
     Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage();
     messages[0].receiver = address(s_reverting_receiver);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
@@ -1198,7 +1198,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
   }
 
-  function test_ManualExecWithInvalidTokenGasOverride_Failure() public {
+  function test_ManualExecWithInvalidTokenGasOverride_Revert() public {
     Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessageWithTokens();
     messages[0].receiver = address(s_reverting_receiver);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
@@ -1217,7 +1217,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
   }
 
-  function test_ManualExecWithTokenGasOverride_Mismatch_Failure() public {
+  function test_ManualExecWithTokenGasOverride_Mismatch_Revert() public {
     Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessageWithTokens();
     messages[0].receiver = address(s_reverting_receiver);
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
