@@ -2524,8 +2524,33 @@ contract PriceRegistry_KeystoneSetup is PriceRegistrySetup {
       reportName: REPORT_NAME_1,
       isAllowed: true
     });
-
+    PriceRegistry.TokenPriceFeedUpdate[] memory tokenPriceFeeds = new PriceRegistry.TokenPriceFeedUpdate[](1);
+    tokenPriceFeeds[0] =  PriceRegistry.TokenPriceFeedUpdate(
+      {
+        sourceToken: s_sourceTokens[0],
+        feedConfig:  IPriceRegistry.TokenPriceFeedConfig({dataFeedAddress: address(0x0), tokenDecimals: 18})
+      }
+    );
     s_priceRegistry.setReportPermissions(permissions);
+    s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeeds);
+  }
+
+  function rebaseTokenPrice(uint256 reportedPrice, uint8 tokenDecimals) internal returns (uint224) {
+    // Rebase formula for units in smallest token denomination: usdValue * (1e18 * 1e18) / 1eTokenDecimals
+    // feedValue * (10 ** (18 - feedDecimals)) * (10 ** (18 - erc20Decimals))
+    // feedValue * (10 ** ((18 - feedDecimals) + (18 - erc20Decimals)))
+    // feedValue * (10 ** (36 - feedDecimals - erc20Decimals))
+    // feedValue * (10 ** (36 - (feedDecimals + erc20Decimals)))
+    // feedValue * (10 ** (36 - excessDecimals))
+    // If excessDecimals > 36 => flip it to feedValue / (10 ** (excessDecimals - 36))
+    uint8 excessDecimals = 18 + tokenDecimals;
+
+    if (excessDecimals > 36) {
+      reportedPrice /= 10 ** (excessDecimals - 36);
+    } else {
+      reportedPrice *= 10 ** (36 - excessDecimals);
+    }
+    return uint224(reportedPrice);
   }
 }
 
@@ -2539,14 +2564,14 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
       PriceRegistry.ReceivedCCIPFeedReport({token: s_sourceTokens[0], price: 4e18, timestamp: uint32(block.timestamp)});
 
     bytes memory encodedReport = abi.encode(report);
-
+    uint256 expectedStoredTokenPrice = rebaseTokenPrice(report[0].price, BurnMintERC677(s_sourceTokens[0]).decimals());
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(report[0].token, report[0].price, block.timestamp);
+    emit PriceRegistry.UsdPerTokenUpdated(report[0].token, expectedStoredTokenPrice, block.timestamp);
 
     changePrank(FORWARDER_1);
     s_priceRegistry.onReport(encodedPermissionsMetadata, encodedReport);
 
-    vm.assertEq(s_priceRegistry.getTokenPrice(report[0].token).value, report[0].price);
+    vm.assertEq(s_priceRegistry.getTokenPrice(report[0].token).value, expectedStoredTokenPrice);
     vm.assertEq(s_priceRegistry.getTokenPrice(report[0].token).timestamp, report[0].timestamp);
   }
 
@@ -2565,6 +2590,25 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
       )
     );
     changePrank(STRANGER);
+    s_priceRegistry.onReport(encodedPermissionsMetadata, encodedReport);
+  }
+
+  function test_onReport_UnsupportedToken_Reverts() public {
+    bytes memory encodedPermissionsMetadata =
+              abi.encodePacked(keccak256(abi.encode("workflowCID")), WORKFLOW_NAME_1, WORKFLOW_OWNER_1, REPORT_NAME_1);
+    PriceRegistry.ReceivedCCIPFeedReport[] memory report = new PriceRegistry.ReceivedCCIPFeedReport[](1);
+    report[0] =
+              PriceRegistry.ReceivedCCIPFeedReport({token: s_sourceTokens[1], price: 4e18, timestamp: uint32(block.timestamp)});
+
+    bytes memory encodedReport = abi.encode(report);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        PriceRegistry.TokenNotSupported.selector,
+        s_sourceTokens[1]
+      )
+    );
+    changePrank(FORWARDER_1);
     s_priceRegistry.onReport(encodedPermissionsMetadata, encodedReport);
   }
 }

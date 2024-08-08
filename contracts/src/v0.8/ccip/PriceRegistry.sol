@@ -465,9 +465,22 @@ contract PriceRegistry is
     ReceivedCCIPFeedReport[] memory feeds = abi.decode(report, (ReceivedCCIPFeedReport[]));
 
     for (uint256 i = 0; i < feeds.length; ++i) {
+      uint256 rebasedValue = uint256(feeds[i].price);
+      uint8 tokenDecimals = s_usdPriceFeedsPerToken[feeds[i].token].tokenDecimals;
+      if (tokenDecimals == 0) {
+        revert TokenNotSupported(feeds[i].token);
+      }
+      if (tokenDecimals > 18) {
+        rebasedValue /= 10 ** (tokenDecimals - 18);
+      } else {
+        rebasedValue *= 10 ** (18 - tokenDecimals);
+      }
+      if (rebasedValue > type(uint224).max) {
+        revert DataFeedValueOutOfUint224Range();
+      }
       s_usdPerToken[feeds[i].token] =
-        Internal.TimestampedPackedUint224({value: feeds[i].price, timestamp: feeds[i].timestamp});
-      emit UsdPerTokenUpdated(feeds[i].token, feeds[i].price, feeds[i].timestamp);
+                Internal.TimestampedPackedUint224({value: uint224(rebasedValue), timestamp: feeds[i].timestamp});
+      emit UsdPerTokenUpdated(feeds[i].token, uint224(rebasedValue), feeds[i].timestamp);
     }
   }
 
