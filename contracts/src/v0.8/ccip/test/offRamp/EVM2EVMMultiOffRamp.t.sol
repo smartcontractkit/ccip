@@ -2396,7 +2396,7 @@ contract EVM2EVMMultiOffRamp__releaseOrMintSingleToken is EVM2EVMMultiOffRampSet
 
     bytes memory revertData = "call reverted :o";
 
-    vm.mockCallRevert(destToken, abi.encodeWithSelector(IERC20.approve.selector, s_offRamp, amount), revertData);
+    vm.mockCallRevert(destToken, abi.encodeWithSelector(IERC20.transfer.selector, receiver, amount), revertData);
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.TokenHandlingError.selector, revertData));
     s_offRamp.releaseOrMintSingleToken(
@@ -2451,44 +2451,22 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     uint256 amount = 100;
     uint256 destinationDenominationMultiplier = 1000;
-    srcTokenAmounts[0].amount = amount;
+    srcTokenAmounts[1].amount = amount;
 
     bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
 
     Internal.RampTokenAmount[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
 
-    address pool = s_destPoolBySourceToken[srcTokenAmounts[0].token];
-    address destToken = s_destTokenBySourceToken[srcTokenAmounts[0].token];
+    address pool = s_destPoolBySourceToken[srcTokenAmounts[1].token];
+    address destToken = s_destTokenBySourceToken[srcTokenAmounts[1].token];
 
-    // Since the pool call is mocked, we manually approve funds to the offRamp
-    deal(destToken, pool, amount * destinationDenominationMultiplier);
-    vm.startPrank(pool);
-    IERC20(destToken).approve(address(s_offRamp), amount * destinationDenominationMultiplier);
-    vm.startPrank(OWNER);
-
-    Pool.ReleaseOrMintInV1 memory releaseOrMintIn = Pool.ReleaseOrMintInV1({
-      originalSender: abi.encode(OWNER),
-      receiver: OWNER,
-      amount: amount,
-      localToken: destToken,
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      sourcePoolAddress: sourceTokenAmounts[0].sourcePoolAddress,
-      sourcePoolData: sourceTokenAmounts[0].extraData,
-      offchainTokenData: offchainTokenData[0]
-    });
-
-    vm.mockCall(
-      s_destPoolBySourceToken[srcTokenAmounts[0].token],
-      abi.encodeWithSelector(LockReleaseTokenPool.releaseOrMint.selector, releaseOrMintIn),
-      abi.encode(amount * destinationDenominationMultiplier)
-    );
+    MaybeRevertingBurnMintTokenPool(pool).setReleaseOrMintMultiplier(destinationDenominationMultiplier);
 
     Client.EVMTokenAmount[] memory destTokenAmounts = s_offRamp.releaseOrMintTokens(
       sourceTokenAmounts, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR_1, offchainTokenData
     );
-
-    assertEq(destTokenAmounts[0].amount, amount * destinationDenominationMultiplier);
-    assertEq(destTokenAmounts[0].token, destToken);
+    assertEq(destTokenAmounts[1].amount, amount * destinationDenominationMultiplier);
+    assertEq(destTokenAmounts[1].token, destToken);
   }
 
   // Revert
