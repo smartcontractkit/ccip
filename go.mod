@@ -116,7 +116,6 @@ require (
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/guregu/null.v4 v4.0.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
-	gotest.tools/v3 v3.5.1
 	k8s.io/utils v0.0.0-20230711102312-30195339c3c7
 )
 
