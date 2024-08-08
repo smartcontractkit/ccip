@@ -99,17 +99,16 @@ func NewNode(
 	}
 
 	// Build evm factory using clients + keystore.
-	mailMon := mailbox.NewMonitor("ccip", lggr.Named("mailbox"))
+	mailMon := mailbox.NewMonitor("node", lggr.Named("mailbox"))
 	evmOpts := chainlink.EVMFactoryConfig{
 		ChainOpts: legacyevm.ChainOpts{
 			AppConfig: cfg,
 			GenEthClient: func(i *big.Int) client.Client {
-				t.Log("genning eth client for chain id:", i.String())
-				client, ok := clients[i.Uint64()]
+				ethClient, ok := clients[i.Uint64()]
 				if !ok {
 					t.Fatal("no backend for chainID", i)
 				}
-				return client
+				return ethClient
 			},
 			MailMon: mailMon,
 			DS:      db,
@@ -141,6 +140,7 @@ func NewNode(
 		MailMon:                    mailMon,
 		LoopRegistry:               plugins.NewLoopRegistry(lggr, cfg.Tracing()),
 	})
+	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, db.Close())
 	})
