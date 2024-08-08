@@ -23,7 +23,6 @@ import {EVM2EVMMultiOffRamp} from "../../offRamp/EVM2EVMMultiOffRamp.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {EVM2EVMMultiOffRampHelper} from "../helpers/EVM2EVMMultiOffRampHelper.sol";
-import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import {ConformingReceiver} from "../helpers/receivers/ConformingReceiver.sol";
@@ -2337,6 +2336,52 @@ contract EVM2EVMMultiOffRamp__releaseOrMintSingleToken is EVM2EVMMultiOffRampSet
     assertEq(startingBalance + amount, dstToken1.balanceOf(OWNER));
   }
 
+  function test_releaseOrMintToken_InvalidDataLength_Revert() public {
+    uint256 amount = 123123;
+    address token = s_sourceTokens[0];
+
+    Internal.RampTokenAmount memory tokenAmount = Internal.RampTokenAmount({
+      sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
+      destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
+      extraData: "",
+      amount: amount
+    });
+
+    // Mock the call so returns 2 slots of data
+    vm.mockCall(
+      s_destTokenBySourceToken[token], abi.encodeWithSelector(IERC20.balanceOf.selector, OWNER), abi.encode(0, 0)
+    );
+
+    vm.expectRevert(
+      abi.encodeWithSelector(EVM2EVMMultiOffRamp.InvalidDataLength.selector, Internal.MAX_BALANCE_OF_RET_BYTES, 64)
+    );
+
+    s_offRamp.releaseOrMintSingleToken(tokenAmount, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR, "");
+  }
+
+  function test_releaseOrMintToken_TokenHandlingError_BalanceOf_Revert() public {
+    uint256 amount = 123123;
+    address token = s_sourceTokens[0];
+
+    Internal.RampTokenAmount memory tokenAmount = Internal.RampTokenAmount({
+      sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
+      destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
+      extraData: "",
+      amount: amount
+    });
+
+    bytes memory revertData = "failed to balanceOf";
+
+    // Mock the call so returns 2 slots of data
+    vm.mockCallRevert(
+      s_destTokenBySourceToken[token], abi.encodeWithSelector(IERC20.balanceOf.selector, OWNER), revertData
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.TokenHandlingError.selector, revertData));
+
+    s_offRamp.releaseOrMintSingleToken(tokenAmount, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR, "");
+  }
+
   function test__releaseOrMintSingleToken_NotACompatiblePool_Revert() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
@@ -2379,7 +2424,7 @@ contract EVM2EVMMultiOffRamp__releaseOrMintSingleToken is EVM2EVMMultiOffRampSet
     s_offRamp.releaseOrMintSingleToken(tokenAmount, originalSender, OWNER, SOURCE_CHAIN_SELECTOR_1, offchainTokenData);
   }
 
-  function test__releaseOrMintSingleToken_TokenHandlingError_revert_Revert() public {
+  function test__releaseOrMintSingleToken_TokenHandlingError_transfer_Revert() public {
     address receiver = makeAddr("receiver");
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
