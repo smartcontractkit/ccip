@@ -2,6 +2,7 @@ package smoke
 
 import (
 	"fmt"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"math/big"
 	"testing"
@@ -887,7 +888,7 @@ func TestSmokeCCIPReorgBelowFinality(t *testing.T) {
 		// sending multiple request and expect all should go through though there is below finality reorg
 		err := lane.SendRequests(5, gasLimit)
 		require.NoError(t, err)
-		rs := testsetups.SetupReorgSuite(t, &log, setUpOutput, TestCfg)
+		rs := SetupReorgSuite(t, &log, setUpOutput)
 		// run below finality reorg in both source and destination chain
 		blocksBackSrc := int(rs.Cfg.SrcFinalityDepth) - rs.Cfg.FinalityDelta
 		blocksBackDst := int(rs.Cfg.DstFinalityDepth) - rs.Cfg.FinalityDelta
@@ -898,10 +899,30 @@ func TestSmokeCCIPReorgBelowFinality(t *testing.T) {
 	})
 }
 
-// Test expects to generate above finality reorg in both destination and
-// expect CCIP transaction doesn't go through successful and node detects reorg successfully
-func TestSmokeCCIPReorgAboveFinality(t *testing.T) {
+// Test creates above finality reorg at destination and
+// expects ccip transactions in-flight and the one initiated after reorg
+// doesn't go through and verifies every node is able to detect reorg.
+// Note: LogPollInterval interval is set as 1s to detect the reorg immediately
+func TestSmokeCCIPReorgAboveFinalityAtDestination(t *testing.T) {
 	t.Parallel()
+	t.Run("Above finality reorg in destination chain", func(t *testing.T) {
+		performReorgAndValidate(t, "Destination")
+	})
+}
+
+// Test creates above finality reorg at destination and
+// expects ccip transactions in-flight doesn't go through, the transaction initiated after reorg
+// shouldn't even get initiated and verifies every node is able to detect reorg.
+// Note: LogPollInterval interval is set as 1s to detect the reorg immediately
+func TestSmokeCCIPReorgAboveFinalityAtSource(t *testing.T) {
+	t.Parallel()
+	t.Run("Above finality reorg in source chain", func(t *testing.T) {
+		performReorgAndValidate(t, "Source")
+	})
+}
+
+// performReorgAndValidate is to perform the above finality reorg test
+func performReorgAndValidate(t *testing.T, network string) {
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
 	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
@@ -911,46 +932,54 @@ func TestSmokeCCIPReorgAboveFinality(t *testing.T) {
 		log.Info().Msg("No lanes found")
 		return
 	}
-
 	t.Cleanup(func() {
 		require.NoError(t, setUpOutput.TearDown())
 	})
-
+	rs := SetupReorgSuite(t, &log, setUpOutput)
 	lane := setUpOutput.Lanes[0].ForwardLane
 	log.Info().
 		Str("Source", lane.SourceNetworkName).
 		Str("Destination", lane.DestNetworkName).
-		Msg("Starting CCIP reorg test")
-	t.Run(fmt.Sprintf("CCIP reorg above finality test from network %s to network %s",
-		lane.SourceNetworkName, lane.DestNetworkName), func(t *testing.T) {
-		t.Parallel()
-		lane.Test = t
-		lane.RecordStateBeforeTransfer()
-		rs := testsetups.SetupReorgSuite(t, &log, setUpOutput, TestCfg)
-		err := lane.SendRequests(1, gasLimit)
-		require.NoError(t, err)
-		// run above finality reorg in destination chain
-		blocksBackDst := int(rs.Cfg.DstFinalityDepth) + rs.Cfg.FinalityDelta
-		//blocksBackSrc := int(rs.Cfg.SrcFinalityDepth) + rs.Cfg.FinalityDelta
-		//rs.RunReorg(rs.SrcClient, blocksBackSrc, "Source", 2*time.Second)
-		rs.RunReorg(rs.DstClient, blocksBackDst, "Destination", 2*time.Second)
-		clNodes := setUpOutput.Env.CLNodes
-		assert.Eventually(t, func() bool {
-			for _, node := range clNodes {
-				resp, _, err := node.Health()
-				require.NoError(t, err)
-				for _, d := range resp.Data {
-					if d.Attributes.Name == "EVM.2337.LogPoller" && d.Attributes.Output == "finality violated" && d.Attributes.Status == "failing" {
-						log.Info().Msg("Finality violated is reported by node")
-						return true
-					}
+		Msg("Starting ccip reorg test")
+	lane.Test = t
+	lane.RecordStateBeforeTransfer()
+	err := lane.SendRequests(1, gasLimit)
+	require.NoError(t, err)
+	logPollerName := ""
+	if network == "Destination" {
+		logPollerName = "EVM.2337.LogPoller"
+		rs.RunReorg(rs.DstClient, int(rs.Cfg.DstFinalityDepth)+rs.Cfg.FinalityDelta, network, 2*time.Second)
+	} else {
+		logPollerName = "EVM.1337.LogPoller"
+		rs.RunReorg(rs.SrcClient, int(rs.Cfg.SrcFinalityDepth)+rs.Cfg.FinalityDelta, network, 2*time.Second)
+	}
+	clNodes := setUpOutput.Env.CLNodes
+	// assert every node is detecting the reorg (LogPollInterval is set as 1s for faster detection in the test)
+	assert.Eventually(t, func() bool {
+		violationDetectedByNodeCount := 0
+		for _, node := range clNodes {
+			resp, _, err := node.Health()
+			require.NoError(t, err)
+			for _, d := range resp.Data {
+				if d.Attributes.Name == logPollerName && d.Attributes.Output == "finality violated" && d.Attributes.Status == "failing" {
+					log.Debug().Msg("Finality violated is detected by node")
+					violationDetectedByNodeCount++
 				}
 			}
-			log.Info().Msg("Finality violated is not yet reported by node")
-			return false
-		}, 3*time.Minute, 20*time.Second, "Reorg above finality depth is not detected by node")
-		lane.ValidateRequests(actions.ExpectAnyPhaseToFail(actions.WithTimeout(time.Minute)))
-	})
+		}
+		return violationDetectedByNodeCount == len(clNodes)
+	}, 3*time.Minute, 20*time.Second, "Reorg above finality depth is not detected by node")
+	// send another request and verify it fails
+	err = lane.SendRequests(1, gasLimit)
+	if network == "Source" {
+		// if it is source chain reorg, the transaction will not even be initiated
+		require.Error(t, err)
+	} else {
+		// if it is destination chain reorg, the transaction will be initiated and will fail in the process
+		require.NoError(t, err)
+	}
+
+	lane.ValidateRequests(actions.ExpectAnyPhaseToFail(actions.WithTimeout(time.Minute)))
 }
 
 // add liquidity to pools on both networks
@@ -1103,4 +1132,37 @@ func testOffRampRateLimits(t *testing.T, rateLimiterConfig contracts.RateLimiter
 		})
 	}
 
+}
+
+// SetupReorgSuite defines the setup required to perform re-org step
+func SetupReorgSuite(t *testing.T, lggr *zerolog.Logger, setupOutput *testsetups.CCIPTestSetUpOutputs) *ReorgSuite {
+	var finalitySrc uint64
+	var finalityDst uint64
+	if setupOutput.Cfg.SelectedNetworks[0].FinalityTag {
+		finalitySrc = 10
+	} else {
+		finalitySrc = setupOutput.Cfg.SelectedNetworks[0].FinalityDepth
+	}
+	if setupOutput.Cfg.SelectedNetworks[1].FinalityTag {
+		finalityDst = 10
+	} else {
+		finalityDst = setupOutput.Cfg.SelectedNetworks[1].FinalityDepth
+	}
+	var srcGethHTTPURL, dstGethHTTPURL string
+	if setupOutput.Env.LocalCluster != nil {
+		srcGethHTTPURL = setupOutput.Env.LocalCluster.EVMNetworks[0].HTTPURLs[0]
+		dstGethHTTPURL = setupOutput.Env.LocalCluster.EVMNetworks[1].HTTPURLs[0]
+	} else {
+		srcGethHTTPURL = setupOutput.Env.K8Env.URLs["source-chain_http"][0]
+		dstGethHTTPURL = setupOutput.Env.K8Env.URLs["dest-chain_http"][0]
+	}
+	rs, err := NewReorgSuite(t, lggr, &ReorgConfig{
+		SrcGethHTTPURL:   srcGethHTTPURL,
+		DstGethHTTPURL:   dstGethHTTPURL,
+		SrcFinalityDepth: finalitySrc,
+		DstFinalityDepth: finalityDst,
+		FinalityDelta:    setupOutput.Cfg.TestGroupInput.ChaosReorgProfile.FinalityDelta,
+	})
+	require.NoError(t, err)
+	return rs
 }

@@ -1,4 +1,4 @@
-package chaos
+package smoke
 
 import (
 	"fmt"
@@ -9,17 +9,15 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/client"
-	"github.com/smartcontractkit/chainlink-testing-framework/grafana"
 )
 
 // ReorgSuite is a test suite that generates reorgs on source/dest chains
 type ReorgSuite struct {
-	t             *testing.T
-	Cfg           *ReorgConfig
-	Logger        *zerolog.Logger
-	SrcClient     *client.RPCClient
-	DstClient     *client.RPCClient
-	GrafanaClient *grafana.Client
+	t         *testing.T
+	Cfg       *ReorgConfig
+	Logger    *zerolog.Logger
+	SrcClient *client.RPCClient
+	DstClient *client.RPCClient
 }
 
 // ReorgConfig is a configuration for reorg tests
@@ -34,10 +32,6 @@ type ReorgConfig struct {
 	DstFinalityDepth uint64
 	// FinalityDelta blocks to rewind below or above finality
 	FinalityDelta int
-	// ExperimentDuration experiment duration
-	ExperimentDuration time.Duration
-	// GrafanaConfig is common Grafana config
-	*GrafanaConfig
 }
 
 // Validate validates ReorgConfig params
@@ -48,7 +42,7 @@ func (rc *ReorgConfig) Validate() error {
 			rc.FinalityDelta, rc.SrcFinalityDepth, rc.DstFinalityDepth,
 		)
 	}
-	return rc.GrafanaConfig.Validate()
+	return nil
 }
 
 // NewReorgSuite creates new reorg suite with source/dest RPC clients, works only with Geth
@@ -57,12 +51,11 @@ func NewReorgSuite(t *testing.T, lggr *zerolog.Logger, cfg *ReorgConfig) (*Reorg
 		return nil, err
 	}
 	return &ReorgSuite{
-		t:             t,
-		Cfg:           cfg,
-		Logger:        lggr,
-		SrcClient:     client.NewRPCClient(cfg.SrcGethHTTPURL),
-		DstClient:     client.NewRPCClient(cfg.DstGethHTTPURL),
-		GrafanaClient: grafana.NewGrafanaClient(cfg.GrafanaURL, cfg.GrafanaToken),
+		t:         t,
+		Cfg:       cfg,
+		Logger:    lggr,
+		SrcClient: client.NewRPCClient(cfg.SrcGethHTTPURL),
+		DstClient: client.NewRPCClient(cfg.DstGethHTTPURL),
 	}, nil
 }
 
@@ -89,14 +82,6 @@ func (r *ReorgSuite) RunReorg(client *client.RPCClient, blocksBack int, network 
 			Int64("Number", blockNumber).
 			Str("Network", network).
 			Msg("Block number after rewinding")
-		err = PostGrafanaAnnotation(
-			r.Logger,
-			r.GrafanaClient,
-			r.Cfg.dashboardUID,
-			fmt.Sprintf("rewinded %s chain for %d blocks back, finality in source is: %d and finality in destination is: %d",
-				network, blocksBack, r.Cfg.SrcFinalityDepth, r.Cfg.SrcFinalityDepth),
-			nil,
-		)
 		assert.NoError(r.t, err)
 	}()
 }

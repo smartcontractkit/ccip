@@ -48,6 +48,7 @@ DBArgs = ['shared_buffers=1536MB', 'effective_cache_size=4096MB', 'work_mem=64MB
 
 [CCIP.Env.NewCLCluster.Common]
 CommonChainConfigTOML = """
+LogPollInterval = '1s'
 [HeadTracker]
 HistoryDepth = 30
 
@@ -56,19 +57,10 @@ PriceMax = '200 gwei'
 LimitDefault = 6000000
 FeeCapDefault = '200 gwei'
 """
-#[CCIP.Groups.load]
-#BiDirectionalLane = true
-#[CCIP.Groups.load.LoadProfile]
-#RequestPerUnitTime = [1]          # number of ccip requests to be sent per unit time
-#TimeUnit = '10s'                  # unit of time for RequestPerUnitTime
-#TestDuration = '10m'              # load test duration, not used for smoke tests
-#WaitBetweenChaosDuringLoad = '2m' # Duration to wait between each chaos injection during load test; only valid for chaos tests
-#NetworkChaosDelay = '100ms'       # Duration for network chaos delay; only valid for chaos tests using network chaos
-#FailOnFirstErrorInLoad = true
 
 [CCIP.Groups.smoke]
 BiDirectionalLane = true
-PhaseTimeout = '5m'       # Duration to wait for the each phase validation(SendRequested, Commit, RMN Blessing, Execution) to time-out.
+PhaseTimeout = '3m'       # Duration to wait for the each phase validation(SendRequested, Commit, RMN Blessing, Execution) to time-out.
 LocalCluster = false
 
 [CCIP.Groups.smoke.ChaosReorgProfile]
