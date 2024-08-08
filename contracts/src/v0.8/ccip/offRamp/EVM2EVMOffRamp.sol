@@ -22,6 +22,8 @@ import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/ERC165Checker.sol";
+import "../libraries/Internal.sol";
+import "../libraries/Internal.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
@@ -234,24 +236,27 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     uint256 numMsgs = report.messages.length;
     if (numMsgs != gasLimitOverrides.length) revert ManualExecutionGasLimitMismatch();
     for (uint256 i = 0; i < numMsgs; ++i) {
-      uint256 newLimit = gasLimitOverrides[i].receiverExecutionGasLimit;
+      Internal.EVM2EVMMessage memory message = report.messages[i];
+      GasLimitOverride memory gasLimitOverride = gasLimitOverrides[i];
+
+      uint256 newLimit = gasLimitOverride.receiverExecutionGasLimit;
       // Checks to ensure message cannot be executed with less gas than specified.
       if (newLimit != 0) {
-        if (newLimit < report.messages[i].gasLimit) {
+        if (newLimit < message.gasLimit) {
           revert InvalidManualExecutionGasLimit(i, newLimit);
         }
       }
 
-      if (report.messages[i].tokenAmounts.length != gasLimitOverrides[i].tokenGasOverrides.length) {
-        revert DestinationGasAmountCountMismatch(report.messages[i].messageId, report.messages[i].sequenceNumber);
+      if (message.tokenAmounts.length != gasLimitOverride.tokenGasOverrides.length) {
+        revert DestinationGasAmountCountMismatch(message.messageId, message.sequenceNumber);
       }
 
-      bytes[] memory encodedSourceTokenData = report.messages[i].sourceTokenData;
+      bytes[] memory encodedSourceTokenData = message.sourceTokenData;
 
-      for (uint256 j = 0; j < report.messages[i].tokenAmounts.length; ++j) {
+      for (uint256 j = 0; j < message.tokenAmounts.length; ++j) {
         Internal.SourceTokenData memory sourceTokenData =
           abi.decode(encodedSourceTokenData[i], (Internal.SourceTokenData));
-        uint256 tokenGasOverride = gasLimitOverrides[i].tokenGasOverrides[j];
+        uint256 tokenGasOverride = gasLimitOverride.tokenGasOverrides[j];
         if (tokenGasOverride != 0 && tokenGasOverride < sourceTokenData.destGasAmount) {
           revert InvalidTokenGasOverride(j, tokenGasOverride);
         }
