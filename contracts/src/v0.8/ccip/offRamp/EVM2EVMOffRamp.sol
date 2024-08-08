@@ -50,6 +50,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
   error TokenHandlingError(bytes err);
+  error ReleaseOrMintBalanceMismatch(uint256 expected, uint256 actual);
   error EmptyReport();
   error CursedByRMN();
   error InvalidMessageId();
@@ -611,6 +612,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       revert NotACompatiblePool(localPoolAddress);
     }
 
+    // We retrieve the local token balance of the receiver before the pool call.
     (bool success, bytes memory returnData, uint256 gasUsed) = CallWithExactGas._callWithExactGasSafeReturnData(
       abi.encodeCall(IERC20.balanceOf, (receiver)),
       localToken,
@@ -621,8 +623,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     if (!success) revert TokenHandlingError(returnData);
 
     // If the call was successful, the returnData should contain only the pre-balance.
-    if (returnData.length != 32) {
-      revert InvalidDataLength(32, returnData.length);
+    if (returnData.length != Internal.MAX_BALANCE_OF_RET_BYTES) {
+      revert InvalidDataLength(Internal.MAX_BALANCE_OF_RET_BYTES, returnData.length);
     }
     uint256 balancePre = abi.decode(returnData, (uint256));
 
@@ -671,13 +673,12 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
     if (!success) revert TokenHandlingError(returnData);
     // If the call was successful, the returnData should contain only the post-balance.
-    if (returnData.length != 32) {
-      revert InvalidDataLength(32, returnData.length);
+    if (returnData.length != Internal.MAX_BALANCE_OF_RET_BYTES) {
+      revert InvalidDataLength(Internal.MAX_BALANCE_OF_RET_BYTES, returnData.length);
     }
-    uint256 balancePost = abi.decode(returnData, (uint256));
-
-    if (balancePost - balancePre != localAmount) {
-      revert TokenHandlingError("Balance mismatch");
+    uint256 transferredAmount = abi.decode(returnData, (uint256)) - balancePre;
+    if (transferredAmount != localAmount) {
+      revert ReleaseOrMintBalanceMismatch(localAmount, transferredAmount);
     }
 
     return Client.EVMTokenAmount({token: localToken, amount: localAmount});
