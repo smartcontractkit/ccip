@@ -74,7 +74,7 @@ func MatchContractVersionsOrAbove(requiredContractVersions map[Name]Version) err
 }
 
 // NeedTokenAdminRegistry checks if token admin registry is needed for the current version of ccip
-// if the version is less than 1.5.0-dev, then token admin registry is not needed
+// if the version is less than 1.5.0, then token admin registry is not needed
 func NeedTokenAdminRegistry() bool {
 	return MatchContractVersionsOrAbove(map[Name]Version{
 		TokenPoolContract: V1_5_0_dev,
@@ -1399,7 +1399,8 @@ func NewCommitOffchainConfig(
 	ExecGasPriceDeviationPPB uint32,
 	TokenPriceHeartBeat config.Duration,
 	TokenPriceDeviationPPB uint32,
-	InflightCacheExpiry config.Duration) (ccipconfig.OffchainConfig, error) {
+	InflightCacheExpiry config.Duration,
+	priceReportingDisabled bool) (ccipconfig.OffchainConfig, error) {
 	switch VersionMap[CommitStoreContract] {
 	case Latest:
 		return testhelpers.NewCommitOffchainConfig(
@@ -1409,6 +1410,7 @@ func NewCommitOffchainConfig(
 			TokenPriceHeartBeat,
 			TokenPriceDeviationPPB,
 			InflightCacheExpiry,
+			priceReportingDisabled,
 		), nil
 	case V1_2_0:
 		return testhelpers_1_4_0.NewCommitOffchainConfig(
@@ -1418,6 +1420,7 @@ func NewCommitOffchainConfig(
 			TokenPriceHeartBeat,
 			TokenPriceDeviationPPB,
 			InflightCacheExpiry,
+			priceReportingDisabled,
 		), nil
 	default:
 		return nil, fmt.Errorf("version not supported: %s", VersionMap[CommitStoreContract])

@@ -33,7 +33,6 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
 
-  error AlreadyExecuted(uint64 sourceChainSelector, uint64 sequenceNumber);
   error ZeroChainSelectorNotAllowed();
   error ExecutionError(bytes32 messageId, bytes err);
   error SourceChainNotEnabled(uint64 sourceChainSelector);
@@ -48,6 +47,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
   error TokenHandlingError(bytes err);
+  error ReleaseOrMintBalanceMismatch(uint256 amountReleased, uint256 balancePre, uint256 balancePost);
   error EmptyReport();
   error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
@@ -89,14 +89,16 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp)
   struct SourceChainConfig {
-    bool isEnabled; // ──────────╮  Flag whether the source chain is enabled or not
+    IRouter router; // ──────────╮  Local router to use for messages coming from this source chain
+    bool isEnabled; //           |  Flag whether the source chain is enabled or not
     uint64 minSeqNr; // ─────────╯  The min sequence number expected for future messages
     bytes onRamp; // OnRamp address on the source chain
   }
 
   /// @notice SourceChainConfig update args scoped to one source chain
   struct SourceChainConfigArgs {
-    uint64 sourceChainSelector; //  ───╮  Source chain selector of the config to update
+    IRouter router; // ────────────────╮  Local router to use for messages coming from this source chain
+    uint64 sourceChainSelector; //     |  Source chain selector of the config to update
     bool isEnabled; // ────────────────╯  Flag whether the source chain is enabled or not
     bytes onRamp; // OnRamp address on the source chain
   }
@@ -104,12 +106,11 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @notice Dynamic offRamp config
   /// @dev since OffRampConfig is part of OffRampConfigChanged event, if changing it, we should update the ABI on Atlas
   struct DynamicConfig {
-    address router; // ─────────────────────────────────╮ Router address
+    address priceRegistry; // ──────────────────────────╮ Price registry address on the local chain
     uint32 permissionLessExecutionThresholdSeconds; //  │ Waiting time before manual execution is enabled
     uint32 maxTokenTransferGas; //                      │ Maximum amount of gas passed on to token `transfer` call
     uint32 maxPoolReleaseOrMintGas; // ─────────────────╯ Maximum amount of gas passed on to token pool when calling releaseOrMint
     address messageValidator; // Optional message validator to validate incoming messages (zero address = no validator)
-    address priceRegistry; // Price registry address on the local chain
   }
 
   /// @notice a sequenceNumber interval
@@ -495,7 +496,10 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// its execution and enforce atomicity among successful message processing and token transfer.
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts
   /// (for example smart contract wallets) without an associated message.
-  function executeSingleMessage(Internal.Any2EVMRampMessage memory message, bytes[] memory offchainTokenData) external {
+  function executeSingleMessage(
+    Internal.Any2EVMRampMessage memory message,
+    bytes[] calldata offchainTokenData
+  ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
@@ -534,9 +538,9 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
-    (bool success, bytes memory returnData,) = IRouter(s_dynamicConfig.router).routeMessage(
-      any2EvmMessage, Internal.GAS_FOR_CALL_EXACT_CHECK, message.gasLimit, message.receiver
-    );
+    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.header.sourceChainSelector]
+      .router
+      .routeMessage(any2EvmMessage, Internal.GAS_FOR_CALL_EXACT_CHECK, message.gasLimit, message.receiver);
     // If CCIP receiver execution is not successful, revert the call including token transfers
     if (!success) revert ReceiverError(returnData);
   }
@@ -729,6 +733,10 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         revert ZeroChainSelectorNotAllowed();
       }
 
+      if (address(sourceConfigUpdate.router) == address(0)) {
+        revert ZeroAddressNotAllowed();
+      }
+
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
       bytes memory currentOnRamp = currentConfig.onRamp;
       bytes memory newOnRamp = sourceConfigUpdate.onRamp;
@@ -746,8 +754,8 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         revert InvalidStaticConfig(sourceChainSelector);
       }
 
-      // The only dynamic config is the isEnabled flag
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
+      currentConfig.router = sourceConfigUpdate.router;
       emit SourceChainConfigSet(sourceChainSelector, currentConfig);
     }
   }
@@ -761,7 +769,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @notice Sets the dynamic config.
   /// @param dynamicConfig The dynamic config.
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
-    if (dynamicConfig.priceRegistry == address(0) || dynamicConfig.router == address(0)) {
+    if (dynamicConfig.priceRegistry == address(0)) {
       revert ZeroAddressNotAllowed();
     }
 
@@ -818,12 +826,17 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       revert NotACompatiblePool(localPoolAddress);
     }
 
+    // We retrieve the local token balance of the receiver before the pool call.
+    (uint256 balancePre, uint256 gasLeft) =
+      _getBalanceOfReceiver(receiver, localToken, s_dynamicConfig.maxPoolReleaseOrMintGas);
+
     // We determined that the pool address is a valid EVM address, but that does not mean the code at this
     // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location
     // contains a contract. If it doesn't it reverts with a known error, which we catch gracefully.
     // We call the pool with exact gas to increase resistance against malicious tokens or token pools.
     // We protects against return data bombs by capping the return data size at MAX_RET_BYTES.
-    (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
+    (bool success, bytes memory returnData, uint256 gasUsedReleaseOrMint) = CallWithExactGas
+      ._callWithExactGasSafeReturnData(
       abi.encodeCall(
         IPoolV1.releaseOrMint,
         Pool.ReleaseOrMintInV1({
@@ -838,7 +851,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         })
       ),
       localPoolAddress,
-      s_dynamicConfig.maxPoolReleaseOrMintGas,
+      gasLeft,
       Internal.GAS_FOR_CALL_EXACT_CHECK,
       Internal.MAX_RET_BYTES
     );
@@ -850,21 +863,44 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     if (returnData.length != Pool.CCIP_POOL_V1_RET_BYTES) {
       revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
     }
+
     uint256 localAmount = abi.decode(returnData, (uint256));
-    // Since token pools send the tokens to the msg.sender, which is this offRamp, we need to
-    // transfer them to the final receiver. We use the _callWithExactGasSafeReturnData function because
-    // the token contracts are not considered trusted.
-    (success, returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
-      abi.encodeCall(IERC20.transfer, (receiver, localAmount)),
-      localToken,
-      s_dynamicConfig.maxTokenTransferGas,
+    // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case
+    // of a lockRelease pool.
+    if (receiver != localPoolAddress) {
+      (uint256 balancePost,) = _getBalanceOfReceiver(receiver, localToken, gasLeft - gasUsedReleaseOrMint);
+
+      // First we check if the subtraction would result in an underflow to ensure we revert with a clear error
+      if (balancePost < balancePre || balancePost - balancePre != localAmount) {
+        revert ReleaseOrMintBalanceMismatch(localAmount, balancePre, balancePost);
+      }
+    }
+
+    return Client.EVMTokenAmount({token: localToken, amount: localAmount});
+  }
+
+  function _getBalanceOfReceiver(
+    address receiver,
+    address token,
+    uint256 gasLimit
+  ) internal returns (uint256 balance, uint256 gasLeft) {
+    (bool success, bytes memory returnData, uint256 gasUsed) = CallWithExactGas._callWithExactGasSafeReturnData(
+      abi.encodeCall(IERC20.balanceOf, (receiver)),
+      token,
+      gasLimit,
       Internal.GAS_FOR_CALL_EXACT_CHECK,
       Internal.MAX_RET_BYTES
     );
-
     if (!success) revert TokenHandlingError(returnData);
 
-    return Client.EVMTokenAmount({token: localToken, amount: localAmount});
+    // If the call was successful, the returnData should contain only the balance.
+    if (returnData.length != Internal.MAX_BALANCE_OF_RET_BYTES) {
+      revert InvalidDataLength(Internal.MAX_BALANCE_OF_RET_BYTES, returnData.length);
+    }
+
+    // Return the decoded balance, which cannot fail as we checked the length, and the gas that is left
+    // after this call.
+    return (abi.decode(returnData, (uint256)), gasLimit - gasUsed);
   }
 
   /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
@@ -882,7 +918,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
-    bytes[] memory offchainTokenData
+    bytes[] calldata offchainTokenData
   ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
     destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
