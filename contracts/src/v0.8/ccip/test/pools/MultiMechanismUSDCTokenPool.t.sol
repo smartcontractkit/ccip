@@ -250,7 +250,7 @@ contract USDCTokenPoolAltMechanismTests is USDCTokenPoolSetup {
       address(s_token),
       amount,
       address(s_usdcTokenPool),
-      expectedDomain.allowedCaller,
+      receiver,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
