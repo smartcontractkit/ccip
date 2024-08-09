@@ -1,4 +1,4 @@
-package smoke
+package actions
 
 import (
 	"fmt"

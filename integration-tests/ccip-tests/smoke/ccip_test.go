@@ -1137,7 +1137,7 @@ func testOffRampRateLimits(t *testing.T, rateLimiterConfig contracts.RateLimiter
 }
 
 // SetupReorgSuite defines the setup required to perform re-org step
-func SetupReorgSuite(t *testing.T, lggr *zerolog.Logger, setupOutput *testsetups.CCIPTestSetUpOutputs) *ReorgSuite {
+func SetupReorgSuite(t *testing.T, lggr *zerolog.Logger, setupOutput *testsetups.CCIPTestSetUpOutputs) *actions.ReorgSuite {
 	var finalitySrc uint64
 	var finalityDst uint64
 	if setupOutput.Cfg.SelectedNetworks[0].FinalityTag {
@@ -1158,7 +1158,7 @@ func SetupReorgSuite(t *testing.T, lggr *zerolog.Logger, setupOutput *testsetups
 		srcGethHTTPURL = setupOutput.Env.K8Env.URLs["source-chain_http"][0]
 		dstGethHTTPURL = setupOutput.Env.K8Env.URLs["dest-chain_http"][0]
 	}
-	rs, err := NewReorgSuite(t, lggr, &ReorgConfig{
+	rs, err := actions.NewReorgSuite(t, lggr, &actions.ReorgConfig{
 		SrcGethHTTPURL:   srcGethHTTPURL,
 		DstGethHTTPURL:   dstGethHTTPURL,
 		SrcFinalityDepth: finalitySrc,
