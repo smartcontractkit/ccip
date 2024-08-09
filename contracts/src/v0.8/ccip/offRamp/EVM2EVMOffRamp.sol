@@ -102,8 +102,12 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     address destToken;
   }
 
+  /// @notice Gas overrides for manual exec, the number of token overrides must match the number of tokens in the msg.
   struct GasLimitOverride {
+    /// @notice Gas limit override for the call to the receiver contract. A value of 0 indicates no override and is valid.
     uint256 receiverExecutionGasLimit;
+    /// @notice Gas limit override per token in the message. Must be same length as tokenAmounts. A value of 0 indicates no
+    /// override and is valid.
     uint32[] tokenGasOverrides;
   }
 
@@ -272,6 +276,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   /// @notice Entrypoint for execution, called by the OCR network
   /// @dev Expects an encoded ExecutionReport
+  /// @dev Supplies no GasLimitOverrides as the DON will only execute with the original gas limits.
   function _report(bytes calldata report) internal override {
     _execute(abi.decode(report, (Internal.ExecutionReport)), new GasLimitOverride[](0));
   }
