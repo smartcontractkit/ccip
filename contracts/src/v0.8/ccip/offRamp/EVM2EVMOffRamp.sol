@@ -46,8 +46,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error ManualExecutionNotYetEnabled();
   error ManualExecutionGasLimitMismatch();
   error DestinationGasAmountCountMismatch(bytes32 messageId, uint64 sequenceNumber);
-  error InvalidManualExecutionGasLimit(uint256 index, uint256 newLimit);
-  error InvalidTokenGasOverride(uint256 index, uint256 tokenGasOverride);
+  error InvalidManualExecutionGasLimit(bytes32 messageId, uint256 newLimit);
+  error InvalidTokenGasOverride(bytes32 messageId, uint256 tokenIndex, uint256 tokenGasOverride);
   error RootNotCommitted();
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
@@ -241,7 +241,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // Checks to ensure message cannot be executed with less gas than specified.
       if (newLimit != 0) {
         if (newLimit < message.gasLimit) {
-          revert InvalidManualExecutionGasLimit(i, newLimit);
+          revert InvalidManualExecutionGasLimit(message.messageId, newLimit);
         }
       }
 
@@ -255,8 +255,13 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         Internal.SourceTokenData memory sourceTokenData =
           abi.decode(encodedSourceTokenData[i], (Internal.SourceTokenData));
         uint256 tokenGasOverride = gasLimitOverride.tokenGasOverrides[j];
+
+        // The gas limit can not be lowered as that could cause the message to fail. If manual execution is done
+        // from an UNTOUCHED state and we would allow lower gas limit, anyone could grief by executing the message with
+        // lower gas limit than the DON would have used. This results in the message being marked FAILURE and the DON
+        // would not attempt it with the correct gas limit.
         if (tokenGasOverride != 0 && tokenGasOverride < sourceTokenData.destGasAmount) {
-          revert InvalidTokenGasOverride(j, tokenGasOverride);
+          revert InvalidTokenGasOverride(message.messageId, j, tokenGasOverride);
         }
       }
     }
