@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -276,16 +277,23 @@ func (p *priceService) observePriceUpdates(
 		return nil, nil, fmt.Errorf("gasPriceEstimator and/or destPriceRegistry is not set yet")
 	}
 
-	return p.generatePriceUpdates(ctx, lggr)
+	sortedLaneTokens, _, err := ccipcommon.GetFilteredSortedLaneTokens(ctx, p.offRampReader, p.destPriceRegistryReader, p.priceGetter)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get filtered sorted lane tokens: %w", err)
+	}
+
+	return p.generatePriceUpdates(ctx, lggr, sortedLaneTokens)
 }
 
 // All prices are USD ($1=1e18) denominated. All prices must be not nil.
 // Jobspec should have the list of destTokens (ARL, Bips, etc) and the sourceNative token.
 // Not respecting this will error out as we need to fetch the token decimals for all tokens expect sourceNative.
+// sortedLaneTokens is only used to check if sourceNative has the same address as one of the dest tokens.
 // Return token prices should contain the exact same tokens as in tokenDecimals.
 func (p *priceService) generatePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
+	sortedLaneTokens []cciptypes.Address,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[cciptypes.Address]*big.Int, err error) {
 	// notice USD is in 1e18 scale, i.e. $1 = 1e18
 	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, []cciptypes.Address{})
@@ -299,10 +307,13 @@ func (p *priceService) generatePriceUpdates(
 		return nil, nil, fmt.Errorf("missing source native (%s) price", p.sourceNative)
 	}
 
-	// Filter out source native token from token prices to get only the destination tokens
+	// Check for case where sourceNative has same address as one of the dest tokens (example: WETH in Base and Optimism)
+	hasSameDestAddress := ccipcommon.Contains(sortedLaneTokens, p.sourceNative)
+
+	// Filter out source native token only if it has the same address as one of the dest tokens
 	var destTokens []cciptypes.Address
 	for key := range rawTokenPricesUSD {
-		if key != p.sourceNative {
+		if hasSameDestAddress || key != p.sourceNative {
 			destTokens = append(destTokens, key)
 		}
 	}

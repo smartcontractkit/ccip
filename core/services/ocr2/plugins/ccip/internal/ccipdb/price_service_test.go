@@ -230,8 +230,8 @@ func TestPriceService_generatePriceUpdates(t *testing.T) {
 		expErr               bool
 	}{
 		{
-			name: "base",
-			tokenDecimals: map[cciptypes.Address]uint8{ // only destination tokens (source native token should not be included)
+			name: "base case with src native token not equals to dest token",
+			tokenDecimals: map[cciptypes.Address]uint8{ // only destination tokens
 				tokens[1]: 18,
 				tokens[2]: 12,
 			},
@@ -253,15 +253,26 @@ func TestPriceService_generatePriceUpdates(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name: "price getter returned an error",
+			name: "base case with src native token equals to dest token",
 			tokenDecimals: map[cciptypes.Address]uint8{
 				tokens[0]: 18,
-				tokens[1]: 18,
+				tokens[1]: 12,
 			},
-			sourceNativeToken:   tokens[0],
-			priceGetterRespData: nil,
-			priceGetterRespErr:  fmt.Errorf("some random network error"),
-			expErr:              true,
+			sourceNativeToken: tokens[0],
+			priceGetterRespData: map[cciptypes.Address]*big.Int{
+				tokens[0]: val1e18(100),
+				tokens[1]: val1e18(200),
+			},
+			priceGetterRespErr:   nil,
+			feeEstimatorRespFee:  big.NewInt(10),
+			feeEstimatorRespErr:  nil,
+			maxGasPrice:          1e18,
+			expSourceGasPriceUSD: big.NewInt(1000),
+			expTokenPricesUSD: map[cciptypes.Address]*big.Int{
+				tokens[0]: val1e18(100),
+				tokens[1]: val1e18(200 * 1e6),
+			},
+			expErr: false,
 		},
 		{
 			name: "price getter skipped a requested price",
@@ -293,6 +304,7 @@ func TestPriceService_generatePriceUpdates(t *testing.T) {
 		{
 			name: "dynamic fee cap overrides legacy",
 			tokenDecimals: map[cciptypes.Address]uint8{
+				tokens[0]: 18,
 				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[0],
@@ -306,6 +318,7 @@ func TestPriceService_generatePriceUpdates(t *testing.T) {
 			maxGasPrice:          1e18,
 			expSourceGasPriceUSD: big.NewInt(2000),
 			expTokenPricesUSD: map[cciptypes.Address]*big.Int{
+				tokens[0]: val1e18(100),
 				tokens[1]: val1e18(200),
 			},
 			expErr: false,
@@ -313,14 +326,13 @@ func TestPriceService_generatePriceUpdates(t *testing.T) {
 		{
 			name: "nil gas price",
 			tokenDecimals: map[cciptypes.Address]uint8{
+				tokens[0]: 18,
 				tokens[1]: 18,
-				tokens[2]: 18,
 			},
 			sourceNativeToken: tokens[0],
 			priceGetterRespData: map[cciptypes.Address]*big.Int{
 				tokens[0]: val1e18(100),
 				tokens[1]: val1e18(200),
-				tokens[2]: val1e18(300),
 			},
 			feeEstimatorRespFee: nil,
 			maxGasPrice:         1e18,
@@ -378,7 +390,7 @@ func TestPriceService_generatePriceUpdates(t *testing.T) {
 			priceService.gasPriceEstimator = gasPriceEstimator
 			priceService.destPriceRegistryReader = destPriceReg
 
-			sourceGasPriceUSD, tokenPricesUSD, err := priceService.generatePriceUpdates(context.Background(), lggr)
+			sourceGasPriceUSD, tokenPricesUSD, err := priceService.generatePriceUpdates(context.Background(), lggr, destTokens)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -659,8 +671,8 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 	sourceNative := cciptypes.Address("0x123")
 	feeTokens := []cciptypes.Address{"0x234"}
 	rampTokens := []cciptypes.Address{"0x345", "0x456"}
-	// rampFilteredTokens := []cciptypes.Address{"0x345"}
-	// rampFilterOutTokens := []cciptypes.Address{"0x456"}
+	rampFilteredTokens := []cciptypes.Address{"0x345"}
+	rampFilterOutTokens := []cciptypes.Address{"0x456"}
 
 	laneTokens := []cciptypes.Address{"0x234", "0x345"}
 	laneTokenDecimals := []uint8{18, 18}
@@ -682,7 +694,7 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 		tokens[1]: val1e18(tokenPrices[1]),
 		tokens[2]: val1e18(tokenPrices[2]),
 	}, nil)
-	// priceGetter.On("FilterConfiguredTokens", mock.Anything, rampTokens).Return(rampFilteredTokens, rampFilterOutTokens, nil)
+	priceGetter.On("FilterConfiguredTokens", mock.Anything, rampTokens).Return(rampFilteredTokens, rampFilterOutTokens, nil)
 
 	offRampReader := ccipdatamocks.NewOffRampReader(t)
 	offRampReader.On("GetTokens", mock.Anything).Return(cciptypes.OffRampTokens{
