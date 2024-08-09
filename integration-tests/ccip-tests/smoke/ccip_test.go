@@ -906,7 +906,7 @@ func TestSmokeCCIPReorgBelowFinality(t *testing.T) {
 func TestSmokeCCIPReorgAboveFinalityAtDestination(t *testing.T) {
 	t.Parallel()
 	t.Run("Above finality reorg in destination chain", func(t *testing.T) {
-		performReorgAndValidate(t, "Destination")
+		performAboveFinalityReorgAndValidate(t, "Destination")
 	})
 }
 
@@ -917,12 +917,14 @@ func TestSmokeCCIPReorgAboveFinalityAtDestination(t *testing.T) {
 func TestSmokeCCIPReorgAboveFinalityAtSource(t *testing.T) {
 	t.Parallel()
 	t.Run("Above finality reorg in source chain", func(t *testing.T) {
-		performReorgAndValidate(t, "Source")
+		performAboveFinalityReorgAndValidate(t, "Source")
 	})
 }
 
-// performReorgAndValidate is to perform the above finality reorg test
-func performReorgAndValidate(t *testing.T, network string) {
+// performAboveFinalityReorgAndValidate is to perform the above finality reorg test
+func performAboveFinalityReorgAndValidate(t *testing.T, network string) {
+	t.Helper()
+
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
 	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
@@ -947,10 +949,10 @@ func performReorgAndValidate(t *testing.T, network string) {
 	require.NoError(t, err)
 	logPollerName := ""
 	if network == "Destination" {
-		logPollerName = "EVM.2337.LogPoller"
+		logPollerName = fmt.Sprintf("EVM.%d.LogPoller", lane.DestChain.GetChainID())
 		rs.RunReorg(rs.DstClient, int(rs.Cfg.DstFinalityDepth)+rs.Cfg.FinalityDelta, network, 2*time.Second)
 	} else {
-		logPollerName = "EVM.1337.LogPoller"
+		logPollerName = fmt.Sprintf("EVM.%d.LogPoller", lane.SourceChain.GetChainID())
 		rs.RunReorg(rs.SrcClient, int(rs.Cfg.SrcFinalityDepth)+rs.Cfg.FinalityDelta, network, 2*time.Second)
 	}
 	clNodes := setUpOutput.Env.CLNodes
