@@ -1,0 +1,161 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity 0.8.24;
+
+import {ILiquidityContainer} from "../../../liquiditymanager/interfaces/ILiquidityContainer.sol";
+import {ITokenMessenger} from "../USDC/ITokenMessenger.sol";
+
+import {Pool} from "../../libraries/Pool.sol";
+
+import {TokenPool} from "../TokenPool.sol";
+import {USDCTokenPool} from "../USDC/USDCTokenPool.sol";
+import {MultiMechanismPoolManager} from "./MultiMechanismPoolManager.sol";
+import {USDCBridgeMigrator} from "./USDCBridgeMigrator.sol";
+
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+
+/// @notice A token pool for USDC which uses CCTP for supported-chains and Lock-Release for all others
+/// @dev The functionality from LockReleaseTokenPool.sol has been duplicated due to lack of compiler support for shared
+/// constructors between parents
+/// @dev The primary token mechanism in this pool is Burn-Mint with CCTP, with Lock-Release as the
+/// secondary, opt-in mechanism for chains not currently supporting CCTP.
+contract MultiMechanismUSDCTokenPool is USDCTokenPool, MultiMechanismPoolManager, USDCBridgeMigrator {
+  using SafeERC20 for IERC20;
+
+  /// @notice The address of the rebalancer.
+  /// External liquidity is not required when there is one canonical token deployed to a chain,
+  /// and CCIP is facilitating mint/burn on all the other chains, in which case the invariant
+  /// balanceOf(pool) on home chain >= sum(totalSupply(mint/burn "wrapped" token) on all remote chains) should always hold
+  address internal s_rebalancer;
+
+  error LanePausedForCCTPMigration(uint64 remoteChainSelector);
+
+  constructor(
+    ITokenMessenger tokenMessenger,
+    IERC20 token,
+    address[] memory allowlist,
+    address rmnProxy,
+    address router
+  ) USDCTokenPool(tokenMessenger, token, allowlist, rmnProxy, router) USDCBridgeMigrator(address(token), router) {}
+
+  /// @notice Locks the token in the pool
+  /// @dev The _validateLockOrBurn check is an essential security check
+  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
+    public
+    virtual
+    override
+    returns (Pool.LockOrBurnOutV1 memory)
+  {
+    // If the alternative mechanism (L/R) for chains which have it enabled
+    if (shouldUseAltMechForOutgoingMessage(lockOrBurnIn.remoteChainSelector)) {
+      return _altMechOutgoingMessage(lockOrBurnIn);
+    } else {
+      // Otherwise, use native CCTP functionality
+      return super.lockOrBurn(lockOrBurnIn);
+    }
+  }
+
+  /// @notice Release tokens from the pool to the recipient
+  /// @dev The _validateReleaseOrMint check is an essential security check
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    public
+    virtual
+    override
+    returns (Pool.ReleaseOrMintOutV1 memory)
+  {
+    // TODO: Determine which struct field for token Data should be used in this function
+    if (shouldUseAltMechForIncomingMessage(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.offchainTokenData)) {
+      return _altMechIncomingMessage(releaseOrMintIn);
+    } else {
+      return super.releaseOrMint(releaseOrMintIn);
+    }
+  }
+
+  /// @notice Contains the alternative mechanism for incoming tokens, in this implementation is "Release" incoming tokens
+  function _altMechIncomingMessage(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    internal
+    virtual
+    returns (Pool.ReleaseOrMintOutV1 memory)
+  {
+    _validateReleaseOrMint(releaseOrMintIn);
+
+    // Since the storage slot is increased whenever liquidity is provided, as long as
+    // sufficient tokens exist to release to the receiver, this will never underflow
+    s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.amount;
+
+    // Release to the offRamp, which forwards it to the recipient
+    getToken().safeTransfer(msg.sender, releaseOrMintIn.amount);
+
+    emit Released(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
+
+    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
+  }
+
+  /// @notice Contains the alternative mechanism, in this implementation is "Lock" on outgoing tokens
+  function _altMechOutgoingMessage(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
+    internal
+    virtual
+    returns (Pool.LockOrBurnOutV1 memory)
+  {
+    _validateLockOrBurn(lockOrBurnIn);
+
+    // Increase internal accounting of locked tokens for burnLockedUSDC() migration
+    s_lockedTokensByChainSelector[lockOrBurnIn.remoteChainSelector] += lockOrBurnIn.amount;
+
+    emit Locked(msg.sender, lockOrBurnIn.amount);
+
+    return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+  }
+
+  /// @notice Circle's migration policies requires a pausable supply-lock during the migration process.
+  /// This override adds an additional condition to valid lockOrBurns that ensures the destination chain
+  /// is not currently undergoing a migration by reverting, as well as all other validations
+  function _validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn) internal override {
+    if (s_proposedUSDCMigrationChain != 0 && s_proposedUSDCMigrationChain == lockOrBurnIn.remoteChainSelector) {
+      revert LanePausedForCCTPMigration(s_proposedUSDCMigrationChain);
+    }
+
+    super._validateLockOrBurn(lockOrBurnIn);
+  }
+
+  /// @notice Gets LiquidityManager, can be address(0) if none is configured.
+  /// @return The current liquidity manager.
+  function getRebalancer() external view returns (address) {
+    return s_rebalancer;
+  }
+
+  /// @notice Sets the LiquidityManager address.
+  /// @dev Only callable by the owner.
+  function setRebalancer(address rebalancer) external onlyOwner {
+    s_rebalancer = rebalancer;
+  }
+
+  /// @notice Adds liquidity to the pool. The tokens should be approved first.
+  /// @param amount The amount of liquidity to provide.
+  /// @param remoteChainSelector The chain for which liquidity is provided to. Necessary to ensure there's accurate
+  /// parity between locked USDC in this contract and the circulating supply on the remote chain
+  function provideLiquidity(uint64 remoteChainSelector, uint256 amount) external {
+    if (s_rebalancer != msg.sender) revert TokenPool.Unauthorized(msg.sender);
+
+    s_lockedTokensByChainSelector[remoteChainSelector] += amount;
+
+    i_token.safeTransferFrom(msg.sender, address(this), amount);
+
+    emit ILiquidityContainer.LiquidityAdded(msg.sender, amount);
+  }
+
+  /// @notice Removed liquidity to the pool. The tokens will be sent to msg.sender.
+  /// @param remoteChainSelector The chain where liquidity is being released.
+  /// @param amount The amount of liquidity to remove.
+  /// @dev The function should only be called if non-canonical USDC on the remote chain has been burned and is not being
+  /// withdrawn on this chain, otherwise a mismatch may occur between locked token balance and remote circulating supply
+  /// which may block a potential future migration of the chain to CCTP.
+  function withdrawLiquidity(uint64 remoteChainSelector, uint256 amount) external {
+    if (s_rebalancer != msg.sender) revert TokenPool.Unauthorized(msg.sender);
+
+    s_lockedTokensByChainSelector[remoteChainSelector] -= amount;
+
+    i_token.safeTransfer(msg.sender, amount);
+    emit ILiquidityContainer.LiquidityRemoved(msg.sender, amount);
+  }
+}
