@@ -46,8 +46,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   error ManualExecutionNotYetEnabled();
   error ManualExecutionGasLimitMismatch();
   error DestinationGasAmountCountMismatch(bytes32 messageId, uint64 sequenceNumber);
-  error InvalidManualExecutionGasLimit(bytes32 messageId, uint256 newLimit);
-  error InvalidTokenGasOverride(bytes32 messageId, uint256 tokenIndex, uint256 tokenGasOverride);
+  error InvalidManualExecutionGasLimit(bytes32 messageId, uint256 oldLimit, uint256 newLimit);
+  error InvalidTokenGasOverride(bytes32 messageId, uint256 tokenIndex, uint256 oldLimit, uint256 tokenGasOverride);
   error RootNotCommitted();
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
@@ -104,10 +104,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   /// @notice Gas overrides for manual exec, the number of token overrides must match the number of tokens in the msg.
   struct GasLimitOverride {
-    /// @notice Gas limit override for the call to the receiver contract. A value of 0 indicates no override and is valid.
+    /// @notice Overrides EVM2EVMMessage.gasLimit. A value of zero indicates no override and is valid.
     uint256 receiverExecutionGasLimit;
-    /// @notice Gas limit override per token in the message. Must be same length as tokenAmounts. A value of 0 indicates no
-    /// override and is valid.
+    /// @notice Overrides EVM2EVMMessage.sourceTokenData.destGasAmount. Must be same length as tokenAmounts. A value
+    /// of zero indicates no override and is valid.
     uint32[] tokenGasOverrides;
   }
 
@@ -246,7 +246,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // Checks to ensure message cannot be executed with less gas than specified.
       if (newLimit != 0) {
         if (newLimit < message.gasLimit) {
-          revert InvalidManualExecutionGasLimit(message.messageId, newLimit);
+          revert InvalidManualExecutionGasLimit(message.messageId, message.gasLimit, newLimit);
         }
       }
 
@@ -266,7 +266,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         // lower gas limit than the DON would have used. This results in the message being marked FAILURE and the DON
         // would not attempt it with the correct gas limit.
         if (tokenGasOverride != 0 && tokenGasOverride < sourceTokenData.destGasAmount) {
-          revert InvalidTokenGasOverride(message.messageId, j, tokenGasOverride);
+          revert InvalidTokenGasOverride(message.messageId, j, sourceTokenData.destGasAmount, tokenGasOverride);
         }
       }
     }
@@ -283,10 +283,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   /// @notice Executes a report, executing each message in order.
   /// @param report The execution report containing the messages and proofs.
-  /// @param manualExecGasLimits An array of gas limits to use for manual execution.
+  /// @param manualExecGasOverrides An array of gas limits to use for manual execution.
   /// @dev If called from the DON, this array is always empty.
   /// @dev If called from manual execution, this array is always same length as messages.
-  function _execute(Internal.ExecutionReport memory report, GasLimitOverride[] memory manualExecGasLimits) internal {
+  function _execute(Internal.ExecutionReport memory report, GasLimitOverride[] memory manualExecGasOverrides) internal {
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(i_sourceChainSelector)))) revert CursedByRMN();
 
     uint256 numMsgs = report.messages.length;
@@ -305,6 +305,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // a message with an unexpected hash.
       if (hashedLeaves[i] != message.messageId) revert InvalidMessageId();
     }
+    bool manualExecution = manualExecGasOverrides.length != 0;
 
     // SECURITY CRITICAL CHECK
     uint256 timestampCommitted = ICommitStore(i_commitStore).verify(hashedLeaves, report.proofs, report.proofFlagBits);
@@ -330,10 +331,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         continue;
       }
       uint32[] memory tokenGasOverrides;
-      bool manualExecution = manualExecGasLimits.length != 0;
 
       if (manualExecution) {
-        tokenGasOverrides = manualExecGasLimits[i].tokenGasOverrides;
+        tokenGasOverrides = manualExecGasOverrides[i].tokenGasOverrides;
         bool isOldCommitReport =
           (block.timestamp - timestampCommitted) > s_dynamicConfig.permissionLessExecutionThresholdSeconds;
         // Manually execution is fine if we previously failed or if the commit report is just too old
@@ -343,8 +343,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         }
 
         // Manual execution gas limit can override gas limit specified in the message. Value of 0 indicates no override.
-        if (manualExecGasLimits[i].receiverExecutionGasLimit != 0) {
-          message.gasLimit = manualExecGasLimits[i].receiverExecutionGasLimit;
+        if (manualExecGasOverrides[i].receiverExecutionGasLimit != 0) {
+          message.gasLimit = manualExecGasOverrides[i].receiverExecutionGasLimit;
         }
       } else {
         // DON can only execute a message once

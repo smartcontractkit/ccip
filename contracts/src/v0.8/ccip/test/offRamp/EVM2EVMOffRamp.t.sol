@@ -1164,61 +1164,74 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
   }
 
-  function test_ManualExecWithInvalidSourceTokenDataCount_Revert() public {
+  function test_manuallyExecute_WithInvalidSourceTokenDataCount_Revert() public {
+    uint256 messageIndex = 0;
+
     Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessageWithTokens();
-    messages[0].receiver = address(s_reverting_receiver);
-    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+    messages[messageIndex].receiver = address(s_reverting_receiver);
+    messages[messageIndex].messageId = Internal._hash(messages[messageIndex], s_offRamp.metadataHash());
 
     EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = _getGasLimitsFromMessages(messages);
 
-    // make sourceTokenData as empty array in messages[0]
-    messages[0].sourceTokenData = new bytes[](0);
+    messages[messageIndex].sourceTokenData = new bytes[](0);
 
     vm.expectRevert(stdError.indexOOBError);
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
   }
 
-  function test_ManualExecWithInvalidReceiverExecutionGasOverride_Revert() public {
+  function test_manuallyExecute_WithInvalidReceiverExecutionGasOverride_Revert() public {
+    uint256 messageIndex = 0;
+
     Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage();
-    messages[0].receiver = address(s_reverting_receiver);
-    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+    messages[messageIndex].receiver = address(s_reverting_receiver);
+    messages[messageIndex].messageId = Internal._hash(messages[messageIndex], s_offRamp.metadataHash());
     s_offRamp.execute(_generateReportFromMessages(messages), new EVM2EVMOffRamp.GasLimitOverride[](messages.length));
 
     s_reverting_receiver.setRevert(false);
     EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = _getGasLimitsFromMessages(messages);
-    gasLimitOverrides[0].receiverExecutionGasLimit -= 1;
+    gasLimitOverrides[messageIndex].receiverExecutionGasLimit -= 1;
 
     vm.expectRevert(
-      abi.encodeWithSelector(EVM2EVMOffRamp.InvalidManualExecutionGasLimit.selector, messages[0].messageId, 199999)
+      abi.encodeWithSelector(
+        EVM2EVMOffRamp.InvalidManualExecutionGasLimit.selector,
+        messages[messageIndex].messageId,
+        messages[messageIndex].gasLimit,
+        gasLimitOverrides[messageIndex].receiverExecutionGasLimit
+      )
     );
 
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
   }
 
   function test_manuallyExecute_LowGasLimitManualExec_Success() public {
+    uint256 messageIndex = 0;
+
     Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage();
-    messages[0].gasLimit = 1;
-    messages[0].receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
-    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+    messages[messageIndex].gasLimit = 1;
+    messages[messageIndex].receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
+    messages[messageIndex].messageId = Internal._hash(messages[messageIndex], s_offRamp.metadataHash());
 
     vm.expectEmit();
     emit EVM2EVMOffRamp.ExecutionStateChanged(
-      messages[0].sequenceNumber,
-      messages[0].messageId,
+      messages[messageIndex].sequenceNumber,
+      messages[messageIndex].messageId,
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(EVM2EVMOffRamp.ReceiverError.selector, "")
     );
     s_offRamp.execute(_generateReportFromMessages(messages), new EVM2EVMOffRamp.GasLimitOverride[](0));
 
     EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = new EVM2EVMOffRamp.GasLimitOverride[](1);
-    gasLimitOverrides[0].receiverExecutionGasLimit = 100_000;
+    gasLimitOverrides[messageIndex].receiverExecutionGasLimit = 100_000;
 
     vm.expectEmit();
     emit MaybeRevertMessageReceiver.MessageReceived();
 
     vm.expectEmit();
     emit EVM2EVMOffRamp.ExecutionStateChanged(
-      messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
+      messages[messageIndex].sequenceNumber,
+      messages[messageIndex].messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
   }
@@ -1291,6 +1304,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
         EVM2EVMOffRamp.InvalidTokenGasOverride.selector,
         messages[failingMessageIndex].messageId,
         failingTokenIndex,
+        DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
         gasLimitOverrides[failingMessageIndex].tokenGasOverrides[failingTokenIndex]
       )
     );
@@ -1345,16 +1359,18 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
   }
 
   function test_ManualExecInvalidGasLimit_Revert() public {
-    Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage();
+    uint256 messageIndex = 0;
 
+    Internal.EVM2EVMMessage[] memory messages = _generateSingleBasicMessage();
     EVM2EVMOffRamp.GasLimitOverride[] memory gasLimits = _getGasLimitsFromMessages(messages);
-    gasLimits[0].receiverExecutionGasLimit = gasLimits[0].receiverExecutionGasLimit - 1;
+    gasLimits[messageIndex].receiverExecutionGasLimit -= 1;
 
     vm.expectRevert(
       abi.encodeWithSelector(
         EVM2EVMOffRamp.InvalidManualExecutionGasLimit.selector,
-        messages[0].messageId,
-        gasLimits[0].receiverExecutionGasLimit
+        messages[messageIndex].messageId,
+        messages[messageIndex].gasLimit,
+        gasLimits[messageIndex].receiverExecutionGasLimit
       )
     );
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimits);
