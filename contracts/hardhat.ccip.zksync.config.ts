@@ -40,7 +40,7 @@ let config = {
     artifacts: './artifacts',
     cache: './cache',
     sources: './src/v0.8/ccip',
-    tests: './test/v0.8/ccip',
+    tests: './test/v0.8/ccip, ./src/v0.8/ccip/test',
   },
   typechain: {
     outDir: './typechain',
@@ -66,18 +66,6 @@ let config = {
   solidity: {
     compilers: [
       {
-        version: '0.8.6',
-        settings: COMPILER_SETTINGS,
-      },
-      {
-        version: '0.8.16',
-        settings: COMPILER_SETTINGS,
-      },
-      {
-        version: '0.8.19',
-        settings: COMPILER_SETTINGS,
-      },
-      {
         version: '0.8.24',
         settings: {
           ...COMPILER_SETTINGS,
@@ -98,12 +86,8 @@ let config = {
         dockerImage: '',
         tag: '',
       },
-      // contractsToCompile: ['RMN', 'ARMProxy'] // uncomment this to compile only specific contracts
+      contractsToCompile: ['RMN', 'ARMProxy'] // uncomment this to compile only specific contracts
     },
-  },
-  mocha: {
-    timeout: 150000,
-    forbidOnly: Boolean(process.env.CI),
   },
   warnings: !process.env.HIDE_WARNINGS,
 }
