@@ -348,7 +348,6 @@ func (p *priceService) observeGasPriceUpdates(
 		"sourceGasPriceUSD", sourceGasPriceUSD,
 	)
 	return sourceGasPriceUSD, nil
-
 }
 
 // All prices are USD ($1=1e18) denominated. All prices must be not nil.
