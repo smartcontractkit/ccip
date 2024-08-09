@@ -41,10 +41,10 @@ contract ReentrantMaliciousTokenPool is TokenPool {
 
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
     external
+    pure
     override
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
-    i_token.approve(msg.sender, releaseOrMintIn.amount);
     return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
   }
 }
