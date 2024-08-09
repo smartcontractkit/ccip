@@ -278,8 +278,9 @@ func (p *priceService) observePriceUpdates(
 	}
 
 	sortedLaneTokens, _, err := ccipcommon.GetFilteredSortedLaneTokens(ctx, p.offRampReader, p.destPriceRegistryReader, p.priceGetter)
+
 	if err != nil {
-		return nil, nil, fmt.Errorf("get filtered sorted lane tokens: %w", err)
+		return nil, nil, fmt.Errorf("get destination tokens: %w", err)
 	}
 
 	return p.generatePriceUpdates(ctx, lggr, sortedLaneTokens)
