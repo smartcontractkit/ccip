@@ -82,8 +82,8 @@ func TestPriceService_priceCleanup(t *testing.T) {
 			}
 
 			mockOrm := ccipmocks.NewORM(t)
-			mockOrm.On("ClearGasPricesByDestChain", ctx, destChainSelector, priceExpireSec).Return(gasPricesError).Once()
-			mockOrm.On("ClearTokenPricesByDestChain", ctx, destChainSelector, priceExpireSec).Return(tokenPricesError).Once()
+			mockOrm.On("ClearGasPricesByDestChain", ctx, destChainSelector, int(priceExpireThreshold.Seconds())).Return(gasPricesError).Once()
+			mockOrm.On("ClearTokenPricesByDestChain", ctx, destChainSelector, int(priceExpireThreshold.Seconds())).Return(tokenPricesError).Once()
 
 			priceService := NewPriceService(
 				lggr,
@@ -819,7 +819,7 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 	// run cleanup every 3 seconds
 	priceService.cleanupInterval = cleanupInterval
 	// expire all prices during every cleanup
-	priceService.priceExpireSec = 0
+	priceService.priceExpireThreshold = time.Duration(0)
 
 	// initially, db is empty
 	assert.NoError(t, checkResultLen(t, priceService, destChainSelector, 0, 0))

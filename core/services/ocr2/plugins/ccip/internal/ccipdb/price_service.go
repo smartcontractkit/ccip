@@ -43,27 +43,27 @@ var _ PriceService = (*priceService)(nil)
 
 const (
 	// Gas prices are refreshed every 1 minute, they are sufficiently accurate, and consistent with Commit OCR round time.
-	gasPriceUpdateInterval = 60 * time.Second
+	gasPriceUpdateInterval = 1 * time.Minute
 	// Token prices are refreshed every 10 minutes, we only report prices for blue chip tokens, DS&A simulation show
 	// their prices are stable, 10-minute resolution is accurate enough.
-	tokenPriceUpdateInterval = 600 * time.Second
+	tokenPriceUpdateInterval = 10 * time.Minute
 
 	// Prices should expire after 25 minutes in DB. Prices should be fresh in the Commit plugin.
 	// 25 min provides sufficient buffer for the Commit plugin to withstand transient price update outages, while
 	// surfacing price update outages quickly enough.
-	priceExpireSec = 1500
+	priceExpireThreshold = 25 * time.Minute
 
 	// Cleanups are called every 10 minutes. For a given job, on average we may expect 3 token prices and 1 gas price.
 	// 10 minutes should result in ~13 rows being cleaned up per job, it is not a heavy load on DB, so there is no need
-	// to run cleanup more frequently. We shouldn't clean up less frequently than `priceExpireSec`.
-	priceCleanupInterval = 600 * time.Second
+	// to run cleanup more frequently. We shouldn't clean up less frequently than `priceExpireThreshold`.
+	priceCleanupInterval = 10 * time.Minute
 )
 
 type priceService struct {
-	priceExpireSec      int
-	cleanupInterval     time.Duration
-	gasUpdateInterval   time.Duration
-	tokenUpdateInterval time.Duration
+	priceExpireThreshold time.Duration
+	cleanupInterval      time.Duration
+	gasUpdateInterval    time.Duration
+	tokenUpdateInterval  time.Duration
 
 	lggr              logger.Logger
 	orm               cciporm.ORM
@@ -98,10 +98,10 @@ func NewPriceService(
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pw := &priceService{
-		priceExpireSec:      priceExpireSec,
-		cleanupInterval:     utils.WithJitter(priceCleanupInterval), // use WithJitter to avoid multiple services impacting DB at same time
-		gasUpdateInterval:   utils.WithJitter(gasPriceUpdateInterval),
-		tokenUpdateInterval: utils.WithJitter(tokenPriceUpdateInterval),
+		priceExpireThreshold: priceExpireThreshold,
+		cleanupInterval:      utils.WithJitter(priceCleanupInterval), // use WithJitter to avoid multiple services impacting DB at same time
+		gasUpdateInterval:    utils.WithJitter(gasPriceUpdateInterval),
+		tokenUpdateInterval:  utils.WithJitter(tokenPriceUpdateInterval),
 
 		lggr:              lggr,
 		orm:               orm,
@@ -146,6 +146,9 @@ func (p *priceService) run() {
 
 	go func() {
 		defer p.wg.Done()
+		defer cleanupTicker.Stop()
+		defer gasUpdateTicker.Stop()
+		defer tokenUpdateTicker.Stop()
 
 		for {
 			select {
@@ -239,7 +242,7 @@ func (p *priceService) runCleanup(ctx context.Context) error {
 	eg := new(errgroup.Group)
 
 	eg.Go(func() error {
-		err := p.orm.ClearGasPricesByDestChain(ctx, p.destChainSelector, p.priceExpireSec)
+		err := p.orm.ClearGasPricesByDestChain(ctx, p.destChainSelector, int(p.priceExpireThreshold.Seconds()))
 		if err != nil {
 			return fmt.Errorf("error clearing gas prices: %w", err)
 		}
@@ -247,7 +250,7 @@ func (p *priceService) runCleanup(ctx context.Context) error {
 	})
 
 	eg.Go(func() error {
-		err := p.orm.ClearTokenPricesByDestChain(ctx, p.destChainSelector, p.priceExpireSec)
+		err := p.orm.ClearTokenPricesByDestChain(ctx, p.destChainSelector, int(p.priceExpireThreshold.Seconds()))
 		if err != nil {
 			return fmt.Errorf("error clearing token prices: %w", err)
 		}
@@ -320,7 +323,7 @@ func (p *priceService) observeGasPriceUpdates(
 	// Include wrapped native to identify the source native USD price, notice USD is in 1e18 scale, i.e. $1 = 1e18
 	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, []cciptypes.Address{p.sourceNative})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch source native price (%s): %w", p.sourceNative, err)
 	}
 
 	sourceNativePriceUSD, exists := rawTokenPricesUSD[p.sourceNative]
@@ -343,6 +346,7 @@ func (p *priceService) observeGasPriceUpdates(
 	lggr.Infow("PriceService observed latest gas price",
 		"sourceChainSelector", p.sourceChainSelector,
 		"destChainSelector", p.destChainSelector,
+		"sourceNative", p.sourceNative,
 		"gasPriceWei", sourceGasPrice,
 		"sourceNativePriceUSD", sourceNativePriceUSD,
 		"sourceGasPriceUSD", sourceGasPriceUSD,
@@ -361,17 +365,16 @@ func (p *priceService) observeTokenPriceUpdates(
 	}
 
 	sortedLaneTokens, filteredLaneTokens, err := ccipcommon.GetFilteredSortedLaneTokens(ctx, p.offRampReader, p.destPriceRegistryReader, p.priceGetter)
-
-	lggr.Debugw("Filtered bridgeable tokens with no configured price getter", "filteredLaneTokens", filteredLaneTokens)
-
 	if err != nil {
 		return nil, fmt.Errorf("get destination tokens: %w", err)
 	}
 
+	lggr.Debugw("Filtered bridgeable tokens with no configured price getter", "filteredLaneTokens", filteredLaneTokens)
+
 	queryTokens := ccipcommon.FlattenUniqueSlice(sortedLaneTokens)
 	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, queryTokens)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch token prices (%v): %w", queryTokens, err)
 	}
 	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
 
@@ -427,7 +430,7 @@ func (p *priceService) writeTokenPricesToDB(ctx context.Context, tokenPricesUSD 
 		})
 	}
 
-	// Sort token by addr to make price updates ordering deterministic, easier to testing and debugging
+	// Sort token by addr to make price updates ordering deterministic, easier for testing and debugging
 	sort.Slice(tokenPrices, func(i, j int) bool {
 		return tokenPrices[i].TokenAddr < tokenPrices[j].TokenAddr
 	})
