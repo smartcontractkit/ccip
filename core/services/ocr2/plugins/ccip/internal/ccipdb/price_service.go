@@ -276,7 +276,7 @@ func (p *priceService) runGasPriceUpdate(ctx context.Context) error {
 		return fmt.Errorf("failed to observe gas price updates: %w", err)
 	}
 
-	err = p.writePricesToDB(ctx, sourceGasPriceUSD, nil)
+	err = p.writeGasPricesToDB(ctx, sourceGasPriceUSD)
 	if err != nil {
 		return fmt.Errorf("failed to write gas prices to db: %w", err)
 	}
@@ -301,7 +301,7 @@ func (p *priceService) runTokenPriceUpdate(ctx context.Context) error {
 		return fmt.Errorf("failed to observe token price updates: %w", err)
 	}
 
-	err = p.writePricesToDB(ctx, nil, tokenPricesUSD)
+	err = p.writeTokenPricesToDB(ctx, tokenPricesUSD)
 	if err != nil {
 		return fmt.Errorf("failed to write token prices to db: %w", err)
 	}
@@ -400,45 +400,39 @@ func (p *priceService) observeTokenPriceUpdates(
 	return tokenPricesUSD, nil
 }
 
-func (p *priceService) writePricesToDB(
-	ctx context.Context,
-	sourceGasPriceUSD *big.Int,
-	tokenPricesUSD map[cciptypes.Address]*big.Int,
-) (err error) {
-	eg := new(errgroup.Group)
+func (p *priceService) writeGasPricesToDB(ctx context.Context, sourceGasPriceUSD *big.Int) (err error) {
+	if sourceGasPriceUSD == nil {
+		return nil
+	}
 
-	if sourceGasPriceUSD != nil {
-		eg.Go(func() error {
-			return p.orm.InsertGasPricesForDestChain(ctx, p.destChainSelector, p.jobId, []cciporm.GasPriceUpdate{
-				{
-					SourceChainSelector: p.sourceChainSelector,
-					GasPrice:            assets.NewWei(sourceGasPriceUSD),
-				},
-			})
+	return p.orm.InsertGasPricesForDestChain(ctx, p.destChainSelector, p.jobId, []cciporm.GasPriceUpdate{
+		{
+			SourceChainSelector: p.sourceChainSelector,
+			GasPrice:            assets.NewWei(sourceGasPriceUSD),
+		},
+	})
+}
+
+func (p *priceService) writeTokenPricesToDB(ctx context.Context, tokenPricesUSD map[cciptypes.Address]*big.Int) (err error) {
+	if tokenPricesUSD == nil {
+		return nil
+	}
+
+	var tokenPrices []cciporm.TokenPriceUpdate
+
+	for token, price := range tokenPricesUSD {
+		tokenPrices = append(tokenPrices, cciporm.TokenPriceUpdate{
+			TokenAddr:  string(token),
+			TokenPrice: assets.NewWei(price),
 		})
 	}
 
-	if tokenPricesUSD != nil {
-		var tokenPrices []cciporm.TokenPriceUpdate
+	// Sort token by addr to make price updates ordering deterministic, easier to testing and debugging
+	sort.Slice(tokenPrices, func(i, j int) bool {
+		return tokenPrices[i].TokenAddr < tokenPrices[j].TokenAddr
+	})
 
-		for token, price := range tokenPricesUSD {
-			tokenPrices = append(tokenPrices, cciporm.TokenPriceUpdate{
-				TokenAddr:  string(token),
-				TokenPrice: assets.NewWei(price),
-			})
-		}
-
-		// Sort token by addr to make price updates ordering deterministic, easier to testing and debugging
-		sort.Slice(tokenPrices, func(i, j int) bool {
-			return tokenPrices[i].TokenAddr < tokenPrices[j].TokenAddr
-		})
-
-		eg.Go(func() error {
-			return p.orm.InsertTokenPricesForDestChain(ctx, p.destChainSelector, p.jobId, tokenPrices)
-		})
-	}
-
-	return eg.Wait()
+	return p.orm.InsertTokenPricesForDestChain(ctx, p.destChainSelector, p.jobId, tokenPrices)
 }
 
 // Input price is USD per full token, with 18 decimal precision

@@ -105,17 +105,13 @@ func TestPriceService_priceCleanup(t *testing.T) {
 	}
 }
 
-func TestPriceService_priceWrite(t *testing.T) {
+func TestPriceService_writeGasPrices(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	jobId := int32(1)
 	destChainSelector := uint64(12345)
 	sourceChainSelector := uint64(67890)
 
 	gasPrice := big.NewInt(1e18)
-	tokenPrices := map[cciptypes.Address]*big.Int{
-		"0x123": big.NewInt(2e18),
-		"0x234": big.NewInt(3e18),
-	}
 
 	expectedGasPriceUpdate := []cciporm.GasPriceUpdate{
 		{
@@ -123,6 +119,67 @@ func TestPriceService_priceWrite(t *testing.T) {
 			GasPrice:            assets.NewWei(gasPrice),
 		},
 	}
+
+	testCases := []struct {
+		name          string
+		gasPriceError bool
+		expectedErr   bool
+	}{
+		{
+			name:          "ORM called successfully",
+			gasPriceError: false,
+			expectedErr:   false,
+		},
+		{
+			name:          "gasPrice clear failed",
+			gasPriceError: true,
+			expectedErr:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tests.Context(t)
+
+			var gasPricesError error
+			if tc.gasPriceError {
+				gasPricesError = fmt.Errorf("gas prices error")
+			}
+
+			mockOrm := ccipmocks.NewORM(t)
+			mockOrm.On("InsertGasPricesForDestChain", ctx, destChainSelector, jobId, expectedGasPriceUpdate).Return(gasPricesError).Once()
+
+			priceService := NewPriceService(
+				lggr,
+				mockOrm,
+				jobId,
+				destChainSelector,
+				sourceChainSelector,
+				"",
+				nil,
+				nil,
+			).(*priceService)
+			err := priceService.writeGasPricesToDB(ctx, gasPrice)
+			if tc.expectedErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestPriceService_writeTokenPrices(t *testing.T) {
+	lggr := logger.TestLogger(t)
+	jobId := int32(1)
+	destChainSelector := uint64(12345)
+	sourceChainSelector := uint64(67890)
+
+	tokenPrices := map[cciptypes.Address]*big.Int{
+		"0x123": big.NewInt(2e18),
+		"0x234": big.NewInt(3e18),
+	}
+
 	expectedTokenPriceUpdate := []cciporm.TokenPriceUpdate{
 		{
 			TokenAddr:  "0x123",
@@ -136,31 +193,16 @@ func TestPriceService_priceWrite(t *testing.T) {
 
 	testCases := []struct {
 		name            string
-		gasPriceError   bool
 		tokenPriceError bool
 		expectedErr     bool
 	}{
 		{
 			name:            "ORM called successfully",
-			gasPriceError:   false,
 			tokenPriceError: false,
 			expectedErr:     false,
 		},
 		{
-			name:            "gasPrice clear failed",
-			gasPriceError:   true,
-			tokenPriceError: false,
-			expectedErr:     true,
-		},
-		{
 			name:            "tokenPrice clear failed",
-			gasPriceError:   false,
-			tokenPriceError: true,
-			expectedErr:     true,
-		},
-		{
-			name:            "both ORM calls failed",
-			gasPriceError:   true,
 			tokenPriceError: true,
 			expectedErr:     true,
 		},
@@ -170,17 +212,12 @@ func TestPriceService_priceWrite(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tests.Context(t)
 
-			var gasPricesError error
 			var tokenPricesError error
-			if tc.gasPriceError {
-				gasPricesError = fmt.Errorf("gas prices error")
-			}
 			if tc.tokenPriceError {
 				tokenPricesError = fmt.Errorf("token prices error")
 			}
 
 			mockOrm := ccipmocks.NewORM(t)
-			mockOrm.On("InsertGasPricesForDestChain", ctx, destChainSelector, jobId, expectedGasPriceUpdate).Return(gasPricesError).Once()
 			mockOrm.On("InsertTokenPricesForDestChain", ctx, destChainSelector, jobId, expectedTokenPriceUpdate).Return(tokenPricesError).Once()
 
 			priceService := NewPriceService(
@@ -193,7 +230,7 @@ func TestPriceService_priceWrite(t *testing.T) {
 				nil,
 				nil,
 			).(*priceService)
-			err := priceService.writePricesToDB(ctx, gasPrice, tokenPrices)
+			err := priceService.writeTokenPricesToDB(ctx, tokenPrices)
 			if tc.expectedErr {
 				assert.Error(t, err)
 			} else {
