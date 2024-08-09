@@ -1537,6 +1537,7 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
   function test_releaseOrMintToken_ReleaseOrMintBalanceMismatch_Revert() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
+    uint256 mockedStaticBalance = 50000;
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
@@ -1546,12 +1547,40 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
     });
 
     vm.mockCall(
-      s_destTokenBySourceToken[token], abi.encodeWithSelector(IERC20.balanceOf.selector, OWNER), abi.encode(0)
+      s_destTokenBySourceToken[token],
+      abi.encodeWithSelector(IERC20.balanceOf.selector, OWNER),
+      abi.encode(mockedStaticBalance)
     );
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.ReleaseOrMintBalanceMismatch.selector, amount, 0));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        EVM2EVMOffRamp.ReleaseOrMintBalanceMismatch.selector, amount, mockedStaticBalance, mockedStaticBalance
+      )
+    );
 
     s_offRamp.releaseOrMintToken(amount, abi.encode(OWNER), OWNER, sourceTokenData, "");
+  }
+
+  function test_releaseOrMintToken_skip_ReleaseOrMintBalanceMismatch_if_pool_Revert() public {
+    uint256 amount = 123123;
+    address token = s_sourceTokens[0];
+    uint256 mockedStaticBalance = 50000;
+
+    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
+      sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
+      destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
+      extraData: "",
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+    });
+
+    // This should make the call fail if it does not skip the check
+    vm.mockCall(
+      s_destTokenBySourceToken[token],
+      abi.encodeWithSelector(IERC20.balanceOf.selector, OWNER),
+      abi.encode(mockedStaticBalance)
+    );
+
+    s_offRamp.releaseOrMintToken(amount, abi.encode(OWNER), s_destPoolBySourceToken[token], sourceTokenData, "");
   }
 
   function test__releaseOrMintToken_NotACompatiblePool_Revert() public {

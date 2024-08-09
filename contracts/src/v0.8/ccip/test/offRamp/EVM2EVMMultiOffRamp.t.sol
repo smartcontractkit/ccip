@@ -2385,6 +2385,7 @@ contract EVM2EVMMultiOffRamp__releaseOrMintSingleToken is EVM2EVMMultiOffRampSet
   function test_releaseOrMintToken_ReleaseOrMintBalanceMismatch_Revert() public {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
+    uint256 mockedStaticBalance = 50000;
 
     Internal.RampTokenAmount memory tokenAmount = Internal.RampTokenAmount({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
@@ -2394,12 +2395,42 @@ contract EVM2EVMMultiOffRamp__releaseOrMintSingleToken is EVM2EVMMultiOffRampSet
     });
 
     vm.mockCall(
-      s_destTokenBySourceToken[token], abi.encodeWithSelector(IERC20.balanceOf.selector, OWNER), abi.encode(0)
+      s_destTokenBySourceToken[token],
+      abi.encodeWithSelector(IERC20.balanceOf.selector, OWNER),
+      abi.encode(mockedStaticBalance)
     );
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.ReleaseOrMintBalanceMismatch.selector, amount, 0));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        EVM2EVMMultiOffRamp.ReleaseOrMintBalanceMismatch.selector, amount, mockedStaticBalance, mockedStaticBalance
+      )
+    );
 
     s_offRamp.releaseOrMintSingleToken(tokenAmount, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR, "");
+  }
+
+  function test_releaseOrMintToken_skip_ReleaseOrMintBalanceMismatch_if_pool_Revert() public {
+    uint256 amount = 123123;
+    address token = s_sourceTokens[0];
+    uint256 mockedStaticBalance = 50000;
+
+    Internal.RampTokenAmount memory tokenAmount = Internal.RampTokenAmount({
+      sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
+      destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
+      extraData: "",
+      amount: amount
+    });
+
+    // This should make the call fail if it does not skip the check
+    vm.mockCall(
+      s_destTokenBySourceToken[token],
+      abi.encodeWithSelector(IERC20.balanceOf.selector, OWNER),
+      abi.encode(mockedStaticBalance)
+    );
+
+    s_offRamp.releaseOrMintSingleToken(
+      tokenAmount, abi.encode(OWNER), s_destPoolBySourceToken[token], SOURCE_CHAIN_SELECTOR, ""
+    );
   }
 
   function test__releaseOrMintSingleToken_NotACompatiblePool_Revert() public {

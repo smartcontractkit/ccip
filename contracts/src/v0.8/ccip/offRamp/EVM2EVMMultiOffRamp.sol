@@ -48,7 +48,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
   error TokenHandlingError(bytes err);
-  error ReleaseOrMintBalanceMismatch(uint256 expected, uint256 actual);
+  error ReleaseOrMintBalanceMismatch(uint256 amountReleased, uint256 balancePre, uint256 balancePost);
   error EmptyReport();
   error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
@@ -871,8 +871,9 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     if (receiver != localPoolAddress) {
       (uint256 balancePost,) = _getBalanceOfReceiver(receiver, localToken, gasLeft - gasUsedReleaseOrMint);
 
-      if (balancePost - balancePre != localAmount) {
-        revert ReleaseOrMintBalanceMismatch(localAmount, balancePost - balancePre);
+      // First we check if the subtraction would result in an underflow to ensure we revert with a clear error
+      if (balancePost < balancePre || balancePost - balancePre != localAmount) {
+        revert ReleaseOrMintBalanceMismatch(localAmount, balancePre, balancePost);
       }
     }
 
