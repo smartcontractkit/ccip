@@ -61,6 +61,15 @@ type Version struct {
 	semver.Version
 }
 
+// GasUpdateEvent holds the event details of Gas price update
+type GasUpdateEvent struct {
+	Sender    string
+	Tx        string
+	Value     *big.Int
+	DestChain uint64
+	Source    string
+}
+
 // MustVersion creates a new Version object from a semver string and panics if it fails
 func MustVersion(version string) Version {
 	v := semver.MustParse(version)
@@ -97,13 +106,13 @@ const (
 	CommitStoreContract   Name = "CommitStore"
 
 	defaultDestByteOverhead = uint32(32)
-	defaultDestGasOverhead  = uint32(29_000)
+	defaultDestGasOverhead  = uint32(125_000)
 )
 
 var (
 	V1_2_0            = MustVersion("1.2.0")
 	V1_4_0            = MustVersion("1.4.0")
-	V1_5_0_dev        = MustVersion("1.5.0-dev")
+	V1_5_0_dev        = MustVersion("1.5.0")
 	LatestPoolVersion = V1_5_0_dev
 	Latest            = V1_5_0_dev
 	VersionMap        = map[Name]Version{
