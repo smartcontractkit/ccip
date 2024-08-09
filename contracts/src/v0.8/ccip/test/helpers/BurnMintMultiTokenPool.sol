@@ -46,9 +46,8 @@ contract BurnMintMultiTokenPool is MultiTokenPool {
   {
     _validateReleaseOrMint(releaseOrMintIn);
 
-    // Mint to the this contract and approve the msg.sender to send it to the recipient
-    IBurnMintERC20(releaseOrMintIn.localToken).mint(address(this), releaseOrMintIn.amount);
-    IBurnMintERC20(releaseOrMintIn.localToken).approve(msg.sender, releaseOrMintIn.amount);
+    // Mint to the receiver
+    IBurnMintERC20(releaseOrMintIn.localToken).mint(msg.sender, releaseOrMintIn.amount);
 
     emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
