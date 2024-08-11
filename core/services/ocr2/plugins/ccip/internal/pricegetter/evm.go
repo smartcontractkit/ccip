@@ -185,6 +185,9 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	return nil
 }
 
+// preparePricesAndBatchCallsPerChain uses this price getter to prepare for a list of tokens:
+// - the map of token address to their prices (static prices)
+// - the map of and batch calls per chain for the given tokens (dynamic prices)
 func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain() (map[cciptypes.Address]*big.Int, map[uint64]*batchCallsForChain, error) {
 	prices := make(map[cciptypes.Address]*big.Int)
 	batchCallsPerChain := make(map[uint64]*batchCallsForChain)

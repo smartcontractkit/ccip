@@ -391,7 +391,7 @@ func (p *priceService) observeTokenPriceUpdates(
 	// Check for case where sourceNative has same address as one of the dest tokens (example: WETH in Base and Optimism)
 	hasSameDestAddress := ccipcommon.Contains(sortedLaneTokens, p.sourceNative)
 
-	// Filter out source native token only if it has the same address as one of the dest tokens
+	// Filter out source native token only if source native not in dest tokens
 	var destTokens []cciptypes.Address
 	for key := range rawTokenPricesUSD {
 		if hasSameDestAddress || key != p.sourceNative {
