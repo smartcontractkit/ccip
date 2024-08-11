@@ -1,6 +1,7 @@
 package ccip_test
 
 import (
+	"context"
 	"encoding/json"
 	"math/big"
 	"testing"
@@ -113,11 +114,22 @@ func test_CLOSpecApprovalFlow(t *testing.T, ccipTH integrationtesthelpers.CCIPIn
 
 	_, err = ccipTH.Source.LinkToken.Approve(ccipTH.Source.User, ccipTH.Source.Router.Address(), new(big.Int).Set(fee))
 	require.NoError(t, err)
-	ccipTH.Source.Chain.Commit()
+	blockHash := ccipTH.Dest.Chain.Commit()
+	// get the block number
+	block, err := ccipTH.Dest.Chain.BlockByHash(context.Background(), blockHash)
+	require.NoError(t, err)
+	blockNumber := block.Number().Uint64() + 1 // +1 as a block will be mined for the request from EventuallyReportCommitted
 
 	ccipTH.SendRequest(t, msg)
 	ccipTH.AllNodesHaveReqSeqNum(t, currentSeqNum)
 	ccipTH.EventuallyReportCommitted(t, currentSeqNum)
+	ccipTH.EventuallyPriceRegistryUpdated(
+		t,
+		blockNumber,
+		ccipTH.Source.ChainSelector,
+		[]common.Address{ccipTH.Dest.LinkToken.Address(), ccipTH.Dest.WrappedNative.Address()},
+		ccipTH.Source.WrappedNative.Address(),
+	)
 
 	executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, currentSeqNum, currentSeqNum)
 	assert.Len(t, executionLogs, 1)
