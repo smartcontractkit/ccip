@@ -48,12 +48,26 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
+type LogInfo struct {
+	BlockNumber uint64
+	TxHash      common.Hash
+}
+
 // Name denotes a contract name
 type Name string
 
 // Version wraps a semver.Version object to provide some custom unmarshalling
 type Version struct {
 	semver.Version
+}
+
+// GasUpdateEvent holds the event details of Gas price update
+type GasUpdateEvent struct {
+	Sender    string
+	Tx        string
+	Value     *big.Int
+	DestChain uint64
+	Source    string
 }
 
 // MustVersion creates a new Version object from a semver string and panics if it fails
@@ -92,17 +106,17 @@ const (
 	CommitStoreContract   Name = "CommitStore"
 
 	defaultDestByteOverhead = uint32(32)
-	defaultDestGasOverhead  = uint32(29_000)
+	defaultDestGasOverhead  = uint32(125_000)
 )
 
 var (
 	V1_2_0            = MustVersion("1.2.0")
 	V1_4_0            = MustVersion("1.4.0")
-	V1_5_0_dev        = MustVersion("1.5.0-dev")
+	V1_5_0_dev        = MustVersion("1.5.0")
 	LatestPoolVersion = V1_5_0_dev
 	Latest            = V1_5_0_dev
 	VersionMap        = map[Name]Version{
-		PriceRegistryContract: Latest,
+		PriceRegistryContract: V1_2_0,
 		OffRampContract:       Latest,
 		OnRampContract:        Latest,
 		CommitStoreContract:   Latest,
@@ -955,7 +969,7 @@ type CommitStoreReportAccepted struct {
 	Min        uint64
 	Max        uint64
 	MerkleRoot [32]byte
-	Raw        types.Log
+	LogInfo    LogInfo
 }
 
 type CommitStoreWrapper struct {
@@ -1496,7 +1510,7 @@ type SendReqEventData struct {
 	SequenceNumber uint64
 	DataLength     int
 	NoOfTokens     int
-	Raw            types.Log
+	LogInfo        LogInfo
 	Fee            *big.Int
 }
 
@@ -2151,7 +2165,7 @@ type EVM2EVMOffRampExecutionStateChanged struct {
 	MessageId      [32]byte
 	State          uint8
 	ReturnData     []byte
-	Raw            types.Log
+	LogInfo        LogInfo
 }
 
 type MockAggregator struct {

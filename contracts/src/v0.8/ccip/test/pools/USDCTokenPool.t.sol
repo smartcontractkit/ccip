@@ -23,6 +23,7 @@ contract USDCTokenPoolSetup is BaseTest {
   IBurnMintERC20 internal s_token;
   MockUSDCTokenMessenger internal s_mockUSDC;
   MockE2EUSDCTransmitter internal s_mockUSDCTransmitter;
+  uint32 internal constant USDC_DEST_TOKEN_GAS = 150_000;
 
   struct USDCMessage {
     uint32 version;
@@ -150,7 +151,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_token),
       amount,
       address(s_usdcTokenPool),
-      expectedDomain.allowedCaller,
+      receiver,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
@@ -190,7 +191,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_token),
       amount,
       address(s_usdcTokenPool),
-      expectedDomain.allowedCaller,
+      destinationReceiver,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
@@ -230,7 +231,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_token),
       amount,
       address(s_usdcTokenPoolWithAllowList),
-      expectedDomain.allowedCaller,
+      destinationReceiver,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
@@ -319,27 +320,20 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       })
     );
   }
-
-  function test_lockOrBurn_InvalidReceiver_Revert() public {
-    vm.startPrank(s_routerAllowedOnRamp);
-
-    bytes memory receiver = abi.encodePacked(address(0), address(1));
-
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidReceiver.selector, receiver));
-
-    s_usdcTokenPool.lockOrBurn(
-      Pool.LockOrBurnInV1({
-        originalSender: OWNER,
-        receiver: receiver,
-        amount: 1,
-        remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_token)
-      })
-    );
-  }
 }
 
 contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
+  // From https://github.com/circlefin/evm-cctp-contracts/blob/377c9bd813fb86a42d900ae4003599d82aef635a/src/messages/BurnMessage.sol#L57
+  function _formatMessage(
+    uint32 _version,
+    bytes32 _burnToken,
+    bytes32 _mintRecipient,
+    uint256 _amount,
+    bytes32 _messageSender
+  ) internal pure returns (bytes memory) {
+    return abi.encodePacked(_version, _burnToken, _mintRecipient, _amount, _messageSender);
+  }
+
   function test_Fuzz_ReleaseOrMint_Success(address recipient, uint256 amount) public {
     vm.assume(recipient != address(0) && recipient != address(s_token));
     amount = bound(amount, 0, getInboundRateLimiterConfig().capacity);
@@ -352,7 +346,13 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       sender: SOURCE_CHAIN_TOKEN_SENDER,
       recipient: bytes32(uint256(uint160(recipient))),
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
-      messageBody: bytes("")
+      messageBody: _formatMessage(
+        0,
+        bytes32(uint256(uint160(address(s_token)))),
+        bytes32(uint256(uint160(recipient))),
+        amount,
+        bytes32(uint256(uint160(OWNER)))
+        )
     });
 
     bytes memory message = _generateUSDCMessage(usdcMessage);
@@ -363,7 +363,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
         USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
-        )
+        ),
+      destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
     bytes memory offchainTokenData =
@@ -408,7 +409,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain}))
+      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain})),
+      destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
     // The mocked receiver does not release the token to the pool, so we manually do it here
@@ -452,7 +454,13 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       sender: SOURCE_CHAIN_TOKEN_SENDER,
       recipient: bytes32(uint256(uint160(address(s_mockUSDC)))),
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
-      messageBody: bytes("")
+      messageBody: _formatMessage(
+        0,
+        bytes32(uint256(uint160(address(s_token)))),
+        bytes32(uint256(uint160(OWNER))),
+        amount,
+        bytes32(uint256(uint160(OWNER)))
+        )
     });
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
@@ -460,7 +468,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
         USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
-        )
+        ),
+      destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
     bytes memory offchainTokenData = abi.encode(
@@ -492,7 +501,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER}))
+      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
+      destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
     bytes memory offchainTokenData =

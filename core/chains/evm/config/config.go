@@ -109,12 +109,11 @@ type Transactions interface {
 
 type AutoPurgeConfig interface {
 	Enabled() bool
-	Threshold() uint32
-	MinAttempts() uint32
+	Threshold() *uint32
+	MinAttempts() *uint32
 	DetectionApiUrl() *url.URL
 }
 
-//go:generate mockery --quiet --name GasEstimator --output ./mocks/ --case=underscore
 type GasEstimator interface {
 	BlockHistory() BlockHistory
 	LimitJobType() LimitJobType
@@ -176,8 +175,6 @@ type NodePool interface {
 }
 
 // TODO BCF-2509 does the chainscopedconfig really need the entire app config?
-//
-//go:generate mockery --quiet --name ChainScopedConfig --output ./mocks/ --case=underscore
 type ChainScopedConfig interface {
 	EVM() EVM
 }

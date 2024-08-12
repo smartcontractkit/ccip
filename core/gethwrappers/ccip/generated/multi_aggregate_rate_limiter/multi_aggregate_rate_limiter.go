@@ -345,6 +345,28 @@ func (_MultiAggregateRateLimiter *MultiAggregateRateLimiterCallerSession) Owner(
 	return _MultiAggregateRateLimiter.Contract.Owner(&_MultiAggregateRateLimiter.CallOpts)
 }
 
+func (_MultiAggregateRateLimiter *MultiAggregateRateLimiterCaller) TypeAndVersion(opts *bind.CallOpts) (string, error) {
+	var out []interface{}
+	err := _MultiAggregateRateLimiter.contract.Call(opts, &out, "typeAndVersion")
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
+}
+
+func (_MultiAggregateRateLimiter *MultiAggregateRateLimiterSession) TypeAndVersion() (string, error) {
+	return _MultiAggregateRateLimiter.Contract.TypeAndVersion(&_MultiAggregateRateLimiter.CallOpts)
+}
+
+func (_MultiAggregateRateLimiter *MultiAggregateRateLimiterCallerSession) TypeAndVersion() (string, error) {
+	return _MultiAggregateRateLimiter.Contract.TypeAndVersion(&_MultiAggregateRateLimiter.CallOpts)
+}
+
 func (_MultiAggregateRateLimiter *MultiAggregateRateLimiterTransactor) AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
 	return _MultiAggregateRateLimiter.contract.Transact(opts, "acceptOwnership")
 }
@@ -1753,6 +1775,8 @@ type MultiAggregateRateLimiterInterface interface {
 	GetPriceRegistry(opts *bind.CallOpts) (common.Address, error)
 
 	Owner(opts *bind.CallOpts) (common.Address, error)
+
+	TypeAndVersion(opts *bind.CallOpts) (string, error)
 
 	AcceptOwnership(opts *bind.TransactOpts) (*types.Transaction, error)
 
