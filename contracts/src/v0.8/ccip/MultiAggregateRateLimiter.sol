@@ -235,9 +235,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers, IT
       bytes memory remoteToken = adds[i].remoteToken;
       address localToken = localTokenArgs.localToken;
 
-      if (
-        localToken == address(0) || keccak256(abi.encodePacked(remoteToken)) == keccak256(abi.encodePacked(address(0)))
-      ) {
+      if (localToken == address(0) || remoteToken.length == 0) {
         revert ZeroAddressNotAllowed();
       }
 

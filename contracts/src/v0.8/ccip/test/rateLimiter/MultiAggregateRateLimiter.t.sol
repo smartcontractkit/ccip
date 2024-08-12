@@ -634,7 +634,7 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
         remoteChainSelector: CHAIN_SELECTOR_1,
         localToken: s_destTokens[0]
       }),
-      remoteToken: abi.encodePacked(address(0))
+      remoteToken: new bytes(0)
     });
 
     vm.expectRevert(AuthorizedCallers.ZeroAddressNotAllowed.selector);
