@@ -93,32 +93,13 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     emit ConfigSet(address(tokenMessenger));
   }
 
-  /// @notice Burns USDC in the pool
-  /// @dev invokes underlying CCTP protocol
-  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
-    external
-    override
-    returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut)
-  {
-    return _lockOrBurn(lockOrBurnIn);
-  }
-
-  /// @notice Mints USDC to the recipient
-  /// @dev invokes underlying CCTP protocol
-  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
-    external
-    override
-    returns (Pool.ReleaseOrMintOutV1 memory)
-  {
-    return _releaseOrMint(releaseOrMintIn);
-  }
-
   /// @notice Burn the token in the pool
   /// @dev emits ITokenMessenger.DepositForBurn
   /// @dev Assumes caller has validated destinationReceiver
-  function _lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
-    internal
+  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
+    public
     virtual
+    override
     returns (Pool.LockOrBurnOutV1 memory)
   {
     _validateLockOrBurn(lockOrBurnIn);
@@ -157,9 +138,10 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// for that message, including its (nonce, sourceDomain). This way, the only
   /// non-reverting offchainTokenData that can be supplied is a valid attestation for the
   /// specific message that was sent on source.
-  function _releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
-    internal
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    public
     virtual
+    override
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
     _validateReleaseOrMint(releaseOrMintIn);
