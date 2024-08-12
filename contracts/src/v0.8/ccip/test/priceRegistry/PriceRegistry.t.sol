@@ -397,7 +397,7 @@ contract PriceRegistryFeeSetup is PriceRegistrySetup {
     });
 
     for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-      messageEvent.tokenAmounts[i] = _getSourceTokenData(message.tokenAmounts[i], tokenAdminRegistry);
+      messageEvent.tokenAmounts[i] = _getSourceTokenData(message.tokenAmounts[i], tokenAdminRegistry, destChainSelector);
     }
 
     messageEvent.header.messageId = Internal._hash(messageEvent, metadataHash);
@@ -406,15 +406,25 @@ contract PriceRegistryFeeSetup is PriceRegistrySetup {
 
   function _getSourceTokenData(
     Client.EVMTokenAmount memory tokenAmount,
-    TokenAdminRegistry tokenAdminRegistry
+    TokenAdminRegistry tokenAdminRegistry,
+    uint64 destChainSelector
   ) internal view returns (Internal.RampTokenAmount memory) {
     address destToken = s_destTokenBySourceToken[tokenAmount.token];
+    uint256 tokenTransferFeeConfigArgIndex;
+    uint256 tokenTransferFeeConfigsIndex;
+
+    uint32 expectedDestGasAmount;
+    PriceRegistry.TokenTransferFeeConfig memory tokenTransferFeeConfig =
+      PriceRegistry(s_priceRegistry).getTokenTransferFeeConfig(destChainSelector, tokenAmount.token);
+    expectedDestGasAmount =
+      tokenTransferFeeConfig.isEnabled ? tokenTransferFeeConfig.destGasOverhead : DEFAULT_TOKEN_DEST_GAS_OVERHEAD;
 
     return Internal.RampTokenAmount({
       sourcePoolAddress: abi.encode(tokenAdminRegistry.getTokenConfig(tokenAmount.token).tokenPool),
       destTokenAddress: abi.encode(destToken),
       extraData: "",
-      amount: tokenAmount.amount
+      amount: tokenAmount.amount,
+      destGasAmount: expectedDestGasAmount
     });
   }
 
@@ -2310,7 +2320,7 @@ contract PriceRegistry_validatePoolReturnData is PriceRegistryFeeSetup {
     sourceTokenAmounts[0].token = s_sourceTokens[0];
 
     Internal.RampTokenAmount[] memory rampTokenAmounts = new Internal.RampTokenAmount[](1);
-    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry);
+    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry, DEST_CHAIN_SELECTOR);
 
     // No revert - successful
     s_priceRegistry.validatePoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
@@ -2322,7 +2332,7 @@ contract PriceRegistry_validatePoolReturnData is PriceRegistryFeeSetup {
     sourceTokenAmounts[0].token = s_sourceTokens[0];
 
     Internal.RampTokenAmount[] memory rampTokenAmounts = new Internal.RampTokenAmount[](1);
-    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry);
+    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry, DEST_CHAIN_SELECTOR);
 
     // Revert due to index out of bounds access
     vm.expectRevert();
@@ -2340,7 +2350,7 @@ contract PriceRegistry_validatePoolReturnData is PriceRegistryFeeSetup {
     sourceTokenAmounts[0].token = sourceETH;
 
     Internal.RampTokenAmount[] memory rampTokenAmounts = new Internal.RampTokenAmount[](1);
-    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry);
+    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry, DEST_CHAIN_SELECTOR);
 
     // No data set, should succeed
     s_priceRegistry.validatePoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
@@ -2389,7 +2399,7 @@ contract PriceRegistry_validatePoolReturnData is PriceRegistryFeeSetup {
     sourceTokenAmounts[0].token = s_sourceTokens[0];
 
     Internal.RampTokenAmount[] memory rampTokenAmounts = new Internal.RampTokenAmount[](1);
-    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry);
+    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry, DEST_CHAIN_SELECTOR);
     rampTokenAmounts[0].destTokenAddress = nonEvmAddress;
 
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, nonEvmAddress));

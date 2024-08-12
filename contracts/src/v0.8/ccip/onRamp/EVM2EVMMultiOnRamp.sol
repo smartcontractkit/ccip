@@ -19,6 +19,7 @@ import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {PriceRegistry} from "../PriceRegistry.sol";
 
 /// @notice The EVM2EVMMultiOnRamp is a contract that handles lane-specific fee logic
 /// @dev The EVM2EVMMultiOnRamp, MultiCommitStore and EVM2EVMMultiOffRamp form an xchain upgradeable unit. Any change to one of them
@@ -247,12 +248,18 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     );
 
     // NOTE: pool data validations are outsourced to the PriceRegistry to handle family-specific logic handling
-
+    PriceRegistry.TokenTransferFeeConfig memory tokenTransferFeeConfig =
+      PriceRegistry(s_dynamicConfig.priceRegistry).getTokenTransferFeeConfig(destChainSelector, tokenAndAmount.token);
+    uint32 defaultGasOverhead =
+      PriceRegistry(s_dynamicConfig.priceRegistry).getDestChainConfig(destChainSelector).defaultTokenDestGasOverhead;
     return Internal.RampTokenAmount({
       sourcePoolAddress: abi.encode(sourcePool),
       destTokenAddress: poolReturnData.destTokenAddress,
       extraData: poolReturnData.destPoolData,
-      amount: tokenAndAmount.amount
+      amount: tokenAndAmount.amount,
+      // The user will be billed either the default or the override, so we send the exact amount that we billed for
+      // to the destination chain to be used for the token releaseOrMint and transfer.
+      destGasAmount: tokenTransferFeeConfig.isEnabled ? tokenTransferFeeConfig.destGasOverhead : defaultGasOverhead
     });
   }
 

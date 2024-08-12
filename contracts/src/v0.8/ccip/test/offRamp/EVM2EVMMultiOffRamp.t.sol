@@ -1705,7 +1705,8 @@ contract EVM2EVMMultiOffRamp_manuallyExecute is EVM2EVMMultiOffRampSetup {
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[s_sourceFeeToken]),
       destTokenAddress: abi.encode(s_destTokenBySourceToken[s_sourceFeeToken]),
       extraData: "",
-      amount: tokenAmount
+      amount: tokenAmount,
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     messages[0].receiver = address(receiver);
@@ -2263,7 +2264,8 @@ contract EVM2EVMMultiOffRamp_trialExecute is EVM2EVMMultiOffRampSetup {
       sourcePoolAddress: abi.encode(address(0)),
       destTokenAddress: abi.encode(address(0)),
       extraData: "",
-      amount: message.tokenAmounts[0].amount
+      amount: message.tokenAmounts[0].amount,
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     message.header.messageId = Internal._hash(message, ON_RAMP_ADDRESS_1);
@@ -2280,7 +2282,8 @@ contract EVM2EVMMultiOffRamp_trialExecute is EVM2EVMMultiOffRampSetup {
       sourcePoolAddress: abi.encode(address(0)),
       destTokenAddress: abi.encode(notAContract),
       extraData: "",
-      amount: message.tokenAmounts[0].amount
+      amount: message.tokenAmounts[0].amount,
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     message.header.messageId = Internal._hash(message, ON_RAMP_ADDRESS_1);
@@ -2311,7 +2314,8 @@ contract EVM2EVMMultiOffRamp__releaseOrMintSingleToken is EVM2EVMMultiOffRampSet
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
       destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
       extraData: "",
-      amount: amount
+      amount: amount,
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     vm.expectCall(
@@ -2344,7 +2348,8 @@ contract EVM2EVMMultiOffRamp__releaseOrMintSingleToken is EVM2EVMMultiOffRampSet
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
       destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
       extraData: "",
-      amount: amount
+      amount: amount,
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     // Mock the call so returns 2 slots of data
@@ -2367,7 +2372,8 @@ contract EVM2EVMMultiOffRamp__releaseOrMintSingleToken is EVM2EVMMultiOffRampSet
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
       destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
       extraData: "",
-      amount: amount
+      amount: amount,
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     bytes memory revertData = "failed to balanceOf";
@@ -2391,7 +2397,8 @@ contract EVM2EVMMultiOffRamp__releaseOrMintSingleToken is EVM2EVMMultiOffRampSet
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
       destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
       extraData: "",
-      amount: amount
+      amount: amount,
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     vm.mockCall(
@@ -2418,7 +2425,8 @@ contract EVM2EVMMultiOffRamp__releaseOrMintSingleToken is EVM2EVMMultiOffRampSet
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
       destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
       extraData: "",
-      amount: amount
+      amount: amount,
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     // This should make the call fail if it does not skip the check
@@ -2445,7 +2453,8 @@ contract EVM2EVMMultiOffRamp__releaseOrMintSingleToken is EVM2EVMMultiOffRampSet
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
       destTokenAddress: abi.encode(destToken),
       extraData: "",
-      amount: amount
+      amount: amount,
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     // Address(0) should always revert
@@ -2487,7 +2496,8 @@ contract EVM2EVMMultiOffRamp__releaseOrMintSingleToken is EVM2EVMMultiOffRampSet
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
       destTokenAddress: abi.encode(destToken),
       extraData: "",
-      amount: amount
+      amount: amount,
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     bytes memory revertData = "call reverted :o";
@@ -2645,7 +2655,8 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
       sourcePoolAddress: abi.encode(fakePoolAddress),
       destTokenAddress: abi.encode(s_offRamp),
       extraData: "",
-      amount: 1
+      amount: 1,
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOffRamp.NotACompatiblePool.selector, address(0)));
@@ -2697,7 +2708,8 @@ contract EVM2EVMMultiOffRamp_releaseOrMintTokens is EVM2EVMMultiOffRampSetup {
       sourcePoolAddress: unusedVar,
       destTokenAddress: abi.encode(destPool),
       extraData: unusedVar,
-      amount: 1
+      amount: 1,
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     try s_offRamp.releaseOrMintTokens(
