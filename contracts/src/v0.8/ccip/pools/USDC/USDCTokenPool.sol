@@ -107,6 +107,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// @dev invokes underlying CCTP protocol
   function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
     external
+    override
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
     return _releaseOrMint(releaseOrMintIn);
