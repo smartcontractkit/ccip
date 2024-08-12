@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/log_emitter"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"math/big"
 	"sync"
 	"testing"
@@ -639,4 +643,50 @@ func TestIntegration_CCIP(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestReorg(t *testing.T) {
+	t.Run("Reorg test to simulate caching problem", func(t *testing.T) {
+		reOrgDepth := 5
+		ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
+		depositAmount := big.NewInt(500000003)
+		ccipTH.Dest.User.Value = depositAmount
+		_, err2 := ccipTH.Dest.WrappedNative.Deposit(ccipTH.Dest.User)
+		require.NoError(t, err2)
+		ccipTH.Source.Chain.Commit()
+		performReOrg := func(ec *backends.SimulatedBackend, user *bind.TransactOpts, reOrgDepth int) {
+			latest, err1 := ec.BlockByNumber(testutils.Context(t), nil)
+			require.NoError(t, err1)
+			reorgedBlock := big.NewInt(0).Sub(latest.Number(), big.NewInt(int64(reOrgDepth)))
+			reOrg, err1 := ec.BlockByNumber(testutils.Context(t), reorgedBlock)
+			require.NoError(t, err1)
+			require.NoError(t, ec.Fork(testutils.Context(t), reOrg.Hash()))
+			_, _, emitter1, err := log_emitter.DeployLogEmitter(user, ec)
+			require.NoError(t, err)
+			// Actually need to change the block here to trigger the reorg.
+			_, err1 = emitter1.EmitLog1(user, []*big.Int{big.NewInt(1)})
+			require.NoError(t, err1)
+			for j := 0; j < reOrgDepth+1; j++ { // Need +1 to make it actually longer height to detect it.
+				ec.Commit()
+			}
+			latest, err1 = ec.BlockByNumber(testutils.Context(t), nil)
+			require.NoError(t, err1)
+			t.Logf("New latest (%v, %x), latest parent %x)\n", latest.NumberU64(), latest.Hash(), latest.ParentHash())
+		}
+
+		gasLimit := big.NewInt(200_003) // prime number
+		tokenAmount := big.NewInt(100)
+
+		// send a request
+		ccipTH.SendMessage(t, gasLimit, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
+		ccipTH.Source.Chain.Commit()
+		ccipTH.Dest.Chain.Commit()
+		_, _ = performReOrg, reOrgDepth
+		performReOrg(ccipTH.Dest.Chain, ccipTH.Dest.User, reOrgDepth)
+		ccipTH.EventuallySendRequested(t, uint64(1))
+		ccipTH.AllNodesHaveReqSeqNum(t, 1, ccipTH.CCIPContracts.Dest.OffRamp.Address())
+		ccipTH.EventuallyReportCommitted(t, 1)
+		executionLog := ccipTH.AllNodesHaveExecutedSeqNums(t, 1, 1)
+		ccipTH.AssertExecState(t, executionLog[0], testhelpers.ExecutionStateSuccess)
+	})
 }
