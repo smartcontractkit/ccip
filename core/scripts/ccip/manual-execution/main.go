@@ -306,7 +306,8 @@ func (args *execArgs) execute() error {
 		gasLimitOverrides[i] = big.NewInt(int64(args.cfg.GasLimitOverride))
 	}
 
-	args.destUser.GasLimit = 5000000
+	// GasLimit may need to be raised if the TX is reverting. Must be set to a value larger than the GasLimitOverride.
+	// args.destUser.GasLimit = 5000000
 	tx, err := helpers.ManuallyExecute(args.destChain, args.destUser, args.cfg.OffRamp, offRampProof, gasLimitOverrides)
 	if err != nil {
 		return err
@@ -314,6 +315,7 @@ func (args *execArgs) execute() error {
 	// wait for tx confirmation
 	err = helpers.WaitForSuccessfulTxReceipt(args.destChain, tx.Hash())
 	if err != nil {
+		log.Println("Failures may be due to insufficient gas, try increasing args.destUser.GasLimit.")
 		return err
 	}
 
