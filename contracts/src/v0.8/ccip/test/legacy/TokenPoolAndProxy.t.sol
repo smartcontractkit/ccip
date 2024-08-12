@@ -21,7 +21,7 @@ import {BurnMintTokenPool1_2, TokenPool1_2} from "./BurnMintTokenPool1_2.sol";
 import {BurnMintTokenPool1_4, TokenPool1_4} from "./BurnMintTokenPool1_4.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
   BurnMintTokenPoolAndProxy internal s_newPool;
@@ -478,10 +478,7 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
     vm.startPrank(address(s_fakeOffRamp));
 
     vm.expectEmit(address(s_legacyPool));
-    emit Minted(address(s_pool), address(s_pool), amount);
-
-    vm.expectEmit(address(s_token));
-    emit IERC20.Approval(address(s_pool), address(s_fakeOffRamp), amount);
+    emit Minted(address(s_pool), address(OWNER), amount);
 
     s_pool.releaseOrMint(
       Pool.ReleaseOrMintInV1({

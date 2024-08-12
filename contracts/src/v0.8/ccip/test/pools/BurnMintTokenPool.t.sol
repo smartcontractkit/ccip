@@ -32,7 +32,7 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
     assertEq(address(s_burnMintERC677), address(s_pool.getToken()));
     assertEq(address(s_mockRMN), s_pool.getRmnProxy());
     assertEq(false, s_pool.getAllowListEnabled());
-    assertEq("BurnMintTokenPool 1.5.0-dev", s_pool.typeAndVersion());
+    assertEq("BurnMintTokenPool 1.5.0", s_pool.typeAndVersion());
   }
 
   function test_PoolBurn_Success() public {
@@ -107,15 +107,17 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
 contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
   function test_PoolMint_Success() public {
     uint256 amount = 1e19;
+    address receiver = makeAddr("receiver_address");
 
     vm.startPrank(s_burnMintOffRamp);
 
     vm.expectEmit();
-    emit IERC20.Approval(address(s_pool), address(s_burnMintOffRamp), amount);
+    emit IERC20.Transfer(address(0), receiver, amount);
+
     s_pool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
         originalSender: bytes(""),
-        receiver: OWNER,
+        receiver: receiver,
         amount: amount,
         localToken: address(s_burnMintERC677),
         remoteChainSelector: DEST_CHAIN_SELECTOR,
@@ -125,7 +127,7 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
       })
     );
 
-    assertEq(s_burnMintERC677.allowance(address(s_pool), s_burnMintOffRamp), amount);
+    assertEq(s_burnMintERC677.balanceOf(receiver), amount);
   }
 
   function test_PoolMintNotHealthy_Revert() public {
