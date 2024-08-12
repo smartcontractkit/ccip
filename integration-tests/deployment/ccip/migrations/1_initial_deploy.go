@@ -1,11 +1,9 @@
 package migrations
 
 import (
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 
-	ccipdeployment "github.com/smartcontractkit/chainlink/integration-tests/deployment/ccip"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/ccip"
 )
 
 // We expect the migration input to be unique per migration.
@@ -19,23 +17,18 @@ func Apply0001(env deployment.Environment, c ccipdeployment.DeployCCIPContractCo
 		env.Logger.Errorw("Failed to deploy CCIP contracts", "err", err, "addresses", ab)
 		return deployment.MigrationOutput{}, err
 	}
-	state, err := ccipdeployment.GenerateOnchainState(env, ab)
+	js, err := ccipdeployment.NewCCIPJobSpecs(env.NodeIDs, env.Offchain)
 	if err != nil {
 		return deployment.MigrationOutput{}, err
 	}
-	js, err := ccipdeployment.GenerateJobSpecs(common.Address{})
-	if err != nil {
-		return deployment.MigrationOutput{}, err
-	}
-	proposal, err := ccipdeployment.GenerateAcceptOwnershipProposal(env, env.AllChainSelectors(), state)
+	proposal, err := ccipdeployment.GenerateAcceptOwnershipProposal(env, env.AllChainSelectors(), ab)
 	if err != nil {
 		return deployment.MigrationOutput{}, err
 	}
 	return deployment.MigrationOutput{
 		Proposals:   []deployment.Proposal{proposal},
 		AddressBook: ab,
-		JobSpecs: map[string][]string{
-			"chain-layer": {js.String()},
-		},
+		// Mapping of which nodes get which jobs.
+		JobSpecs: js,
 	}, nil
 }

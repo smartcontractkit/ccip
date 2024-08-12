@@ -5,6 +5,7 @@ import "fmt"
 type AddressBook interface {
 	Save(chainSelector uint64, address string, typeAndVersion string) error
 	Addresses() (map[uint64]map[string]string, error)
+	AddressesForChain(chain uint64) (map[string]string, error)
 	// Allows for merging address books (e.g. new deployments with existing ones)
 	Merge(other AddressBook) error
 }
@@ -27,6 +28,11 @@ func (m *AddressBookMap) Save(chainSelector uint64, address string, typeAndVersi
 
 func (m *AddressBookMap) Addresses() (map[uint64]map[string]string, error) {
 	return m.AddressesByChain, nil
+}
+
+func (m *AddressBookMap) AddressesForChain(chain uint64) (map[string]string, error) {
+	// TODO error
+	return m.AddressesByChain[chain], nil
 }
 
 // Attention this will mutate existing book

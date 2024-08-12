@@ -1,0 +1,111 @@
+package memory
+
+import (
+	"testing"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/hashicorp/consul/sdk/freeport"
+	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+)
+
+const (
+	Memory = "memory"
+)
+
+type MemoryEnvironmentConfig struct {
+	Chains         int
+	Nodes          int
+	Bootstraps     int
+	RegistryConfig RegistryConfig
+}
+
+// Needed for environment variables on the node which point to prexisitng addresses.
+// i.e. CapReg.
+func NewMemoryChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
+	mchains := GenerateChains(t, numChains)
+	chains := make(map[uint64]deployment.Chain)
+	for cid, chain := range mchains {
+		sel, err := chainsel.SelectorFromChainId(cid)
+		require.NoError(t, err)
+		chains[sel] = deployment.Chain{
+			Selector:    sel,
+			Client:      chain.Backend,
+			DeployerKey: chain.DeployerKey,
+			Confirm: func(tx common.Hash) error {
+				chain.Backend.Commit()
+				return nil
+			},
+		}
+	}
+	return chains
+}
+
+func NewNodes(t *testing.T, chains map[uint64]deployment.Chain, numNodes, numBootstraps int, registryConfig RegistryConfig) map[string]Node {
+	mchains := make(map[uint64]EVMChain)
+	for _, chain := range chains {
+		evmChainID, err := chainsel.ChainIdFromSelector(chain.Selector)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mchains[evmChainID] = EVMChain{
+			Backend:     chain.Client.(*backends.SimulatedBackend),
+			DeployerKey: chain.DeployerKey,
+		}
+	}
+	nodesByPeerID := make(map[string]Node)
+	var nodeIDs []string
+	ports := freeport.GetN(t, numNodes)
+	var existingNumBootstraps int
+	for i := 0; i < numNodes; i++ {
+		bootstrap := false
+		if existingNumBootstraps < numBootstraps {
+			bootstrap = true
+			existingNumBootstraps++
+		}
+		node := NewNode(t, ports[i], mchains, zapcore.DebugLevel, bootstrap, registryConfig)
+		nodesByPeerID[node.Keys.PeerID.String()] = *node
+		// Note in real env, this ID is allocated by JD.
+		nodeIDs = append(nodeIDs, node.Keys.PeerID.String())
+	}
+	return nodesByPeerID
+}
+
+func NewMemoryEnvironmentExistingChains(t *testing.T, lggr logger.Logger,
+	chains map[uint64]deployment.Chain, config MemoryEnvironmentConfig) deployment.Environment {
+	nodes := NewNodes(t, chains, config.Nodes, config.Bootstraps, config.RegistryConfig)
+	var nodeIDs []string
+	for id := range nodes {
+		nodeIDs = append(nodeIDs, id)
+	}
+	return deployment.Environment{
+		Name:     Memory,
+		Offchain: NewMemoryJobClient(nodes),
+		NodeIDs:  nodeIDs,
+		Chains:   chains,
+		Logger:   lggr,
+	}
+}
+
+// To be used by tests and any kind of deployment logic.
+func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, config MemoryEnvironmentConfig) deployment.Environment {
+	chains := NewMemoryChains(t, config.Chains)
+	nodes := NewNodes(t, chains, config.Nodes, config.Bootstraps, config.RegistryConfig)
+	var nodeIDs []string
+	for id := range nodes {
+		nodeIDs = append(nodeIDs, id)
+	}
+	return deployment.Environment{
+		Name:     Memory,
+		Offchain: NewMemoryJobClient(nodes),
+		NodeIDs:  nodeIDs,
+		Chains:   chains,
+		Logger:   lggr,
+	}
+}

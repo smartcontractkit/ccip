@@ -1,46 +1,63 @@
-package deployment
+package ccipdeployment
 
 import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	owner_helpers "github.com/smartcontractkit/ccip-owner-contracts/gethwrappers"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	deployment2 "github.com/smartcontractkit/chainlink/integration-tests/deployment"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 )
 
+func SimTransactOpts() *bind.TransactOpts {
+	return &bind.TransactOpts{Signer: func(address common.Address, transaction *types.Transaction) (*types.Transaction, error) {
+		return transaction, nil
+	}, From: common.HexToAddress("0x0"), NoSend: true, GasLimit: 200_000}
+}
+
 func GenerateAcceptOwnershipProposal(
-	e deployment2.Environment,
+	e deployment.Environment,
 	chains []uint64,
-	state CCIPOnChainState,
-) (deployment2.Proposal, error) {
+	ab deployment.AddressBook,
+) (deployment.Proposal, error) {
+	state, err := GenerateOnchainState(e, ab)
+	if err != nil {
+		return deployment.Proposal{}, err
+	}
 	// TODO: Just onramp as an example
-	var ops []deployment2.ManyChainMultiSigOp
+	var ops []owner_helpers.ManyChainMultiSigOp
 	for _, sel := range chains {
-		e.Chains[sel].DeployerKey.NoSend = true
-		txData, err := state.EvmOnRampsV160[sel].AcceptOwnership(e.Chains[sel].DeployerKey)
+		opCount, err := state.Mcms[sel].GetOpCount(nil)
 		if err != nil {
-			return deployment2.Proposal{}, err
+			return deployment.Proposal{}, err
+		}
+
+		txData, err := state.EvmOnRampsV160[sel].AcceptOwnership(SimTransactOpts())
+		if err != nil {
+			return deployment.Proposal{}, err
 		}
 		evmID, err := chainsel.ChainIdFromSelector(sel)
 		if err != nil {
-			return deployment2.Proposal{}, err
+			return deployment.Proposal{}, err
 		}
-		ops = append(ops, deployment2.ManyChainMultiSigOp{
+		ops = append(ops, owner_helpers.ManyChainMultiSigOp{
 			ChainId:  big.NewInt(int64(evmID)),
-			MultiSig: common.Address{},
-			Nonce:    big.NewInt(0),
+			MultiSig: state.McmsAddrs[sel],
+			Nonce:    opCount,
 			To:       state.EvmOnRampsV160[sel].Address(),
 			Value:    big.NewInt(0),
 			Data:     txData.Data(),
 		})
 	}
 	// TODO: Real valid until.
-	return deployment2.Proposal{ValidUntil: uint32(time.Now().Unix()), Ops: ops}, nil
+	return deployment.Proposal{ValidUntil: uint32(time.Now().Unix()), Ops: ops}, nil
 }
 
-func ApplyProposal(env deployment2.Environment, p deployment2.Proposal, state CCIPOnChainState) error {
+func ApplyProposal(env deployment.Environment, p deployment.Proposal, state CCIPOnChainState) error {
 	// TODO
 	return nil
 }

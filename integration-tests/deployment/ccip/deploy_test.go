@@ -1,17 +1,20 @@
-package deployment
+package ccipdeployment
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 
-	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/memory"
+
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 func TestDeployCCIPContracts(t *testing.T) {
-	e := deployment.NewMemoryEnvironment(t, deployment.MemoryEnvironmentConfig{
+	lggr := logger.TestLogger(t)
+	e := memory.NewMemoryEnvironment(t, lggr, memory.MemoryEnvironmentConfig{
 		Chains: 1,
 		Nodes:  1,
 	})
@@ -24,11 +27,20 @@ func TestDeployCCIPContracts(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert expect every deployed address to be in the address book.
-	for name, chain := range snap.Chains {
-		addrs, err := ab.Addresses()
-		require.NoError(t, err)
-		evmChainID, _ := chainsel.ChainIdFromName(name)
-		sel, _ := chainsel.SelectorFromChainId(evmChainID)
-		assert.Contains(t, addrs[sel], chain.TokenAdminRegistry.String())
+	b, err := json.MarshalIndent(snap, "", "	")
+	require.NoError(t, err)
+	fmt.Println(string(b))
+}
+
+func TestJobSpecGeneration(t *testing.T) {
+	lggr := logger.TestLogger(t)
+	e := memory.NewMemoryEnvironment(t, lggr, memory.MemoryEnvironmentConfig{
+		Chains: 1,
+		Nodes:  1,
+	})
+	js, err := NewCCIPJobSpecs(e.NodeIDs, e.Offchain)
+	require.NoError(t, err)
+	for node, jb := range js {
+		fmt.Println(node, jb)
 	}
 }

@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"net"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -29,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/testutils/heavyweight"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
@@ -53,7 +56,14 @@ func Context(tb testing.TB) context.Context {
 type Node struct {
 	App chainlink.Application
 	// Transmitter key/OCR keys for this node
-	Keys Keys
+	Keys       Keys
+	Addr       net.TCPAddr
+	IsBoostrap bool
+}
+
+type RegistryConfig struct {
+	EVMChainID uint64
+	Contract   common.Address
 }
 
 // Creates a CL node which is:
@@ -65,6 +75,8 @@ func NewNode(
 	port int, // Port for the P2P V2 listener.
 	chains map[uint64]EVMChain,
 	logLevel zapcore.Level,
+	bootstrap bool,
+	registryConfig RegistryConfig,
 ) *Node {
 	// Do not want to load fixtures as they contain a dummy chainID.
 	// Create database and initial configuration.
@@ -78,6 +90,12 @@ func NewNode(
 		c.P2P.V2.DeltaDial = config.MustNewDuration(500 * time.Millisecond)
 		c.P2P.V2.DeltaReconcile = config.MustNewDuration(5 * time.Second)
 		c.P2P.V2.ListenAddresses = &[]string{fmt.Sprintf("127.0.0.1:%d", port)}
+
+		// Enable Capabilities, This is a pre-requisite for registrySyncer to work.
+		c.Capabilities.ExternalRegistry.NetworkID = ptr(relay.NetworkEVM)
+		c.Capabilities.ExternalRegistry.ChainID = ptr(strconv.FormatUint(uint64(registryConfig.EVMChainID), 10))
+		fmt.Println("REG COFN", registryConfig.Contract.String())
+		c.Capabilities.ExternalRegistry.Address = ptr(registryConfig.Contract.String())
 
 		// OCR configs
 		c.OCR.Enabled = ptr(false)
@@ -162,8 +180,10 @@ func NewNode(
 	keys := CreateKeys(t, app, chains)
 
 	return &Node{
-		App:  app,
-		Keys: keys,
+		App:        app,
+		Keys:       keys,
+		Addr:       net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
+		IsBoostrap: bootstrap,
 	}
 }
 

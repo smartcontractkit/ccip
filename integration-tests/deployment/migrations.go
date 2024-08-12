@@ -1,21 +1,10 @@
 package deployment
 
 import (
-	"math/big"
-
-	"github.com/ethereum/go-ethereum/common"
+	owner_wrappers "github.com/smartcontractkit/ccip-owner-contracts/gethwrappers"
 )
 
-// TODO: To move to ccip-owner-contracts
-type ManyChainMultiSigOp struct {
-	ChainId  *big.Int
-	MultiSig common.Address
-	Nonce    *big.Int
-	To       common.Address
-	Value    *big.Int
-	Data     []byte
-}
-
+// TODO: Move to real MCM structs once available.
 type Proposal struct {
 	// keccak256(abi.encode(root, validUntil)) is what is signed by MCMS
 	// signers.
@@ -23,7 +12,7 @@ type Proposal struct {
 	// Leaves are the items in the proposal.
 	// Uses these to generate the root as well as display whats in the root.
 	// These Ops may be destined for distinct chains.
-	Ops []ManyChainMultiSigOp
+	Ops []owner_wrappers.ManyChainMultiSigOp
 }
 
 func (p Proposal) String() string {
