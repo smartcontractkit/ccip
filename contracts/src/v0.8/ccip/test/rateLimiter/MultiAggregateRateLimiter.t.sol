@@ -483,14 +483,14 @@ contract MultiAggregateRateLimiter_updateRateLimitTokens is MultiAggregateRateLi
         remoteChainSelector: CHAIN_SELECTOR_1,
         localToken: s_destTokens[0]
       }),
-      remoteToken: abi.encodePacked(s_sourceTokens[0])
+      remoteToken: abi.encode(s_sourceTokens[0])
     });
     adds[1] = MultiAggregateRateLimiter.RateLimitTokenArgs({
       localTokenArgs: MultiAggregateRateLimiter.LocalRateLimitToken({
         remoteChainSelector: CHAIN_SELECTOR_1,
         localToken: s_destTokens[1]
       }),
-      remoteToken: abi.encodePacked(s_sourceTokens[1])
+      remoteToken: abi.encode(s_sourceTokens[1])
     });
 
     for (uint256 i = 0; i < adds.length; ++i) {
