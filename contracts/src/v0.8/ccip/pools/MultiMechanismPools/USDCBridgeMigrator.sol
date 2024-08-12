@@ -14,7 +14,7 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
 
   mapping(uint64 chainSelector => uint256 lockedBalance) internal s_lockedTokensByChainSelector;
 
-  EnumerableSet.UintSet internal s_ExecutedCCTPChainMigrations;
+  EnumerableSet.UintSet internal s_executedCCTPChainMigrations;
 
   uint64 internal s_proposedUSDCMigrationChain;
 
@@ -47,7 +47,7 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
     delete s_lockedTokensByChainSelector[burnChainSelector];
     delete s_proposedUSDCMigrationChain;
 
-    s_ExecutedCCTPChainMigrations.add(burnChainSelector);
+    s_executedCCTPChainMigrations.add(burnChainSelector);
 
     i_USDC.burn(tokensToBurn);
 
@@ -64,7 +64,7 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
     // Ensure that the chain is supported by CCIP and non-zero, hasn't already been executed on, and is
     // a valid CCIP-supported chain selector
     if (
-      remoteChainSelector == 0 || s_ExecutedCCTPChainMigrations.contains(remoteChainSelector)
+      remoteChainSelector == 0 || s_executedCCTPChainMigrations.contains(remoteChainSelector)
         || !i_router.isChainSupported(remoteChainSelector)
     ) revert InvalidChainSelector(remoteChainSelector);
 
