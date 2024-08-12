@@ -93,11 +93,22 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     emit ConfigSet(address(tokenMessenger));
   }
 
+  /// @inheritdoc IPoolV1
+  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn) {
+    _lockOrBurn(lockOrBurnIn);
+  }
+
+  /// @inheritdoc IPoolV1
+  function _releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    _releaseOrMint(releaseOrMintIn);
+  }
+
+
   /// @notice Burn the token in the pool
   /// @dev emits ITokenMessenger.DepositForBurn
   /// @dev Assumes caller has validated destinationReceiver
-  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
-    public
+  function _lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
+    internal
     virtual
     override
     returns (Pool.LockOrBurnOutV1 memory)
@@ -138,8 +149,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// for that message, including its (nonce, sourceDomain). This way, the only
   /// non-reverting offchainTokenData that can be supplied is a valid attestation for the
   /// specific message that was sent on source.
-  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
-    public
+  function _releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    internal
     virtual
     override
     returns (Pool.ReleaseOrMintOutV1 memory)
