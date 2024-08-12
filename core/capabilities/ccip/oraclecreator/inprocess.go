@@ -311,8 +311,8 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			ccipevm.NewExecutePluginCodecV1(),
 			ccipevm.NewMessageHasherV1(),
 			i.homeChainReader,
-			ccipevm.NewGasEstimateProvider(), // TODO: this works for evm only, how about non-evm?
 			superfakes.NewNilTokenDataReader(),
+			ccipevm.NewGasEstimateProvider(), // TODO: this works for evm only, how about non-evm?
 			contractReaders,
 			chainWriters,
 		)
