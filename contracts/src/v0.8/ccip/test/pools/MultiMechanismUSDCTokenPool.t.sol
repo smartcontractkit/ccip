@@ -54,6 +54,7 @@ contract USDCTokenPoolSetup is BaseTest {
   Router internal s_router;
 
   MultiMechanismUSDCTokenPool internal s_usdcTokenPool;
+  MultiMechanismUSDCTokenPool internal s_usdcTokenPoolTransferLiquidity;
   address[] internal s_allowedList;
 
   function setUp() public virtual override {
@@ -69,6 +70,9 @@ contract USDCTokenPoolSetup is BaseTest {
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
 
     s_usdcTokenPool =
+      new MultiMechanismUSDCTokenPool(s_mockUSDC, s_token, new address[](0), address(s_mockRMN), address(s_router));
+
+    s_usdcTokenPoolTransferLiquidity =
       new MultiMechanismUSDCTokenPool(s_mockUSDC, s_token, new address[](0), address(s_mockRMN), address(s_router));
 
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDC));
@@ -591,5 +595,49 @@ contract USDCTokenPoolMigrationTests is USDCTokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(USDCBridgeMigrator.ExistingMigrationProposal.selector));
     s_usdcTokenPool.burnLockedUSDC();
+  }
+
+  function test_transferLiquidity_Success() public {
+    // Set as the OWNER so we can provide liquidity
+    vm.startPrank(OWNER);
+    s_usdcTokenPoolTransferLiquidity.setRebalancer(OWNER);
+
+    s_token.approve(address(s_usdcTokenPoolTransferLiquidity), type(uint256).max);
+
+    uint256 liquidityAmount = 1e9;
+
+    // Provide 1000 USDC as liquidity
+    s_usdcTokenPoolTransferLiquidity.provideLiquidity(DEST_CHAIN_SELECTOR, liquidityAmount);
+
+    // Set the new token pool as the rebalancer
+    s_usdcTokenPoolTransferLiquidity.setRebalancer(address(s_usdcTokenPool));
+
+    vm.expectEmit();
+    emit ILiquidityContainer.LiquidityRemoved(address(s_usdcTokenPool), liquidityAmount);
+
+    vm.expectEmit();
+    emit MultiMechanismUSDCTokenPool.LiquidityTransferred(
+      address(s_usdcTokenPoolTransferLiquidity), DEST_CHAIN_SELECTOR, liquidityAmount
+    );
+
+    s_usdcTokenPool.transferLiquidity(address(s_usdcTokenPoolTransferLiquidity), DEST_CHAIN_SELECTOR, liquidityAmount);
+
+    assertEq(
+      s_usdcTokenPool.getLockedTokensForChain(DEST_CHAIN_SELECTOR),
+      liquidityAmount,
+      "Tokens locked for dest chain doesn't match expected amount in storage"
+    );
+
+    assertEq(
+      s_usdcTokenPoolTransferLiquidity.getLockedTokensForChain(DEST_CHAIN_SELECTOR),
+      0,
+      "Tokens locked for dest chain in old token pool doesn't match expected amount in storage"
+    );
+
+    assertEq(
+      s_token.balanceOf(address(s_usdcTokenPool)),
+      liquidityAmount,
+      "Liquidity amount of tokens should be new in new pool, but aren't"
+    );
   }
 }

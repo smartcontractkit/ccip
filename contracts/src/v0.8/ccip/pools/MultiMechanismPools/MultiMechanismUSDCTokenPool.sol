@@ -3,9 +3,9 @@ pragma solidity 0.8.24;
 
 import {ILiquidityContainer} from "../../../liquiditymanager/interfaces/ILiquidityContainer.sol";
 import {ITokenMessenger} from "../USDC/ITokenMessenger.sol";
+import {IMigratableMultiMechanismTokenPool} from "./IMigratableMultiMechanismTokenPool.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
-
 import {TokenPool} from "../TokenPool.sol";
 import {USDCTokenPool} from "../USDC/USDCTokenPool.sol";
 import {MultiMechanismPoolManager} from "./MultiMechanismPoolManager.sol";
@@ -28,6 +28,8 @@ contract MultiMechanismUSDCTokenPool is USDCTokenPool, MultiMechanismPoolManager
   /// balanceOf(pool) on home chain >= sum(totalSupply(mint/burn "wrapped" token) on all remote chains) should always hold
   address internal s_rebalancer;
 
+  event LiquidityTransferred(address indexed from, uint64 indexed remoteChainSelector, uint256 amount);
+
   error LanePausedForCCTPMigration(uint64 remoteChainSelector);
 
   constructor(
@@ -48,7 +50,11 @@ contract MultiMechanismUSDCTokenPool is USDCTokenPool, MultiMechanismPoolManager
   {
     // If the alternative mechanism (L/R) for chains which have it enabled
     if (shouldUseAltMechForOutgoingMessage(lockOrBurnIn.remoteChainSelector)) {
-      return _altMechOutgoingMessage(lockOrBurnIn);
+      if (s_proposedUSDCMigrationChain != 0 && s_proposedUSDCMigrationChain == lockOrBurnIn.remoteChainSelector) {
+        revert LanePausedForCCTPMigration(s_proposedUSDCMigrationChain);
+      } else {
+        return _altMechOutgoingMessage(lockOrBurnIn);
+      }
     } else {
       // Otherwise, use native CCTP functionality
       return super.lockOrBurn(lockOrBurnIn);
@@ -107,17 +113,6 @@ contract MultiMechanismUSDCTokenPool is USDCTokenPool, MultiMechanismPoolManager
     return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
-  /// @notice Circle's migration policies requires a pausable supply-lock during the migration process.
-  /// This override adds an additional condition to valid lockOrBurns that ensures the destination chain
-  /// is not currently undergoing a migration by reverting, as well as all other validations
-  function _validateLockOrBurn(Pool.LockOrBurnInV1 memory lockOrBurnIn) internal override {
-    if (s_proposedUSDCMigrationChain != 0 && s_proposedUSDCMigrationChain == lockOrBurnIn.remoteChainSelector) {
-      revert LanePausedForCCTPMigration(s_proposedUSDCMigrationChain);
-    }
-
-    super._validateLockOrBurn(lockOrBurnIn);
-  }
-
   /// @notice Gets LiquidityManager, can be address(0) if none is configured.
   /// @return The current liquidity manager.
   function getRebalancer() external view returns (address) {
@@ -157,5 +152,24 @@ contract MultiMechanismUSDCTokenPool is USDCTokenPool, MultiMechanismPoolManager
 
     i_token.safeTransfer(msg.sender, amount);
     emit ILiquidityContainer.LiquidityRemoved(msg.sender, amount);
+  }
+
+  /// @notice This function can be used to transfer liquidity from an older version of the pool to this pool. To do so
+  /// this pool will have to be set as the rebalancer in the older version of the pool. This allows it to transfer the
+  /// funds in the old pool to the new pool.
+  /// @dev When upgrading a LockRelease pool, this function can be called at the same time as the pool is changed in the
+  /// TokenAdminRegistry. This allows for a smooth transition of both liquidity and transactions to the new pool.
+  /// Alternatively, when no multicall is available, a portion of the funds can be transferred to the new pool before
+  /// changing which pool CCIP uses, to ensure both pools can operate. Then the pool should be changed in the
+  /// TokenAdminRegistry, which will activate the new pool. All new transactions will use the new pool and its
+  /// liquidity. Finally, the remaining liquidity can be transferred to the new pool using this function one more time.
+  /// @param from The address of the old pool.
+  /// @param amount The amount of liquidity to transfer.
+  function transferLiquidity(address from, uint64 remoteChainSelector, uint256 amount) external onlyOwner {
+    IMigratableMultiMechanismTokenPool(from).withdrawLiquidity(remoteChainSelector, amount);
+
+    s_lockedTokensByChainSelector[remoteChainSelector] += amount;
+
+    emit LiquidityTransferred(from, remoteChainSelector, amount);
   }
 }
