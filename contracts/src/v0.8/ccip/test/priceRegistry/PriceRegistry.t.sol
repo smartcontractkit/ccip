@@ -250,7 +250,6 @@ contract PriceRegistrySetup is TokenSetup {
         maxPerMsgGasLimit: MAX_GAS_LIMIT,
         defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
         defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
-        defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
         defaultTxGasLimit: GAS_LIMIT,
         gasMultiplierWeiPerEth: 5e17,
         networkFeeUSDCents: 1_00,
@@ -314,7 +313,6 @@ contract PriceRegistrySetup is TokenSetup {
     assertEq(a.destDataAvailabilityMultiplierBps, b.destDataAvailabilityMultiplierBps);
     assertEq(a.defaultTokenFeeUSDCents, b.defaultTokenFeeUSDCents);
     assertEq(a.defaultTokenDestGasOverhead, b.defaultTokenDestGasOverhead);
-    assertEq(a.defaultTokenDestBytesOverhead, b.defaultTokenDestBytesOverhead);
     assertEq(a.defaultTxGasLimit, b.defaultTxGasLimit);
   }
 }
@@ -1174,13 +1172,6 @@ contract PriceRegistry_applyDestChainConfigUpdates is PriceRegistrySetup {
         destChainConfigArgs.destChainConfig.defaultTxGasLimit, 1, destChainConfigArgs.destChainConfig.maxPerMsgGasLimit
       )
     );
-    destChainConfigArgs.destChainConfig.defaultTokenDestBytesOverhead = uint32(
-      bound(
-        destChainConfigArgs.destChainConfig.defaultTokenDestBytesOverhead,
-        Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-        type(uint32).max
-      )
-    );
     destChainConfigArgs.destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
 
     bool isNewChain = destChainConfigArgs.destChainSelector != DEST_CHAIN_SELECTOR;
@@ -1275,17 +1266,6 @@ contract PriceRegistry_applyDestChainConfigUpdates is PriceRegistrySetup {
     vm.expectRevert(
       abi.encodeWithSelector(PriceRegistry.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
     );
-    s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
-  }
-
-  function test_InvalidDestBytesOverhead_Revert() public {
-    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
-    PriceRegistry.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
-
-    destChainConfigArg.destChainConfig.defaultTokenDestBytesOverhead = uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES - 1);
-
-    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.InvalidDestChainConfig.selector, DEST_CHAIN_SELECTOR));
-
     s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
@@ -1395,8 +1375,6 @@ contract PriceRegistry_getDataAvailabilityCost is PriceRegistrySetup {
     destChainConfigArgs[0].destChainConfig.defaultTxGasLimit = GAS_LIMIT;
     destChainConfigArgs[0].destChainConfig.maxPerMsgGasLimit = GAS_LIMIT;
     destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
-    destChainConfigArgs[0].destChainConfig.defaultTokenDestBytesOverhead = DEFAULT_TOKEN_BYTES_OVERHEAD;
-
     s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
 
     uint256 dataAvailabilityCostUSD = s_priceRegistry.getDataAvailabilityCost(
