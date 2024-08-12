@@ -548,7 +548,6 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(gasPriceObs map[uint64][]*
 				})
 			}
 		}
-
 	}
 
 	sort.Slice(gasPriceUpdate, func(i, j int) bool {
