@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.24;
-
 import {IPoolV1} from "../../interfaces/IPool.sol";
 
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
