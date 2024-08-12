@@ -93,16 +93,24 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     emit ConfigSet(address(tokenMessenger));
   }
 
-  /// @inheritdoc IPoolV1
-  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn) {
-    _lockOrBurn(lockOrBurnIn);
+  /// @notice Burns USDC in the pool
+  /// @dev invokes underlying CCTP protocol
+  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
+    external
+    override
+    returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut)
+  {
+    return _lockOrBurn(lockOrBurnIn);
   }
 
-  /// @inheritdoc IPoolV1
-  function _releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
-    _releaseOrMint(releaseOrMintIn);
+  /// @notice Mints USDC to the recipient
+  /// @dev invokes underlying CCTP protocol
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    external
+    returns (Pool.ReleaseOrMintOutV1 memory)
+  {
+    return _releaseOrMint(releaseOrMintIn);
   }
-
 
   /// @notice Burn the token in the pool
   /// @dev emits ITokenMessenger.DepositForBurn
@@ -110,7 +118,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   function _lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
     internal
     virtual
-    override
     returns (Pool.LockOrBurnOutV1 memory)
   {
     _validateLockOrBurn(lockOrBurnIn);
@@ -152,7 +159,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   function _releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
     internal
     virtual
-    override
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
     _validateReleaseOrMint(releaseOrMintIn);
