@@ -24,6 +24,8 @@ for i, pairs in enumerate(lines):
     # per msg config
     parts = pairs.split(",")
     if len(parts) != 2:
+        if pairs != "":
+            print("skipping CSV line with unexpected format: %s" % pairs)
         continue
 
     msg_id = parts[0]
