@@ -208,7 +208,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
     remoteTokens = new bytes[](tokenCount);
 
     for (uint256 i = 0; i < tokenCount; ++i) {
-      (address localToken, bytes memory remoteToken) = s_rateLimitedTokensLocalToRemote[remoteChainSelector]._at(i);
+      (address localToken, bytes memory remoteToken) = s_rateLimitedTokensLocalToRemote[remoteChainSelector].at(i);
       localTokens[i] = localToken;
       remoteTokens[i] = remoteToken;
     }
@@ -226,7 +226,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
       address localToken = removes[i].localToken;
       uint64 remoteChainSelector = removes[i].remoteChainSelector;
 
-      if (s_rateLimitedTokensLocalToRemote[remoteChainSelector]._remove(localToken)) {
+      if (s_rateLimitedTokensLocalToRemote[remoteChainSelector].remove(localToken)) {
         emit TokenAggregateRateLimitRemoved(remoteChainSelector, localToken);
       }
     }
@@ -244,7 +244,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers {
 
       uint64 remoteChainSelector = localTokenArgs.remoteChainSelector;
 
-      if (s_rateLimitedTokensLocalToRemote[remoteChainSelector]._set(localToken, remoteToken)) {
+      if (s_rateLimitedTokensLocalToRemote[remoteChainSelector].set(localToken, remoteToken)) {
         emit TokenAggregateRateLimitAdded(remoteChainSelector, remoteToken, localToken);
       }
     }
