@@ -33,10 +33,8 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
 
-  error AlreadyAttempted(uint64 sourceChainSelector, uint64 sequenceNumber);
-  error AlreadyExecuted(uint64 sourceChainSelector, uint64 sequenceNumber);
   error ZeroChainSelectorNotAllowed();
-  error ExecutionError(bytes32 messageId, bytes error);
+  error ExecutionError(bytes32 messageId, bytes err);
   error SourceChainNotEnabled(uint64 sourceChainSelector);
   error TokenDataMismatch(uint64 sourceChainSelector, uint64 sequenceNumber);
   error UnexpectedTokenData();
@@ -47,8 +45,9 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   error RootAlreadyCommitted(uint64 sourceChainSelector, bytes32 merkleRoot);
   error InvalidRoot();
   error CanOnlySelfCall();
-  error ReceiverError(bytes error);
-  error TokenHandlingError(bytes error);
+  error ReceiverError(bytes err);
+  error TokenHandlingError(bytes err);
+  error ReleaseOrMintBalanceMismatch(uint256 amountReleased, uint256 balancePre, uint256 balancePost);
   error EmptyReport();
   error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
@@ -74,6 +73,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   event SourceChainSelectorAdded(uint64 sourceChainSelector);
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
   event SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
+  event AlreadyAttempted(uint64 sourceChainSelector, uint64 sequenceNumber);
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event CommitReportAccepted(CommitReport report);
   event RootRemoved(bytes32 root);
@@ -89,14 +89,16 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp)
   struct SourceChainConfig {
-    bool isEnabled; // ──────────╮  Flag whether the source chain is enabled or not
+    IRouter router; // ──────────╮  Local router to use for messages coming from this source chain
+    bool isEnabled; //           |  Flag whether the source chain is enabled or not
     uint64 minSeqNr; // ─────────╯  The min sequence number expected for future messages
     bytes onRamp; // OnRamp address on the source chain
   }
 
   /// @notice SourceChainConfig update args scoped to one source chain
   struct SourceChainConfigArgs {
-    uint64 sourceChainSelector; //  ───╮  Source chain selector of the config to update
+    IRouter router; // ────────────────╮  Local router to use for messages coming from this source chain
+    uint64 sourceChainSelector; //     |  Source chain selector of the config to update
     bool isEnabled; // ────────────────╯  Flag whether the source chain is enabled or not
     bytes onRamp; // OnRamp address on the source chain
   }
@@ -104,12 +106,11 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @notice Dynamic offRamp config
   /// @dev since OffRampConfig is part of OffRampConfigChanged event, if changing it, we should update the ABI on Atlas
   struct DynamicConfig {
-    address router; // ─────────────────────────────────╮ Router address
+    address priceRegistry; // ──────────────────────────╮ Price registry address on the local chain
     uint32 permissionLessExecutionThresholdSeconds; //  │ Waiting time before manual execution is enabled
     uint32 maxTokenTransferGas; //                      │ Maximum amount of gas passed on to token `transfer` call
     uint32 maxPoolReleaseOrMintGas; // ─────────────────╯ Maximum amount of gas passed on to token pool when calling releaseOrMint
     address messageValidator; // Optional message validator to validate incoming messages (zero address = no validator)
-    address priceRegistry; // Price registry address on the local chain
   }
 
   /// @notice a sequenceNumber interval
@@ -169,7 +170,11 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev The sequence number of the last price update
   uint64 private s_latestPriceSequenceNumber;
 
-  constructor(StaticConfig memory staticConfig, SourceChainConfigArgs[] memory sourceChainConfigs) MultiOCR3Base() {
+  constructor(
+    StaticConfig memory staticConfig,
+    DynamicConfig memory dynamicConfig,
+    SourceChainConfigArgs[] memory sourceChainConfigs
+  ) MultiOCR3Base() {
     if (
       staticConfig.rmnProxy == address(0) || staticConfig.tokenAdminRegistry == address(0)
         || staticConfig.nonceManager == address(0)
@@ -187,6 +192,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     i_nonceManager = staticConfig.nonceManager;
     emit StaticConfigSet(staticConfig);
 
+    _setDynamicConfig(dynamicConfig);
     _applySourceChainConfigUpdates(sourceChainConfigs);
   }
 
@@ -279,8 +285,10 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       for (uint256 msgIndex = 0; msgIndex < numMsgs; ++msgIndex) {
         uint256 newLimit = msgGasLimitOverrides[msgIndex];
         // Checks to ensure message cannot be executed with less gas than specified.
-        if (newLimit != 0 && newLimit < report.messages[msgIndex].gasLimit) {
-          revert InvalidManualExecutionGasLimit(report.sourceChainSelector, msgIndex, newLimit);
+        if (newLimit != 0) {
+          if (newLimit < report.messages[msgIndex].gasLimit) {
+            revert InvalidManualExecutionGasLimit(report.sourceChainSelector, msgIndex, newLimit);
+          }
         }
       }
     }
@@ -368,13 +376,6 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
 
       Internal.MessageExecutionState originalState =
         getExecutionState(sourceChainSelector, message.header.sequenceNumber);
-      if (originalState == Internal.MessageExecutionState.SUCCESS) {
-        // If the message has already been executed, we skip it.  We want to not revert on race conditions between
-        // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
-        // reverting an entire DON batch when a user manually executes while the tx is inflight.
-        emit SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
-        continue;
-      }
       // Two valid cases here, we either have never touched this message before, or we tried to execute
       // and failed. This check protects against reentry and re-execution because the other state is
       // IN_PROGRESS which should not be allowed to execute.
@@ -383,7 +384,13 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
           originalState == Internal.MessageExecutionState.UNTOUCHED
             || originalState == Internal.MessageExecutionState.FAILURE
         )
-      ) revert AlreadyExecuted(sourceChainSelector, message.header.sequenceNumber);
+      ) {
+        // If the message has already been executed, we skip it.  We want to not revert on race conditions between
+        // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
+        // reverting an entire DON batch when a user manually executes while the tx is inflight.
+        emit SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
+        continue;
+      }
 
       if (manualExecution) {
         bool isOldCommitReport =
@@ -402,7 +409,8 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         // DON can only execute a message once
         // Acceptable state transitions: UNTOUCHED->SUCCESS, UNTOUCHED->FAILURE
         if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
-          revert AlreadyAttempted(sourceChainSelector, message.header.sequenceNumber);
+          emit AlreadyAttempted(sourceChainSelector, message.header.sequenceNumber);
+          continue;
         }
       }
 
@@ -412,11 +420,15 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       // FAILURE   -> FAILURE  no nonce bump
       // FAILURE   -> SUCCESS  no nonce bump
       // UNTOUCHED messages MUST be executed in order always
-      if (message.header.nonce > 0 && originalState == Internal.MessageExecutionState.UNTOUCHED) {
-        // If a nonce is not incremented, that means it was skipped, and we can ignore the message
-        if (
-          !INonceManager(i_nonceManager).incrementInboundNonce(sourceChainSelector, message.header.nonce, message.sender)
-        ) continue;
+      if (message.header.nonce != 0) {
+        if (originalState == Internal.MessageExecutionState.UNTOUCHED) {
+          // If a nonce is not incremented, that means it was skipped, and we can ignore the message
+          if (
+            !INonceManager(i_nonceManager).incrementInboundNonce(
+              sourceChainSelector, message.header.nonce, message.sender
+            )
+          ) continue;
+        }
       }
 
       // Although we expect only valid messages will be committed, we check again
@@ -427,25 +439,29 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       }
 
       _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
+
       (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
       _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
 
       // Since it's hard to estimate whether manual execution will succeed, we
       // revert the entire transaction if it fails. This will show the user if
       // their manual exec will fail before they submit it.
-      if (
-        manualExecution && newState == Internal.MessageExecutionState.FAILURE
-          && originalState != Internal.MessageExecutionState.UNTOUCHED
-      ) {
-        // If manual execution fails, we revert the entire transaction, unless the originalState is UNTOUCHED as we
-        // would still be making progress by changing the state from UNTOUCHED to FAILURE.
-        revert ExecutionError(message.header.messageId, returnData);
+      if (manualExecution) {
+        if (newState == Internal.MessageExecutionState.FAILURE) {
+          if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
+            // If manual execution fails, we revert the entire transaction, unless the originalState is UNTOUCHED as we
+            // would still be making progress by changing the state from UNTOUCHED to FAILURE.
+            revert ExecutionError(message.header.messageId, returnData);
+          }
+        }
       }
 
       // The only valid prior states are UNTOUCHED and FAILURE (checked above)
       // The only valid post states are FAILURE and SUCCESS (checked below)
-      if (newState != Internal.MessageExecutionState.FAILURE && newState != Internal.MessageExecutionState.SUCCESS) {
-        revert InvalidNewState(sourceChainSelector, message.header.sequenceNumber, newState);
+      if (newState != Internal.MessageExecutionState.SUCCESS) {
+        if (newState != Internal.MessageExecutionState.FAILURE) {
+          revert InvalidNewState(sourceChainSelector, message.header.sequenceNumber, newState);
+        }
       }
 
       emit ExecutionStateChanged(
@@ -465,21 +481,9 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   ) internal returns (Internal.MessageExecutionState, bytes memory) {
     try this.executeSingleMessage(message, offchainTokenData) {}
     catch (bytes memory err) {
-      bytes4 errorSelector = bytes4(err);
-      if (
-        ReceiverError.selector == errorSelector || TokenHandlingError.selector == errorSelector
-          || Internal.InvalidEVMAddress.selector == errorSelector || InvalidDataLength.selector == errorSelector
-          || CallWithExactGas.NoContract.selector == errorSelector || NotACompatiblePool.selector == errorSelector
-          || IMessageInterceptor.MessageValidationError.selector == errorSelector
-      ) {
-        // If CCIP receiver execution is not successful, bubble up receiver revert data,
-        // prepended by the 4 bytes of ReceiverError.selector, TokenHandlingError.selector or InvalidPoolAddress.selector.
-        // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES
-        return (Internal.MessageExecutionState.FAILURE, err);
-      } else {
-        // If revert is not caused by CCIP receiver, it is unexpected, bubble up the revert.
-        revert ExecutionError(message.header.messageId, err);
-      }
+      // return the message execution state as FAILURE and the revert data
+      // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES
+      return (Internal.MessageExecutionState.FAILURE, err);
     }
     // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
     return (Internal.MessageExecutionState.SUCCESS, "");
@@ -492,7 +496,10 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// its execution and enforce atomicity among successful message processing and token transfer.
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts
   /// (for example smart contract wallets) without an associated message.
-  function executeSingleMessage(Internal.Any2EVMRampMessage memory message, bytes[] memory offchainTokenData) external {
+  function executeSingleMessage(
+    Internal.Any2EVMRampMessage memory message,
+    bytes[] calldata offchainTokenData
+  ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
@@ -531,9 +538,9 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
-    (bool success, bytes memory returnData,) = IRouter(s_dynamicConfig.router).routeMessage(
-      any2EvmMessage, Internal.GAS_FOR_CALL_EXACT_CHECK, message.gasLimit, message.receiver
-    );
+    (bool success, bytes memory returnData,) = s_sourceChainConfigs[message.header.sourceChainSelector]
+      .router
+      .routeMessage(any2EvmMessage, Internal.GAS_FOR_CALL_EXACT_CHECK, message.gasLimit, message.receiver);
     // If CCIP receiver execution is not successful, revert the call including token transfers
     if (!success) revert ReceiverError(returnData);
   }
@@ -615,7 +622,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice Returns the sequence number of the last price update.
   /// @return the latest price update sequence number.
-  function getLatestPriceSequenceNumber() public view returns (uint64) {
+  function getLatestPriceSequenceNumber() external view returns (uint64) {
     return s_latestPriceSequenceNumber;
   }
 
@@ -726,6 +733,10 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         revert ZeroChainSelectorNotAllowed();
       }
 
+      if (address(sourceConfigUpdate.router) == address(0)) {
+        revert ZeroAddressNotAllowed();
+      }
+
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
       bytes memory currentOnRamp = currentConfig.onRamp;
       bytes memory newOnRamp = sourceConfigUpdate.onRamp;
@@ -743,15 +754,22 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         revert InvalidStaticConfig(sourceChainSelector);
       }
 
-      // The only dynamic config is the isEnabled flag
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
+      currentConfig.router = sourceConfigUpdate.router;
       emit SourceChainConfigSet(sourceChainSelector, currentConfig);
     }
   }
 
   /// @notice Sets the dynamic config.
+  /// @param dynamicConfig The new dynamic config.
   function setDynamicConfig(DynamicConfig memory dynamicConfig) external onlyOwner {
-    if (dynamicConfig.priceRegistry == address(0) || dynamicConfig.router == address(0)) {
+    _setDynamicConfig(dynamicConfig);
+  }
+
+  /// @notice Sets the dynamic config.
+  /// @param dynamicConfig The dynamic config.
+  function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
+    if (dynamicConfig.priceRegistry == address(0)) {
       revert ZeroAddressNotAllowed();
     }
 
@@ -808,14 +826,19 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       revert NotACompatiblePool(localPoolAddress);
     }
 
+    // We retrieve the local token balance of the receiver before the pool call.
+    (uint256 balancePre, uint256 gasLeft) =
+      _getBalanceOfReceiver(receiver, localToken, s_dynamicConfig.maxPoolReleaseOrMintGas);
+
     // We determined that the pool address is a valid EVM address, but that does not mean the code at this
     // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location
     // contains a contract. If it doesn't it reverts with a known error, which we catch gracefully.
     // We call the pool with exact gas to increase resistance against malicious tokens or token pools.
     // We protects against return data bombs by capping the return data size at MAX_RET_BYTES.
-    (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
-      abi.encodeWithSelector(
-        IPoolV1.releaseOrMint.selector,
+    (bool success, bytes memory returnData, uint256 gasUsedReleaseOrMint) = CallWithExactGas
+      ._callWithExactGasSafeReturnData(
+      abi.encodeCall(
+        IPoolV1.releaseOrMint,
         Pool.ReleaseOrMintInV1({
           originalSender: originalSender,
           receiver: receiver,
@@ -828,7 +851,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         })
       ),
       localPoolAddress,
-      s_dynamicConfig.maxPoolReleaseOrMintGas,
+      gasLeft,
       Internal.GAS_FOR_CALL_EXACT_CHECK,
       Internal.MAX_RET_BYTES
     );
@@ -840,21 +863,44 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     if (returnData.length != Pool.CCIP_POOL_V1_RET_BYTES) {
       revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
     }
+
     uint256 localAmount = abi.decode(returnData, (uint256));
-    // Since token pools send the tokens to the msg.sender, which is this offRamp, we need to
-    // transfer them to the final receiver. We use the _callWithExactGasSafeReturnData function because
-    // the token contracts are not considered trusted.
-    (success, returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
-      abi.encodeWithSelector(IERC20.transfer.selector, receiver, localAmount),
-      localToken,
-      s_dynamicConfig.maxTokenTransferGas,
+    // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case
+    // of a lockRelease pool.
+    if (receiver != localPoolAddress) {
+      (uint256 balancePost,) = _getBalanceOfReceiver(receiver, localToken, gasLeft - gasUsedReleaseOrMint);
+
+      // First we check if the subtraction would result in an underflow to ensure we revert with a clear error
+      if (balancePost < balancePre || balancePost - balancePre != localAmount) {
+        revert ReleaseOrMintBalanceMismatch(localAmount, balancePre, balancePost);
+      }
+    }
+
+    return Client.EVMTokenAmount({token: localToken, amount: localAmount});
+  }
+
+  function _getBalanceOfReceiver(
+    address receiver,
+    address token,
+    uint256 gasLimit
+  ) internal returns (uint256 balance, uint256 gasLeft) {
+    (bool success, bytes memory returnData, uint256 gasUsed) = CallWithExactGas._callWithExactGasSafeReturnData(
+      abi.encodeCall(IERC20.balanceOf, (receiver)),
+      token,
+      gasLimit,
       Internal.GAS_FOR_CALL_EXACT_CHECK,
       Internal.MAX_RET_BYTES
     );
-
     if (!success) revert TokenHandlingError(returnData);
 
-    return Client.EVMTokenAmount({token: localToken, amount: localAmount});
+    // If the call was successful, the returnData should contain only the balance.
+    if (returnData.length != Internal.MAX_BALANCE_OF_RET_BYTES) {
+      revert InvalidDataLength(Internal.MAX_BALANCE_OF_RET_BYTES, returnData.length);
+    }
+
+    // Return the decoded balance, which cannot fail as we checked the length, and the gas that is left
+    // after this call.
+    return (abi.decode(returnData, (uint256)), gasLimit - gasUsed);
   }
 
   /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
@@ -872,7 +918,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
-    bytes[] memory offchainTokenData
+    bytes[] calldata offchainTokenData
   ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
     destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {

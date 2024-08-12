@@ -8,15 +8,19 @@ import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 contract RegistryModuleOwnerCustom is ITypeAndVersion {
   error CanOnlySelfRegister(address admin, address token);
+  error AddressZero();
 
   event AdministratorRegistered(address indexed token, address indexed administrator);
 
-  string public constant override typeAndVersion = "RegistryModuleOwnerCustom 1.5.0-dev";
+  string public constant override typeAndVersion = "RegistryModuleOwnerCustom 1.5.0";
 
   // The TokenAdminRegistry contract
   ITokenAdminRegistry internal immutable i_tokenAdminRegistry;
 
   constructor(address tokenAdminRegistry) {
+    if (tokenAdminRegistry == address(0)) {
+      revert AddressZero();
+    }
     i_tokenAdminRegistry = ITokenAdminRegistry(tokenAdminRegistry);
   }
 

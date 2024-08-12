@@ -90,9 +90,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       router: router,
       priceRegistry: priceRegistry,
       maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
-      maxDataBytes: MAX_DATA_SIZE,
-      maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
-      maxTokenTransferGas: MAX_TOKEN_POOL_TRANSFER_GAS
+      maxDataBytes: MAX_DATA_SIZE
     });
   }
 
@@ -170,7 +168,8 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(s_sourcePoolByToken[tokenAmounts[i].token]),
           destTokenAddress: abi.encode(s_destTokenBySourceToken[tokenAmounts[i].token]),
-          extraData: ""
+          extraData: "",
+          destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
         })
       );
     }
@@ -188,6 +187,14 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
   function _generateSingleBasicMessage() internal view returns (Internal.EVM2EVMMessage[] memory) {
     Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](1);
     messages[0] = _generateAny2EVMMessageNoTokens(1);
+    return messages;
+  }
+
+  function _generateSingleBasicMessageWithTokens() internal view returns (Internal.EVM2EVMMessage[] memory) {
+    Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](1);
+    Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    tokenAmounts[0].amount = 1e18;
+    messages[0] = _generateAny2EVMMessage(1, tokenAmounts, false);
     return messages;
   }
 
@@ -223,15 +230,20 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
 
   function _getGasLimitsFromMessages(Internal.EVM2EVMMessage[] memory messages)
     internal
-    pure
-    returns (uint256[] memory)
+    view
+    returns (EVM2EVMOffRamp.GasLimitOverride[] memory)
   {
-    uint256[] memory gasLimits = new uint256[](messages.length);
+    EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = new EVM2EVMOffRamp.GasLimitOverride[](messages.length);
     for (uint256 i = 0; i < messages.length; ++i) {
-      gasLimits[i] = messages[i].gasLimit;
+      gasLimitOverrides[i].receiverExecutionGasLimit = messages[i].gasLimit;
+      gasLimitOverrides[i].tokenGasOverrides = new uint32[](messages[i].tokenAmounts.length);
+
+      for (uint256 j = 0; j < messages[i].tokenAmounts.length; ++j) {
+        gasLimitOverrides[i].tokenGasOverrides[j] = DEFAULT_TOKEN_DEST_GAS_OVERHEAD + 1;
+      }
     }
 
-    return gasLimits;
+    return gasLimitOverrides;
   }
 
   function _assertSameConfig(EVM2EVMOffRamp.DynamicConfig memory a, EVM2EVMOffRamp.DynamicConfig memory b) public pure {
@@ -240,8 +252,6 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     assertEq(a.priceRegistry, b.priceRegistry);
     assertEq(a.maxNumberOfTokensPerMsg, b.maxNumberOfTokensPerMsg);
     assertEq(a.maxDataBytes, b.maxDataBytes);
-    assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);
-    assertEq(a.maxTokenTransferGas, b.maxTokenTransferGas);
   }
 
   function _getDefaultSourceTokenData(Client.EVMTokenAmount[] memory srcTokenAmounts)
@@ -255,7 +265,8 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(s_sourcePoolByToken[srcTokenAmounts[i].token]),
           destTokenAddress: abi.encode(s_destTokenBySourceToken[srcTokenAmounts[i].token]),
-          extraData: ""
+          extraData: "",
+          destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
         })
       );
     }

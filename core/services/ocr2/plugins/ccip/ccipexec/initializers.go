@@ -2,10 +2,8 @@ package ccipexec
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/big"
-	"strconv"
 	"time"
 
 	"github.com/smartcontractkit/chainlink/v2/plugins"
@@ -19,17 +17,11 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"go.uber.org/multierr"
 
-	chainselectors "github.com/smartcontractkit/chain-selectors"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
-
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -50,7 +42,13 @@ var (
 	tokenDataWorkerNumWorkers = 5
 )
 
-var defaultNewReportingPluginRetryConfig = ccipdata.RetryConfig{InitialDelay: time.Second, MaxDelay: 5 * time.Minute}
+var defaultNewReportingPluginRetryConfig = ccipdata.RetryConfig{
+	InitialDelay: time.Second,
+	MaxDelay:     10 * time.Minute,
+	// Retry for approximately 4hrs (MaxDelay of 10m = 6 times per hour, times 4 hours, plus 10 because the first
+	// 10 retries only take 20 minutes due to an initial retry of 1s and exponential backoff)
+	MaxRetries: (6 * 4) + 10,
+}
 
 func NewExecServices(ctx context.Context, lggr logger.Logger, cfg plugins.RegistrarConfig, jb job.Job, sourceTokenAddress string, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider, srcChainID int64, dstChainID int64, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	lggr = lggr.Named("ccip-exec").Named(string(jb.ID))
@@ -109,33 +107,17 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, cfg plugins.Regist
 // UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
 // See comment in UnregisterCommitPluginLpFilters
 // It MUST mirror the filters registered in NewExecServices.
-func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer) error {
-	params, err := extractJobSpecParams(lggr, jb, chainSet, false)
-	if err != nil {
-		return err
-	}
-
-	offRampAddress, err := params.offRampReader.Address(ctx)
-	if err != nil {
-		return fmt.Errorf("get offramp reader address: %w", err)
-	}
-
-	versionFinder := factory.NewEvmVersionFinder()
+// This currently works because the filters registered by the created custom providers when the job is first added
+// are stored in the db. Those same filters are unregistered (i.e. deleted from the db) by the newly created providers
+// that are passed in from cleanupEVM, as while the providers have no knowledge of each other, they are created
+// on the same source and dest relayer.
+func UnregisterExecPluginLpFilters(srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider) error {
 	unregisterFuncs := []func() error{
 		func() error {
-			return factory.CloseCommitStoreReader(lggr, versionFinder, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller())
+			return srcProvider.Close()
 		},
 		func() error {
-			return factory.CloseOnRampReader(lggr, versionFinder, params.offRampConfig.SourceChainSelector, params.offRampConfig.ChainSelector, params.offRampConfig.OnRamp, params.sourceChain.LogPoller(), params.sourceChain.Client())
-		},
-		func() error {
-			return factory.CloseOffRampReader(lggr, versionFinder, offRampAddress, params.destChain.Client(), params.destChain.LogPoller(), params.destChain.GasEstimator(), params.destChain.Config().EVM().GasEstimator().PriceMax().ToInt())
-		},
-		func() error { // usdc token data reader
-			if usdcDisabled := params.pluginConfig.USDCConfig.AttestationAPI == ""; usdcDisabled {
-				return nil
-			}
-			return ccipdata.CloseUSDCReader(lggr, jobIDToString(jb.ID), params.pluginConfig.USDCConfig.SourceMessageTransmitterAddress, params.sourceChain.LogPoller())
+			return dstProvider.Close()
 		},
 	}
 
@@ -152,63 +134,4 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 // Only MessageIDs will be populated in the TxMeta.
 func ExecReportToEthTxMeta(ctx context.Context, typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
 	return factory.ExecReportToEthTxMeta(ctx, typ, ver)
-}
-
-type jobSpecParams struct {
-	pluginConfig  ccipconfig.ExecPluginJobSpecConfig
-	offRampConfig cciptypes.OffRampStaticConfig
-	offRampReader ccipdata.OffRampReader
-	sourceChain   legacyevm.Chain
-	destChain     legacyevm.Chain
-}
-
-func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, registerFilters bool) (*jobSpecParams, error) {
-	if jb.OCR2OracleSpec == nil {
-		return nil, fmt.Errorf("spec is nil")
-	}
-	spec := jb.OCR2OracleSpec
-	var pluginConfig ccipconfig.ExecPluginJobSpecConfig
-	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	destChain, _, err := ccipconfig.GetChainFromSpec(spec, chainSet)
-	if err != nil {
-		return nil, err
-	}
-
-	versionFinder := factory.NewEvmVersionFinder()
-	offRampAddress := ccipcalc.HexToAddress(spec.ContractID)
-	offRampReader, err := factory.NewOffRampReader(lggr, versionFinder, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), destChain.Config().EVM().GasEstimator().PriceMax().ToInt(), registerFilters)
-	if err != nil {
-		return nil, fmt.Errorf("create offRampReader: %w", err)
-	}
-
-	offRampConfig, err := offRampReader.GetStaticConfig(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("get offRamp static config: %w", err)
-	}
-
-	chainID, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	sourceChain, err := chainSet.Get(strconv.FormatUint(chainID, 10))
-	if err != nil {
-		return nil, fmt.Errorf("open source chain: %w", err)
-	}
-
-	return &jobSpecParams{
-		pluginConfig:  pluginConfig,
-		offRampConfig: offRampConfig,
-		offRampReader: offRampReader,
-		sourceChain:   sourceChain,
-		destChain:     destChain,
-	}, nil
-}
-
-func jobIDToString(id int32) string {
-	return fmt.Sprintf("job_%d", id)
 }

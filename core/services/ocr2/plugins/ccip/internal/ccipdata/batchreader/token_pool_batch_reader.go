@@ -38,7 +38,6 @@ type EVMTokenPoolBatchedReader struct {
 	tokenPoolReaderMu sync.RWMutex
 }
 
-//go:generate mockery --quiet --name TokenPoolBatchedReader --filename token_pool_batched_reader_mock.go --case=underscor
 type TokenPoolBatchedReader interface {
 	cciptypes.TokenPoolBatchedReader
 }

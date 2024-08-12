@@ -36,20 +36,14 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/PingPongDemo/PingPongDemo.abi ../../../contracts/solc/v0.8.24/PingPongDemo/PingPongDemo.bin PingPongDemo ping_pong_demo
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/SelfFundedPingPong/SelfFundedPingPong.abi ../../../contracts/solc/v0.8.24/SelfFundedPingPong/SelfFundedPingPong.bin SelfFundedPingPong self_funded_ping_pong
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MessageHasher/MessageHasher.abi ../../../contracts/solc/v0.8.24/MessageHasher/MessageHasher.bin MessageHasher message_hasher
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MultiOCR3Helper/MultiOCR3Helper.abi ../../../contracts/solc/v0.8.24/MultiOCR3Helper/MultiOCR3Helper.bin MultiOCR3Helper multi_ocr3_helper
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPReaderTester/CCIPReaderTester.abi ../../../contracts/solc/v0.8.24/CCIPReaderTester/CCIPReaderTester.bin CCIPReaderTester ccip_reader_tester
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/ReportCodec/ReportCodec.abi ../../../contracts/solc/v0.8.24/ReportCodec/ReportCodec.bin ReportCodec report_codec
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/EtherSenderReceiver/EtherSenderReceiver.abi ../../../contracts/solc/v0.8.24/EtherSenderReceiver/EtherSenderReceiver.bin EtherSenderReceiver ether_sender_receiver
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/WETH9/WETH9.abi ../../../contracts/solc/v0.8.24/WETH9/WETH9.bin WETH9 weth9
 
 // Customer contracts
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/USDCTokenPool/USDCTokenPool.abi ../../../contracts/solc/v0.8.24/USDCTokenPool/USDCTokenPool.bin USDCTokenPool usdc_token_pool
-
-// Generate mocks for our contracts
-//go:generate mockery --quiet --dir ./generated/evm_2_evm_onramp/ --name EVM2EVMOnRampInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
-//go:generate mockery --quiet --dir ./generated/evm_2_evm_offramp/ --name EVM2EVMOffRampInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
-//go:generate mockery --quiet --dir ./generated/evm_2_evm_offramp_1_2_0/ --name EVM2EVMOffRampInterface --output ./mocks/v1_2_0/ --outpkg mock_contracts --case=underscore
-//go:generate mockery --quiet --dir ./generated/evm_2_evm_offramp_1_0_0/ --name EVM2EVMOffRampInterface --output ./mocks/v1_0_0/ --outpkg mock_contracts --case=underscore
-//go:generate mockery --quiet --dir ./generated/commit_store/ --name CommitStoreInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
-//go:generate mockery --quiet --dir ./generated/price_registry/ --name PriceRegistryInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
-//go:generate mockery --quiet --dir ../generated/link_token_interface/ --name LinkTokenInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
 
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:

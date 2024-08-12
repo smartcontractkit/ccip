@@ -9,8 +9,8 @@ echo " └───────────────────────�
 SOLC_VERSION="0.8.24"
 OPTIMIZE_RUNS=26000
 OPTIMIZE_RUNS_OFFRAMP=18000
-OPTIMIZE_RUNS_ONRAMP=3600
-OPTIMIZE_RUNS_MULTI_OFFRAMP=2400
+OPTIMIZE_RUNS_ONRAMP=4100
+OPTIMIZE_RUNS_MULTI_OFFRAMP=2000
 
 
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
@@ -36,9 +36,13 @@ compileContract () {
     echo "MultiOffRamp uses $OPTIMIZE_RUNS_MULTI_OFFRAMP optimizer runs."
       optimize_runs=$OPTIMIZE_RUNS_MULTI_OFFRAMP
       ;;
-    "ccip/onRamp/EVM2EVMMultiOnRamp.sol" | "ccip/onRamp/EVM2EVMOnRamp.sol")
+    "ccip/onRamp/EVM2EVMOnRamp.sol")
     echo "OnRamp uses $OPTIMIZE_RUNS_ONRAMP optimizer runs."
       optimize_runs=$OPTIMIZE_RUNS_ONRAMP
+      ;;
+    "ccip/test/helpers/CCIPReaderTester.sol")
+    echo "CCIPReaderTester uses 1 optimizer runs for reduced contract size."
+      optimize_runs=1
       ;;
   esac
 
@@ -83,7 +87,10 @@ compileContract ccip/NonceManager.sol
 compileContract ccip/test/helpers/BurnMintERC677Helper.sol
 compileContract ccip/test/helpers/CommitStoreHelper.sol
 compileContract ccip/test/helpers/MessageHasher.sol
+compileContract ccip/test/helpers/CCIPReaderTester.sol
+compileContract ccip/test/helpers/ReportCodec.sol
 compileContract ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
+compileContract ccip/test/helpers/MultiOCR3Helper.sol
 compileContract ccip/test/mocks/MockRMN1_0.sol
 compileContract ccip/test/mocks/MockE2EUSDCTokenMessenger.sol
 compileContract ccip/test/mocks/MockE2EUSDCTransmitter.sol

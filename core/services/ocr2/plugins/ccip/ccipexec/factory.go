@@ -17,6 +17,7 @@ import (
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
@@ -234,8 +235,11 @@ type reportingPluginAndInfo struct {
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
 	initialRetryDelay := rf.config.newReportingPluginRetryConfig.InitialDelay
 	maxDelay := rf.config.newReportingPluginRetryConfig.MaxDelay
+	maxRetries := rf.config.newReportingPluginRetryConfig.MaxRetries
 
-	pluginAndInfo, err := ccipcommon.RetryUntilSuccess(rf.newReportingPluginFn(config), initialRetryDelay, maxDelay)
+	pluginAndInfo, err := ccipcommon.RetryUntilSuccess(
+		rf.NewReportingPluginFn(config), initialRetryDelay, maxDelay, maxRetries,
+	)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -245,8 +249,8 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 // NewReportingPluginFn implements the NewReportingPlugin logic. It is defined as a function so that it can easily be
 // retried via RetryUntilSuccess. NewReportingPlugin must return successfully in order for the Exec plugin to function,
 // hence why we can only keep retrying it until it succeeds.
-func (rf *ExecutionReportingPluginFactory) newReportingPluginFn(config types.ReportingPluginConfig) func() (reportingPluginAndInfo, error) {
-	return func() (reportingPluginAndInfo, error) {
+func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.ReportingPluginConfig) func() (reportingPluginAndInfo, error) {
+	newReportingPluginFn := func() (reportingPluginAndInfo, error) {
 		ctx := context.Background() // todo: consider setting a timeout
 
 		// Start the chainHealthcheck and tokenDataWorker services
@@ -283,6 +287,11 @@ func (rf *ExecutionReportingPluginFactory) newReportingPluginFn(config types.Rep
 			return reportingPluginAndInfo{}, fmt.Errorf("get onchain config from offramp: %w", err)
 		}
 
+		batchingStrategy, err := NewBatchingStrategy(offchainConfig.BatchingStrategyID, rf.config.txmStatusChecker)
+		if err != nil {
+			return reportingPluginAndInfo{}, fmt.Errorf("get batching strategy: %w", err)
+		}
+
 		msgVisibilityInterval := offchainConfig.MessageVisibilityInterval.Duration()
 		if msgVisibilityInterval.Seconds() == 0 {
 			rf.config.lggr.Info("MessageVisibilityInterval not set, falling back to PermissionLessExecutionThreshold")
@@ -308,9 +317,10 @@ func (rf *ExecutionReportingPluginFactory) newReportingPluginFn(config types.Rep
 			offRampReader:               rf.config.offRampReader,
 			tokenPoolBatchedReader:      rf.config.tokenPoolBatchedReader,
 			inflightReports:             newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
-			commitRootsCache:            cache.NewCommitRootsCache(lggr, msgVisibilityInterval, offchainConfig.RootSnoozeTime.Duration()),
+			commitRootsCache:            cache.NewCommitRootsCache(lggr, rf.config.commitStoreReader, msgVisibilityInterval, offchainConfig.RootSnoozeTime.Duration()),
 			metricsCollector:            rf.config.metricsCollector,
 			chainHealthcheck:            rf.config.chainHealthcheck,
+			batchingStrategy:            batchingStrategy,
 		}
 
 		pluginInfo := types.ReportingPluginInfo{
@@ -325,5 +335,15 @@ func (rf *ExecutionReportingPluginFactory) newReportingPluginFn(config types.Rep
 		}
 
 		return reportingPluginAndInfo{plugin, pluginInfo}, nil
+	}
+
+	return func() (reportingPluginAndInfo, error) {
+		result, err := newReportingPluginFn()
+		if err != nil {
+			rf.config.lggr.Errorw("NewReportingPlugin failed", "err", err)
+			rf.config.metricsCollector.NewReportingPluginError()
+		}
+
+		return result, err
 	}
 }

@@ -25,7 +25,7 @@ contract BaseTest is Test {
   // Message info
   uint64 internal constant SOURCE_CHAIN_SELECTOR = 1;
   uint64 internal constant DEST_CHAIN_SELECTOR = 2;
-  uint64 internal constant GAS_LIMIT = 200_000;
+  uint32 internal constant GAS_LIMIT = 200_000;
 
   // Timing
   uint256 internal constant BLOCK_TIME = 1234567890;
@@ -38,8 +38,8 @@ contract BaseTest is Test {
   uint16 internal constant DEST_GAS_PER_PAYLOAD_BYTE = 16;
 
   uint16 internal constant DEFAULT_TOKEN_FEE_USD_CENTS = 50;
-  uint32 internal constant DEFAULT_TOKEN_DEST_GAS_OVERHEAD = 34_000;
-  uint32 internal constant DEFAULT_TOKEN_BYTES_OVERHEAD = 50;
+  uint32 internal constant DEFAULT_TOKEN_DEST_GAS_OVERHEAD = 85_000;
+  uint32 internal constant DEFAULT_TOKEN_BYTES_OVERHEAD = 32;
 
   bool private s_baseTestInitialized;
 

@@ -29,8 +29,6 @@ import (
 // This may lead to some false-positives, but in this case we want to be extra cautious and avoid executing any reorged messages.
 //
 // Additionally, to reduce the number of calls to the RPC, we refresh RMN state in the background based on defaultRMNStateRefreshInterval
-//
-//go:generate mockery --quiet --name ChainHealthcheck --filename chain_health_mock.go --case=underscore
 type ChainHealthcheck interface {
 	services.Service
 	IsHealthy(ctx context.Context) (bool, error)

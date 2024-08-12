@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-
 import {SortedSetValidationUtil} from "../../../shared/util/SortedSetValidationUtil.sol";
 import {CCIPConfig} from "../../capability/CCIPConfig.sol";
 import {ICapabilitiesRegistry} from "../../capability/interfaces/ICapabilitiesRegistry.sol";
 import {CCIPConfigTypes} from "../../capability/libraries/CCIPConfigTypes.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {CCIPConfigHelper} from "../helpers/CCIPConfigHelper.sol";
+import {Test} from "forge-std/Test.sol";
 
 contract CCIPConfigSetup is Test {
   address public constant OWNER = 0x82ae2B4F57CA5C1CBF8f744ADbD3697aD1a35AFe;
@@ -103,9 +102,27 @@ contract CCIPConfigSetup is Test {
     return (p2pIds, signers, transmitters);
   }
 
-  function test_getCapabilityConfiguration_Success() public {
+  function test_getCapabilityConfiguration_Success() public view {
     bytes memory capConfig = s_ccipCC.getCapabilityConfiguration(42 /* doesn't matter, not used */ );
     assertEq(capConfig.length, 0, "capability config length must be 0");
+  }
+}
+
+contract CCIPConfig_constructor is Test {
+  // Successes.
+
+  function test_constructor_Success() public {
+    address capabilitiesRegistry = makeAddr("capabilitiesRegistry");
+    CCIPConfigHelper ccipCC = new CCIPConfigHelper(capabilitiesRegistry);
+    assertEq(address(ccipCC.getCapabilityRegistry()), capabilitiesRegistry);
+    assertEq(ccipCC.typeAndVersion(), "CCIPConfig 1.6.0-dev");
+  }
+
+  // Reverts.
+
+  function test_constructor_ZeroAddressNotAllowed_Revert() public {
+    vm.expectRevert(CCIPConfig.ZeroAddressNotAllowed.selector);
+    new CCIPConfigHelper(address(0));
   }
 }
 
@@ -686,7 +703,7 @@ contract CCIPConfig_validateConfig is CCIPConfigSetup {
 contract CCIPConfig_ConfigStateMachine is CCIPConfigSetup {
   // Successful cases.
 
-  function test__stateFromConfigLength_Success() public {
+  function test__stateFromConfigLength_Success() public view {
     uint256 configLen = 0;
     CCIPConfigTypes.ConfigState state = s_ccipCC.stateFromConfigLength(configLen);
     assertEq(uint256(state), uint256(CCIPConfigTypes.ConfigState.Init));
@@ -700,7 +717,7 @@ contract CCIPConfig_ConfigStateMachine is CCIPConfigSetup {
     assertEq(uint256(state), uint256(CCIPConfigTypes.ConfigState.Staging));
   }
 
-  function test__validateConfigStateTransition_Success() public {
+  function test__validateConfigStateTransition_Success() public view {
     s_ccipCC.validateConfigStateTransition(CCIPConfigTypes.ConfigState.Init, CCIPConfigTypes.ConfigState.Running);
 
     s_ccipCC.validateConfigStateTransition(CCIPConfigTypes.ConfigState.Running, CCIPConfigTypes.ConfigState.Staging);
@@ -708,7 +725,7 @@ contract CCIPConfig_ConfigStateMachine is CCIPConfigSetup {
     s_ccipCC.validateConfigStateTransition(CCIPConfigTypes.ConfigState.Staging, CCIPConfigTypes.ConfigState.Running);
   }
 
-  function test__computeConfigDigest_Success() public {
+  function test__computeConfigDigest_Success() public view {
     // config digest must change upon:
     // - ocr config change (e.g plugin type, chain selector, etc.)
     // - don id change
@@ -752,7 +769,7 @@ contract CCIPConfig_ConfigStateMachine is CCIPConfigSetup {
     assertNotEq(configDigest2, configDigest4, "config digests 2 and 4 must not match");
   }
 
-  function test_Fuzz__groupByPluginType_Success(uint256 numCommitCfgs, uint256 numExecCfgs) public {
+  function test_Fuzz__groupByPluginType_Success(uint256 numCommitCfgs, uint256 numExecCfgs) public view {
     numCommitCfgs = bound(numCommitCfgs, 0, 2);
     numExecCfgs = bound(numExecCfgs, 0, 2);
 
@@ -1360,7 +1377,7 @@ contract CCIPConfig_ConfigStateMachine is CCIPConfigSetup {
   }
 }
 
-contract CCIPConfig__updatePluginConfig is CCIPConfigSetup {
+contract CCIPConfig_updatePluginConfig is CCIPConfigSetup {
   // Successes.
 
   function test__updatePluginConfig_InitToRunning_Success() public {
@@ -1395,7 +1412,6 @@ contract CCIPConfig__updatePluginConfig is CCIPConfigSetup {
     (bytes32[] memory p2pIds, bytes[] memory signers, bytes[] memory transmitters) = _addChainConfig(4);
     // add blue config.
     uint32 donId = 1;
-    Internal.OCRPluginType pluginType = Internal.OCRPluginType.Commit;
     CCIPConfigTypes.OCR3Config memory blueConfig = CCIPConfigTypes.OCR3Config({
       pluginType: Internal.OCRPluginType.Commit,
       offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
@@ -1451,7 +1467,6 @@ contract CCIPConfig__updatePluginConfig is CCIPConfigSetup {
     (bytes32[] memory p2pIds, bytes[] memory signers, bytes[] memory transmitters) = _addChainConfig(4);
     // add blue config.
     uint32 donId = 1;
-    Internal.OCRPluginType pluginType = Internal.OCRPluginType.Commit;
     CCIPConfigTypes.OCR3Config memory blueConfig = CCIPConfigTypes.OCR3Config({
       pluginType: Internal.OCRPluginType.Commit,
       offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
