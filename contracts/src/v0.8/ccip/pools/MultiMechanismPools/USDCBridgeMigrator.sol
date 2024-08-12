@@ -51,9 +51,6 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
 
     i_USDC.burn(tokensToBurn);
 
-    // TODO: Should the "should-use-alt-mechanism" mapping be updated automatically here for the chain
-    // selector on execution, or require another manual update?
-
     emit CCTPMigrationExecuted(burnChainSelector, tokensToBurn);
   }
 

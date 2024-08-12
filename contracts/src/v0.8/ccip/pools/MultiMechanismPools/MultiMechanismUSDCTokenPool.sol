@@ -69,7 +69,6 @@ contract MultiMechanismUSDCTokenPool is USDCTokenPool, MultiMechanismPoolManager
     override
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
-    // TODO: Determine which struct field for token Data should be used in this function
     if (shouldUseAltMechForIncomingMessage(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.offchainTokenData)) {
       return _altMechIncomingMessage(releaseOrMintIn);
     } else {
