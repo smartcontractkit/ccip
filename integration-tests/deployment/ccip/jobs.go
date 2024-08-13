@@ -53,7 +53,7 @@ func NewCCIPJobSpecs(nodeIds []string, oc deployment.OffchainClient) (map[string
 		spec, err := validate.NewCCIPSpecToml(validate.SpecArgs{
 			P2PV2Bootstrappers:     bootstraps,
 			CapabilityVersion:      CapabilityVersion,
-			CapabilityLabelledName: "CCIP",
+			CapabilityLabelledName: CapabilityLabelledName,
 			OCRKeyBundleIDs: map[string]string{
 				// TODO: Validate that that all EVM chains are using the same keybundle.
 				relay.NetworkEVM: nodeChainConfigs.ChainConfigs[0].Ocr2Config.OcrKeyBundle.BundleId,

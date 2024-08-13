@@ -94,7 +94,6 @@ func NewNode(
 		// Enable Capabilities, This is a pre-requisite for registrySyncer to work.
 		c.Capabilities.ExternalRegistry.NetworkID = ptr(relay.NetworkEVM)
 		c.Capabilities.ExternalRegistry.ChainID = ptr(strconv.FormatUint(uint64(registryConfig.EVMChainID), 10))
-		fmt.Println("REG COFN", registryConfig.Contract.String())
 		c.Capabilities.ExternalRegistry.Address = ptr(registryConfig.Contract.String())
 
 		// OCR configs

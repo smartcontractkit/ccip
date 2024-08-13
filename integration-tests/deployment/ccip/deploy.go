@@ -45,9 +45,6 @@ var (
 	EVM2EVMMultiOffRamp_1_6_0  = "EVM2EVMMultiOffRamp 1.6.0-dev"
 	NonceManager_1_6_0         = "NonceManager 1.6.0-dev"
 	PriceRegistry_1_6_0        = "PriceRegistry 1.6.0-dev"
-
-	CapabilityLabelledName = "ccip"
-	CapabilityVersion      = "v1.0.0"
 )
 
 type Contracts interface {
@@ -109,69 +106,6 @@ type DeployCCIPContractConfig struct {
 	// Leave empty if we want to deploy everything
 	// TODO: Add skips to deploy function.
 	CCIPOnChainState
-}
-
-func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainSel uint64) (deployment.AddressBook, error) {
-	ab := deployment.NewMemoryAddressBook()
-	chain := chains[chainSel]
-	capReg, err := deployContract(lggr, chain, ab,
-		func(chain deployment.Chain) ContractDeploy[*capabilities_registry.CapabilitiesRegistry] {
-			crAddr, tx, cr, err2 := capabilities_registry.DeployCapabilitiesRegistry(
-				chain.DeployerKey,
-				chain.Client,
-			)
-			return ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
-				Address: crAddr, Contract: cr, TvStr: CapabilitiesRegistry_1_0_0, Tx: tx, Err: err2,
-			}
-		})
-	if err != nil {
-		lggr.Errorw("Failed to deploy capreg", "err", err)
-		return ab, err
-	}
-	lggr.Infow("deployed capreg", "addr", capReg.Address)
-	ccipConfig, err := deployContract(
-		lggr, chain, ab,
-		func(chain deployment.Chain) ContractDeploy[*ccip_config.CCIPConfig] {
-			ccAddr, tx, cc, err2 := ccip_config.DeployCCIPConfig(
-				chain.DeployerKey,
-				chain.Client,
-				capReg.Address,
-			)
-			return ContractDeploy[*ccip_config.CCIPConfig]{
-				Address: ccAddr, TvStr: CCIPConfig_1_6_0, Tx: tx, Err: err2, Contract: cc,
-			}
-		})
-	if err != nil {
-		lggr.Errorw("Failed to deploy ccip config", "err", err)
-		return ab, err
-	}
-	lggr.Infow("deployed ccip config", "addr", ccipConfig.Address)
-
-	_, err = capReg.Contract.AddCapabilities(chain.DeployerKey, []capabilities_registry.CapabilitiesRegistryCapability{
-		{
-			LabelledName:          CapabilityLabelledName,
-			Version:               CapabilityVersion,
-			CapabilityType:        2, // consensus. not used (?)
-			ResponseType:          0, // report. not used (?)
-			ConfigurationContract: ccipConfig.Address,
-		},
-	})
-	if err != nil {
-		lggr.Errorw("Failed to add capabilities", "err", err)
-		return ab, err
-	}
-	// TODO: Just one for testing.
-	_, err = capReg.Contract.AddNodeOperators(chain.DeployerKey, []capabilities_registry.CapabilitiesRegistryNodeOperator{
-		{
-			Admin: chain.DeployerKey.From,
-			Name:  "NodeOperator",
-		},
-	})
-	if err != nil {
-		lggr.Errorw("Failed to add node operators", "err", err)
-		return ab, err
-	}
-	return ab, nil
 }
 
 // TODO: Likely we'll want to further parameterize the deployment
