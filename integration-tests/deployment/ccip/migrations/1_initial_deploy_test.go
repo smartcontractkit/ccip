@@ -36,7 +36,7 @@ func Test0001_InitialDeploy(t *testing.T) {
 
 	addrs, err := ab.AddressesForChain(homeChainSel)
 	require.NoError(t, err)
-	require.Len(t, addrs, 1)
+	require.Len(t, addrs, 2)
 	capReg := common.Address{}
 	for addr := range addrs {
 		capReg = common.HexToAddress(addr)
@@ -55,43 +55,6 @@ func Test0001_InitialDeploy(t *testing.T) {
 	// Apply migration
 	output, err := Apply0001(e, ccipdeployment.DeployCCIPContractConfig{})
 	require.NoError(t, err)
-
-	// Before we can add the jobs, we need to add the config to the cap registry
-	/*
-		ccipCapabilityID, err := homeChainUni.capabilityRegistry.GetHashedCapabilityId(
-			callCtx, CapabilityLabelledName, CapabilityVersion)
-		require.NoError(t, err, "failed to get hashed capability id for ccip")
-		require.NotEqual(t, [32]byte{}, ccipCapabilityID, "ccip capability id is empty")
-
-		// Need to Add nodes and assign capabilities to them before creating DONS
-		homeChainUni.AddNodes(t, p2pIDs, [][32]byte{ccipCapabilityID})
-
-		for _, uni := range universes {
-			t.Logf("Adding chainconfig for chain %d", uni.chainID)
-			AddChainConfig(t, homeChainUni, getSelector(uni.chainID), p2pIDs, fChain)
-		}
-
-		cfgs, err := homeChainUni.ccipConfig.GetAllChainConfigs(callCtx)
-		require.NoError(t, err)
-		require.Len(t, cfgs, numChains)
-
-		// Create a DON for each chain
-		for _, uni := range universes {
-			// Add nodes and give them the capability
-			t.Log("Adding DON for universe: ", uni.chainID)
-			chainSelector := getSelector(uni.chainID)
-			homeChainUni.AddDON(
-				t,
-				ccipCapabilityID,
-				chainSelector,
-				uni,
-				fChain,
-				bootstrapP2PID,
-				p2pIDs,
-				oracles[uni.chainID],
-			)
-		}
-	*/
 
 	// Apply the jobs.
 	for nodeID, jobs := range output.JobSpecs {

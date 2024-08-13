@@ -1,20 +1,17 @@
 package ccipdeployment
 
 import (
-	"context"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	nodev1 "github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/node/v1"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 
 	owner_helpers "github.com/smartcontractkit/ccip-owner-contracts/gethwrappers"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
@@ -26,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
 
 var (
@@ -44,105 +40,71 @@ var (
 	TokenAdminRegistry_1_5_0 = "TokenAdminRegistry 1.5.0-dev"
 	// 1.6
 	CapabilitiesRegistry_1_0_0 = "CapabilitiesRegistry 1.0.0"
+	CCIPConfig_1_6_0           = "CCIPConfig 1.6.0-dev"
 	EVM2EVMMultiOnRamp_1_6_0   = "EVM2EVMMultiOnRamp 1.6.0-dev"
 	EVM2EVMMultiOffRamp_1_6_0  = "EVM2EVMMultiOffRamp 1.6.0-dev"
 	NonceManager_1_6_0         = "NonceManager 1.6.0-dev"
 	PriceRegistry_1_6_0        = "PriceRegistry 1.6.0-dev"
 
-	CapabilityVersion = "1.0.0"
+	CapabilityLabelledName = "ccip"
+	CapabilityVersion      = "v1.0.0"
 )
 
+type Contracts interface {
+	*capabilities_registry.CapabilitiesRegistry |
+		*arm_proxy_contract.ARMProxyContract |
+		*ccip_config.CCIPConfig |
+		*nonce_manager.NonceManager |
+		*price_registry.PriceRegistry |
+		*router.Router |
+		*token_admin_registry.TokenAdminRegistry |
+		*weth9.WETH9 |
+		*mock_arm_contract.MockARMContract |
+		*owner_helpers.ManyChainMultiSig |
+		*owner_helpers.RBACTimelock |
+		*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp |
+		*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp |
+		*burn_mint_erc677.BurnMintERC677
+}
+
+type ContractDeploy[C Contracts] struct {
+	// We just return keep all the deploy return values
+	// since some will be empty if there's an error.
+	// and we want to avoid repeating that
+	Address  common.Address
+	Contract C
+	Tx       *types.Transaction
+	TvStr    string
+	Err      error
+}
+
 // TODO: pull up to general deployment pkg
-func deployContract(
+func deployContract[C Contracts](
 	lggr logger.Logger,
-	deploy func() (common.Address, string, *types.Transaction, error),
-	confirm func(common.Hash) error,
-	save func(address common.Address, tv string) error,
-) (common.Address, error) {
-	contractAddr, tvStr, tx, err := deploy()
-	if err != nil {
-		lggr.Errorw("Failed to deploy contract", "err", err)
-		return common.Address{}, err
+	chain deployment.Chain,
+	addressBook deployment.AddressBook,
+	deploy func(chain deployment.Chain) ContractDeploy[C],
+) (*ContractDeploy[C], error) {
+	contractDeploy := deploy(chain)
+	if contractDeploy.Err != nil {
+		lggr.Errorw("Failed to deploy contract", "err", contractDeploy.Err)
+		return nil, contractDeploy.Err
 	}
-	err = confirm(tx.Hash())
+	err := chain.Confirm(contractDeploy.Tx.Hash())
 	if err != nil {
 		lggr.Errorw("Failed to confirm deployment", "err", err)
-		return common.Address{}, err
+		return nil, err
 	}
-	err = save(contractAddr, tvStr)
+	err = addressBook.Save(chain.Selector, contractDeploy.Address.String(), contractDeploy.TvStr)
 	if err != nil {
 		lggr.Errorw("Failed to save contract address", "err", err)
-		return common.Address{}, err
+		return nil, err
 	}
-	return contractAddr, nil
-}
-
-type CCIPSpec struct{}
-
-func (s CCIPSpec) String() string {
-	return ""
-}
-
-// In our case, the only address needed is the cap registry which is actually an env var.
-// and will pre-exist for our deployment. So the job specs only depend on the environment operators.
-func NewCCIPJobSpecs(nodeIds []string, oc deployment.OffchainClient) (map[string][]string, error) {
-	// Generate a set of brand new job specs for CCIP for a specific environment
-	// (including NOPs) and new addresses.
-	// We want to assign one CCIP capability job to each node. And node with
-	// an addr we'll list as bootstrapper.
-	// Find the bootstrap nodes
-	bootstrapMp := make(map[string]struct{})
-	for _, node := range nodeIds {
-		// TODO: Filter should accept multiple nodes
-		nodeChainConfigs, err := oc.ListNodeChainConfigs(context.Background(), &nodev1.ListNodeChainConfigsRequest{Filter: &nodev1.ListNodeChainConfigsRequest_Filter{
-			NodeId: node,
-		}})
-		if err != nil {
-			return nil, err
-		}
-		for _, chainConfig := range nodeChainConfigs.ChainConfigs {
-			if chainConfig.Ocr2Config.IsBootstrap {
-				bootstrapMp[fmt.Sprintf("%s@%s",
-					// p2p_12D3... -> 12D3...
-					chainConfig.Ocr2Config.P2PKeyBundle.PeerId[4:], chainConfig.Ocr2Config.Multiaddr)] = struct{}{}
-			}
-		}
-	}
-	var bootstraps []string
-	for b := range bootstrapMp {
-		bootstraps = append(bootstraps, b)
-	}
-	nodesToJobSpecs := make(map[string][]string)
-	for _, node := range nodeIds {
-		// TODO: Filter should accept multiple.
-		nodeChainConfigs, err := oc.ListNodeChainConfigs(context.Background(), &nodev1.ListNodeChainConfigsRequest{Filter: &nodev1.ListNodeChainConfigsRequest_Filter{
-			NodeId: node,
-		}})
-		if err != nil {
-			return nil, err
-		}
-		spec, err := validate.NewCCIPSpecToml(validate.SpecArgs{
-			P2PV2Bootstrappers:     bootstraps,
-			CapabilityVersion:      CapabilityVersion,
-			CapabilityLabelledName: "CCIP",
-			OCRKeyBundleIDs: map[string]string{
-				// TODO: Validate that that all EVM chains are using the same keybundle.
-				relay.NetworkEVM: nodeChainConfigs.ChainConfigs[0].Ocr2Config.OcrKeyBundle.BundleId,
-			},
-			// TODO: validate that all EVM chains are using the same keybundle
-			P2PKeyID:     nodeChainConfigs.ChainConfigs[0].Ocr2Config.P2PKeyBundle.PeerId,
-			RelayConfigs: nil,
-			PluginConfig: map[string]any{},
-		})
-		if err != nil {
-			return nil, err
-		}
-		nodesToJobSpecs[node] = append(nodesToJobSpecs[node], spec)
-	}
-	return nodesToJobSpecs, nil
+	return &contractDeploy, nil
 }
 
 type DeployCCIPContractConfig struct {
+	HomeChainSel uint64
 	// Existing contracts which we want to skip deployment
 	// Leave empty if we want to deploy everything
 	// TODO: Add skips to deploy function.
@@ -152,22 +114,63 @@ type DeployCCIPContractConfig struct {
 func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainSel uint64) (deployment.AddressBook, error) {
 	ab := deployment.NewMemoryAddressBook()
 	chain := chains[chainSel]
-	saveToChain := func(addr common.Address, tv string) error {
-		return ab.Save(chain.Selector, addr.String(), tv)
-	}
-	capRegAddr, err := deployContract(lggr,
-		func() (common.Address, string, *types.Transaction, error) {
-			cr, tx, _, err2 := capabilities_registry.DeployCapabilitiesRegistry(
+	capReg, err := deployContract(lggr, chain, ab,
+		func(chain deployment.Chain) ContractDeploy[*capabilities_registry.CapabilitiesRegistry] {
+			crAddr, tx, cr, err2 := capabilities_registry.DeployCapabilitiesRegistry(
 				chain.DeployerKey,
 				chain.Client,
 			)
-			return cr, CapabilitiesRegistry_1_0_0, tx, err2
-		}, chain.Confirm, saveToChain)
+			return ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
+				Address: crAddr, Contract: cr, TvStr: CapabilitiesRegistry_1_0_0, Tx: tx, Err: err2,
+			}
+		})
 	if err != nil {
 		lggr.Errorw("Failed to deploy capreg", "err", err)
 		return ab, err
 	}
-	lggr.Infow("deployed capreg", "addr", capRegAddr)
+	lggr.Infow("deployed capreg", "addr", capReg.Address)
+	ccipConfig, err := deployContract(
+		lggr, chain, ab,
+		func(chain deployment.Chain) ContractDeploy[*ccip_config.CCIPConfig] {
+			ccAddr, tx, cc, err2 := ccip_config.DeployCCIPConfig(
+				chain.DeployerKey,
+				chain.Client,
+				capReg.Address,
+			)
+			return ContractDeploy[*ccip_config.CCIPConfig]{
+				Address: ccAddr, TvStr: CCIPConfig_1_6_0, Tx: tx, Err: err2, Contract: cc,
+			}
+		})
+	if err != nil {
+		lggr.Errorw("Failed to deploy ccip config", "err", err)
+		return ab, err
+	}
+	lggr.Infow("deployed ccip config", "addr", ccipConfig.Address)
+
+	_, err = capReg.Contract.AddCapabilities(chain.DeployerKey, []capabilities_registry.CapabilitiesRegistryCapability{
+		{
+			LabelledName:          CapabilityLabelledName,
+			Version:               CapabilityVersion,
+			CapabilityType:        2, // consensus. not used (?)
+			ResponseType:          0, // report. not used (?)
+			ConfigurationContract: ccipConfig.Address,
+		},
+	})
+	if err != nil {
+		lggr.Errorw("Failed to add capabilities", "err", err)
+		return ab, err
+	}
+	// TODO: Just one for testing.
+	_, err = capReg.Contract.AddNodeOperators(chain.DeployerKey, []capabilities_registry.CapabilitiesRegistryNodeOperator{
+		{
+			Admin: chain.DeployerKey.From,
+			Name:  "NodeOperator",
+		},
+	})
+	if err != nil {
+		lggr.Errorw("Failed to add node operators", "err", err)
+		return ab, err
+	}
 	return ab, nil
 }
 
@@ -177,92 +180,101 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 // Deployment produces an address book of everything it deployed.
 func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (deployment.AddressBook, error) {
 	ab := deployment.NewMemoryAddressBook()
-
 	for sel, chain := range e.Chains {
-		saveToChain := func(addr common.Address, tv string) error {
-			return ab.Save(chain.Selector, addr.String(), tv)
+		if c.HomeChainSel == sel {
 		}
 
 		// TODO: Still waiting for RMNRemote/RMNHome contracts etc.
-		mockARM, err := deployContract(e.Logger,
-			func() (common.Address, string, *types.Transaction, error) {
-				mockARM, tx, _, err2 := mock_arm_contract.DeployMockARMContract(
+		mockARM, err := deployContract(e.Logger, chain, ab,
+			func(chain deployment.Chain) ContractDeploy[*mock_arm_contract.MockARMContract] {
+				mockARMAddr, tx, mockARM, err2 := mock_arm_contract.DeployMockARMContract(
 					chain.DeployerKey,
 					chain.Client,
 				)
-				return mockARM, MockARM_1_0_0, tx, err2
-			}, chain.Confirm, saveToChain)
+				return ContractDeploy[*mock_arm_contract.MockARMContract]{
+					mockARMAddr, mockARM, tx, MockARM_1_0_0, err2,
+				}
+			})
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy mockARM", "err", err)
 			return ab, err
 		}
 		e.Logger.Infow("deployed mockARM", "addr", mockARM)
 
-		mcmAddr, err := deployContract(e.Logger,
-			func() (common.Address, string, *types.Transaction, error) {
-				mcm, tx, _, err2 := owner_helpers.DeployManyChainMultiSig(
+		mcm, err := deployContract(e.Logger, chain, ab,
+			func(chain deployment.Chain) ContractDeploy[*owner_helpers.ManyChainMultiSig] {
+				mcmAddr, tx, mcm, err2 := owner_helpers.DeployManyChainMultiSig(
 					chain.DeployerKey,
 					chain.Client,
 				)
-				return mcm, MCMS_1_0_0, tx, err2
-			}, chain.Confirm, saveToChain)
+				return ContractDeploy[*owner_helpers.ManyChainMultiSig]{
+					mcmAddr, mcm, tx, MCMS_1_0_0, err2,
+				}
+			})
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy mcm", "err", err)
 			return ab, err
 		}
-		e.Logger.Infow("deployed mcm", "addr", mcmAddr)
+		// TODO: Address soon
+		e.Logger.Infow("deployed mcm", "addr", mcm.Address)
 
-		_, err = deployContract(e.Logger,
-			func() (common.Address, string, *types.Transaction, error) {
-				timelock, tx, _, err2 := owner_helpers.DeployRBACTimelock(
+		_, err = deployContract(e.Logger, chain, ab,
+			func(chain deployment.Chain) ContractDeploy[*owner_helpers.RBACTimelock] {
+				timelock, tx, cc, err2 := owner_helpers.DeployRBACTimelock(
 					chain.DeployerKey,
 					chain.Client,
 					big.NewInt(0), // minDelay
-					mcmAddr,
-					[]common.Address{mcmAddr},                // proposers
+					mcm.Address,
+					[]common.Address{mcm.Address},            // proposers
 					[]common.Address{chain.DeployerKey.From}, //executors
-					[]common.Address{mcmAddr},                // cancellers
-					[]common.Address{mcmAddr},                // bypassers
+					[]common.Address{mcm.Address},            // cancellers
+					[]common.Address{mcm.Address},            // bypassers
 				)
-				return timelock, RBAC_Timelock_1_0_0, tx, err2
-			}, chain.Confirm, saveToChain)
+				return ContractDeploy[*owner_helpers.RBACTimelock]{
+					timelock, cc, tx, RBAC_Timelock_1_0_0, err2,
+				}
+			})
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy timelock", "err", err)
 			return ab, err
 		}
-		e.Logger.Infow("deployed timelock", "addr", mcmAddr)
+		e.Logger.Infow("deployed timelock", "addr", mcm.Address)
 
-		armProxy, err := deployContract(e.Logger,
-			func() (common.Address, string, *types.Transaction, error) {
-				armProxy, tx, _, err2 := arm_proxy_contract.DeployARMProxyContract(
+		armProxy, err := deployContract(e.Logger, chain, ab,
+			func(chain deployment.Chain) ContractDeploy[*arm_proxy_contract.ARMProxyContract] {
+				armProxyAddr, tx, armProxy, err2 := arm_proxy_contract.DeployARMProxyContract(
 					chain.DeployerKey,
 					chain.Client,
-					mockARM,
+					mockARM.Address,
 				)
-				return armProxy, ARMProxy_1_1_0, tx, err2
-			}, chain.Confirm, saveToChain)
+				return ContractDeploy[*arm_proxy_contract.ARMProxyContract]{
+					armProxyAddr, armProxy, tx, ARMProxy_1_1_0, err2,
+				}
+			})
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy armProxy", "err", err)
 			return ab, err
 		}
-		e.Logger.Infow("deployed armProxy", "addr", armProxy)
+		e.Logger.Infow("deployed armProxy", "addr", armProxy.Address)
 
-		weth9, err := deployContract(e.Logger,
-			func() (common.Address, string, *types.Transaction, error) {
-				weth9, tx, _, err2 := weth9.DeployWETH9(
+		weth9, err := deployContract(e.Logger, chain, ab,
+			func(chain deployment.Chain) ContractDeploy[*weth9.WETH9] {
+				weth9Addr, tx, weth9c, err2 := weth9.DeployWETH9(
 					chain.DeployerKey,
 					chain.Client,
 				)
-				return weth9, WETH9_1_0_0, tx, err2
-			}, chain.Confirm, saveToChain)
+				return ContractDeploy[*weth9.WETH9]{
+					weth9Addr, weth9c, tx, WETH9_1_0_0, err2,
+				}
+			})
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy weth9", "err", err)
 			return ab, err
 		}
 
-		linkTokenAddr, err := deployContract(e.Logger,
-			func() (common.Address, string, *types.Transaction, error) {
-				linkToken, tx, _, err2 := burn_mint_erc677.DeployBurnMintERC677(
+		linkToken, err := deployContract(e.Logger, chain, ab,
+			func(chain deployment.Chain) ContractDeploy[*burn_mint_erc677.BurnMintERC677] {
+				linkTokenAddr, tx, linkToken, err2 := burn_mint_erc677.DeployBurnMintERC677(
 					chain.DeployerKey,
 					chain.Client,
 					"Link Token",
@@ -270,157 +282,161 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 					uint8(18),
 					big.NewInt(0).Mul(big.NewInt(1e9), big.NewInt(1e18)),
 				)
-				return linkToken, LinkToken_1_0_0, tx, err2
-			}, chain.Confirm, saveToChain)
+				return ContractDeploy[*burn_mint_erc677.BurnMintERC677]{
+					linkTokenAddr, linkToken, tx, LinkToken_1_0_0, err2,
+				}
+			})
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy linkToken", "err", err)
 			return ab, err
 		}
 
-		routerAddr, err := deployContract(e.Logger,
-			func() (common.Address, string, *types.Transaction, error) {
-				router, tx, _, err2 := router.DeployRouter(
+		routerContract, err := deployContract(e.Logger, chain, ab,
+			func(chain deployment.Chain) ContractDeploy[*router.Router] {
+				routerAddr, tx, routerC, err2 := router.DeployRouter(
 					chain.DeployerKey,
 					chain.Client,
-					weth9,
-					armProxy,
+					weth9.Address,
+					armProxy.Address,
 				)
-				return router, Router_1_2_0, tx, err2
-			}, chain.Confirm, saveToChain)
+				return ContractDeploy[*router.Router]{
+					routerAddr, routerC, tx, Router_1_2_0, err2,
+				}
+			})
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy router", "err", err)
 			return ab, err
 		}
-		e.Logger.Infow("deployed router", "addr", routerAddr)
+		e.Logger.Infow("deployed router", "addr", routerContract)
 
-		tokenAdminRegistry, err := deployContract(e.Logger,
-			func() (common.Address, string, *types.Transaction, error) {
-				tokenAdminRegistry, tx, _, err2 := token_admin_registry.DeployTokenAdminRegistry(
+		tokenAdminRegistry, err := deployContract(e.Logger, chain, ab,
+			func(chain deployment.Chain) ContractDeploy[*token_admin_registry.TokenAdminRegistry] {
+				tokenAdminRegistryAddr, tx, tokenAdminRegistry, err2 := token_admin_registry.DeployTokenAdminRegistry(
 					chain.DeployerKey,
 					chain.Client)
-				return tokenAdminRegistry, TokenAdminRegistry_1_5_0, tx, err2
-			}, chain.Confirm, saveToChain)
+				return ContractDeploy[*token_admin_registry.TokenAdminRegistry]{
+					tokenAdminRegistryAddr, tokenAdminRegistry, tx, TokenAdminRegistry_1_5_0, err2,
+				}
+			})
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy token admin registry", "err", err)
 			return ab, err
 		}
 		e.Logger.Infow("deployed tokenAdminRegistry", "addr", tokenAdminRegistry)
 
-		nonceManagerAddr, err := deployContract(e.Logger,
-			func() (common.Address, string, *types.Transaction, error) {
-				nonceManager, tx, _, err2 := nonce_manager.DeployNonceManager(
+		nonceManager, err := deployContract(e.Logger, chain, ab,
+			func(chain deployment.Chain) ContractDeploy[*nonce_manager.NonceManager] {
+				nonceManagerAddr, tx, nonceManager, err2 := nonce_manager.DeployNonceManager(
 					chain.DeployerKey,
 					chain.Client,
 					[]common.Address{}, // Need to add onRamp after
 				)
-				return nonceManager, NonceManager_1_6_0, tx, err2
-			}, chain.Confirm, saveToChain)
+				return ContractDeploy[*nonce_manager.NonceManager]{
+					nonceManagerAddr, nonceManager, tx, NonceManager_1_6_0, err2,
+				}
+			})
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy router", "err", err)
 			return ab, err
 		}
 
-		priceRegistryAddr, err := deployContract(e.Logger,
-			func() (common.Address, string, *types.Transaction, error) {
-				pr, tx, _, err2 := price_registry.DeployPriceRegistry(
+		priceRegistry, err := deployContract(e.Logger, chain, ab,
+			func(chain deployment.Chain) ContractDeploy[*price_registry.PriceRegistry] {
+				prAddr, tx, pr, err2 := price_registry.DeployPriceRegistry(
 					chain.DeployerKey,
 					chain.Client,
 					price_registry.PriceRegistryStaticConfig{
 						MaxFeeJuelsPerMsg:  big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
-						LinkToken:          linkTokenAddr,
+						LinkToken:          linkToken.Address,
 						StalenessThreshold: uint32(86400),
 					},
-					[]common.Address{},      // ramps added after
-					[]common.Address{weth9}, // fee tokens
+					[]common.Address{},              // ramps added after
+					[]common.Address{weth9.Address}, // fee tokens
 					[]price_registry.PriceRegistryTokenPriceFeedUpdate{},
 					[]price_registry.PriceRegistryTokenTransferFeeConfigArgs{}, // TODO: tokens
 					[]price_registry.PriceRegistryPremiumMultiplierWeiPerEthArgs{
 						{
-							Token:                      weth9,
+							Token:                      weth9.Address,
 							PremiumMultiplierWeiPerEth: 1e6,
 						},
 					},
 					[]price_registry.PriceRegistryDestChainConfigArgs{},
 				)
-				return pr, PriceRegistry_1_6_0, tx, err2
-			}, chain.Confirm, saveToChain)
+				return ContractDeploy[*price_registry.PriceRegistry]{
+					prAddr, pr, tx, PriceRegistry_1_6_0, err2,
+				}
+			})
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy price registry", "err", err)
 			return ab, err
 		}
 
-		onRampAddr, err := deployContract(e.Logger,
-			func() (common.Address, string, *types.Transaction, error) {
-				onRamp, tx, _, err2 := evm_2_evm_multi_onramp.DeployEVM2EVMMultiOnRamp(
+		onRamp, err := deployContract(e.Logger, chain, ab,
+			func(chain deployment.Chain) ContractDeploy[*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp] {
+				onRampAddr, tx, onRamp, err2 := evm_2_evm_multi_onramp.DeployEVM2EVMMultiOnRamp(
 					chain.DeployerKey,
 					chain.Client,
 					evm_2_evm_multi_onramp.EVM2EVMMultiOnRampStaticConfig{
 						ChainSelector:      sel,
-						RmnProxy:           routerAddr,
-						NonceManager:       nonceManagerAddr,
-						TokenAdminRegistry: tokenAdminRegistry,
+						RmnProxy:           routerContract.Address,
+						NonceManager:       nonceManager.Address,
+						TokenAdminRegistry: tokenAdminRegistry.Address,
 					},
 					evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDynamicConfig{
-						PriceRegistry: priceRegistryAddr,
+						PriceRegistry: priceRegistry.Address,
 						FeeAggregator: common.HexToAddress("0x1"), // TODO real fee aggregator
 					},
 					[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{},
 				)
-				return onRamp, EVM2EVMMultiOnRamp_1_6_0, tx, err2
-			}, chain.Confirm, saveToChain)
+				return ContractDeploy[*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp]{
+					onRampAddr, onRamp, tx, EVM2EVMMultiOnRamp_1_6_0, err2,
+				}
+			})
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy onramp", "err", err)
 			return ab, err
 		}
-		e.Logger.Infow("deployed onramp", "addr", tokenAdminRegistry)
+		e.Logger.Infow("deployed onramp", "addr", onRamp.Address)
 
-		offRampAddr, err := deployContract(e.Logger,
-			func() (common.Address, string, *types.Transaction, error) {
+		offRamp, err := deployContract(e.Logger, chain, ab,
+			func(chain deployment.Chain) ContractDeploy[*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp] {
 				offRamp, tx, _, err2 := evm_2_evm_multi_offramp.DeployEVM2EVMMultiOffRamp(
 					chain.DeployerKey,
 					chain.Client,
 					evm_2_evm_multi_offramp.EVM2EVMMultiOffRampStaticConfig{
 						ChainSelector:      sel,
-						RmnProxy:           routerAddr,
-						NonceManager:       nonceManagerAddr,
-						TokenAdminRegistry: tokenAdminRegistry,
+						RmnProxy:           routerContract.Address,
+						NonceManager:       nonceManager.Address,
+						TokenAdminRegistry: tokenAdminRegistry.Address,
 					},
 					evm_2_evm_multi_offramp.EVM2EVMMultiOffRampDynamicConfig{
-						PriceRegistry:                           priceRegistryAddr,
+						PriceRegistry:                           priceRegistry.Address,
 						PermissionLessExecutionThresholdSeconds: uint32(86400),
 						MaxTokenTransferGas:                     uint32(200_000),
 						MaxPoolReleaseOrMintGas:                 uint32(200_000),
 					},
 					[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{},
 				)
-				return offRamp, EVM2EVMMultiOffRamp_1_6_0, tx, err2
-			}, chain.Confirm, saveToChain)
+				return ContractDeploy[*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp]{
+					offRamp, nil, tx, EVM2EVMMultiOffRamp_1_6_0, err2,
+				}
+			})
 		if err != nil {
 			e.Logger.Errorw("Failed to deploy offramp", "err", err)
 			return ab, err
 		}
-		e.Logger.Infow("deployed offramp", "addr", offRampAddr)
+		e.Logger.Infow("deployed offramp", "addr", offRamp)
 
 		// Enable ramps on price registry/nonce manager
-		pr, err := price_registry.NewPriceRegistry(priceRegistryAddr, chain.Client)
-		if err != nil {
-			e.Logger.Errorw("Failed to create price registry", "err", err)
-			return ab, err
-		}
-		tx, err := pr.ApplyAuthorizedCallerUpdates(chain.DeployerKey, price_registry.AuthorizedCallersAuthorizedCallerArgs{
-			AddedCallers: []common.Address{offRampAddr},
+		tx, err := priceRegistry.Contract.ApplyAuthorizedCallerUpdates(chain.DeployerKey, price_registry.AuthorizedCallersAuthorizedCallerArgs{
+			AddedCallers: []common.Address{offRamp.Address},
 		})
 		if err := chain.Confirm(tx.Hash()); err != nil {
 			e.Logger.Errorw("Failed to confirm price registry authorized caller update", "err", err)
 			return ab, err
 		}
-		nm, err := nonce_manager.NewNonceManager(nonceManagerAddr, chain.Client)
-		if err != nil {
-			e.Logger.Errorw("Failed to create nonce manager", "err", err)
-			return ab, err
-		}
-		tx, err = nm.ApplyAuthorizedCallerUpdates(chain.DeployerKey, nonce_manager.AuthorizedCallersAuthorizedCallerArgs{
-			AddedCallers: []common.Address{offRampAddr, onRampAddr},
+		tx, err = nonceManager.Contract.ApplyAuthorizedCallerUpdates(chain.DeployerKey, nonce_manager.AuthorizedCallersAuthorizedCallerArgs{
+			AddedCallers: []common.Address{offRamp.Address, onRamp.Address},
 		})
 		if err != nil {
 			e.Logger.Errorw("Failed to update nonce manager with ramps", "err", err)

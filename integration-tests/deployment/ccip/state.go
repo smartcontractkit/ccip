@@ -8,6 +8,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 
@@ -44,6 +45,7 @@ type CCIPOnChainState struct {
 	LinkTokens map[uint64]*burn_mint_erc677.BurnMintERC677
 	// Note we only expect one of these (on the home chain)
 	CapabilityRegistry map[uint64]*capabilities_registry.CapabilitiesRegistry
+	CCIPConfig         map[uint64]*ccip_config.CCIPConfig
 	Mcms               map[uint64]*owner_wrappers.ManyChainMultiSig
 	// TODO: remove once we have Address() on wrappers
 	McmsAddrs map[uint64]common.Address
@@ -242,6 +244,12 @@ func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (
 					return state, err
 				}
 				state.LinkTokens[chainSelector] = lt
+			case CCIPConfig_1_6_0:
+				cc, err := ccip_config.NewCCIPConfig(common.HexToAddress(address), e.Chains[chainSelector].Client)
+				if err != nil {
+					return state, err
+				}
+				state.CCIPConfig[chainSelector] = cc
 			default:
 				return state, fmt.Errorf("unknown contract %s", tvStr)
 			}
