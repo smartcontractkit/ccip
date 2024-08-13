@@ -77,6 +77,7 @@ let config = {
   zksolc: {
     settings: {
       compilerPath: 'zksolc',
+      version: 'v1.4.1',
       optimizer: {
         enabled: true,
         mode: '3',
