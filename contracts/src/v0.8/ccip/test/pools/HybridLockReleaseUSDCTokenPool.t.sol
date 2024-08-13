@@ -12,8 +12,8 @@ import {Internal} from "../../libraries/Internal.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 
+import {HybridLockReleaseUSDCTokenPool} from "../../pools/MultiMechanismPools/HybridLockReleaseUSDCTokenPool.sol";
 import {MultiMechanismPoolManager} from "../../pools/MultiMechanismPools/MultiMechanismPoolManager.sol";
-import {MultiMechanismUSDCTokenPool} from "../../pools/MultiMechanismPools/MultiMechanismUSDCTokenPool.sol";
 import {USDCBridgeMigrator} from "../../pools/MultiMechanismPools/USDCBridgeMigrator.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
@@ -53,8 +53,8 @@ contract USDCTokenPoolSetup is BaseTest {
   address internal s_routerAllowedOffRamp = address(234);
   Router internal s_router;
 
-  MultiMechanismUSDCTokenPool internal s_usdcTokenPool;
-  MultiMechanismUSDCTokenPool internal s_usdcTokenPoolTransferLiquidity;
+  HybridLockReleaseUSDCTokenPool internal s_usdcTokenPool;
+  HybridLockReleaseUSDCTokenPool internal s_usdcTokenPoolTransferLiquidity;
   address[] internal s_allowedList;
 
   function setUp() public virtual override {
@@ -70,10 +70,10 @@ contract USDCTokenPoolSetup is BaseTest {
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDCTransmitter));
 
     s_usdcTokenPool =
-      new MultiMechanismUSDCTokenPool(s_mockUSDC, s_token, new address[](0), address(s_mockRMN), address(s_router));
+      new HybridLockReleaseUSDCTokenPool(s_mockUSDC, s_token, new address[](0), address(s_mockRMN), address(s_router));
 
     s_usdcTokenPoolTransferLiquidity =
-      new MultiMechanismUSDCTokenPool(s_mockUSDC, s_token, new address[](0), address(s_mockRMN), address(s_router));
+      new HybridLockReleaseUSDCTokenPool(s_mockUSDC, s_token, new address[](0), address(s_mockRMN), address(s_router));
 
     usdcToken.grantMintAndBurnRoles(address(s_mockUSDC));
     usdcToken.grantMintAndBurnRoles(address(s_usdcTokenPool));
@@ -138,7 +138,7 @@ contract USDCTokenPoolSetup is BaseTest {
   }
 }
 
-contract USDCTokenPoolAltMechanismTests is USDCTokenPoolSetup {
+contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
   function test_LockOrBurn_onAltMechanism_Success() public {
     bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
 
@@ -423,7 +423,7 @@ contract USDCTokenPoolAltMechanismTests is USDCTokenPoolSetup {
 
     // Expect the lockOrBurn to fail because a pending CCTP-Migration has paused outgoing messages on CCIP
     vm.expectRevert(
-      abi.encodeWithSelector(MultiMechanismUSDCTokenPool.LanePausedForCCTPMigration.selector, DEST_CHAIN_SELECTOR)
+      abi.encodeWithSelector(HybridLockReleaseUSDCTokenPool.LanePausedForCCTPMigration.selector, DEST_CHAIN_SELECTOR)
     );
 
     s_usdcTokenPool.lockOrBurn(
@@ -438,7 +438,7 @@ contract USDCTokenPoolAltMechanismTests is USDCTokenPoolSetup {
   }
 }
 
-contract USDCTokenPoolMigrationTests is USDCTokenPoolSetup {
+contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
   function test_lockOrBurn_then_BurnInCCTPMigration_Success() public {
     bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
     address CIRCLE = makeAddr("CIRCLE CCTP Migrator");
@@ -616,7 +616,7 @@ contract USDCTokenPoolMigrationTests is USDCTokenPoolSetup {
     emit ILiquidityContainer.LiquidityRemoved(address(s_usdcTokenPool), liquidityAmount);
 
     vm.expectEmit();
-    emit MultiMechanismUSDCTokenPool.LiquidityTransferred(
+    emit HybridLockReleaseUSDCTokenPool.LiquidityTransferred(
       address(s_usdcTokenPoolTransferLiquidity), DEST_CHAIN_SELECTOR, liquidityAmount
     );
 

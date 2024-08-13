@@ -14,23 +14,23 @@ import {USDCBridgeMigrator} from "./USDCBridgeMigrator.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/// @notice A token pool for USDC which uses CCTP for supported-chains and Lock-Release for all others
+/// @notice A token pool for USDC which uses CCTP for supported chains and Lock/Release for all others
 /// @dev The functionality from LockReleaseTokenPool.sol has been duplicated due to lack of compiler support for shared
 /// constructors between parents
-/// @dev The primary token mechanism in this pool is Burn-Mint with CCTP, with Lock-Release as the
-/// secondary, opt-in mechanism for chains not currently supporting CCTP.
-contract MultiMechanismUSDCTokenPool is USDCTokenPool, MultiMechanismPoolManager, USDCBridgeMigrator {
+/// @dev The primary token mechanism in this pool is Burn/Mint with CCTP, with Lock/Release as the
+/// secondary, opt in mechanism for chains not currently supporting CCTP.
+contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, MultiMechanismPoolManager, USDCBridgeMigrator {
   using SafeERC20 for IERC20;
+
+  event LiquidityTransferred(address indexed from, uint64 indexed remoteChainSelector, uint256 amount);
+
+  error LanePausedForCCTPMigration(uint64 remoteChainSelector);
 
   /// @notice The address of the rebalancer.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
   /// and CCIP is facilitating mint/burn on all the other chains, in which case the invariant
   /// balanceOf(pool) on home chain >= sum(totalSupply(mint/burn "wrapped" token) on all remote chains) should always hold
   address internal s_rebalancer;
-
-  event LiquidityTransferred(address indexed from, uint64 indexed remoteChainSelector, uint256 amount);
-
-  error LanePausedForCCTPMigration(uint64 remoteChainSelector);
 
   constructor(
     ITokenMessenger tokenMessenger,
@@ -48,17 +48,27 @@ contract MultiMechanismUSDCTokenPool is USDCTokenPool, MultiMechanismPoolManager
     override
     returns (Pool.LockOrBurnOutV1 memory)
   {
-    // If the alternative mechanism (L/R) for chains which have it enabled
-    if (shouldUseAltMechForOutgoingMessage(lockOrBurnIn.remoteChainSelector)) {
-      if (s_proposedUSDCMigrationChain != 0 && s_proposedUSDCMigrationChain == lockOrBurnIn.remoteChainSelector) {
-        revert LanePausedForCCTPMigration(s_proposedUSDCMigrationChain);
-      } else {
-        return _altMechOutgoingMessage(lockOrBurnIn);
-      }
-    } else {
-      // Otherwise, use native CCTP functionality
+    // // If the alternative mechanism (L/R) for chains which have it enabled
+    if (!shouldUseAltMechForOutgoingMessage(lockOrBurnIn.remoteChainSelector)) {
       return super.lockOrBurn(lockOrBurnIn);
     }
+
+    if (s_proposedUSDCMigrationChain != 0 && s_proposedUSDCMigrationChain == lockOrBurnIn.remoteChainSelector) {
+      revert LanePausedForCCTPMigration(s_proposedUSDCMigrationChain);
+    }
+
+    return _altMechOutgoingMessage(lockOrBurnIn);
+
+    // if (shouldUseAltMechForOutgoingMessage(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.offchainTokenData)) {
+    //   if (s_proposedUSDCMigrationChain != 0 && s_proposedUSDCMigrationChain == lockOrBurnIn.remoteChainSelector) {
+    //     revert LanePausedForCCTPMigration(s_proposedUSDCMigrationChain);
+    //   } else {
+    //     return _altMechOutgoingMessage(lockOrBurnIn);
+    //   }
+    // } else {
+    //   // Otherwise, use native CCTP functionality
+    //   return super.lockOrBurn(lockOrBurnIn);
+    // }
   }
 
   /// @notice Release tokens from the pool to the recipient
@@ -124,7 +134,9 @@ contract MultiMechanismUSDCTokenPool is USDCTokenPool, MultiMechanismPoolManager
     s_rebalancer = rebalancer;
   }
 
-  /// @notice Adds liquidity to the pool. The tokens should be approved first.
+  /// @notice Adds liquidity to the pool for a specific chain. The tokens should be approved first.
+  /// @dev Liquidity is expected to be added on a per chain basis. Parties are expected to provide liquidity for their
+  /// own chain which implements non canonical USDC and liquidity is not shared across lanes.
   /// @param amount The amount of liquidity to provide.
   /// @param remoteChainSelector The chain for which liquidity is provided to. Necessary to ensure there's accurate
   /// parity between locked USDC in this contract and the circulating supply on the remote chain
@@ -141,7 +153,7 @@ contract MultiMechanismUSDCTokenPool is USDCTokenPool, MultiMechanismPoolManager
   /// @notice Removed liquidity to the pool. The tokens will be sent to msg.sender.
   /// @param remoteChainSelector The chain where liquidity is being released.
   /// @param amount The amount of liquidity to remove.
-  /// @dev The function should only be called if non-canonical USDC on the remote chain has been burned and is not being
+  /// @dev The function should only be called if non canonical USDC on the remote chain has been burned and is not being
   /// withdrawn on this chain, otherwise a mismatch may occur between locked token balance and remote circulating supply
   /// which may block a potential future migration of the chain to CCTP.
   function withdrawLiquidity(uint64 remoteChainSelector, uint256 amount) external {

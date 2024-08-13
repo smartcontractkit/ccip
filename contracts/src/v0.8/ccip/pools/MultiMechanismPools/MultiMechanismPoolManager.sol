@@ -3,10 +3,10 @@ pragma solidity ^0.8.24;
 import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
 
 abstract contract MultiMechanismPoolManager is OwnerIsCreator {
-  mapping(uint64 => bool) internal s_shouldUseAltMech;
-
   event AltMechanismEnabled(uint64 indexed remoteChainSelector);
   event AltMechanismDisabled(uint64 indexed remoteChainSelector);
+
+  mapping(uint64 => bool) internal s_shouldUseAltMech;
 
   /// @notice Return whether a lane should use the alternative L/R mechanism in the token pool.
   /// @param destChainSelector the source chain the message was sent from
@@ -14,6 +14,8 @@ abstract contract MultiMechanismPoolManager is OwnerIsCreator {
   /// @dev Function has been marked virtual and includes an unused calldata parameter in the event that
   /// more complex logic becomes necessary in the future, especially if logic changes between incoming
   /// and outgoing messages.
+  /// @dev It is currently assumed that for a given chain selector, s_shouldUseAltMech is always symmetrical for
+  /// incoming and outgoing messages. This may change if the function is overridden
   function shouldUseAltMechForOutgoingMessage(uint64 destChainSelector) public view virtual returns (bool) {
     return s_shouldUseAltMech[destChainSelector];
   }
@@ -31,7 +33,7 @@ abstract contract MultiMechanismPoolManager is OwnerIsCreator {
     return s_shouldUseAltMech[sourceChainSelector];
   }
 
-  /// @notice Updates designations for chains on whether to use LR/BM mechanism on CCIP-messages
+  /// @notice Updates Updates designations for chains on whether to use primary or alt mechanism on CCIP messages
   /// @param removes A list of chain selectors to disable Lock-Release, and enforce BM
   /// @param adds A list of chain selectors to enable LR instead of BM
   function updateChainSelectorMechanisms(uint64[] calldata removes, uint64[] calldata adds) external onlyOwner {

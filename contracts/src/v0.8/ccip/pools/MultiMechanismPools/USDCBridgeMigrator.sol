@@ -10,14 +10,6 @@ import {Router} from "../../Router.sol";
 abstract contract USDCBridgeMigrator is OwnerIsCreator {
   using EnumerableSet for EnumerableSet.UintSet;
 
-  address internal s_circleUSDCMigrator;
-
-  mapping(uint64 chainSelector => uint256 lockedBalance) internal s_lockedTokensByChainSelector;
-
-  EnumerableSet.UintSet internal s_executedCCTPChainMigrations;
-
-  uint64 internal s_proposedUSDCMigrationChain;
-
   event CCTPMigrationProposed(uint64 remoteChainSelector);
   event CCTPMigrationExecuted(uint64 remoteChainSelector, uint256 USDCBurned);
   event CCTPMigrationCancelled(uint64 existingProposalSelector);
@@ -30,6 +22,11 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
 
   IBurnMintERC20 internal immutable i_USDC;
   Router internal immutable i_router;
+  EnumerableSet.UintSet internal s_executedCCTPChainMigrations;
+
+  address internal s_circleUSDCMigrator;
+  uint64 internal s_proposedUSDCMigrationChain;
+  mapping(uint64 chainSelector => uint256 lockedBalance) internal s_lockedTokensByChainSelector;
 
   constructor(address token, address router) {
     i_USDC = IBurnMintERC20(token);
