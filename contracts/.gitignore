@@ -6,7 +6,8 @@ abi
 coverage
 coverage.json
 typechain
-
+artifacts-zk
+cache-zk
 
 # Foundry
 foundry-cache

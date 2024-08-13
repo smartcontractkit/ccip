@@ -14,6 +14,7 @@
     "clean": "hardhat clean",
     "compile:native": "./scripts/native_solc_compile_all",
     "compile": "hardhat compile --no-typechain",
+    "zksync:compile": "hardhat compile --config ./hardhat.config.ccip.zksync.ts --no-typechain",
     "coverage": "hardhat coverage",
     "prepare": "chmod +x .husky/prepare.sh && ./.husky/prepare.sh",
     "prepublishOnly": "pnpm compile && ./scripts/prepublish_generate_abi_folder",
@@ -108,9 +109,11 @@
     "@changesets/changelog-github": "^0.5.0",
     "@changesets/cli": "~2.27.3",
     "@eth-optimism/contracts": "0.6.0",
+    "@matterlabs/hardhat-zksync-solc": "^1.2.1",
     "@openzeppelin/contracts": "4.9.3",
     "@openzeppelin/contracts-upgradeable": "4.9.3",
     "@scroll-tech/contracts": "0.1.0",
+    "dependencies": "^0.0.1",
     "semver": "^7.6.2"
   },
   "lint-staged": {
