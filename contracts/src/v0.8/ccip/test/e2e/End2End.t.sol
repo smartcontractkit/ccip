@@ -53,7 +53,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     bytes memory commitReport = abi.encode(
       CommitStore.CommitReport({
         priceUpdates: getEmptyPriceUpdates(),
-        interval: CommitStore.Interval(messages[0].sequenceNumber, messages[2].sequenceNumber),
+        interval: CommitStore.Interval(messages[0].messageNumber, messages[2].messageNumber),
         merkleRoot: merkleRoots[0]
       })
     );
@@ -75,17 +75,17 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
 
     vm.expectEmit();
     emit EVM2EVMOffRamp.ExecutionStateChanged(
-      messages[0].sequenceNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
+      messages[0].messageNumber, messages[0].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
     vm.expectEmit();
     emit EVM2EVMOffRamp.ExecutionStateChanged(
-      messages[1].sequenceNumber, messages[1].messageId, Internal.MessageExecutionState.SUCCESS, ""
+      messages[1].messageNumber, messages[1].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
     vm.expectEmit();
     emit EVM2EVMOffRamp.ExecutionStateChanged(
-      messages[2].sequenceNumber, messages[2].messageId, Internal.MessageExecutionState.SUCCESS, ""
+      messages[2].messageNumber, messages[2].messageId, Internal.MessageExecutionState.SUCCESS, ""
     );
 
     Internal.ExecutionReport memory execReport = _generateReportFromMessages(messages);
@@ -93,7 +93,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     s_offRamp.execute(execReport, new EVM2EVMOffRamp.GasLimitOverride[](0));
   }
 
-  function sendRequest(uint64 expectedSeqNum) public returns (Internal.EVM2EVMMessage memory) {
+  function sendRequest(uint64 expectedMsgNum) public returns (Internal.EVM2EVMMessage memory) {
     Client.EVM2AnyMessage memory message = _generateTokenMessage();
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
 
@@ -102,7 +102,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
 
     message.receiver = abi.encode(address(s_receiver));
     Internal.EVM2EVMMessage memory msgEvent =
-      _messageToEvent(message, expectedSeqNum, expectedSeqNum, expectedFee, OWNER);
+      _messageToEvent(message, expectedMsgNum, expectedMsgNum, expectedFee, OWNER);
 
     vm.expectEmit();
     emit EVM2EVMOnRamp.CCIPSendRequested(msgEvent);

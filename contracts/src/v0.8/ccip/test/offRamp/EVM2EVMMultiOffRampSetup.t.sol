@@ -272,9 +272,9 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
   function _generateAny2EVMMessageNoTokens(
     uint64 sourceChainSelector,
     bytes memory onRamp,
-    uint64 sequenceNumber
+    uint64 messageNumber
   ) internal view returns (Internal.Any2EVMRampMessage memory) {
-    return _generateAny2EVMMessage(sourceChainSelector, onRamp, sequenceNumber, new Client.EVMTokenAmount[](0), false);
+    return _generateAny2EVMMessage(sourceChainSelector, onRamp, messageNumber, new Client.EVMTokenAmount[](0), false);
   }
 
   function _generateAny2EVMMessageWithTokens(
@@ -293,7 +293,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
   function _generateAny2EVMMessage(
     uint64 sourceChainSelector,
     bytes memory onRamp,
-    uint64 sequenceNumber,
+    uint64 messageNumber,
     Client.EVMTokenAmount[] memory tokenAmounts,
     bool allowOutOfOrderExecution
   ) internal view returns (Internal.Any2EVMRampMessage memory) {
@@ -316,8 +316,8 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
         messageId: "",
         sourceChainSelector: sourceChainSelector,
         destChainSelector: DEST_CHAIN_SELECTOR,
-        sequenceNumber: sequenceNumber,
-        nonce: allowOutOfOrderExecution ? 0 : sequenceNumber
+        messageNumber: messageNumber,
+        nonce: allowOutOfOrderExecution ? 0 : messageNumber
       }),
       sender: abi.encode(OWNER),
       data: data,
@@ -411,7 +411,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     EVM2EVMMultiOffRamp.SourceChainConfig memory config2
   ) internal pure {
     assertEq(config1.isEnabled, config2.isEnabled);
-    assertEq(config1.minSeqNr, config2.minSeqNr);
+    assertEq(config1.minMsgNr, config2.minMsgNr);
     assertEq(config1.onRamp, config2.onRamp);
     assertEq(address(config1.router), address(config2.router));
   }

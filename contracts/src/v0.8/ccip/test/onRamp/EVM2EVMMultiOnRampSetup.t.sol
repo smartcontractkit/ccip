@@ -73,7 +73,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
 
   function _messageToEvent(
     Client.EVM2AnyMessage memory message,
-    uint64 seqNum,
+    uint64 msgNum,
     uint64 nonce,
     uint256 feeTokenAmount,
     address originalSender
@@ -82,7 +82,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
       message,
       SOURCE_CHAIN_SELECTOR,
       DEST_CHAIN_SELECTOR,
-      seqNum,
+      msgNum,
       nonce,
       feeTokenAmount,
       originalSender,

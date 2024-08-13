@@ -250,7 +250,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       }
 
       if (message.tokenAmounts.length != gasLimitOverride.tokenGasOverrides.length) {
-        revert DestinationGasAmountCountMismatch(message.messageId, message.sequenceNumber);
+        revert DestinationGasAmountCountMismatch(message.messageId, message.messageNumber);
       }
 
       bytes[] memory encodedSourceTokenData = message.sourceTokenData;
@@ -313,7 +313,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     // Execute messages
     for (uint256 i = 0; i < numMsgs; ++i) {
       Internal.EVM2EVMMessage memory message = report.messages[i];
-      Internal.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
+      Internal.MessageExecutionState originalState = getExecutionState(message.messageNumber);
       // Two valid cases here, we either have never touched this message before, or we tried to execute
       // and failed. This check protects against reentry and re-execution because the other state is
       // IN_PROGRESS which should not be allowed to execute.
@@ -326,7 +326,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         // If the message has already been executed, we skip it.  We want to not revert on race conditions between
         // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
         // reverting an entire DON batch when a user manually executes while the tx is inflight.
-        emit SkippedAlreadyExecutedMessage(message.sequenceNumber);
+        emit SkippedAlreadyExecutedMessage(message.messageNumber);
         continue;
       }
       uint32[] memory tokenGasOverrides;
@@ -349,7 +349,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         // DON can only execute a message once
         // Acceptable state transitions: UNTOUCHED->SUCCESS, UNTOUCHED->FAILURE
         if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
-          emit AlreadyAttempted(message.sequenceNumber);
+          emit AlreadyAttempted(message.messageNumber);
           continue;
         }
       }
@@ -392,17 +392,17 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // when executing as a defense in depth measure.
       bytes[] memory offchainTokenData = report.offchainTokenData[i];
       _isWellFormed(
-        message.sequenceNumber,
+        message.messageNumber,
         message.sourceChainSelector,
         message.tokenAmounts.length,
         message.data.length,
         offchainTokenData.length
       );
 
-      _setExecutionState(message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
+      _setExecutionState(message.messageNumber, Internal.MessageExecutionState.IN_PROGRESS);
       (Internal.MessageExecutionState newState, bytes memory returnData) =
         _trialExecute(message, offchainTokenData, tokenGasOverrides);
-      _setExecutionState(message.sequenceNumber, newState);
+      _setExecutionState(message.messageNumber, newState);
 
       // Since it's hard to estimate whether manual execution will succeed, we
       // revert the entire transaction if it fails. This will show the user if
@@ -421,7 +421,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // The only valid post states are SUCCESS and FAILURE (checked below)
       if (newState != Internal.MessageExecutionState.SUCCESS) {
         if (newState != Internal.MessageExecutionState.FAILURE) {
-          revert InvalidNewState(message.sequenceNumber, newState);
+          revert InvalidNewState(message.messageNumber, newState);
         }
       }
 
@@ -437,7 +437,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
         }
       }
 
-      emit ExecutionStateChanged(message.sequenceNumber, message.messageId, newState, returnData);
+      emit ExecutionStateChanged(message.messageNumber, message.messageId, newState, returnData);
     }
   }
 

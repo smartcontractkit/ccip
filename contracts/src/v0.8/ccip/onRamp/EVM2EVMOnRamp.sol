@@ -197,10 +197,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   uint96 internal s_nopFeesJuels;
   /// @dev The combined weight of all NOPs weights
   uint32 internal s_nopWeightsTotal;
-  /// @dev The last used sequence number. This is zero in the case where no
-  /// messages has been sent yet. 0 is not a valid sequence number for any
+  /// @dev The last used message number. This is zero in the case where no
+  /// messages has been sent yet. 0 is not a valid message number for any
   /// real transaction.
-  uint64 internal s_sequenceNumber;
+  uint64 internal s_messageNumber;
 
   constructor(
     StaticConfig memory staticConfig,
@@ -241,8 +241,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   // ================================================================
 
   /// @inheritdoc IEVM2AnyOnRamp
-  function getExpectedNextSequenceNumber() external view returns (uint64) {
-    return s_sequenceNumber + 1;
+  function getExpectedNextMessageNumber() external view returns (uint64) {
+    return s_messageNumber + 1;
   }
 
   /// @inheritdoc IEVM2AnyOnRamp
@@ -314,14 +314,14 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       }
     }
 
-    // We need the next available sequence number so we increment before we use the value
+    // We need the next available message number so we increment before we use the value
     Internal.EVM2EVMMessage memory newMessage = Internal.EVM2EVMMessage({
       sourceChainSelector: i_chainSelector,
       sender: originalSender,
       // EVM destination addresses should be abi encoded and therefore always 32 bytes long
       // Not duplicately validated in `getFee`. Invalid address is uncommon, gas cost outweighs UX gain.
       receiver: Internal._validateEVMAddress(message.receiver),
-      sequenceNumber: ++s_sequenceNumber,
+      messageNumber: ++s_messageNumber,
       gasLimit: extraArgs.gasLimit,
       strict: false,
       // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we

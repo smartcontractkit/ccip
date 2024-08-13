@@ -121,35 +121,31 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     });
   }
 
-  function _generateAny2EVMMessageNoTokens(uint64 sequenceNumber)
-    internal
-    view
-    returns (Internal.EVM2EVMMessage memory)
-  {
-    return _generateAny2EVMMessage(sequenceNumber, new Client.EVMTokenAmount[](0), false);
+  function _generateAny2EVMMessageNoTokens(uint64 messageNumber) internal view returns (Internal.EVM2EVMMessage memory) {
+    return _generateAny2EVMMessage(messageNumber, new Client.EVMTokenAmount[](0), false);
   }
 
   function _generateAny2EVMMessageWithTokens(
-    uint64 sequenceNumber,
+    uint64 messageNumber,
     uint256[] memory amounts
   ) internal view returns (Internal.EVM2EVMMessage memory) {
     Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       tokenAmounts[i].amount = amounts[i];
     }
-    return _generateAny2EVMMessage(sequenceNumber, tokenAmounts, false);
+    return _generateAny2EVMMessage(messageNumber, tokenAmounts, false);
   }
 
   function _generateAny2EVMMessage(
-    uint64 sequenceNumber,
+    uint64 messageNumber,
     Client.EVMTokenAmount[] memory tokenAmounts,
     bool allowOutOfOrderExecution
   ) internal view returns (Internal.EVM2EVMMessage memory) {
     bytes memory data = abi.encode(0);
     Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
-      sequenceNumber: sequenceNumber,
+      messageNumber: messageNumber,
       sender: OWNER,
-      nonce: allowOutOfOrderExecution ? 0 : sequenceNumber,
+      nonce: allowOutOfOrderExecution ? 0 : messageNumber,
       gasLimit: GAS_LIMIT,
       strict: false,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,

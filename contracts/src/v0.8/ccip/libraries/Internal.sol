@@ -97,7 +97,7 @@ library Internal {
     uint64 sourceChainSelector; // ────────╮ the chain selector of the source chain, note: not chainId
     address sender; // ────────────────────╯ sender address on the source chain
     address receiver; // ──────────────────╮ receiver address on the destination chain
-    uint64 sequenceNumber; // ─────────────╯ sequence number, not unique across lanes
+    uint64 messageNumber; // ──────────────╯ message number, not unique across lanes
     uint256 gasLimit; //                     user supplied maximum gas amount available for dest chain execution
     bool strict; // ───────────────────────╮ DEPRECATED
     uint64 nonce; //                       │ nonce for this lane for this sender, not unique across senders/lanes
@@ -164,7 +164,7 @@ library Internal {
           abi.encode(
             original.sender,
             original.receiver,
-            original.sequenceNumber,
+            original.messageNumber,
             original.gasLimit,
             original.strict,
             original.nonce,
@@ -205,7 +205,7 @@ library Internal {
             original.header.messageId,
             original.sender,
             original.receiver,
-            original.header.sequenceNumber,
+            original.header.messageNumber,
             original.gasLimit,
             original.header.nonce
           )
@@ -227,7 +227,7 @@ library Internal {
           abi.encode(
             original.sender,
             original.receiver,
-            original.header.sequenceNumber,
+            original.header.messageNumber,
             original.header.nonce,
             original.feeToken,
             original.feeTokenAmount
@@ -302,7 +302,7 @@ library Internal {
     bytes32 messageId; // Unique identifier for the message, generated with the source chain's encoding scheme (i.e. not necessarily abi.encoded)
     uint64 sourceChainSelector; // ──╮ the chain selector of the source chain, note: not chainId
     uint64 destChainSelector; //     | the chain selector of the destination chain, note: not chainId
-    uint64 sequenceNumber; //        │ sequence number, not unique across lanes
+    uint64 messageNumber; //         │ messages number, not unique across lanes
     uint64 nonce; // ────────────────╯ nonce for this lane for this sender, not unique across senders/lanes
   }
 

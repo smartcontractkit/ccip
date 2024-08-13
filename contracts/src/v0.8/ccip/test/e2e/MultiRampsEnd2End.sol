@@ -139,12 +139,12 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](2);
     roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: EVM2EVMMultiOffRamp.Interval(messages1[0].header.sequenceNumber, messages1[1].header.sequenceNumber),
+      interval: EVM2EVMMultiOffRamp.Interval(messages1[0].header.messageNumber, messages1[1].header.messageNumber),
       merkleRoot: merkleRoots[0]
     });
     roots[1] = EVM2EVMMultiOffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
-      interval: EVM2EVMMultiOffRamp.Interval(messages2[0].header.sequenceNumber, messages2[0].header.sequenceNumber),
+      interval: EVM2EVMMultiOffRamp.Interval(messages2[0].header.messageNumber, messages2[0].header.messageNumber),
       merkleRoot: merkleRoots[1]
     });
 
@@ -176,7 +176,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
       SOURCE_CHAIN_SELECTOR,
-      messages1[0].header.sequenceNumber,
+      messages1[0].header.messageNumber,
       messages1[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
       ""
@@ -185,7 +185,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
       SOURCE_CHAIN_SELECTOR,
-      messages1[1].header.sequenceNumber,
+      messages1[1].header.messageNumber,
       messages1[1].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
       ""
@@ -194,7 +194,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
     vm.expectEmit();
     emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
       SOURCE_CHAIN_SELECTOR + 1,
-      messages2[0].header.sequenceNumber,
+      messages2[0].header.messageNumber,
       messages2[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
       ""
@@ -209,7 +209,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
   }
 
   function _sendRequest(
-    uint64 expectedSeqNum,
+    uint64 expectedMsgNum,
     uint64 sourceChainSelector,
     uint64 nonce,
     bytes32 metadataHash,
@@ -227,7 +227,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
       message,
       sourceChainSelector,
       DEST_CHAIN_SELECTOR,
-      expectedSeqNum,
+      expectedMsgNum,
       nonce,
       expectedFee,
       OWNER,
@@ -249,7 +249,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
         messageId: msgEvent.header.messageId,
         sourceChainSelector: sourceChainSelector,
         destChainSelector: DEST_CHAIN_SELECTOR,
-        sequenceNumber: msgEvent.header.sequenceNumber,
+        messageNumber: msgEvent.header.messageNumber,
         nonce: msgEvent.header.nonce
       }),
       sender: abi.encode(msgEvent.sender),

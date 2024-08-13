@@ -63,9 +63,9 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
 
   /// @dev Struct to hold the configs for a destination chain
   struct DestChainConfig {
-    // The last used sequence number. This is zero in the case where no messages has been sent yet.
-    // 0 is not a valid sequence number for any real transaction.
-    uint64 sequenceNumber;
+    // The last used message number. This is zero in the case where no messages has been sent yet.
+    // 0 is not a valid message number for any real transaction.
+    uint64 messageNumber;
     // This is the local router address that is allowed to send messages to the destination chain.
     // This is NOT the receiving router address on the destination chain.
     IRouter router;
@@ -123,11 +123,11 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   // │                          Messaging                           │
   // ================================================================
 
-  /// @notice Gets the next sequence number to be used in the onRamp
+  /// @notice Gets the next message number to be used in the onRamp
   /// @param destChainSelector The destination chain selector
-  /// @return the next sequence number to be used
-  function getExpectedNextSequenceNumber(uint64 destChainSelector) external view returns (uint64) {
-    return s_destChainConfigs[destChainSelector].sequenceNumber + 1;
+  /// @return the next message number to be used
+  function getExpectedNextMessageNumber(uint64 destChainSelector) external view returns (uint64) {
+    return s_destChainConfigs[destChainSelector].messageNumber + 1;
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
@@ -166,8 +166,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
         messageId: "",
         sourceChainSelector: i_chainSelector,
         destChainSelector: destChainSelector,
-        // We need the next available sequence number so we increment before we use the value
-        sequenceNumber: ++destChainConfig.sequenceNumber,
+        // We need the next available message number so we increment before we use the value
+        messageNumber: ++destChainConfig.messageNumber,
         // Only bump nonce for messages that specify allowOutOfOrderExecution == false. Otherwise, we
         // may block ordered message nonces, which is not what we want.
         nonce: isOutOfOrderExecution
@@ -325,7 +325,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
       }
 
       DestChainConfig memory newDestChainConfig = DestChainConfig({
-        sequenceNumber: s_destChainConfigs[destChainSelector].sequenceNumber,
+        messageNumber: s_destChainConfigs[destChainSelector].messageNumber,
         router: destChainConfigArg.router
       });
       s_destChainConfigs[destChainSelector] = newDestChainConfig;

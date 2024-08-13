@@ -41,7 +41,7 @@ contract EVM2EVMOnRampHelper is EVM2EVMOnRamp, IgnoreContractSize {
     return _getTokenTransferCost(feeToken, feeTokenPrice, tokenAmounts);
   }
 
-  function getSequenceNumber() external view returns (uint64) {
-    return s_sequenceNumber;
+  function getMessageNumber() external view returns (uint64) {
+    return s_messageNumber;
   }
 }

@@ -42,7 +42,7 @@ contract PingPong_startPingPong is PingPongDappSetup {
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, sentMessage);
 
     Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
-      sequenceNumber: 1,
+      messageNumber: 1,
       feeTokenAmount: expectedFee,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       sender: address(s_pingPong),

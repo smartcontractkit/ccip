@@ -369,7 +369,7 @@ contract PriceRegistryFeeSetup is PriceRegistrySetup {
     Client.EVM2AnyMessage memory message,
     uint64 sourceChainSelector,
     uint64 destChainSelector,
-    uint64 seqNum,
+    uint64 msgNum,
     uint64 nonce,
     uint256 feeTokenAmount,
     address originalSender,
@@ -384,7 +384,7 @@ contract PriceRegistryFeeSetup is PriceRegistrySetup {
         messageId: "",
         sourceChainSelector: sourceChainSelector,
         destChainSelector: destChainSelector,
-        sequenceNumber: seqNum,
+        messageNumber: msgNum,
         nonce: extraArgs.allowOutOfOrderExecution ? 0 : nonce
       }),
       sender: originalSender,

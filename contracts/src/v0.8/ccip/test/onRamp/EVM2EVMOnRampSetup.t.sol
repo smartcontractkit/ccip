@@ -191,7 +191,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
 
   function _messageToEvent(
     Client.EVM2AnyMessage memory message,
-    uint64 seqNum,
+    uint64 msgNum,
     uint64 nonce,
     uint256 feeTokenAmount,
     address originalSender
@@ -204,7 +204,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     uint256 numberOfTokens = message.tokenAmounts.length;
     Client.EVMExtraArgsV2 memory extraArgs = _extraArgsFromBytes(bytes4(message.extraArgs), args);
     Internal.EVM2EVMMessage memory messageEvent = Internal.EVM2EVMMessage({
-      sequenceNumber: seqNum,
+      messageNumber: msgNum,
       feeTokenAmount: feeTokenAmount,
       sender: originalSender,
       nonce: extraArgs.allowOutOfOrderExecution ? 0 : nonce,
