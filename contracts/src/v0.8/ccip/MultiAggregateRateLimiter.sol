@@ -19,7 +19,6 @@ import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers, ITypeAndVersion {
   using RateLimiter for RateLimiter.TokenBucket;
   using USDPriceWith18Decimals for uint224;
-  using EnumerableMapAddresses for EnumerableMapAddresses.AddressToBytes32Map;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToBytesMap;
 
   error PriceNotFoundForToken(address token);
