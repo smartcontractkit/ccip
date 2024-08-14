@@ -123,8 +123,9 @@ func Test0001_InitialDeploy(t *testing.T) {
 
 		t.Logf("Sending CCIP request from chain selector %d to chain selector %d",
 			sel, dest)
-		_, err = state.Routers[sel].CcipSend(e.Chains[sel].DeployerKey, homeChainSel, msg)
+		tx, err = state.Routers[sel].CcipSend(e.Chains[sel].DeployerKey, homeChainSel, msg)
 		require.NoError(t, err)
+		require.NoError(t, chain.Confirm(tx.Hash()))
 		break
 	}
 	// TODO: Apply the proposal.

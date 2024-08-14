@@ -491,6 +491,12 @@ func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) 
 
 	_, err = state.PriceRegistries[from].UpdatePrices(
 		e.Chains[from].DeployerKey, price_registry.InternalPriceUpdates{
+			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+				{
+					SourceToken: state.Weth9s[from].Address(),
+					UsdPerToken: big.NewInt(1),
+				},
+			},
 			GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
 				{
 					DestChainSelector: to,
