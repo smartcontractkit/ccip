@@ -7,8 +7,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
-
 	"go.uber.org/multierr"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -309,10 +307,10 @@ func (d *DstExecProvider) Close() error {
 		if d.seenCommitStoreAddr == nil {
 			return nil
 		}
-		return ccip.CloseCommitStoreReader(d.lggr, versionFinder, *d.seenCommitStoreAddr, d.client, d.lp)
+		return ccip.CloseCommitStoreReader(d.lggr, versionFinder, *d.seenCommitStoreAddr, d.client, d.lp, d.feeEstimatorConfig)
 	})
 	unregisterFuncs = append(unregisterFuncs, func() error {
-		return ccip.CloseOffRampReader(d.lggr, versionFinder, d.offRampAddress, d.client, d.lp, nil, big.NewInt(0))
+		return ccip.CloseOffRampReader(d.lggr, versionFinder, d.offRampAddress, d.client, d.lp, nil, big.NewInt(0), d.feeEstimatorConfig)
 	})
 
 	var multiErr error

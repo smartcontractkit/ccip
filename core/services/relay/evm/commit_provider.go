@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
-
 	"go.uber.org/multierr"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -27,12 +25,12 @@ var _ commontypes.CCIPCommitProvider = (*SrcCommitProvider)(nil)
 var _ commontypes.CCIPCommitProvider = (*DstCommitProvider)(nil)
 
 type SrcCommitProvider struct {
-	lggr        logger.Logger
-	startBlock  uint64
-	client      client.Client
-	lp          logpoller.LogPoller
-	estimator   gas.EvmFeeEstimator
-	maxGasPrice *big.Int
+	lggr               logger.Logger
+	startBlock         uint64
+	client             client.Client
+	lp                 logpoller.LogPoller
+	estimator          gas.EvmFeeEstimator
+	maxGasPrice        *big.Int
 	feeEstimatorConfig estimatorconfig.FeeEstimatorConfigProvider
 
 	// these values will be lazily initialized
@@ -179,13 +177,13 @@ func (P *DstCommitProvider) Close() error {
 		if P.seenCommitStoreAddress == nil {
 			return nil
 		}
-		return ccip.CloseCommitStoreReader(P.lggr, versionFinder, *P.seenCommitStoreAddress, P.client, P.lp)
+		return ccip.CloseCommitStoreReader(P.lggr, versionFinder, *P.seenCommitStoreAddress, P.client, P.lp, P.feeEstimatorConfig)
 	})
 	unregisterFuncs = append(unregisterFuncs, func() error {
 		if P.seenOffRampAddress == nil {
 			return nil
 		}
-		return ccip.CloseOffRampReader(P.lggr, versionFinder, *P.seenOffRampAddress, P.client, P.lp, nil, big.NewInt(0))
+		return ccip.CloseOffRampReader(P.lggr, versionFinder, *P.seenOffRampAddress, P.client, P.lp, nil, big.NewInt(0), P.feeEstimatorConfig)
 	})
 
 	var multiErr error
