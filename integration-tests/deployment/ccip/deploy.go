@@ -323,16 +323,20 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 					price_registry.PriceRegistryStaticConfig{
 						MaxFeeJuelsPerMsg:  big.NewInt(0).Mul(big.NewInt(2e2), big.NewInt(1e18)),
 						LinkToken:          linkToken.Address,
-						StalenessThreshold: uint32(86400),
+						StalenessThreshold: uint32(24 * 60 * 60),
 					},
-					[]common.Address{},              // ramps added after
-					[]common.Address{weth9.Address}, // fee tokens
+					[]common.Address{}, // ramps added after
+					[]common.Address{weth9.Address, linkToken.Address}, // fee tokens
 					[]price_registry.PriceRegistryTokenPriceFeedUpdate{},
 					[]price_registry.PriceRegistryTokenTransferFeeConfigArgs{}, // TODO: tokens
 					[]price_registry.PriceRegistryPremiumMultiplierWeiPerEthArgs{
 						{
+							PremiumMultiplierWeiPerEth: 9e17, // 0.9 ETH
+							Token:                      linkToken.Address,
+						},
+						{
+							PremiumMultiplierWeiPerEth: 1e18,
 							Token:                      weth9.Address,
-							PremiumMultiplierWeiPerEth: 1e6,
 						},
 					},
 					[]price_registry.PriceRegistryDestChainConfigArgs{},
@@ -412,13 +416,6 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 			return ab, err
 		}
 
-		// Always enable weth9 and linkToken as fee tokens.
-		tx, err = priceRegistry.Contract.ApplyFeeTokensUpdates(chain.DeployerKey, []common.Address{weth9.Address, linkToken.Address}, []common.Address{})
-		if err := ConfirmIfNoError(chain, tx, err); err != nil {
-			e.Logger.Errorw("Failed to confirm price registry fee tokens update", "err", err)
-			return ab, err
-		}
-
 		tx, err = nonceManager.Contract.ApplyAuthorizedCallerUpdates(chain.DeployerKey, nonce_manager.AuthorizedCallersAuthorizedCallerArgs{
 			AddedCallers: []common.Address{offRamp.Address, onRamp.Address},
 		})
@@ -459,12 +456,30 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 	return ab, nil
 }
 
+func MaybeDataErr(err error) string {
+	d, ok := err.(rpc.DataError)
+	if ok {
+		return d.ErrorData().(string)
+	}
+	return ""
+}
+
 func ConfirmIfNoError(chain deployment.Chain, tx *types.Transaction, err error) error {
 	if err != nil {
-		fmt.Println("Error", err.(rpc.DataError).ErrorData())
+		d, ok := err.(rpc.DataError)
+		if ok {
+			fmt.Println("Got Data Error", d.ErrorData())
+		}
 		return err
 	}
 	return chain.Confirm(tx.Hash())
+}
+func uBigInt(i uint64) *big.Int {
+	return new(big.Int).SetUint64(i)
+}
+
+func e18Mult(amount uint64) *big.Int {
+	return new(big.Int).Mul(uBigInt(amount), uBigInt(1e18))
 }
 
 func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) error {
@@ -493,8 +508,12 @@ func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) 
 		e.Chains[from].DeployerKey, price_registry.InternalPriceUpdates{
 			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 				{
+					SourceToken: state.LinkTokens[from].Address(),
+					UsdPerToken: e18Mult(20),
+				},
+				{
 					SourceToken: state.Weth9s[from].Address(),
-					UsdPerToken: big.NewInt(1),
+					UsdPerToken: e18Mult(4000),
 				},
 			},
 			GasPriceUpdates: []price_registry.InternalGasPriceUpdate{

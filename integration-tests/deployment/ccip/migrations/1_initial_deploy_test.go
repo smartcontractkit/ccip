@@ -107,8 +107,7 @@ func Test0001_InitialDeploy(t *testing.T) {
 		}
 		fee, err := state.Routers[sel].GetFee(
 			&bind.CallOpts{Context: context.Background()}, dest, msg)
-		require.NoError(t, err)
-		require.NoError(t, err, "%T", err)
+		require.NoError(t, err, ccipdeployment.MaybeDataErr(err))
 		tx, err := state.Weth9s[sel].Deposit(&bind.TransactOpts{
 			From:   e.Chains[sel].DeployerKey.From,
 			Signer: e.Chains[sel].DeployerKey.Signer,
