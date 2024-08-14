@@ -159,7 +159,10 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	if err != nil {
 		return nil, fmt.Errorf("failed to get public config from OCR config: %w", err)
 	}
+
 	var execBatchGasLimit uint64
+	var commitOffchainConfig *pluginconfig.CommitOffchainConfig
+
 	if pluginType == cctypes.PluginTypeCCIPExec {
 		execOffchainConfig, err2 := pluginconfig.DecodeExecuteOffchainConfig(publicConfig.ReportingPluginConfig)
 		if err2 != nil {
@@ -170,6 +173,14 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			return nil, fmt.Errorf("BatchGasLimit not set in execute offchain config, must be > 0")
 		}
 		execBatchGasLimit = execOffchainConfig.BatchGasLimit
+	} else if pluginType == cctypes.PluginTypeCCIPCommit {
+		commitOffchainCfg, err2 := pluginconfig.DecodeCommitOffchainConfig(publicConfig.ReportingPluginConfig)
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to decode commit offchain config: %w, raw: %s",
+				err2, string(publicConfig.ReportingPluginConfig))
+		}
+
+		commitOffchainConfig = &commitOffchainCfg
 	}
 
 	// this is so that we can use the msg hasher and report encoder from that dest chain relayer's provider.
@@ -179,9 +190,14 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 		var chainReaderConfig evmrelaytypes.ChainReaderConfig
 		if chain.ID().Uint64() == destChainID {
 			chainReaderConfig = evmconfig.DestReaderConfig()
+		} else if commitOffchainConfig != nil && commitOffchainConfig.TokenPriceChainSelector == chain.ID().Uint64() {
+			// If the chain is the chain with token price contract, then use the config that includes the price aggregator
+			// This is essentially the same as source reader config, but with the price aggregator contract.
+			chainReaderConfig = evmconfig.PriceReaderConfig()
 		} else {
 			chainReaderConfig = evmconfig.SourceReaderConfig()
 		}
+
 		cr, err2 := evm.NewChainReaderService(
 			context.Background(),
 			i.lggr.
@@ -208,6 +224,30 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			})
 			if err3 != nil {
 				return nil, fmt.Errorf("failed to bind chain reader for dest chain %s's offramp at %s: %w", chain.ID(), offrampAddressHex, err3)
+			}
+		} else if commitOffchainConfig != nil && chain.ID().Uint64() == commitOffchainConfig.TokenPriceChainSelector {
+			// Only supporting one price source for now.
+			//TODO: Once chainreader new changes https://github.com/smartcontractkit/chainlink-common/pull/603
+			// are merged we'll be able to use different bindings for different tokens.
+			// We'll just need to remove the condition len(priceSources) > 1, and it should work.
+			priceSources := commitOffchainConfig.PriceSources
+			if len(priceSources) == 0 {
+				return nil, fmt.Errorf("no price sources provided")
+			} else if len(priceSources) > 1 {
+				return nil, fmt.Errorf("can't have more than one price source for now")
+			}
+
+			// Binding tokens
+			var bcs []types.BoundContract
+			for _, priceSource := range priceSources {
+				bcs = append(bcs, types.BoundContract{
+					Address: priceSource.AggregatorAddress,
+					Name:    consts.ContractNamePriceAggregator,
+				})
+			}
+
+			if err1 := cr.Bind(context.Background(), bcs); err1 != nil {
+				return nil, fmt.Errorf("failed to bind token price aggregator: %w", err)
 			}
 		}
 

@@ -5,14 +5,13 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
-
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
@@ -22,6 +21,7 @@ var (
 	capabilitiesRegsitryABI = evmtypes.MustGetABI(kcr.CapabilitiesRegistryABI)
 	ccipConfigABI           = evmtypes.MustGetABI(ccip_config.CCIPConfigABI)
 	priceRegistryABI        = evmtypes.MustGetABI(price_registry.PriceRegistryABI)
+	priceAggregatorABI      = evmtypes.MustGetABI(aggregator_v3_interface.AggregatorV3InterfaceABI)
 )
 
 // MustSourceReaderConfig returns a ChainReaderConfig that can be used to read from the onramp.
@@ -181,6 +181,20 @@ func SourceReaderConfig() evmrelaytypes.ChainReaderConfig {
 			},
 		},
 	}
+}
+
+func PriceReaderConfig() evmrelaytypes.ChainReaderConfig {
+	allContracts := SourceReaderConfig().Contracts
+	allContracts[consts.ContractNamePriceAggregator] = evmrelaytypes.ChainContractReader{
+		ContractABI: aggregator_v3_interface.AggregatorV3InterfaceABI,
+		Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
+			consts.MethodNameGetLatestRoundData: {
+				ChainSpecificName: mustGetMethodName(consts.MethodNameGetLatestRoundData, priceAggregatorABI),
+			},
+		},
+	}
+
+	return evmrelaytypes.ChainReaderConfig{Contracts: allContracts}
 }
 
 // HomeChainReaderConfigRaw returns a ChainReaderConfig that can be used to read from the home chain.
