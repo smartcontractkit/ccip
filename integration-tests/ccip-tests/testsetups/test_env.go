@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
+	ctfConfigTypes "github.com/smartcontractkit/chainlink-testing-framework/config/types"
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/conversions"
 
@@ -292,8 +293,8 @@ func DeployLocalCluster(
 				require.NoError(t, err, "failed to get default chain config: %w", err)
 			} else {
 				chainConfig.ChainID = int(network.ChainID)
-				eth1 := ctfconfig.EthereumVersion_Eth1
-				geth := ctfconfig.ExecutionLayer_Geth
+				eth1 := ctfConfigTypes.EthereumVersion_Eth1
+				geth := ctfConfigTypes.ExecutionLayer_Geth
 
 				privateEthereumNetworks = append(privateEthereumNetworks, &ctfconfig.EthereumNetworkConfig{
 					EthereumVersion:     &eth1,
