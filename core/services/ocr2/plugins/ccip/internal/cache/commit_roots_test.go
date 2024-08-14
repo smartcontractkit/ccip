@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
@@ -54,7 +55,9 @@ func Test_RootsEligibleForExecution(t *testing.T) {
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 2, time.Now(), 1)))
 
-	commitStore, err := v1_2_0.NewCommitStore(logger.TestLogger(t), commitStoreAddr, nil, lp)
+	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
+
+	commitStore, err := v1_2_0.NewCommitStore(logger.TestLogger(t), commitStoreAddr, nil, lp, feeEstimatorConfig)
 	require.NoError(t, err)
 
 	rootsCache := cache.NewCommitRootsCache(logger.TestLogger(t), commitStore, 10*time.Hour, time.Second)
@@ -162,7 +165,9 @@ func Test_RootsEligibleForExecutionWithReorgs(t *testing.T) {
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 3, time.Now(), 1)))
 
-	commitStore, err := v1_2_0.NewCommitStore(logger.TestLogger(t), commitStoreAddr, nil, lp)
+	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
+
+	commitStore, err := v1_2_0.NewCommitStore(logger.TestLogger(t), commitStoreAddr, nil, lp, feeEstimatorConfig)
 	require.NoError(t, err)
 
 	rootsCache := cache.NewCommitRootsCache(logger.TestLogger(t), commitStore, 10*time.Hour, time.Second)
@@ -221,7 +226,9 @@ func Test_BlocksWithTheSameTimestamps(t *testing.T) {
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 2, time.Now(), 2)))
 
-	commitStore, err := v1_2_0.NewCommitStore(logger.TestLogger(t), commitStoreAddr, nil, lp)
+	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
+
+	commitStore, err := v1_2_0.NewCommitStore(logger.TestLogger(t), commitStoreAddr, nil, lp, feeEstimatorConfig)
 	require.NoError(t, err)
 
 	rootsCache := cache.NewCommitRootsCache(logger.TestLogger(t), commitStore, 10*time.Hour, time.Second)
