@@ -332,10 +332,7 @@ func AddDON(
 			Config:       encodedConfigs,
 		},
 	}, false, false, f)
-	if err != nil {
-		return fmt.Errorf("%s", err.(rpc.DataError).ErrorData().(string))
-	}
-	if err := home.Confirm(tx.Hash()); err != nil {
+	if err := ConfirmIfNoError(home, tx, err); err != nil {
 		return err
 	}
 
@@ -396,10 +393,7 @@ func AddDON(
 	//uni.backend.Commit()
 
 	tx, err = offRamp.SetOCR3Configs(dest.DeployerKey, offrampOCR3Configs)
-	if err != nil {
-		return fmt.Errorf("%s", err.(rpc.DataError).ErrorData().(string))
-	}
-	if err := home.Confirm(tx.Hash()); err != nil {
+	if err := ConfirmIfNoError(dest, tx, err); err != nil {
 		return err
 	}
 

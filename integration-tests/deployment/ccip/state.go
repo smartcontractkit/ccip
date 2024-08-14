@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 
@@ -50,6 +51,9 @@ type CCIPOnChainState struct {
 	// TODO: remove once we have Address() on wrappers
 	McmsAddrs map[uint64]common.Address
 	Timelocks map[uint64]*owner_wrappers.RBACTimelock
+
+	// Test contracts
+	Receivers map[uint64]*maybe_revert_message_receiver.MaybeRevertMessageReceiver
 }
 
 type CCIPSnapShot struct {
@@ -157,6 +161,7 @@ func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (
 		Timelocks:            make(map[uint64]*owner_wrappers.RBACTimelock),
 		CapabilityRegistry:   make(map[uint64]*capabilities_registry.CapabilitiesRegistry),
 		CCIPConfig:           make(map[uint64]*ccip_config.CCIPConfig),
+		Receivers:            make(map[uint64]*maybe_revert_message_receiver.MaybeRevertMessageReceiver),
 	}
 	// Get all the onchain state
 	addresses, err := ab.Addresses()
@@ -251,6 +256,12 @@ func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (
 					return state, err
 				}
 				state.CCIPConfig[chainSelector] = cc
+			case CCIPReceiver_1_0_0:
+				mr, err := maybe_revert_message_receiver.NewMaybeRevertMessageReceiver(common.HexToAddress(address), e.Chains[chainSelector].Client)
+				if err != nil {
+					return state, err
+				}
+				state.Receivers[chainSelector] = mr
 			default:
 				return state, fmt.Errorf("unknown contract %s", tvStr)
 			}

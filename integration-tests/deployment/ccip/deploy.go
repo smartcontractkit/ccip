@@ -1,14 +1,18 @@
 package ccipdeployment
 
 import (
+	"encoding/hex"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rpc"
 	owner_helpers "github.com/smartcontractkit/ccip-owner-contracts/gethwrappers"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
@@ -33,6 +37,7 @@ var (
 	WETH9_1_0_0         = "WETH9 1.0.0"
 	MCMS_1_0_0          = "ManyChainMultiSig 1.0.0"
 	RBAC_Timelock_1_0_0 = "RBACTimelock 1.0.0"
+	CCIPReceiver_1_0_0  = "CCIPReceiver 1.0.0"
 
 	// 1.2
 	Router_1_2_0 = "Router 1.2.0"
@@ -61,7 +66,8 @@ type Contracts interface {
 		*owner_helpers.RBACTimelock |
 		*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp |
 		*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp |
-		*burn_mint_erc677.BurnMintERC677
+		*burn_mint_erc677.BurnMintERC677 |
+		*maybe_revert_message_receiver.MaybeRevertMessageReceiver
 }
 
 type ContractDeploy[C Contracts] struct {
@@ -136,6 +142,23 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 	}
 
 	for sel, chain := range e.Chains {
+		ccipReceiver, err := deployContract(e.Logger, chain, ab,
+			func(chain deployment.Chain) ContractDeploy[*maybe_revert_message_receiver.MaybeRevertMessageReceiver] {
+				receiverAddr, tx, receiver, err2 := maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(
+					chain.DeployerKey,
+					chain.Client,
+					false,
+				)
+				return ContractDeploy[*maybe_revert_message_receiver.MaybeRevertMessageReceiver]{
+					receiverAddr, receiver, tx, CCIPReceiver_1_0_0, err2,
+				}
+			})
+		if err != nil {
+			e.Logger.Errorw("Failed to deploy receiver", "err", err)
+			return ab, err
+		}
+		e.Logger.Infow("deployed receiver", "addr", ccipReceiver.Address)
+
 		// TODO: Still waiting for RMNRemote/RMNHome contracts etc.
 		mockARM, err := deployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) ContractDeploy[*mock_arm_contract.MockARMContract] {
@@ -381,21 +404,26 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 
 		// Enable ramps on price registry/nonce manager
 		tx, err := priceRegistry.Contract.ApplyAuthorizedCallerUpdates(chain.DeployerKey, price_registry.AuthorizedCallersAuthorizedCallerArgs{
-			AddedCallers: []common.Address{offRamp.Address},
+			// TODO: We enable the deployer initially to set prices
+			AddedCallers: []common.Address{offRamp.Address, chain.DeployerKey.From},
 		})
-		if err := chain.Confirm(tx.Hash()); err != nil {
+		if err := ConfirmIfNoError(chain, tx, err); err != nil {
 			e.Logger.Errorw("Failed to confirm price registry authorized caller update", "err", err)
 			return ab, err
 		}
+
+		// Always enable weth9 and linkToken as fee tokens.
+		tx, err = priceRegistry.Contract.ApplyFeeTokensUpdates(chain.DeployerKey, []common.Address{weth9.Address, linkToken.Address}, []common.Address{})
+		if err := ConfirmIfNoError(chain, tx, err); err != nil {
+			e.Logger.Errorw("Failed to confirm price registry fee tokens update", "err", err)
+			return ab, err
+		}
+
 		tx, err = nonceManager.Contract.ApplyAuthorizedCallerUpdates(chain.DeployerKey, nonce_manager.AuthorizedCallersAuthorizedCallerArgs{
 			AddedCallers: []common.Address{offRamp.Address, onRamp.Address},
 		})
-		if err != nil {
+		if err := ConfirmIfNoError(chain, tx, err); err != nil {
 			e.Logger.Errorw("Failed to update nonce manager with ramps", "err", err)
-			return ab, err
-		}
-		if err := chain.Confirm(tx.Hash()); err != nil {
-			e.Logger.Errorw("Failed to confirm price registry authorized caller update", "err", err)
 			return ab, err
 		}
 
@@ -428,7 +456,112 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 		}
 	}
 
-	// Next steps: add initial configuration to cap registry and to offramps.
-
 	return ab, nil
+}
+
+func ConfirmIfNoError(chain deployment.Chain, tx *types.Transaction, err error) error {
+	if err != nil {
+		fmt.Println("Error", err.(rpc.DataError).ErrorData())
+		return err
+	}
+	return chain.Confirm(tx.Hash())
+}
+
+func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) error {
+	// TODO: Batch
+	tx, err := state.Routers[from].ApplyRampUpdates(e.Chains[from].DeployerKey, []router.RouterOnRamp{
+		{
+			DestChainSelector: to,
+			OnRamp:            state.EvmOnRampsV160[from].Address(),
+		},
+	}, []router.RouterOffRamp{}, []router.RouterOffRamp{})
+	if err := ConfirmIfNoError(e.Chains[from], tx, err); err != nil {
+		return err
+	}
+	tx, err = state.EvmOnRampsV160[from].ApplyDestChainConfigUpdates(e.Chains[from].DeployerKey,
+		[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{
+			{
+				DestChainSelector: to,
+				Router:            state.Routers[from].Address(),
+			},
+		})
+	if err := ConfirmIfNoError(e.Chains[from], tx, err); err != nil {
+		return err
+	}
+
+	_, err = state.PriceRegistries[from].UpdatePrices(
+		e.Chains[from].DeployerKey, price_registry.InternalPriceUpdates{
+			GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
+				{
+					DestChainSelector: to,
+					UsdPerUnitGas:     big.NewInt(2e12),
+				},
+			}})
+	if err := ConfirmIfNoError(e.Chains[from], tx, err); err != nil {
+		return err
+	}
+
+	// Enable dest in price registy
+	tx, err = state.PriceRegistries[from].ApplyDestChainConfigUpdates(e.Chains[from].DeployerKey,
+		[]price_registry.PriceRegistryDestChainConfigArgs{
+			{
+				DestChainSelector: to,
+				DestChainConfig:   defaultPriceRegistryDestChainConfig(),
+			},
+		})
+	if err := ConfirmIfNoError(e.Chains[from], tx, err); err != nil {
+		return err
+	}
+
+	tx, err = state.EvmOffRampsV160[to].ApplySourceChainConfigUpdates(e.Chains[to].DeployerKey,
+		[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{
+			{
+				Router:              state.Routers[to].Address(),
+				SourceChainSelector: from,
+				IsEnabled:           true,
+				OnRamp:              common.LeftPadBytes(state.EvmOnRampsV160[from].Address().Bytes(), 32),
+			},
+		})
+	if err := ConfirmIfNoError(e.Chains[to], tx, err); err != nil {
+		return err
+	}
+	tx, err = state.Routers[to].ApplyRampUpdates(e.Chains[to].DeployerKey, []router.RouterOnRamp{}, []router.RouterOffRamp{}, []router.RouterOffRamp{
+		{
+			SourceChainSelector: from,
+			OffRamp:             state.EvmOffRampsV160[to].Address(),
+		},
+	})
+	if err := ConfirmIfNoError(e.Chains[to], tx, err); err != nil {
+		return err
+	}
+	return nil
+}
+
+func defaultPriceRegistryDestChainConfig() price_registry.PriceRegistryDestChainConfig {
+	// https://github.com/smartcontractkit/ccip/blob/c4856b64bd766f1ddbaf5d13b42d3c4b12efde3a/contracts/src/v0.8/ccip/libraries/Internal.sol#L337-L337
+	/*
+		```Solidity
+			// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
+			bytes4 public constant CHAIN_FAMILY_SELECTOR_EVM = 0x2812d52c;
+		```
+	*/
+	evmFamilySelector, _ := hex.DecodeString("2812d52c")
+	return price_registry.PriceRegistryDestChainConfig{
+		IsEnabled:                         true,
+		MaxNumberOfTokensPerMsg:           10,
+		MaxDataBytes:                      256,
+		MaxPerMsgGasLimit:                 3_000_000,
+		DestGasOverhead:                   50_000,
+		DefaultTokenFeeUSDCents:           1,
+		DestGasPerPayloadByte:             10,
+		DestDataAvailabilityOverheadGas:   0,
+		DestGasPerDataAvailabilityByte:    100,
+		DestDataAvailabilityMultiplierBps: 1,
+		DefaultTokenDestGasOverhead:       125_000,
+		DefaultTokenDestBytesOverhead:     32,
+		DefaultTxGasLimit:                 200_000,
+		GasMultiplierWeiPerEth:            1,
+		NetworkFeeUSDCents:                1,
+		ChainFamilySelector:               [4]byte(evmFamilySelector),
+	}
 }
