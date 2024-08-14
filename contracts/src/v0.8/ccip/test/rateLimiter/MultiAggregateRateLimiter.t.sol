@@ -1003,9 +1003,7 @@ contract MultiAggregateRateLimiter_onOutboundMessage is MultiAggregateRateLimite
           localToken: s_sourceTokens[i]
         }),
         // Create a remote token address that is different from CHAIN_SELECTOR_1
-        remoteToken: abi.encode(
-          uint256(uint160(s_destTokenBySourceToken[s_sourceTokens[i]])) + type(uint160).max + 1
-          )
+        remoteToken: abi.encode(uint256(uint160(s_destTokenBySourceToken[s_sourceTokens[i]])) + type(uint160).max + 1)
       });
     }
     s_rateLimiter.updateRateLimitTokens(new MultiAggregateRateLimiter.LocalRateLimitToken[](0), tokensToAdd);
