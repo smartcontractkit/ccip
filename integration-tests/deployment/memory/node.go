@@ -92,9 +92,11 @@ func NewNode(
 		c.P2P.V2.ListenAddresses = &[]string{fmt.Sprintf("127.0.0.1:%d", port)}
 
 		// Enable Capabilities, This is a pre-requisite for registrySyncer to work.
-		c.Capabilities.ExternalRegistry.NetworkID = ptr(relay.NetworkEVM)
-		c.Capabilities.ExternalRegistry.ChainID = ptr(strconv.FormatUint(uint64(registryConfig.EVMChainID), 10))
-		c.Capabilities.ExternalRegistry.Address = ptr(registryConfig.Contract.String())
+		if registryConfig.Contract != common.HexToAddress("0x0") {
+			c.Capabilities.ExternalRegistry.NetworkID = ptr(relay.NetworkEVM)
+			c.Capabilities.ExternalRegistry.ChainID = ptr(strconv.FormatUint(uint64(registryConfig.EVMChainID), 10))
+			c.Capabilities.ExternalRegistry.Address = ptr(registryConfig.Contract.String())
+		}
 
 		// OCR configs
 		c.OCR.Enabled = ptr(false)
@@ -187,9 +189,9 @@ func NewNode(
 }
 
 type Keys struct {
-	PeerID       p2pkey.PeerID
-	Transmitters map[uint64]common.Address
-	OCRKeyBundle ocr2key.KeyBundle
+	PeerID                   p2pkey.PeerID
+	TransmittersByEVMChainID map[uint64]common.Address
+	OCRKeyBundle             ocr2key.KeyBundle
 }
 
 func CreateKeys(t *testing.T,
@@ -229,9 +231,9 @@ func CreateKeys(t *testing.T,
 	keybundle, err := app.GetKeyStore().OCR2().Create(ctx, chaintype.EVM)
 	require.NoError(t, err)
 	return Keys{
-		PeerID:       peerID,
-		Transmitters: transmitters,
-		OCRKeyBundle: keybundle,
+		PeerID:                   peerID,
+		TransmittersByEVMChainID: transmitters,
+		OCRKeyBundle:             keybundle,
 	}
 }
 

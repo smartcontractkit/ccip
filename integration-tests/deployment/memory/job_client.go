@@ -2,27 +2,18 @@ package memory
 
 import (
 	"context"
+	"strconv"
 
+	"github.com/ethereum/go-ethereum/common"
 	"google.golang.org/grpc"
 
 	jobv1 "github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/job/v1"
 	nodev1 "github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/node/v1"
-
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/validate"
 )
 
 type JobClient struct {
 	Nodes map[string]Node
-}
-
-func (j JobClient) ArchiveNode(ctx context.Context, in *nodev1.ArchiveNodeRequest, opts ...grpc.CallOption) (*nodev1.ArchiveNodeResponse, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (j JobClient) CreateNode(ctx context.Context, in *nodev1.CreateNodeRequest, opts ...grpc.CallOption) (*nodev1.CreateNodeResponse, error) {
-	//TODO implement me
-	panic("implement me")
 }
 
 func (j JobClient) GetNode(ctx context.Context, in *nodev1.GetNodeRequest, opts ...grpc.CallOption) (*nodev1.GetNodeResponse, error) {
@@ -37,34 +28,41 @@ func (j JobClient) ListNodes(ctx context.Context, in *nodev1.ListNodesRequest, o
 
 func (j JobClient) ListNodeChainConfigs(ctx context.Context, in *nodev1.ListNodeChainConfigsRequest, opts ...grpc.CallOption) (*nodev1.ListNodeChainConfigsResponse, error) {
 	n := j.Nodes[in.Filter.NodeId]
+	offpk := n.Keys.OCRKeyBundle.OffchainPublicKey()
+	cpk := n.Keys.OCRKeyBundle.ConfigEncryptionPublicKey()
+	var chainConfigs []*nodev1.ChainConfig
+	for evmChainID, transmitter := range n.Keys.TransmittersByEVMChainID {
+		chainConfigs = append(chainConfigs, &nodev1.ChainConfig{
+			Chain: &nodev1.Chain{
+				Id:   strconv.Itoa(int(evmChainID)),
+				Type: nodev1.ChainType_CHAIN_TYPE_EVM,
+			},
+			AccountAddress: transmitter.String(),
+			AdminAddress:   "",
+			Ocr1Config:     nil,
+			Ocr2Config: &nodev1.OCR2Config{
+				Enabled:     true,
+				IsBootstrap: n.IsBoostrap,
+				P2PKeyBundle: &nodev1.OCR2Config_P2PKeyBundle{
+					PeerId: n.Keys.PeerID.String(),
+				},
+				OcrKeyBundle: &nodev1.OCR2Config_OCRKeyBundle{
+					BundleId:              n.Keys.OCRKeyBundle.ID(),
+					ConfigPublicKey:       common.Bytes2Hex(cpk[:]),
+					OffchainPublicKey:     common.Bytes2Hex(offpk[:]),
+					OnchainSigningAddress: n.Keys.OCRKeyBundle.OnChainPublicKey(),
+				},
+				Multiaddr:        n.Addr.String(),
+				Plugins:          nil,
+				ForwarderAddress: "",
+			},
+		})
+	}
+
 	// TODO: I think we can pull it from the feeds manager.
 	return &nodev1.ListNodeChainConfigsResponse{
-		ChainConfigs: []*nodev1.ChainConfig{
-			{
-				Ocr2Config: &nodev1.OCR2Config{
-					P2PKeyBundle: &nodev1.OCR2Config_P2PKeyBundle{
-						PeerId:    n.Keys.PeerID.String(),
-						PublicKey: "",
-					},
-					OcrKeyBundle: &nodev1.OCR2Config_OCRKeyBundle{
-						BundleId: n.Keys.OCRKeyBundle.ID(),
-					},
-					IsBootstrap: n.IsBoostrap,
-					Multiaddr:   n.Addr.String(),
-				},
-			},
-		},
+		ChainConfigs: chainConfigs,
 	}, nil
-}
-
-func (j JobClient) UnarchiveNode(ctx context.Context, in *nodev1.UnarchiveNodeRequest, opts ...grpc.CallOption) (*nodev1.UnarchiveNodeResponse, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (j JobClient) UpdateNode(ctx context.Context, in *nodev1.UpdateNodeRequest, opts ...grpc.CallOption) (*nodev1.UpdateNodeResponse, error) {
-	//TODO implement me
-	panic("implement me")
 }
 
 func (j JobClient) GetJob(ctx context.Context, in *jobv1.GetJobRequest, opts ...grpc.CallOption) (*jobv1.GetJobResponse, error) {

@@ -156,6 +156,7 @@ func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (
 		McmsAddrs:            make(map[uint64]common.Address),
 		Timelocks:            make(map[uint64]*owner_wrappers.RBACTimelock),
 		CapabilityRegistry:   make(map[uint64]*capabilities_registry.CapabilitiesRegistry),
+		CCIPConfig:           make(map[uint64]*ccip_config.CCIPConfig),
 	}
 	// Get all the onchain state
 	addresses, err := ab.Addresses()

@@ -3,12 +3,12 @@ package ccipdeployment
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	owner_helpers "github.com/smartcontractkit/ccip-owner-contracts/gethwrappers"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
-
-	owner_helpers "github.com/smartcontractkit/ccip-owner-contracts/gethwrappers"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
@@ -114,10 +114,28 @@ type DeployCCIPContractConfig struct {
 // Deployment produces an address book of everything it deployed.
 func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (deployment.AddressBook, error) {
 	ab := deployment.NewMemoryAddressBook()
-	for sel, chain := range e.Chains {
-		if c.HomeChainSel == sel {
-		}
+	nodes, err := NodeInfo(e.NodeIDs, e.Offchain)
+	if err != nil {
+		e.Logger.Errorw("Failed to get node info", "err", err)
+		return ab, err
+	}
+	cap, err := c.CapabilityRegistry[c.HomeChainSel].GetHashedCapabilityId(
+		&bind.CallOpts{}, CapabilityLabelledName, CapabilityVersion)
+	if err != nil {
+		e.Logger.Errorw("Failed to get hashed capability id", "err", err)
+		return ab, err
+	}
+	// Signal to CR that our nodes support CCIP capability.
+	if err := AddNodes(
+		c.CapabilityRegistry[c.HomeChainSel],
+		e.Chains[c.HomeChainSel],
+		nodes.PeerIDs(c.HomeChainSel), // Doesn't actually matter which sel here
+		[][32]byte{cap},
+	); err != nil {
+		return ab, err
+	}
 
+	for sel, chain := range e.Chains {
 		// TODO: Still waiting for RMNRemote/RMNHome contracts etc.
 		mockARM, err := deployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) ContractDeploy[*mock_arm_contract.MockARMContract] {
@@ -334,7 +352,7 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 
 		offRamp, err := deployContract(e.Logger, chain, ab,
 			func(chain deployment.Chain) ContractDeploy[*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp] {
-				offRamp, tx, _, err2 := evm_2_evm_multi_offramp.DeployEVM2EVMMultiOffRamp(
+				offRampAddr, tx, offRamp, err2 := evm_2_evm_multi_offramp.DeployEVM2EVMMultiOffRamp(
 					chain.DeployerKey,
 					chain.Client,
 					evm_2_evm_multi_offramp.EVM2EVMMultiOffRampStaticConfig{
@@ -352,7 +370,7 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 					[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{},
 				)
 				return ContractDeploy[*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp]{
-					offRamp, nil, tx, EVM2EVMMultiOffRamp_1_6_0, err2,
+					offRampAddr, offRamp, tx, EVM2EVMMultiOffRamp_1_6_0, err2,
 				}
 			})
 		if err != nil {
@@ -380,6 +398,37 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 			e.Logger.Errorw("Failed to confirm price registry authorized caller update", "err", err)
 			return ab, err
 		}
+
+		// Add chain config for each chain.
+		_, err = AddChainConfig(e.Logger,
+			e.Chains[c.HomeChainSel],
+			c.CCIPOnChainState.CCIPConfig[c.HomeChainSel],
+			chain.Selector,
+			nodes.PeerIDs(chain.Selector),
+			uint8(len(nodes)/3))
+		if err != nil {
+			return ab, err
+		}
+
+		// For each chain, we create a DON on the home chain.
+		if err := AddDON(e.Logger,
+			cap,
+			c.CapabilityRegistry[c.HomeChainSel],
+			c.CCIPConfig[c.HomeChainSel],
+			offRamp.Contract,
+			chain,
+			e.Chains[c.HomeChainSel],
+			uint8(len(nodes)/3),
+			nodes.BootstrapPeerIDs(chain.Selector)[0],
+			nodes.PeerIDs(chain.Selector),
+			nodes,
+		); err != nil {
+			e.Logger.Errorw("Failed to add DON", "err", err)
+			return ab, err
+		}
 	}
+
+	// Next steps: add initial configuration to cap registry and to offramps.
+
 	return ab, nil
 }

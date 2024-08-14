@@ -52,8 +52,14 @@ func Test0001_InitialDeploy(t *testing.T) {
 			Contract:   capReg,
 		},
 	})
+	state, err := ccipdeployment.GenerateOnchainState(e, ab)
+	require.NoError(t, err)
 	// Apply migration
-	output, err := Apply0001(e, ccipdeployment.DeployCCIPContractConfig{})
+	output, err := Apply0001(e, ccipdeployment.DeployCCIPContractConfig{
+		HomeChainSel: homeChainSel,
+		// Capreg/config already exist.
+		CCIPOnChainState: state,
+	})
 	require.NoError(t, err)
 
 	// Apply the jobs.

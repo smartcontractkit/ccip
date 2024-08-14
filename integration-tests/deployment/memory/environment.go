@@ -87,9 +87,10 @@ func NewMemoryEnvironmentExistingChains(t *testing.T, lggr logger.Logger,
 	return deployment.Environment{
 		Name:     Memory,
 		Offchain: NewMemoryJobClient(nodes),
-		NodeIDs:  nodeIDs,
-		Chains:   chains,
-		Logger:   lggr,
+		// Note these have the p2p_ prefix.
+		NodeIDs: nodeIDs,
+		Chains:  chains,
+		Logger:  lggr,
 	}
 }
 

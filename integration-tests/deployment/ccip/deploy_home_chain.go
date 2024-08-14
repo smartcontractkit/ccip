@@ -4,27 +4,27 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rpc"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
-
-	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccip_integration_tests/integrationhelpers"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ocr3_config_encoder"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 const (
@@ -156,6 +156,17 @@ func AddNodes(
 	return nil
 }
 
+func SetupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) ccip_config.CCIPConfigTypesChainConfigInfo {
+	return ccip_config.CCIPConfigTypesChainConfigInfo{
+		ChainSelector: chainSelector,
+		ChainConfig: ccip_config.CCIPConfigTypesChainConfig{
+			Readers: readers,
+			FChain:  fChain,
+			Config:  cfg,
+		},
+	}
+}
+
 func AddChainConfig(
 	lggr logger.Logger,
 	h deployment.Chain,
@@ -176,7 +187,7 @@ func AddChainConfig(
 	if err != nil {
 		return ccip_config.CCIPConfigTypesChainConfigInfo{}, err
 	}
-	chainConfig := integrationhelpers.SetupConfigInfo(chainSelector, p2pIDs, f, encodedExtraChainConfig)
+	chainConfig := SetupConfigInfo(chainSelector, p2pIDs, f, encodedExtraChainConfig)
 	inputConfig := []ccip_config.CCIPConfigTypesChainConfigInfo{
 		chainConfig,
 	}
@@ -192,22 +203,32 @@ func AddChainConfig(
 
 func AddDON(
 	lggr logger.Logger,
-	capReg *capabilities_registry.CapabilitiesRegistry,
 	ccipCapabilityID [32]byte,
-	chainSelector uint64,
+	capReg *capabilities_registry.CapabilitiesRegistry,
 	ccipConfig *ccip_config.CCIPConfig,
-	dest deployment.Chain,
 	offRamp *evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp,
+	dest deployment.Chain,
 	home deployment.Chain,
 	f uint8,
 	bootstrapP2PID [32]byte,
 	p2pIDs [][32]byte,
-	oracles []confighelper2.OracleIdentityExtra,
+	nodes []Node,
 ) error {
+	sortP2PIDS(p2pIDs)
 	// Get OCR3 Config from helper
 	var schedule []int
-	for range oracles {
+	var oracles []confighelper2.OracleIdentityExtra
+	for _, node := range nodes {
 		schedule = append(schedule, 1)
+		cfg := node.selToOCRConfig[dest.Selector]
+		oracles = append(oracles, confighelper2.OracleIdentityExtra{
+			OracleIdentity: confighelper2.OracleIdentity{
+				OnchainPublicKey:  cfg.OnchainPublicKey,
+				TransmitAccount:   cfg.TransmitAccount,
+				OffchainPublicKey: cfg.OffchainPublicKey,
+				PeerID:            cfg.PeerID.String(),
+			}, ConfigEncryptionPublicKey: cfg.ConfigEncryptionPublicKey,
+		})
 	}
 
 	tabi, err := ocr3_config_encoder.IOCR3ConfigEncoderMetaData.GetAbi()
@@ -281,7 +302,7 @@ func AddDON(
 
 		ocr3Configs = append(ocr3Configs, ocr3_config_encoder.CCIPConfigTypesOCR3Config{
 			PluginType:            uint8(pluginType),
-			ChainSelector:         chainSelector,
+			ChainSelector:         dest.Selector,
 			F:                     configF,
 			OffchainConfigVersion: offchainConfigVersion,
 			OfframpAddress:        offRamp.Address().Bytes(),
@@ -311,6 +332,9 @@ func AddDON(
 			Config:       encodedConfigs,
 		},
 	}, false, false, f)
+	if err != nil {
+		return fmt.Errorf("%s", err.(rpc.DataError).ErrorData().(string))
+	}
 	if err := home.Confirm(tx.Hash()); err != nil {
 		return err
 	}
@@ -373,7 +397,7 @@ func AddDON(
 
 	tx, err = offRamp.SetOCR3Configs(dest.DeployerKey, offrampOCR3Configs)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s", err.(rpc.DataError).ErrorData().(string))
 	}
 	if err := home.Confirm(tx.Hash()); err != nil {
 		return err
@@ -384,7 +408,8 @@ func AddDON(
 			Context: context.Background(),
 		}, uint8(pluginType))
 		if err != nil {
-			return err
+			//return err
+			return fmt.Errorf("%s", err.(rpc.DataError).ErrorData().(string))
 		}
 		// TODO: assertions
 		//require.Equalf(t, offrampOCR3Configs[pluginType].ConfigDigest, ocrConfig.ConfigInfo.ConfigDigest, "%s OCR3 config digest mismatch", pluginType.String())
@@ -394,7 +419,7 @@ func AddDON(
 		//	// only commit will set signers, exec doesn't need them.
 		//	require.Equalf(t, offrampOCR3Configs[pluginType].Signers, ocrConfig.Signers, "%s OCR3 config signers mismatch", pluginType.String())
 		//}
-		//require.Equalf(t, offrampOCR3Configs[pluginType].Transmitters, ocrConfig.Transmitters, "%s OCR3 config transmitters mismatch", pluginType.String())
+		//require.Equalf(t, offrampOCR3Configs[pluginType].TransmittersByEVMChainID, ocrConfig.TransmittersByEVMChainID, "%s OCR3 config transmitters mismatch", pluginType.String())
 	}
 
 	lggr.Infof("set ocr3 config on the offramp, signers: %+v, transmitters: %+v", signerAddresses, transmitterAddresses)
