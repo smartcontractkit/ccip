@@ -58,8 +58,7 @@ func (o *orm) GetGasPricesByDestChain(ctx context.Context, destChainSelector uin
 	stmt := `
 		SELECT source_chain_selector, gas_price
 		FROM ccip.observed_gas_prices
-		WHERE chain_selector = $1
-		ORDER BY source_chain_selector, created_at DESC;
+		WHERE chain_selector = $1;
 	`
 	err := o.ds.SelectContext(ctx, &gasPrices, stmt, destChainSelector)
 	if err != nil {
@@ -74,8 +73,7 @@ func (o *orm) GetTokenPricesByDestChain(ctx context.Context, destChainSelector u
 	stmt := `
 		SELECT token_addr, token_price
 		FROM ccip.observed_token_prices
-		WHERE chain_selector = $1
-		ORDER BY token_addr;
+		WHERE chain_selector = $1;
 	`
 	err := o.ds.SelectContext(ctx, &tokenPrices, stmt, destChainSelector)
 	if err != nil {

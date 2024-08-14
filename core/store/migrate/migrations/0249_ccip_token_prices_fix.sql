@@ -10,7 +10,7 @@ CREATE TABLE ccip.observed_token_prices
     token_addr     BYTEA          NOT NULL,
     token_price    NUMERIC(78, 0) NOT NULL,
     created_at     TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
-    CONSTRAINT unique_token_chain_selector UNIQUE (token_addr, chain_selector)
+    PRIMARY KEY (chain_selector, token_addr)
 );
 
 CREATE TABLE ccip.observed_gas_prices
@@ -19,7 +19,7 @@ CREATE TABLE ccip.observed_gas_prices
     source_chain_selector NUMERIC(20, 0) NOT NULL,
     gas_price             NUMERIC(78, 0) NOT NULL,
     created_at            TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
-    CONSTRAINT unique_source_dest_chain UNIQUE (source_chain_selector, chain_selector)
+    PRIMARY KEY (chain_selector, source_chain_selector)
 );
 
 -- +goose Down
