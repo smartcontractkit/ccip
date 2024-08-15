@@ -27,6 +27,8 @@ import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessag
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {MultiOCR3BaseSetup} from "../ocr/MultiOCR3BaseSetup.t.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
+import {Vm} from "forge-std/Test.sol";
+import "forge-std/console.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
@@ -488,5 +490,62 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
 
     vm.startPrank(s_validTransmitters[0]);
     s_offRamp.execute(reportContext, abi.encode(reports));
+  }
+
+  function parseUintArray(string memory json) internal pure returns (uint256[] memory) {
+    bytes memory jsonData = bytes(json);
+    uint256 length = jsonData.length;
+    uint256 numCount = 0;
+    bool inNumber = false;
+
+    // First pass: count how many numbers are in the string
+    for (uint256 i = 0; i < length; i++) {
+      if (jsonData[i] >= 0x30 && jsonData[i] <= 0x39) {
+        // If it's a digit
+        if (!inNumber) {
+          inNumber = true;
+          numCount++;
+        }
+      } else {
+        inNumber = false;
+      }
+    }
+
+    // Initialize the array with the count
+    uint256[] memory arr = new uint256[](numCount);
+    uint256 index = 0;
+    uint256 value = 0;
+
+    // Second pass: parse and fill the array
+    for (uint256 i = 0; i < length; i++) {
+      bytes1 b = jsonData[i];
+      if (b >= 0x30 && b <= 0x39) {
+        // If it's a digit
+        value = value * 10 + (uint8(b) - 48); // Convert the digit character to its uint256 value
+      } else if (value > 0 || b == 0x30) {
+        // End of number or single '0'
+        arr[index] = value;
+        index++;
+        value = 0; // Reset for the next number
+      }
+    }
+
+    // Handle the case where the string ends with a number
+    if (value > 0 || (length > 0 && jsonData[length - 1] == 0x30)) {
+      arr[index] = value;
+    }
+
+    return arr;
+  }
+
+  function printExecutionStateChangedEventLogs() public {
+    Vm.Log[] memory logs = vm.getRecordedLogs();
+
+    for (uint256 i = 0; i < logs.length; i++) {
+      if (logs[i].topics[0] == keccak256("ExecutionStateChanged(uint64,uint64,bytes32,uint8,bytes,uint256)")) {
+        (,, uint256 gasUsed) = abi.decode(logs[i].data, (uint8, bytes, uint256));
+        console.log("gasUsed for execution is: %d", gasUsed);
+      }
+    }
   }
 }

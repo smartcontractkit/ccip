@@ -403,7 +403,8 @@ contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      ""
+      "",
+      92255
     );
 
     s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
@@ -431,7 +432,8 @@ contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
       messagesChain3[0].header.sequenceNumber,
       messagesChain3[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      ""
+      "",
+      72949
     );
 
     s_offRamp.executeSingleReport(
@@ -510,7 +512,8 @@ contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
       messagesMultiRamp[0].header.sequenceNumber,
       messagesMultiRamp[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      ""
+      "",
+      74218
     );
 
     s_offRamp.executeSingleReport(
@@ -530,7 +533,8 @@ contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
       messagesMultiRamp[0].header.sequenceNumber,
       messagesMultiRamp[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      ""
+      "",
+      24930
     );
 
     s_offRamp.executeSingleReport(
@@ -562,7 +566,8 @@ contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
       messagesMultiRamp[0].header.sequenceNumber,
       messagesMultiRamp[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      ""
+      "",
+      74255
     );
 
     // new sender nonce in new offramp should go from 0 -> 1
@@ -617,7 +622,8 @@ contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      ""
+      "",
+      70218
     );
 
     s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));

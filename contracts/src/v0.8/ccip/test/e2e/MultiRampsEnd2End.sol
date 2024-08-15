@@ -179,7 +179,8 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
       messages1[0].header.sequenceNumber,
       messages1[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      ""
+      "",
+      271393
     );
 
     vm.expectEmit();
@@ -188,7 +189,8 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
       messages1[1].header.sequenceNumber,
       messages1[1].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      ""
+      "",
+      86186
     );
 
     vm.expectEmit();
@@ -197,7 +199,8 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
       messages2[0].header.sequenceNumber,
       messages2[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      ""
+      "",
+      161402
     );
 
     Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](2);
