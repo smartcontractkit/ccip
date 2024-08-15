@@ -64,7 +64,7 @@ func GenerateChains(t *testing.T, numChains int) map[uint64]EVMChain {
 		require.NoError(t, err)
 		backend := backends.NewSimulatedBackend(core.GenesisAlloc{
 			owner.From: {Balance: big.NewInt(0).Mul(big.NewInt(100), big.NewInt(params.Ether))}}, 10000000)
-		tweakChainTimestamp(t, backend, time.Hour*24)
+		tweakChainTimestamp(t, backend, time.Hour*8)
 		chains[chainID] = EVMChain{
 			Backend:     backend,
 			DeployerKey: owner,

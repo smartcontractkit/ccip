@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment/memory"
 
@@ -14,7 +15,7 @@ import (
 
 func TestDeployCCIPContracts(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	e := memory.NewMemoryEnvironment(t, lggr, memory.MemoryEnvironmentConfig{
+	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
 		Chains: 1,
 		Nodes:  1,
 	})

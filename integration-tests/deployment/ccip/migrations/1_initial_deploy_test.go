@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 
@@ -65,7 +66,7 @@ func Test0001_InitialDeploy(t *testing.T) {
 		capReg = common.HexToAddress(addr)
 		break
 	}
-	nodes := memory.NewNodes(t, chains, 4, 1, memory.RegistryConfig{
+	nodes := memory.NewNodes(t, zapcore.InfoLevel, chains, 4, 1, memory.RegistryConfig{
 		EVMChainID: homeChainEVM,
 		Contract:   capReg,
 	})
@@ -128,6 +129,8 @@ func Test0001_InitialDeploy(t *testing.T) {
 			}
 		}
 	}
+
+	// Send a message from each chain to the home chain.
 	for sel, chain := range e.Chains {
 		dest := homeChainSel
 		if sel == homeChainSel {
@@ -166,6 +169,9 @@ func Test0001_InitialDeploy(t *testing.T) {
 			state.EvmOffRampsV160[homeChainSel],
 			ccipocr3.SeqNumRange{1, 1},
 		)
+		waitForExecWithSeqNr(t,
+			state.EvmOffRampsV160[homeChainSel],
+			chain, e.Chains[homeChainSel], 1)
 	}
 	// TODO: Apply the proposal.
 }
@@ -192,17 +198,18 @@ func waitForCommitWithInterval(
 	}, sink)
 	require.NoError(t, err)
 	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {
-		case <-ticker.C:
-			src.Client.(*backends.SimulatedBackend).Commit()
-			dest.Client.(*backends.SimulatedBackend).Commit()
 		case <-time.After(time.Minute):
 			t.Logf("Waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
 				dest.Selector, src.Selector, expectedSeqNumRange.String())
 			t.Error("Timed out waiting for commit report")
 			return
+		case <-ticker.C:
+			src.Client.(*backends.SimulatedBackend).Commit()
+			dest.Client.(*backends.SimulatedBackend).Commit()
 		case subErr := <-subscription.Err():
 			t.Fatalf("Subscription error: %+v", subErr)
 		case report := <-sink:
@@ -218,6 +225,42 @@ func waitForCommitWithInterval(
 						return
 					}
 				}
+			}
+		}
+	}
+}
+
+func waitForExecWithSeqNr(t *testing.T,
+	offramp *evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp,
+	source, dest deployment.Chain, expectedSeqNr uint64) {
+	tick := time.NewTicker(5 * time.Second)
+	defer tick.Stop()
+	for {
+		select {
+		case <-time.After(time.Minute):
+			t.Log("Timed out waiting for ExecutionStateChanged")
+			return
+		case <-tick.C:
+			// TODO: Clean this up
+			source.Client.(*backends.SimulatedBackend).Commit()
+			dest.Client.(*backends.SimulatedBackend).Commit()
+			scc, err := offramp.GetSourceChainConfig(nil, source.Selector)
+			require.NoError(t, err)
+			t.Logf("Waiting for ExecutionStateChanged on chain  %d from chain %d with expected sequence number %d, current onchain minSeqNr: %d",
+				dest.Selector, source.Selector, expectedSeqNr, scc.MinSeqNr)
+			iter, err := offramp.FilterExecutionStateChanged(nil,
+				[]uint64{source.Selector}, []uint64{expectedSeqNr}, nil)
+			require.NoError(t, err)
+			var count int
+			for iter.Next() {
+				if iter.Event.SequenceNumber == expectedSeqNr && iter.Event.SourceChainSelector == source.Selector {
+					count++
+				}
+			}
+			if count == 1 {
+				t.Logf("Received ExecutionStateChanged on chain %d from chain %d with expected sequence number %d",
+					dest.Selector, source.Selector, expectedSeqNr)
+				return
 			}
 		}
 	}
