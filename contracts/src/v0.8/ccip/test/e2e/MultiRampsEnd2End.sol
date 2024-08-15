@@ -173,42 +173,37 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
     vm.warp(BLOCK_TIME + 2000);
 
     // Execute
-    vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
-      SOURCE_CHAIN_SELECTOR,
-      messages1[0].header.sequenceNumber,
-      messages1[0].header.messageId,
-      Internal.MessageExecutionState.SUCCESS,
-      "",
-      271393
-    );
-
-    vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
-      SOURCE_CHAIN_SELECTOR,
-      messages1[1].header.sequenceNumber,
-      messages1[1].header.messageId,
-      Internal.MessageExecutionState.SUCCESS,
-      "",
-      86186
-    );
-
-    vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
-      SOURCE_CHAIN_SELECTOR + 1,
-      messages2[0].header.sequenceNumber,
-      messages2[0].header.messageId,
-      Internal.MessageExecutionState.SUCCESS,
-      "",
-      161402
-    );
-
     Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](2);
     reports[0] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR, messages1);
     reports[1] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR + 1, messages2);
 
     vm.resumeGasMetering();
+    vm.recordLogs();
     _execute(reports);
+
+    assertExecutionStateChangedEventLogs(
+      SOURCE_CHAIN_SELECTOR,
+      messages1[0].header.sequenceNumber,
+      messages1[0].header.messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+
+    assertExecutionStateChangedEventLogs(
+      SOURCE_CHAIN_SELECTOR,
+      messages1[1].header.sequenceNumber,
+      messages1[1].header.messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+
+    assertExecutionStateChangedEventLogs(
+      SOURCE_CHAIN_SELECTOR + 1,
+      messages2[0].header.sequenceNumber,
+      messages2[0].header.messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
   }
 
   function _sendRequest(

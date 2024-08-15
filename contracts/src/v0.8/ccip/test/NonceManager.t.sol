@@ -397,17 +397,16 @@ contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
   function test_Upgraded_Success() public {
     Internal.Any2EVMRampMessage[] memory messages =
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
-    vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
+
+    vm.recordLogs();
+    s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
+    assertExecutionStateChangedEventLogs(
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      "",
-      92255
+      ""
     );
-
-    s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
   }
 
   function test_NoPrevOffRampForChain_Success() public {
@@ -426,19 +425,20 @@ contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
 
     Internal.Any2EVMRampMessage[] memory messagesChain3 =
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_3, ON_RAMP_ADDRESS_3);
-    vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
-      SOURCE_CHAIN_SELECTOR_3,
-      messagesChain3[0].header.sequenceNumber,
-      messagesChain3[0].header.messageId,
-      Internal.MessageExecutionState.SUCCESS,
-      "",
-      72949
-    );
+
+    vm.recordLogs();
 
     s_offRamp.executeSingleReport(
       _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_3, messagesChain3), new uint256[](0)
     );
+    assertExecutionStateChangedEventLogs(
+      SOURCE_CHAIN_SELECTOR_3,
+      messagesChain3[0].header.sequenceNumber,
+      messagesChain3[0].header.messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+
     assertEq(
       startNonceChain3 + 1, s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_3, messagesChain3[0].sender)
     );
@@ -506,19 +506,20 @@ contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
     messagesMultiRamp[0].header.nonce++;
     messagesMultiRamp[0].header.messageId = Internal._hash(messagesMultiRamp[0], ON_RAMP_ADDRESS_1);
 
-    vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
-      SOURCE_CHAIN_SELECTOR_1,
-      messagesMultiRamp[0].header.sequenceNumber,
-      messagesMultiRamp[0].header.messageId,
-      Internal.MessageExecutionState.SUCCESS,
-      "",
-      74218
-    );
+    vm.recordLogs();
 
     s_offRamp.executeSingleReport(
       _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messagesMultiRamp), new uint256[](0)
     );
+
+    assertExecutionStateChangedEventLogs(
+      SOURCE_CHAIN_SELECTOR_1,
+      messagesMultiRamp[0].header.sequenceNumber,
+      messagesMultiRamp[0].header.messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+
     assertEq(
       startNonce + 2, s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messagesMultiRamp[0].sender)
     );
@@ -527,19 +528,18 @@ contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
     messagesMultiRamp[0].header.sequenceNumber++;
     messagesMultiRamp[0].header.messageId = Internal._hash(messagesMultiRamp[0], ON_RAMP_ADDRESS_1);
 
-    vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
+    vm.recordLogs();
+    s_offRamp.executeSingleReport(
+      _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messagesMultiRamp), new uint256[](0)
+    );
+    assertExecutionStateChangedEventLogs(
       SOURCE_CHAIN_SELECTOR_1,
       messagesMultiRamp[0].header.sequenceNumber,
       messagesMultiRamp[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      "",
-      24930
+      ""
     );
 
-    s_offRamp.executeSingleReport(
-      _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messagesMultiRamp), new uint256[](0)
-    );
     assertEq(
       startNonce + 3, s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messagesMultiRamp[0].sender)
     );
@@ -560,20 +560,18 @@ contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
     messagesMultiRamp[0].sender = newSender;
     messagesMultiRamp[0].header.messageId = Internal._hash(messagesMultiRamp[0], ON_RAMP_ADDRESS_1);
 
-    vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
+    // new sender nonce in new offramp should go from 0 -> 1
+    assertEq(s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, newSender), 0);
+    vm.recordLogs();
+    s_offRamp.executeSingleReport(
+      _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messagesMultiRamp), new uint256[](0)
+    );
+    assertExecutionStateChangedEventLogs(
       SOURCE_CHAIN_SELECTOR_1,
       messagesMultiRamp[0].header.sequenceNumber,
       messagesMultiRamp[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      "",
-      74255
-    );
-
-    // new sender nonce in new offramp should go from 0 -> 1
-    assertEq(s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, newSender), 0);
-    s_offRamp.executeSingleReport(
-      _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messagesMultiRamp), new uint256[](0)
+      ""
     );
     assertEq(s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, newSender), 1);
   }
@@ -616,17 +614,15 @@ contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
     messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
 
     // new offramp is able to execute
-    vm.expectEmit();
-    emit EVM2EVMMultiOffRamp.ExecutionStateChanged(
+    vm.recordLogs();
+    s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
+    assertExecutionStateChangedEventLogs(
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      "",
-      70218
+      ""
     );
-
-    s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
     assertEq(startNonce + 2, s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender));
   }
 

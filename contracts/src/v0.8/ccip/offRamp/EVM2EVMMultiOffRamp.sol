@@ -466,13 +466,13 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         }
       }
 
-      uint256 gasUsed;
-      unchecked {
-        gasUsed = gasStart - gasleft();
-      }
-
       emit ExecutionStateChanged(
-        sourceChainSelector, message.header.sequenceNumber, message.header.messageId, newState, returnData, gasUsed
+        sourceChainSelector,
+        message.header.sequenceNumber,
+        message.header.messageId,
+        newState,
+        returnData,
+        gasStart - gasleft()
       );
     }
   }
