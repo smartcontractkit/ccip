@@ -105,7 +105,6 @@ func TestFlattenedAndSortedTokens(t *testing.T) {
 			assert.Equal(t, tc.expectedOutput, res)
 		})
 	}
-
 }
 
 func TestIsTxRevertError(t *testing.T) {
