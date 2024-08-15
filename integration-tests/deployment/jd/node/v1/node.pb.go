@@ -7,12 +7,14 @@
 package v1
 
 import (
-	"github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/shared/ptypes"
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	"reflect"
+	"sync"
+
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/runtime/protoimpl"
 	_ "google.golang.org/protobuf/types/known/timestamppb"
-	reflect "reflect"
-	sync "sync"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/shared/ptypes"
 )
 
 const (

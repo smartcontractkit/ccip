@@ -54,7 +54,6 @@ func Test0001_InitialDeploy(t *testing.T) {
 		homeChainSel = chainSel
 		break
 	}
-	t.Log("home chain", homeChainEVM)
 	ab, err := ccipdeployment.DeployCapReg(lggr, chains, homeChainSel)
 	require.NoError(t, err)
 
@@ -114,6 +113,7 @@ func Test0001_InitialDeploy(t *testing.T) {
 		}
 	}
 	// Wait for plugins to register filters?
+	// TODO: Investigate how to avoid.
 	time.Sleep(30 * time.Second)
 
 	// Ensure job related logs are up to date.
@@ -166,7 +166,6 @@ func Test0001_InitialDeploy(t *testing.T) {
 			state.EvmOffRampsV160[homeChainSel],
 			ccipocr3.SeqNumRange{1, 1},
 		)
-		break
 	}
 	// TODO: Apply the proposal.
 }
@@ -222,18 +221,4 @@ func waitForCommitWithInterval(
 			}
 		}
 	}
-}
-
-// CCIP relies on block timestamps, but SimulatedBackend uses by default clock starting from 1970-01-01
-// This trick is used to move the clock closer to the current time. We set first block to be X hours ago.
-// Tests create plenty of transactions so this number can't be too low, every new block mined will tick the clock,
-// if you mine more than "X hours" transactions, SimulatedBackend will panic because generated timestamps will be in the future.
-func tweakChainTimestamp(t *testing.T, backend *backends.SimulatedBackend, tweak time.Duration) {
-	blockTime := time.Unix(int64(backend.Blockchain().CurrentHeader().Time), 0)
-	sinceBlockTime := time.Since(blockTime)
-	diff := sinceBlockTime - tweak
-	err := backend.AdjustTime(diff)
-	require.NoError(t, err, "unable to adjust time on simulated chain")
-	backend.Commit()
-	backend.Commit()
 }
