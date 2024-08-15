@@ -11,6 +11,7 @@ import {Client} from "../../libraries/Client.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {BurnMintTokenPoolAndProxy} from "../../pools/BurnMintTokenPoolAndProxy.sol";
+import {BurnWithFromMintTokenPoolAndProxy} from "../../pools/BurnWithFromMintTokenPoolAndProxy.sol";
 import {LockReleaseTokenPoolAndProxy} from "../../pools/LockReleaseTokenPoolAndProxy.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
@@ -21,7 +22,7 @@ import {BurnMintTokenPool1_2, TokenPool1_2} from "./BurnMintTokenPool1_2.sol";
 import {BurnMintTokenPool1_4, TokenPool1_4} from "./BurnMintTokenPool1_4.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
   BurnMintTokenPoolAndProxy internal s_newPool;
@@ -352,6 +353,19 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
 
   function test_lockOrBurn_burnMint_Success() public {
     s_pool = new BurnMintTokenPoolAndProxy(s_token, new address[](0), address(s_mockRMN), address(s_sourceRouter));
+    _configurePool();
+    _deployOldPool();
+    _assertLockOrBurnCorrect();
+
+    vm.startPrank(OWNER);
+    BurnMintTokenPoolAndProxy(address(s_pool)).setPreviousPool(IPoolPriorTo1_5(address(0)));
+
+    _assertReleaseOrMintCorrect();
+  }
+
+  function test_lockOrBurn_burnWithFromMint_Success() public {
+    s_pool =
+      new BurnWithFromMintTokenPoolAndProxy(s_token, new address[](0), address(s_mockRMN), address(s_sourceRouter));
     _configurePool();
     _deployOldPool();
     _assertLockOrBurnCorrect();
