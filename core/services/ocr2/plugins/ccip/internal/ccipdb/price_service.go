@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
@@ -356,7 +358,7 @@ func (p *priceService) observeGasPriceUpdates(
 }
 
 // All prices are USD ($1=1e18) denominated. All prices must be not nil.
-// Jobspec should have the list of destTokens (ARL, Bips, etc) and the sourceNative token.
+// Jobspec should have the list of destTokens (ARL, bps, etc) and the sourceNative token.
 // Not respecting this will error out as we need to fetch the token decimals for all tokens expect sourceNative.
 // sortedLaneTokens is only used to check if sourceNative has the same address as one of the dest tokens.
 // Return token prices should contain the exact same tokens as in tokenDecimals.
@@ -371,6 +373,11 @@ func (p *priceService) observeTokenPriceUpdates(
 	sortedLaneTokens, filteredLaneTokens, err := ccipcommon.GetFilteredSortedLaneTokens(ctx, p.offRampReader, p.destPriceRegistryReader, p.priceGetter)
 	if err != nil {
 		return nil, fmt.Errorf("get destination tokens: %w", err)
+	}
+
+	sortedLaneTokensEvmAddr, err := ccipcalc.GenericAddrsToEvm(sortedLaneTokens...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert sorted lane tokens to EVM addresses: %w", err)
 	}
 
 	lggr.Debugw("Filtered bridgeable tokens with no configured price getter", "filteredLaneTokens", filteredLaneTokens)
@@ -388,15 +395,29 @@ func (p *priceService) observeTokenPriceUpdates(
 		}
 	}
 
+	sourceNativeEvmAddr, err := ccipcalc.GenericAddrToEvm(p.sourceNative)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert source native to EVM address: %w", err)
+	}
+
 	// Check for case where sourceNative has same address as one of the dest tokens (example: WETH in Base and Optimism)
-	hasSameDestAddress := ccipcommon.Contains(sortedLaneTokens, p.sourceNative)
+	hasSameDestAddress := slices.Contains(sortedLaneTokensEvmAddr, sourceNativeEvmAddr)
 
 	// Filter out source native token only if source native not in dest tokens
 	var destTokens []cciptypes.Address
-	for key := range rawTokenPricesUSD {
-		if hasSameDestAddress || key != p.sourceNative {
-			destTokens = append(destTokens, key)
+	for token := range rawTokenPricesUSD {
+		tokenEvmAddr, err2 := ccipcalc.GenericAddrToEvm(token)
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to convert token to EVM address: %w", err)
 		}
+
+		if tokenEvmAddr != sourceNativeEvmAddr {
+			destTokens = append(destTokens, token)
+		}
+	}
+
+	if hasSameDestAddress {
+		destTokens = append(destTokens, p.sourceNative)
 	}
 
 	sort.Slice(destTokens, func(i, j int) bool {
@@ -421,7 +442,6 @@ func (p *priceService) observeTokenPriceUpdates(
 		"sourceChainSelector", p.sourceChainSelector,
 		"destChainSelector", p.destChainSelector,
 		"tokenPricesUSD", tokenPricesUSD,
-		"destTokens", destTokens,
 	)
 	return tokenPricesUSD, nil
 }

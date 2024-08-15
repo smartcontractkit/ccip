@@ -110,15 +110,6 @@ func FlattenUniqueSlice[T comparable](slices ...[]T) []T {
 	return flattened
 }
 
-func Contains[T comparable](arr []T, el T) bool {
-	for _, a := range arr {
-		if a == el {
-			return true
-		}
-	}
-	return false
-}
-
 func IsTxRevertError(err error) bool {
 	if err == nil {
 		return false

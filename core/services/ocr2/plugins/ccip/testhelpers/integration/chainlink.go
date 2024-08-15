@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -786,7 +787,7 @@ func (c *CCIPIntegrationTestHarness) EventuallyPriceRegistryUpdated(t *testing.T
 		}
 
 		for _, token := range tokens {
-			if !contains(tokensFetched, token) {
+			if !slices.Contains(tokensFetched, token) {
 				return false
 			}
 		}
@@ -801,16 +802,6 @@ func (c *CCIPIntegrationTestHarness) EventuallyPriceRegistryUpdated(t *testing.T
 
 		return true
 	}, testutils.WaitTimeout(t), 10*time.Second).Should(gomega.BeTrue(), "source gas price has not been updated")
-}
-
-// contains checks if a slice contains a specific element
-func contains(tokens []common.Address, token common.Address) bool {
-	for _, t := range tokens {
-		if t == token {
-			return true
-		}
-	}
-	return false
 }
 
 func (c *CCIPIntegrationTestHarness) EventuallyCommitReportAccepted(t *testing.T, currentBlock uint64, commitStoreOpts ...common.Address) commit_store.CommitStoreCommitReport {
