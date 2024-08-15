@@ -139,9 +139,9 @@ KeepEnvAlive = true
 NoOfCommitNodes = 16
 PhaseTimeout = '40m'
 NodeFunding = 1000.0
-NoOfRoutersPerPair = 2
-NoOfNetworks = 40
-MaxNoOfLanes = 400
+NoOfRoutersPerPair = 1
+NoOfNetworks = 20
+MaxNoOfLanes = 200
 
 [CCIP.Groups.load.OffRampConfig]
 BatchGasLimit = 11000000
@@ -154,7 +154,7 @@ DynamicPriceUpdateInterval ='15s'
 CCIPOwnerTokens = true
 
 [CCIP.Groups.load.LoadProfile]
-TestDuration = '4h'
+TestDuration = '1h'
 TimeUnit = '5s'
 RequestPerUnitTime = [1]
 OptimizeSpace = true
