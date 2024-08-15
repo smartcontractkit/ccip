@@ -81,7 +81,7 @@ func NewNodes(t *testing.T, chains map[uint64]deployment.Chain, numNodes, numBoo
 			bootstrap = true
 			existingNumBootstraps++
 		}
-		node := NewNode(t, ports[i], mchains, zapcore.DebugLevel, bootstrap, registryConfig)
+		node := NewNode(t, ports[i], mchains, zapcore.InfoLevel, bootstrap, registryConfig)
 		nodesByPeerID[node.Keys.PeerID.String()] = *node
 		// Note in real env, this ID is allocated by JD.
 		nodeIDs = append(nodeIDs, node.Keys.PeerID.String())
