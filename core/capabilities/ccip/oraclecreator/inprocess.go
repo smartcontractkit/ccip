@@ -195,12 +195,14 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 
 		if chain.ID().Uint64() == destChainID {
 			chainReaderConfig = evmconfig.DestReaderConfig()
-		} else if commitOffchainConfig != nil && commitOffchainConfig.TokenPriceChainSelector == chainSelector {
-			// If the chain is the chain with token price contract, then use the config that includes the price aggregator
-			// This is essentially the same as source reader config, but with the price aggregator contract.
-			chainReaderConfig = evmconfig.PriceReaderConfig()
 		} else {
 			chainReaderConfig = evmconfig.SourceReaderConfig()
+		}
+
+		if commitOffchainConfig != nil && commitOffchainConfig.TokenPriceChainSelector == chainSelector {
+			// If the chain is the chain with token price contract, then use the config that includes the price aggregator
+			// This is essentially the same as source reader config, but with the price aggregator contract.
+			chainReaderConfig = evmconfig.MergeReaderConfigs(chainReaderConfig, evmconfig.PriceReaderConfig())
 		}
 
 		cr, err2 := evm.NewChainReaderService(
@@ -230,7 +232,9 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			if err3 != nil {
 				return nil, fmt.Errorf("failed to bind chain reader for dest chain %s's offramp at %s: %w", chain.ID(), offrampAddressHex, err3)
 			}
-		} else if commitOffchainConfig != nil && chainSelector == commitOffchainConfig.TokenPriceChainSelector {
+		}
+
+		if commitOffchainConfig != nil && chainSelector == commitOffchainConfig.TokenPriceChainSelector {
 			// Only supporting one price source for now.
 			//TODO: Once chainreader new changes https://github.com/smartcontractkit/chainlink-common/pull/603
 			// are merged we'll be able to use different bindings for different tokens.

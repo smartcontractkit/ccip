@@ -185,21 +185,33 @@ func SourceReaderConfig() evmrelaytypes.ChainReaderConfig {
 	}
 }
 
-func PriceReaderConfig() evmrelaytypes.ChainReaderConfig {
-	allContracts := SourceReaderConfig().Contracts
-	allContracts[consts.ContractNamePriceAggregator] = evmrelaytypes.ChainContractReader{
-		ContractABI: aggregator_v3_interface.AggregatorV3InterfaceABI,
-		Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
-			consts.MethodNameGetLatestRoundData: {
-				ChainSpecificName: mustGetMethodName(consts.MethodNameGetLatestRoundData, priceAggregatorABI),
-			},
-			consts.MethodNameGetDecimals: {
-				ChainSpecificName: mustGetMethodName(consts.MethodNameGetDecimals, priceAggregatorABI),
-			},
-		},
+func MergeReaderConfigs(configs ...evmrelaytypes.ChainReaderConfig) evmrelaytypes.ChainReaderConfig {
+	allContracts := make(map[string]evmrelaytypes.ChainContractReader)
+	for _, c := range configs {
+		for contractName, contractReader := range c.Contracts {
+			allContracts[contractName] = contractReader
+		}
 	}
 
 	return evmrelaytypes.ChainReaderConfig{Contracts: allContracts}
+}
+
+func PriceReaderConfig() evmrelaytypes.ChainReaderConfig {
+	return evmrelaytypes.ChainReaderConfig{
+		Contracts: map[string]evmrelaytypes.ChainContractReader{
+			consts.ContractNamePriceAggregator: {
+				ContractABI: aggregator_v3_interface.AggregatorV3InterfaceABI,
+				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
+					consts.MethodNameGetLatestRoundData: {
+						ChainSpecificName: mustGetMethodName(consts.MethodNameGetLatestRoundData, priceAggregatorABI),
+					},
+					consts.MethodNameGetDecimals: {
+						ChainSpecificName: mustGetMethodName(consts.MethodNameGetDecimals, priceAggregatorABI),
+					},
+				},
+			},
+		},
+	}
 }
 
 // HomeChainReaderConfigRaw returns a ChainReaderConfig that can be used to read from the home chain.
