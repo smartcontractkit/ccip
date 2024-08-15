@@ -4,13 +4,19 @@ import (
 	"context"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	jobv1 "github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/job/v1"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 
 	ccipdeployment "github.com/smartcontractkit/chainlink/integration-tests/deployment/ccip"
@@ -19,8 +25,26 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
+// Context returns a context with the test's deadline, if available.
+func Context(tb testing.TB) context.Context {
+	ctx := context.Background()
+	var cancel func()
+	switch t := tb.(type) {
+	case *testing.T:
+		if d, ok := t.Deadline(); ok {
+			ctx, cancel = context.WithDeadline(ctx, d)
+		}
+	}
+	if cancel == nil {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+	tb.Cleanup(cancel)
+	return ctx
+}
+
 func Test0001_InitialDeploy(t *testing.T) {
 	lggr := logger.TestLogger(t)
+	ctx := Context(t)
 	chains := memory.NewMemoryChains(t, 3)
 	homeChainSel := uint64(0)
 	homeChainEVM := uint64(0)
@@ -30,6 +54,7 @@ func Test0001_InitialDeploy(t *testing.T) {
 		homeChainSel = chainSel
 		break
 	}
+	t.Log("home chain", homeChainEVM)
 	ab, err := ccipdeployment.DeployCapReg(lggr, chains, homeChainSel)
 	require.NoError(t, err)
 
@@ -45,10 +70,23 @@ func Test0001_InitialDeploy(t *testing.T) {
 		EVMChainID: homeChainEVM,
 		Contract:   capReg,
 	})
+	for _, node := range nodes {
+		require.NoError(t, node.App.Start(ctx))
+	}
 
 	e := memory.NewMemoryEnvironmentFromChainsNodes(t, lggr, chains, nodes)
 	state, err := ccipdeployment.GenerateOnchainState(e, ab)
 	require.NoError(t, err)
+
+	capabilities, err := state.CapabilityRegistry[homeChainSel].GetCapabilities(nil)
+	require.NoError(t, err)
+	require.Len(t, capabilities, 1)
+	ccipCap, err := state.CapabilityRegistry[homeChainSel].GetHashedCapabilityId(nil,
+		ccipdeployment.CapabilityLabelledName, ccipdeployment.CapabilityVersion)
+	require.NoError(t, err)
+	_, err = state.CapabilityRegistry[homeChainSel].GetCapability(nil, ccipCap)
+	require.NoError(t, err)
+
 	// Apply migration
 	output, err := Apply0001(e, ccipdeployment.DeployCCIPContractConfig{
 		HomeChainSel: homeChainSel,
@@ -59,21 +97,15 @@ func Test0001_InitialDeploy(t *testing.T) {
 	// Get new state after migration.
 	state, err = ccipdeployment.GenerateOnchainState(e, output.AddressBook)
 	require.NoError(t, err)
-	// Replay the log poller on all the chains so that the logs are in the db.
-	// otherwise the plugins won't pick them up.
-	for _, node := range nodes {
-		for sel := range chains {
-			chainID, _ := chainsel.ChainIdFromSelector(sel)
-			t.Logf("Replaying logs for chain %d from block %d", chainID, 1)
-			require.NoError(t, node.App.ReplayFromBlock(big.NewInt(int64(chainID)), 1, false), "failed to replay logs")
-		}
-	}
+
+	// Ensure capreg logs are up to date.
+	ReplayAllLogs(nodes, chains)
 
 	// Apply the jobs.
 	for nodeID, jobs := range output.JobSpecs {
 		for _, job := range jobs {
 			// Note these auto-accept
-			_, err := e.Offchain.ProposeJob(context.Background(),
+			_, err := e.Offchain.ProposeJob(ctx,
 				&jobv1.ProposeJobRequest{
 					NodeId: nodeID,
 					Spec:   job,
@@ -81,22 +113,27 @@ func Test0001_InitialDeploy(t *testing.T) {
 			require.NoError(t, err)
 		}
 	}
-	// Replay the log poller on all the chains so that the logs are in the db.
-	// otherwise the plugins won't pick them up.
-	for _, node := range nodes {
-		for sel := range chains {
-			chainID, _ := chainsel.ChainIdFromSelector(sel)
-			t.Logf("Replaying logs for chain %d from block %d", chainID, 1)
-			require.NoError(t, node.App.ReplayFromBlock(big.NewInt(int64(chainID)), 1, false), "failed to replay logs")
+	// Wait for plugins to register filters?
+	time.Sleep(30 * time.Second)
+
+	// Ensure job related logs are up to date.
+	ReplayAllLogs(nodes, chains)
+
+	// Send a request from every router
+	// Add all lanes
+	for source := range e.Chains {
+		for dest := range e.Chains {
+			if source != dest {
+				require.NoError(t, ccipdeployment.AddLane(e, state, source, dest))
+			}
 		}
 	}
-	// Send a request from every router
 	for sel, chain := range e.Chains {
 		dest := homeChainSel
 		if sel == homeChainSel {
 			continue
 		}
-		require.NoError(t, ccipdeployment.AddLane(e, state, sel, dest))
+		//require.NoError(t, ccipdeployment.AddLane(e, state, sel, dest))
 		msg := router.ClientEVM2AnyMessage{
 			Receiver:     common.LeftPadBytes(state.Receivers[dest].Address().Bytes(), 32),
 			Data:         []byte("hello"),
@@ -125,7 +162,78 @@ func Test0001_InitialDeploy(t *testing.T) {
 		tx, err = state.Routers[sel].CcipSend(e.Chains[sel].DeployerKey, homeChainSel, msg)
 		require.NoError(t, err)
 		require.NoError(t, chain.Confirm(tx.Hash()))
+		waitForCommitWithInterval(t, chain, e.Chains[homeChainSel],
+			state.EvmOffRampsV160[homeChainSel],
+			ccipocr3.SeqNumRange{1, 1},
+		)
 		break
 	}
 	// TODO: Apply the proposal.
+}
+
+func ReplayAllLogs(nodes map[string]memory.Node, chains map[uint64]deployment.Chain) {
+	for _, node := range nodes {
+		for sel := range chains {
+			chainID, _ := chainsel.ChainIdFromSelector(sel)
+			node.App.ReplayFromBlock(big.NewInt(int64(chainID)), 1, false)
+		}
+	}
+}
+
+func waitForCommitWithInterval(
+	t *testing.T,
+	src deployment.Chain,
+	dest deployment.Chain,
+	offRamp *evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp,
+	expectedSeqNumRange ccipocr3.SeqNumRange,
+) {
+	sink := make(chan *evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReportAccepted)
+	subscription, err := offRamp.WatchCommitReportAccepted(&bind.WatchOpts{
+		Context: context.Background(),
+	}, sink)
+	require.NoError(t, err)
+	ticker := time.NewTicker(1 * time.Second)
+
+	for {
+		select {
+		case <-ticker.C:
+			src.Client.(*backends.SimulatedBackend).Commit()
+			dest.Client.(*backends.SimulatedBackend).Commit()
+		case <-time.After(time.Minute):
+			t.Logf("Waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
+				dest.Selector, src.Selector, expectedSeqNumRange.String())
+			t.Error("Timed out waiting for commit report")
+			return
+		case subErr := <-subscription.Err():
+			t.Fatalf("Subscription error: %+v", subErr)
+		case report := <-sink:
+			if len(report.Report.MerkleRoots) > 0 {
+				// Check the interval of sequence numbers and make sure it matches
+				// the expected range.
+				for _, mr := range report.Report.MerkleRoots {
+					if mr.SourceChainSelector == src.Selector &&
+						uint64(expectedSeqNumRange.Start()) == mr.Interval.Min &&
+						uint64(expectedSeqNumRange.End()) == mr.Interval.Max {
+						t.Logf("Received commit report on selector %d from source selector %d expected seq nr range %s",
+							dest.Selector, src.Selector, expectedSeqNumRange.String())
+						return
+					}
+				}
+			}
+		}
+	}
+}
+
+// CCIP relies on block timestamps, but SimulatedBackend uses by default clock starting from 1970-01-01
+// This trick is used to move the clock closer to the current time. We set first block to be X hours ago.
+// Tests create plenty of transactions so this number can't be too low, every new block mined will tick the clock,
+// if you mine more than "X hours" transactions, SimulatedBackend will panic because generated timestamps will be in the future.
+func tweakChainTimestamp(t *testing.T, backend *backends.SimulatedBackend, tweak time.Duration) {
+	blockTime := time.Unix(int64(backend.Blockchain().CurrentHeader().Time), 0)
+	sinceBlockTime := time.Since(blockTime)
+	diff := sinceBlockTime - tweak
+	err := backend.AdjustTime(diff)
+	require.NoError(t, err, "unable to adjust time on simulated chain")
+	backend.Commit()
+	backend.Commit()
 }

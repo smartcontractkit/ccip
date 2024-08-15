@@ -98,11 +98,8 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 			ConfigurationContract: ccipConfig.Address,
 		},
 	})
-	if err != nil {
+	if err := ConfirmIfNoError(chain, tx, err); err != nil {
 		lggr.Errorw("Failed to add capabilities", "err", err)
-		return ab, err
-	}
-	if err := chain.Confirm(tx.Hash()); err != nil {
 		return ab, err
 	}
 	// TODO: Just one for testing.
@@ -112,11 +109,8 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 			Name:  "NodeOperator",
 		},
 	})
-	if err != nil {
+	if err := ConfirmIfNoError(chain, tx, err); err != nil {
 		lggr.Errorw("Failed to add node operators", "err", err)
-		return ab, err
-	}
-	if err := chain.Confirm(tx.Hash()); err != nil {
 		return ab, err
 	}
 	return ab, nil
@@ -226,7 +220,7 @@ func AddDON(
 				OnchainPublicKey:  cfg.OnchainPublicKey,
 				TransmitAccount:   cfg.TransmitAccount,
 				OffchainPublicKey: cfg.OffchainPublicKey,
-				PeerID:            cfg.PeerID.String(),
+				PeerID:            cfg.PeerID.String()[4:],
 			}, ConfigEncryptionPublicKey: cfg.ConfigEncryptionPublicKey,
 		})
 	}

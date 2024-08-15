@@ -357,7 +357,7 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 					chain.Client,
 					evm_2_evm_multi_onramp.EVM2EVMMultiOnRampStaticConfig{
 						ChainSelector:      sel,
-						RmnProxy:           routerContract.Address,
+						RmnProxy:           armProxy.Address,
 						NonceManager:       nonceManager.Address,
 						TokenAdminRegistry: tokenAdminRegistry.Address,
 					},
@@ -384,7 +384,7 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 					chain.Client,
 					evm_2_evm_multi_offramp.EVM2EVMMultiOffRampStaticConfig{
 						ChainSelector:      sel,
-						RmnProxy:           routerContract.Address,
+						RmnProxy:           armProxy.Address,
 						NonceManager:       nonceManager.Address,
 						TokenAdminRegistry: tokenAdminRegistry.Address,
 					},
