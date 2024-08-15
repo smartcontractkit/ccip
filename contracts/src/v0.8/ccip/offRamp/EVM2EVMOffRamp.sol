@@ -21,7 +21,7 @@ import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/ERC165Checker.sol";
+import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/ERC165Checker.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
@@ -630,9 +630,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   // │                      Tokens and pools                        │
   // ================================================================
 
-  /// @notice Uses a pool to release or mint a token to a receiver address in two steps. First, the pool is called
-  /// to release the tokens to the offRamp, then the offRamp calls the token contract to transfer the tokens to the
-  /// receiver. This is done to ensure the exact number of tokens, the pool claims to release are actually transferred.
+  /// @notice Uses a pool to release or mint a token to a receiver address, with balance checks before and after the
+  /// transfer. This is done to ensure the exact number of tokens the pool claims to release are actually transferred.
   /// @dev The local token address is validated through the TokenAdminRegistry. If, due to some misconfiguration, the
   /// token is unknown to the registry, the offRamp will revert. The tx, and the tokens, can be retrieved by
   /// registering the token on this chain, and re-trying the msg.
