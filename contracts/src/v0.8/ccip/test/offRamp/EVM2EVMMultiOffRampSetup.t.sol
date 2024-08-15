@@ -492,52 +492,6 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     s_offRamp.execute(reportContext, abi.encode(reports));
   }
 
-  function parseUintArray(string memory json) internal pure returns (uint256[] memory) {
-    bytes memory jsonData = bytes(json);
-    uint256 length = jsonData.length;
-    uint256 numCount = 0;
-    bool inNumber = false;
-
-    // First pass: count how many numbers are in the string
-    for (uint256 i = 0; i < length; i++) {
-      if (jsonData[i] >= 0x30 && jsonData[i] <= 0x39) {
-        // If it's a digit
-        if (!inNumber) {
-          inNumber = true;
-          numCount++;
-        }
-      } else {
-        inNumber = false;
-      }
-    }
-
-    // Initialize the array with the count
-    uint256[] memory arr = new uint256[](numCount);
-    uint256 index = 0;
-    uint256 value = 0;
-
-    // Second pass: parse and fill the array
-    for (uint256 i = 0; i < length; i++) {
-      bytes1 b = jsonData[i];
-      if (b >= 0x30 && b <= 0x39) {
-        // If it's a digit
-        value = value * 10 + (uint8(b) - 48); // Convert the digit character to its uint256 value
-      } else if (value > 0 || b == 0x30) {
-        // End of number or single '0'
-        arr[index] = value;
-        index++;
-        value = 0; // Reset for the next number
-      }
-    }
-
-    // Handle the case where the string ends with a number
-    if (value > 0 || (length > 0 && jsonData[length - 1] == 0x30)) {
-      arr[index] = value;
-    }
-
-    return arr;
-  }
-
   function printExecutionStateChangedEventLogs() public {
     Vm.Log[] memory logs = vm.getRecordedLogs();
 
