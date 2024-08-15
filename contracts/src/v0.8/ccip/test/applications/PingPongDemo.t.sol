@@ -30,14 +30,12 @@ contract PingPong_startPingPong is PingPongDappSetup {
   uint256 internal pingPongNumber = 1;
 
   function test_StartPingPong_With_Sequenced_Ordered_Success() public {
-    bytes memory data = abi.encode(pingPongNumber);
-
     Client.EVM2AnyMessage memory sentMessage = Client.EVM2AnyMessage({
       receiver: abi.encode(i_pongContract),
-      data: data,
+      data: abi.encode(pingPongNumber),
       tokenAmounts: new Client.EVMTokenAmount[](0),
       feeToken: s_sourceFeeToken,
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}))
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000}))
     });
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, sentMessage);
@@ -49,10 +47,10 @@ contract PingPong_startPingPong is PingPongDappSetup {
       sender: address(s_pingPong),
       receiver: i_pongContract,
       nonce: 1,
-      data: data,
+      data: abi.encode(pingPongNumber),
       tokenAmounts: sentMessage.tokenAmounts,
       sourceTokenData: new bytes[](sentMessage.tokenAmounts.length),
-      gasLimit: 2e5,
+      gasLimit: 200_000,
       feeToken: sentMessage.feeToken,
       strict: false,
       messageId: ""
@@ -64,14 +62,12 @@ contract PingPong_startPingPong is PingPongDappSetup {
   function test_StartPingPong_With_OOO_Success() public {
     s_pingPong.setOutOfOrderExecution(true);
 
-    bytes memory data = abi.encode(pingPongNumber);
-
     Client.EVM2AnyMessage memory sentMessage = Client.EVM2AnyMessage({
       receiver: abi.encode(i_pongContract),
-      data: data,
+      data: abi.encode(pingPongNumber),
       tokenAmounts: new Client.EVMTokenAmount[](0),
       feeToken: s_sourceFeeToken,
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 2e5, allowOutOfOrderExecution: true}))
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 200_000, allowOutOfOrderExecution: true}))
     });
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, sentMessage);
@@ -83,10 +79,10 @@ contract PingPong_startPingPong is PingPongDappSetup {
       sender: address(s_pingPong),
       receiver: i_pongContract,
       nonce: 0,
-      data: data,
+      data: abi.encode(pingPongNumber),
       tokenAmounts: sentMessage.tokenAmounts,
       sourceTokenData: new bytes[](sentMessage.tokenAmounts.length),
-      gasLimit: 2e5,
+      gasLimit: 200_000,
       feeToken: sentMessage.feeToken,
       strict: false,
       messageId: ""
@@ -163,6 +159,9 @@ contract PingPong_plumbing is PingPongDappSetup {
 
   function test_OutOfOrderExecution_Success() public {
     assertFalse(s_pingPong.getOutOfOrderExecution());
+
+    vm.expectEmit();
+    emit PingPongDemo.OutOfOrderExecutionChange(true);
 
     s_pingPong.setOutOfOrderExecution(true);
 
