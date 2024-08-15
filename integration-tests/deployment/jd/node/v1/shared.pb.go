@@ -7,7 +7,7 @@
 package v1
 
 import (
-	ptypes "github.com/smartcontractkit/job-distributor/pkg/api/gen/shared/ptypes"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/shared/ptypes"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
