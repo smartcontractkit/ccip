@@ -360,7 +360,7 @@ func (p *priceService) observeGasPriceUpdates(
 // All prices are USD ($1=1e18) denominated. All prices must be not nil.
 // Jobspec should have the list of destTokens (ARL, bps, etc) and the sourceNative token.
 // Not respecting this will error out as we need to fetch the token decimals for all tokens expect sourceNative.
-// sortedLaneTokens is only used to check if sourceNative has the same address as one of the dest tokens.
+// destTokens is only used to check if sourceNative has the same address as one of the dest tokens.
 // Return token prices should contain the exact same tokens as in tokenDecimals.
 func (p *priceService) observeTokenPriceUpdates(
 	ctx context.Context,
@@ -370,17 +370,18 @@ func (p *priceService) observeTokenPriceUpdates(
 		return nil, fmt.Errorf("destPriceRegistry is not set yet")
 	}
 
-	sortedLaneTokens, filteredLaneTokens, err := ccipcommon.GetFilteredSortedLaneTokens(ctx, p.offRampReader, p.destPriceRegistryReader, p.priceGetter)
+	fee, bridged, err := ccipcommon.GetDestinationTokens(ctx, p.offRampReader, p.destPriceRegistryReader)
 	if err != nil {
 		return nil, fmt.Errorf("get destination tokens: %w", err)
 	}
+	onchainDestTokens := ccipcommon.FlattenedAndSortedTokens(fee, bridged)
 
-	sortedLaneTokensEvmAddr, err := ccipcalc.GenericAddrsToEvm(sortedLaneTokens...)
+	onchainTokensEvmAddr, err := ccipcalc.GenericAddrsToEvm(onchainDestTokens...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert sorted lane tokens to EVM addresses: %w", err)
 	}
 
-	lggr.Debugw("Filtered bridgeable tokens with no configured price getter", "filteredLaneTokens", filteredLaneTokens)
+	lggr.Debugw("Destination tokens", "destTokens", onchainDestTokens)
 
 	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, []cciptypes.Address{})
 	if err != nil {
@@ -388,8 +389,8 @@ func (p *priceService) observeTokenPriceUpdates(
 	}
 	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
 
-	// make sure that we got prices for at least the sortedLaneTokens
-	for _, token := range sortedLaneTokens {
+	// make sure that we got prices for at least the destTokens
+	for _, token := range onchainDestTokens {
 		if rawTokenPricesUSD[token] == nil {
 			return nil, fmt.Errorf("missing token price: %+v", token)
 		}
@@ -401,10 +402,10 @@ func (p *priceService) observeTokenPriceUpdates(
 	}
 
 	// Check for case where sourceNative has same address as one of the dest tokens (example: WETH in Base and Optimism)
-	hasSameDestAddress := slices.Contains(sortedLaneTokensEvmAddr, sourceNativeEvmAddr)
+	hasSameDestAddress := slices.Contains(onchainTokensEvmAddr, sourceNativeEvmAddr)
 
 	// Filter out source native token only if source native not in dest tokens
-	var destTokens []cciptypes.Address
+	var finalDestTokens []cciptypes.Address
 	for token := range rawTokenPricesUSD {
 		tokenEvmAddr, err2 := ccipcalc.GenericAddrToEvm(token)
 		if err2 != nil {
@@ -412,29 +413,30 @@ func (p *priceService) observeTokenPriceUpdates(
 		}
 
 		if tokenEvmAddr != sourceNativeEvmAddr {
-			destTokens = append(destTokens, token)
+			finalDestTokens = append(finalDestTokens, token)
 		}
 	}
 
 	if hasSameDestAddress {
-		destTokens = append(destTokens, p.sourceNative)
+		finalDestTokens = append(finalDestTokens, p.sourceNative)
 	}
 
-	sort.Slice(destTokens, func(i, j int) bool {
-		return destTokens[i] < destTokens[j]
+	// Sort tokens to make the order deterministic, easier for testing and debugging
+	sort.Slice(finalDestTokens, func(i, j int) bool {
+		return finalDestTokens[i] < finalDestTokens[j]
 	})
 
-	destTokensDecimals, err := p.destPriceRegistryReader.GetTokensDecimals(ctx, destTokens)
+	destTokensDecimals, err := p.destPriceRegistryReader.GetTokensDecimals(ctx, finalDestTokens)
 	if err != nil {
 		return nil, fmt.Errorf("get tokens decimals: %w", err)
 	}
 
-	if len(destTokensDecimals) != len(destTokens) {
+	if len(destTokensDecimals) != len(finalDestTokens) {
 		return nil, fmt.Errorf("mismatched token decimals and tokens")
 	}
 
 	tokenPricesUSD = make(map[cciptypes.Address]*big.Int, len(rawTokenPricesUSD))
-	for i, token := range destTokens {
+	for i, token := range finalDestTokens {
 		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], destTokensDecimals[i])
 	}
 

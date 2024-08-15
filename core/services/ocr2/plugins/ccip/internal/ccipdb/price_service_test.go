@@ -477,7 +477,6 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 
 			if len(queryTokens) > 0 {
 				priceGetter.On("TokenPricesUSD", mock.Anything, []cciptypes.Address{}).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
-				priceGetter.On("FilterConfiguredTokens", mock.Anything, mock.Anything).Return(destTokens, tc.filterOutTokens, nil)
 			}
 
 			offRampReader := ccipdatamocks.NewOffRampReader(t)
@@ -778,17 +777,23 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 	sourceChainSelector := uint64(67890)
 	ctx := tests.Context(t)
 
-	sourceNative := cciptypes.Address("0x123")
-	feeTokens := []cciptypes.Address{"0x234"}
-	rampTokens := []cciptypes.Address{"0x345", "0x456"}
-	rampFilteredTokens := []cciptypes.Address{"0x345"}
-	rampFilterOutTokens := []cciptypes.Address{"0x456"}
+	sourceNative := cciptypes.Address(utils.RandomAddress().String())
+	feeToken := cciptypes.Address(utils.RandomAddress().String())
+	destToken1 := cciptypes.Address(utils.RandomAddress().String())
+	destToken2 := cciptypes.Address(utils.RandomAddress().String())
 
-	laneTokens := []cciptypes.Address{"0x234", "0x345"}
-	laneTokenDecimals := []uint8{18, 18}
+	feeTokens := []cciptypes.Address{feeToken}
+	rampTokens := []cciptypes.Address{destToken1, destToken2}
 
-	tokens := []cciptypes.Address{sourceNative, "0x234", "0x345"}
-	tokenPrices := []int64{2, 3, 4}
+	laneTokens := []cciptypes.Address{sourceNative, feeToken, destToken1, destToken2}
+	// sort laneTokens
+	sort.Slice(laneTokens, func(i, j int) bool {
+		return laneTokens[i] < laneTokens[j]
+	})
+	laneTokenDecimals := []uint8{18, 18, 18, 18}
+
+	tokens := []cciptypes.Address{sourceNative, feeToken, destToken1, destToken2}
+	tokenPrices := []int64{2, 3, 4, 5}
 	gasPrice := big.NewInt(10)
 
 	orm := setupORM(t)
@@ -803,12 +808,13 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 		tokens[0]: val1e18(tokenPrices[0]),
 		tokens[1]: val1e18(tokenPrices[1]),
 		tokens[2]: val1e18(tokenPrices[2]),
+		tokens[3]: val1e18(tokenPrices[3]),
 	}, nil)
-	priceGetter.On("FilterConfiguredTokens", mock.Anything, rampTokens).Return(rampFilteredTokens, rampFilterOutTokens, nil)
 
+	destTokens := append(rampTokens, sourceNative)
 	offRampReader := ccipdatamocks.NewOffRampReader(t)
 	offRampReader.On("GetTokens", mock.Anything).Return(cciptypes.OffRampTokens{
-		DestinationTokens: rampTokens,
+		DestinationTokens: destTokens,
 	}, nil).Maybe()
 
 	gasPriceEstimator.On("GetGasPrice", mock.Anything).Return(gasPrice, nil)
