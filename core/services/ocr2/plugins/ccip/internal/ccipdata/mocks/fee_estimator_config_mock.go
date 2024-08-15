@@ -13,6 +13,14 @@ type FeeEstimatorConfigReader struct {
 	mock.Mock
 }
 
+type FeeEstimatorConfigReader_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *FeeEstimatorConfigReader) EXPECT() *FeeEstimatorConfigReader_Expecter {
+	return &FeeEstimatorConfigReader_Expecter{mock: &_m.Mock}
+}
+
 // GetDataAvailabilityConfig provides a mock function with given fields: ctx
 func (_m *FeeEstimatorConfigReader) GetDataAvailabilityConfig(ctx context.Context) (int64, int64, int64, error) {
 	ret := _m.Called(ctx)
@@ -53,6 +61,34 @@ func (_m *FeeEstimatorConfigReader) GetDataAvailabilityConfig(ctx context.Contex
 	}
 
 	return r0, r1, r2, r3
+}
+
+// FeeEstimatorConfigReader_GetDataAvailabilityConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDataAvailabilityConfig'
+type FeeEstimatorConfigReader_GetDataAvailabilityConfig_Call struct {
+	*mock.Call
+}
+
+// GetDataAvailabilityConfig is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *FeeEstimatorConfigReader_Expecter) GetDataAvailabilityConfig(ctx interface{}) *FeeEstimatorConfigReader_GetDataAvailabilityConfig_Call {
+	return &FeeEstimatorConfigReader_GetDataAvailabilityConfig_Call{Call: _e.mock.On("GetDataAvailabilityConfig", ctx)}
+}
+
+func (_c *FeeEstimatorConfigReader_GetDataAvailabilityConfig_Call) Run(run func(ctx context.Context)) *FeeEstimatorConfigReader_GetDataAvailabilityConfig_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *FeeEstimatorConfigReader_GetDataAvailabilityConfig_Call) Return(destDAOverheadGas int64, destGasPerDAByte int64, destDAMultiplierBps int64, err error) *FeeEstimatorConfigReader_GetDataAvailabilityConfig_Call {
+	_c.Call.Return(destDAOverheadGas, destGasPerDAByte, destDAMultiplierBps, err)
+	return _c
+}
+
+func (_c *FeeEstimatorConfigReader_GetDataAvailabilityConfig_Call) RunAndReturn(run func(context.Context) (int64, int64, int64, error)) *FeeEstimatorConfigReader_GetDataAvailabilityConfig_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // NewFeeEstimatorConfigReader creates a new instance of FeeEstimatorConfigReader. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
