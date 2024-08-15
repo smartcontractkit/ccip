@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
+	deployment2 "github.com/smartcontractkit/ccip/integration-tests/deployment"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 
@@ -98,7 +99,7 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 			ConfigurationContract: ccipConfig.Address,
 		},
 	})
-	if err := ConfirmIfNoError(chain, tx, err); err != nil {
+	if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
 		lggr.Errorw("Failed to add capabilities", "err", err)
 		return ab, err
 	}
@@ -109,7 +110,7 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 			Name:  "NodeOperator",
 		},
 	})
-	if err := ConfirmIfNoError(chain, tx, err); err != nil {
+	if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
 		lggr.Errorw("Failed to add node operators", "err", err)
 		return ab, err
 	}
@@ -206,7 +207,7 @@ func AddDON(
 	f uint8,
 	bootstrapP2PID [32]byte,
 	p2pIDs [][32]byte,
-	nodes []Node,
+	nodes []deployment2.Node,
 ) error {
 	sortP2PIDS(p2pIDs)
 	// Get OCR3 Config from helper
@@ -214,7 +215,7 @@ func AddDON(
 	var oracles []confighelper2.OracleIdentityExtra
 	for _, node := range nodes {
 		schedule = append(schedule, 1)
-		cfg := node.selToOCRConfig[dest.Selector]
+		cfg := node.SelToOCRConfig[dest.Selector]
 		oracles = append(oracles, confighelper2.OracleIdentityExtra{
 			OracleIdentity: confighelper2.OracleIdentity{
 				OnchainPublicKey:  cfg.OnchainPublicKey,
@@ -326,7 +327,7 @@ func AddDON(
 			Config:       encodedConfigs,
 		},
 	}, false, false, f)
-	if err := ConfirmIfNoError(home, tx, err); err != nil {
+	if err := deployment.ConfirmIfNoError(home, tx, err); err != nil {
 		return err
 	}
 
@@ -387,7 +388,7 @@ func AddDON(
 	//uni.backend.Commit()
 
 	tx, err = offRamp.SetOCR3Configs(dest.DeployerKey, offrampOCR3Configs)
-	if err := ConfirmIfNoError(dest, tx, err); err != nil {
+	if err := deployment.ConfirmIfNoError(dest, tx, err); err != nil {
 		return err
 	}
 

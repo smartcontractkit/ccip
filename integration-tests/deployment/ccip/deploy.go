@@ -2,14 +2,13 @@ package ccipdeployment
 
 import (
 	"encoding/hex"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rpc"
 	owner_helpers "github.com/smartcontractkit/ccip-owner-contracts/gethwrappers"
+	deployment2 "github.com/smartcontractkit/ccip/integration-tests/deployment"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
@@ -120,7 +119,7 @@ type DeployCCIPContractConfig struct {
 // Deployment produces an address book of everything it deployed.
 func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (deployment.AddressBook, error) {
 	ab := deployment.NewMemoryAddressBook()
-	nodes, err := NodeInfo(e.NodeIDs, e.Offchain)
+	nodes, err := deployment2.NodeInfo(e.NodeIDs, e.Offchain)
 	if err != nil {
 		e.Logger.Errorw("Failed to get node info", "err", err)
 		return ab, err
@@ -411,7 +410,7 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 			// TODO: We enable the deployer initially to set prices
 			AddedCallers: []common.Address{offRamp.Address, chain.DeployerKey.From},
 		})
-		if err := ConfirmIfNoError(chain, tx, err); err != nil {
+		if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
 			e.Logger.Errorw("Failed to confirm price registry authorized caller update", "err", err)
 			return ab, err
 		}
@@ -419,7 +418,7 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 		tx, err = nonceManager.Contract.ApplyAuthorizedCallerUpdates(chain.DeployerKey, nonce_manager.AuthorizedCallersAuthorizedCallerArgs{
 			AddedCallers: []common.Address{offRamp.Address, onRamp.Address},
 		})
-		if err := ConfirmIfNoError(chain, tx, err); err != nil {
+		if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
 			e.Logger.Errorw("Failed to update nonce manager with ramps", "err", err)
 			return ab, err
 		}
@@ -456,32 +455,6 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 	return ab, nil
 }
 
-func MaybeDataErr(err error) string {
-	d, ok := err.(rpc.DataError)
-	if ok {
-		return d.ErrorData().(string)
-	}
-	return ""
-}
-
-func ConfirmIfNoError(chain deployment.Chain, tx *types.Transaction, err error) error {
-	if err != nil {
-		d, ok := err.(rpc.DataError)
-		if ok {
-			fmt.Println("Got Data Error", d.ErrorData())
-		}
-		return err
-	}
-	return chain.Confirm(tx.Hash())
-}
-func uBigInt(i uint64) *big.Int {
-	return new(big.Int).SetUint64(i)
-}
-
-func e18Mult(amount uint64) *big.Int {
-	return new(big.Int).Mul(uBigInt(amount), uBigInt(1e18))
-}
-
 func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) error {
 	// TODO: Batch
 	tx, err := state.Routers[from].ApplyRampUpdates(e.Chains[from].DeployerKey, []router.RouterOnRamp{
@@ -490,7 +463,7 @@ func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) 
 			OnRamp:            state.EvmOnRampsV160[from].Address(),
 		},
 	}, []router.RouterOffRamp{}, []router.RouterOffRamp{})
-	if err := ConfirmIfNoError(e.Chains[from], tx, err); err != nil {
+	if err := deployment.ConfirmIfNoError(e.Chains[from], tx, err); err != nil {
 		return err
 	}
 	tx, err = state.EvmOnRampsV160[from].ApplyDestChainConfigUpdates(e.Chains[from].DeployerKey,
@@ -500,7 +473,7 @@ func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) 
 				Router:            state.Routers[from].Address(),
 			},
 		})
-	if err := ConfirmIfNoError(e.Chains[from], tx, err); err != nil {
+	if err := deployment.ConfirmIfNoError(e.Chains[from], tx, err); err != nil {
 		return err
 	}
 
@@ -509,11 +482,11 @@ func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) 
 			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 				{
 					SourceToken: state.LinkTokens[from].Address(),
-					UsdPerToken: e18Mult(20),
+					UsdPerToken: deployment2.E18Mult(20),
 				},
 				{
 					SourceToken: state.Weth9s[from].Address(),
-					UsdPerToken: e18Mult(4000),
+					UsdPerToken: deployment2.E18Mult(4000),
 				},
 			},
 			GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
@@ -522,7 +495,7 @@ func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) 
 					UsdPerUnitGas:     big.NewInt(2e12),
 				},
 			}})
-	if err := ConfirmIfNoError(e.Chains[from], tx, err); err != nil {
+	if err := deployment.ConfirmIfNoError(e.Chains[from], tx, err); err != nil {
 		return err
 	}
 
@@ -534,7 +507,7 @@ func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) 
 				DestChainConfig:   defaultPriceRegistryDestChainConfig(),
 			},
 		})
-	if err := ConfirmIfNoError(e.Chains[from], tx, err); err != nil {
+	if err := deployment.ConfirmIfNoError(e.Chains[from], tx, err); err != nil {
 		return err
 	}
 
@@ -547,7 +520,7 @@ func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) 
 				OnRamp:              common.LeftPadBytes(state.EvmOnRampsV160[from].Address().Bytes(), 32),
 			},
 		})
-	if err := ConfirmIfNoError(e.Chains[to], tx, err); err != nil {
+	if err := deployment.ConfirmIfNoError(e.Chains[to], tx, err); err != nil {
 		return err
 	}
 	tx, err = state.Routers[to].ApplyRampUpdates(e.Chains[to].DeployerKey, []router.RouterOnRamp{}, []router.RouterOffRamp{}, []router.RouterOffRamp{
@@ -556,7 +529,7 @@ func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) 
 			OffRamp:             state.EvmOffRampsV160[to].Address(),
 		},
 	})
-	if err := ConfirmIfNoError(e.Chains[to], tx, err); err != nil {
+	if err := deployment.ConfirmIfNoError(e.Chains[to], tx, err); err != nil {
 		return err
 	}
 	return nil

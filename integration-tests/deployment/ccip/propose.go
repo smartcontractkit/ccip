@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 )
 
+// TODO: Pull up to deploy
 func SimTransactOpts() *bind.TransactOpts {
 	return &bind.TransactOpts{Signer: func(address common.Address, transaction *types.Transaction) (*types.Transaction, error) {
 		return transaction, nil
