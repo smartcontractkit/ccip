@@ -96,7 +96,7 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 	// Start committing periodically in the background for all the chains
 	tick := time.NewTicker(simulatedBackendBlockTime)
 	defer tick.Stop()
-	commitBlocksBackground(t, universes, tick)
+	commitBlocksBackground(t, universes, homeChainUni, tick)
 
 	ccipCapabilityID, err := homeChainUni.capabilityRegistry.GetHashedCapabilityId(
 		callCtx, CapabilityLabelledName, CapabilityVersion)

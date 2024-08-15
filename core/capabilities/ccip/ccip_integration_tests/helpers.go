@@ -8,21 +8,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccip_integration_tests/integrationhelpers"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 
-	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccip_integration_tests/integrationhelpers"
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
@@ -36,9 +34,14 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_v3_aggregator_contract"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/link_token"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+
+	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
@@ -88,11 +91,13 @@ func uBigInt(i uint64) *big.Int {
 }
 
 type homeChain struct {
-	backend            *backends.SimulatedBackend
-	owner              *bind.TransactOpts
-	chainID            uint64
-	capabilityRegistry *kcr.CapabilitiesRegistry
-	ccipConfig         *ccip_config.CCIPConfig
+	backend               *backends.SimulatedBackend
+	owner                 *bind.TransactOpts
+	chainID               uint64
+	capabilityRegistry    *kcr.CapabilitiesRegistry
+	ccipConfig            *ccip_config.CCIPConfig
+	mockAggregator        *mock_v3_aggregator_contract.MockV3AggregatorContract
+	mockAggregatorAddress common.Address
 }
 
 type onchainUniverse struct {
@@ -169,8 +174,6 @@ func createUniverses(
 
 	homeChainBase, ok := chains[homeChainID]
 	require.True(t, ok, "home chain backend not available")
-	// Set up home chain first
-	homeChainUniverse := setupHomeChain(t, homeChainBase.owner, homeChainBase.backend)
 
 	// deploy the ccip contracts on all chains
 	universes = make(map[uint64]onchainUniverse)
@@ -267,6 +270,8 @@ func createUniverses(
 
 		universes[chainID] = universe
 	}
+	// Set up home chain first
+	homeChainUniverse := setupHomeChain(t, homeChainBase.owner, homeChainBase.backend)
 
 	// Once we have all chains created and contracts deployed, we can set up the initial configurations and wire chains together
 	connectUniverses(t, universes)
@@ -386,12 +391,18 @@ func setupHomeChain(t *testing.T, owner *bind.TransactOpts, backend *backends.Si
 	require.NoError(t, err, "failed to add node operator to the capability registry")
 	backend.Commit()
 
+	aggAddr, _, aggContract, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(owner, backend, 18, big.NewInt(5e18))
+	require.NoError(t, err)
+	backend.Commit()
+
 	return homeChain{
-		backend:            backend,
-		owner:              owner,
-		chainID:            homeChainID,
-		capabilityRegistry: capabilityRegistry,
-		ccipConfig:         capabilityConfig,
+		backend:               backend,
+		owner:                 owner,
+		chainID:               homeChainID,
+		capabilityRegistry:    capabilityRegistry,
+		ccipConfig:            capabilityConfig,
+		mockAggregator:        aggContract,
+		mockAggregatorAddress: aggAddr,
 	}
 }
 
@@ -477,8 +488,14 @@ func (h *homeChain) AddDON(
 		if pluginType == cctypes.PluginTypeCCIPCommit {
 			encodedOffchainConfig, err2 = pluginconfig.EncodeCommitOffchainConfig(pluginconfig.CommitOffchainConfig{
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(RemoteGasPriceBatchWriteFrequency),
-				// TODO: implement token price writes
-				// TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(tokenPriceBatchWriteFrequency),
+				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(time.Second),
+				PriceSources: map[ocrtypes.Account]pluginconfig.ArbitrumPriceSource{
+					ocrtypes.Account(uni.weth.Address().Hex()): {
+						AggregatorAddress: h.mockAggregatorAddress.Hex(),
+						DeviationPPB:      ccipocr3.BigInt{Int: big.NewInt(1)},
+					},
+				},
+				TokenPriceChainSelector: getSelector(h.chainID),
 			})
 			require.NoError(t, err2)
 		} else {

@@ -193,6 +193,9 @@ func PriceReaderConfig() evmrelaytypes.ChainReaderConfig {
 			consts.MethodNameGetLatestRoundData: {
 				ChainSpecificName: mustGetMethodName(consts.MethodNameGetLatestRoundData, priceAggregatorABI),
 			},
+			consts.MethodNameGetDecimals: {
+				ChainSpecificName: mustGetMethodName(consts.MethodNameGetDecimals, priceAggregatorABI),
+			},
 		},
 	}
 

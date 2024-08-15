@@ -267,17 +267,26 @@ func createConfigV2Chain(chainID *big.Int) *v2toml.EVMConfig {
 }
 
 // Commit blocks periodically in the background for all chains
-func commitBlocksBackground(t *testing.T, universes map[uint64]onchainUniverse, tick *time.Ticker) {
+func commitBlocksBackground(t *testing.T, universes map[uint64]onchainUniverse, homeChainUni homeChain, tick *time.Ticker) {
 	t.Log("starting ticker to commit blocks")
 	tickCtx, tickCancel := context.WithCancel(testutils.Context(t))
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		var round int64
 		for {
+			round++
 			select {
 			case <-tick.C:
 				for _, uni := range universes {
+					if uni.chainID == homeChainID {
+						agg := homeChainUni.mockAggregator
+						_, err := agg.UpdateRoundData(uni.owner, big.NewInt(round), big.NewInt(5e18), big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
+						if err != nil {
+							panic(fmt.Errorf("unable to update round data: %w", err))
+						}
+					}
 					uni.backend.Commit()
 				}
 			case <-tickCtx.Done():

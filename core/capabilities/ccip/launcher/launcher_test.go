@@ -5,21 +5,27 @@ import (
 	"math/big"
 	"reflect"
 	"testing"
+	"time"
 
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types/mocks"
+	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types/mocks"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
+
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func Test_createOracle(t *testing.T) {
@@ -34,7 +40,7 @@ func Test_createOracle(t *testing.T) {
 		pluginType    cctypes.PluginType
 		ocrConfigs    []ccipreaderpkg.OCR3ConfigWithMeta
 	}
-	tests := []struct {
+	var tests = []struct {
 		name    string
 		args    args
 		expect  func(t *testing.T, args args, oracleCreator *mocks.OracleCreator)
@@ -71,6 +77,33 @@ func Test_createOracle(t *testing.T) {
 					{
 						Config: ccipreaderpkg.OCR3Config{
 							BootstrapP2PIds: [][32]byte{myP2PKey},
+						},
+						ConfigCount:  1,
+						ConfigDigest: testutils.Random32Byte(),
+					},
+				},
+			},
+			func(t *testing.T, args args, oracleCreator *mocks.OracleCreator) {
+				oracleCreator.
+					On("CreatePluginOracle", cctypes.PluginTypeCCIPCommit, cctypes.OCR3ConfigWithMeta(args.ocrConfigs[0])).
+					Return(mocks.NewCCIPOracle(t), nil)
+				oracleCreator.
+					On("CreateBootstrapOracle", cctypes.OCR3ConfigWithMeta(args.ocrConfigs[0])).
+					Return(mocks.NewCCIPOracle(t), nil)
+			},
+			false,
+		},
+		{
+			"success, with offchain config",
+			args{
+				myP2PKey,
+				mocks.NewOracleCreator(t),
+				cctypes.PluginTypeCCIPCommit,
+				[]ccipreaderpkg.OCR3ConfigWithMeta{
+					{
+						Config: ccipreaderpkg.OCR3Config{
+							BootstrapP2PIds: [][32]byte{myP2PKey},
+							OffchainConfig:  defaultCommitOCC(),
 						},
 						ConfigCount:  1,
 						ConfigDigest: testutils.Random32Byte(),
@@ -489,6 +522,24 @@ func Test_launcher_processDiff(t *testing.T) {
 	}
 }
 
+func defaultCommitOCC() []byte {
+	cfg, err := pluginconfig.EncodeCommitOffchainConfig(
+		pluginconfig.CommitOffchainConfig{
+			RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(time.Second),
+			TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(time.Second),
+			PriceSources: map[ocrtypes.Account]pluginconfig.ArbitrumPriceSource{
+				"0xtokenAddress": {
+					AggregatorAddress: "0xaggregatorAddress",
+					DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+				},
+			},
+			TokenPriceChainSelector: 1,
+		})
+	if err != nil {
+		panic(err)
+	}
+	return cfg
+}
 func newMock[T any](t *testing.T, newer func(t *testing.T) T, expect func(m T)) T {
 	o := newer(t)
 	expect(o)

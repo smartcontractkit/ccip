@@ -188,9 +188,14 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	chainWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
 	for _, chain := range i.chains.Slice() {
 		var chainReaderConfig evmrelaytypes.ChainReaderConfig
+		chainSelector, ok := chainsel.EvmChainIdToChainSelector()[chain.ID().Uint64()]
+		if !ok {
+			return nil, fmt.Errorf("failed to get chain selector from chain ID %s", chain.ID())
+		}
+
 		if chain.ID().Uint64() == destChainID {
 			chainReaderConfig = evmconfig.DestReaderConfig()
-		} else if commitOffchainConfig != nil && commitOffchainConfig.TokenPriceChainSelector == chain.ID().Uint64() {
+		} else if commitOffchainConfig != nil && commitOffchainConfig.TokenPriceChainSelector == chainSelector {
 			// If the chain is the chain with token price contract, then use the config that includes the price aggregator
 			// This is essentially the same as source reader config, but with the price aggregator contract.
 			chainReaderConfig = evmconfig.PriceReaderConfig()
@@ -225,7 +230,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			if err3 != nil {
 				return nil, fmt.Errorf("failed to bind chain reader for dest chain %s's offramp at %s: %w", chain.ID(), offrampAddressHex, err3)
 			}
-		} else if commitOffchainConfig != nil && chain.ID().Uint64() == commitOffchainConfig.TokenPriceChainSelector {
+		} else if commitOffchainConfig != nil && chainSelector == commitOffchainConfig.TokenPriceChainSelector {
 			// Only supporting one price source for now.
 			//TODO: Once chainreader new changes https://github.com/smartcontractkit/chainlink-common/pull/603
 			// are merged we'll be able to use different bindings for different tokens.
@@ -288,11 +293,6 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 		err2 = cw.Start(context.Background())
 		if err2 != nil {
 			return nil, fmt.Errorf("failed to start chain writer for chain %s: %w", chain.ID(), err2)
-		}
-
-		chainSelector, ok := chainsel.EvmChainIdToChainSelector()[chain.ID().Uint64()]
-		if !ok {
-			return nil, fmt.Errorf("failed to get chain selector from chain ID %s", chain.ID())
 		}
 
 		contractReaders[cciptypes.ChainSelector(chainSelector)] = cr
