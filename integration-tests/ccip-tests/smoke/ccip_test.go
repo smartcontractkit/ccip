@@ -855,6 +855,50 @@ func TestSmokeCCIPManuallyExecuteAfterExecutionFailingDueToInsufficientGas(t *te
 	}
 }
 
+func TestSmokeCCIPOutOfOrderExecution(t *testing.T) {
+	t.Parallel()
+	log := logging.GetTestLogger(t)
+	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
+	if len(setUpOutput.Lanes) == 0 {
+		return
+	}
+	t.Cleanup(func() {
+		require.NoError(t, setUpOutput.TearDown())
+	})
+
+	var tests []testDefinition
+	for _, lane := range setUpOutput.Lanes {
+		tests = append(tests, testDefinition{
+			testName: fmt.Sprintf("Network %s to network %s",
+				lane.ForwardLane.SourceNetworkName, lane.ForwardLane.DestNetworkName),
+			lane: lane.ForwardLane,
+		})
+	}
+
+	for _, tc := range tests {
+		tc.lane.Test = t
+		src := tc.lane.Source
+		// TODO: Not sure if I need this
+		// addLiquidity(t, src.Common, new(big.Int).Mul(capacityLimit, big.NewInt(20)))
+		// addLiquidity(t, dest.Common, new(big.Int).Mul(capacityLimit, big.NewInt(20)))
+
+		// Send transaction destined to fail with too low destination gas
+		src.TransferAmount[0] = big.NewInt(1)
+		tc.lane.RecordStateBeforeTransfer()
+		err := tc.lane.SendRequests(1, big.NewInt(0))
+		require.NoError(t, err)
+		tc.lane.ValidateRequests(actions.ExpectPhaseToFail(testreporters.ExecStateChanged))
+
+		// Send transaction destined that should succeed while the previous one is still pending
+		src.TransferAmount[0] = big.NewInt(2)
+		tc.lane.RecordStateBeforeTransfer()
+		err = tc.lane.SendRequests(1, big.NewInt(actions.DefaultDestinationGasLimit))
+		require.NoError(t, err)
+		tc.lane.ValidateRequests()
+	}
+}
+
 // add liquidity to pools on both networks
 func addLiquidity(t *testing.T, ccipCommon *actions.CCIPCommon, amount *big.Int) {
 	t.Helper()
@@ -1004,5 +1048,4 @@ func testOffRampRateLimits(t *testing.T, rateLimiterConfig contracts.RateLimiter
 			require.NoError(t, err, "Error manually executing transaction after rate limit is lifted")
 		})
 	}
-
 }

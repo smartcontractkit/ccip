@@ -6,6 +6,8 @@ set_config:
   			echo "Overriding config with $(override_toml)"; \
 			echo "export BASE64_CCIP_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" > ./testconfig/override/.env; \
         	echo "export TEST_BASE64_CCIP_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" >> ./testconfig/override/.env; \
+			echo "BASE64_CCIP_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" > ./testconfig/override/debug.env \
+			echo "TEST_BASE64_CCIP_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" >> ./testconfig/override/debug.env \
     else \
       		echo "No override config found, using default config"; \
         	echo  > ./testconfig/override/.env; \
@@ -15,11 +17,13 @@ set_config:
       echo "export BASE64_NETWORK_CONFIG=$$(base64 -i $(network_config_toml))" >> ./testconfig/override/.env; \
     fi
 
-	@echo "setting secret config with $(secret_toml)"
-	@echo "export BASE64_CCIP_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" >> ./testconfig/override/.env
-	@echo "export TEST_BASE64_CCIP_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" >> ./testconfig/override/.env
-	@echo "BASE64_CCIP_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" > ./testconfig/override/debug.env
-	@echo "TEST_BASE64_CCIP_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" >> ./testconfig/override/debug.env
+	if [-s "$(secret_toml)" ]; then \
+		echo "setting secret config with $(secret_toml)"; \
+		echo "export BASE64_CCIP_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" >> ./testconfig/override/.env; \
+		echo "export TEST_BASE64_CCIP_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" >> ./testconfig/override/.env; \
+		echo "BASE64_CCIP_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" > ./testconfig/override/debug.env; \
+		echo "TEST_BASE64_CCIP_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" >> ./testconfig/override/debug.env; \
+	fi
 
 
 # example usage: make test_load_ccip testimage=chainlink-ccip-tests:latest testname=TestLoadCCIPStableRPS override_toml=./testconfig/override/config.toml secret_toml=./testconfig/tomls/secrets.toml network_config_toml=../config/network.toml
