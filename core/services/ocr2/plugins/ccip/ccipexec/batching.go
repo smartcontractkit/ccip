@@ -106,8 +106,8 @@ func (s *BestEffortBatchingStrategy) BuildBatch(
 	return batchBuilder.batch, batchBuilder.statuses
 }
 
-func (s *ZKOverflowBatchingStrategy) GetBatchingStrategyID() uint32 {
-	return s.BatchingStrategyID
+func (bs *ZKOverflowBatchingStrategy) GetBatchingStrategyID() uint32 {
+	return bs.BatchingStrategyID
 }
 
 // ZKOverflowBatchingStrategy is a batching strategy for ZK chains overflowing under certain conditions.

@@ -1464,7 +1464,6 @@ func TestExecutionReportingPlugin_getF(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
 			p := &ExecutionReportingPlugin{}
 			p.F = tc.F
 			bs, err := NewBatchingStrategy(tc.batchingStrategyID, &statuschecker.TxmStatusChecker{})
