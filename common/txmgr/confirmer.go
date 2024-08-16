@@ -1089,10 +1089,11 @@ func hasReceiptInLongestChain[
 				}
 			}
 		}
-		if head.GetParent() == nil {
+
+		head = head.GetParent()
+		if head == nil {
 			return false
 		}
-		head = head.GetParent()
 	}
 }
 
