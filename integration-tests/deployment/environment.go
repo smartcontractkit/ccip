@@ -62,19 +62,19 @@ func ConfirmIfNoError(chain Chain, tx *types.Transaction, err error) error {
 	if err != nil {
 		d, ok := err.(rpc.DataError)
 		if ok {
-			fmt.Println("Got Data Error", d.ErrorData())
+			return fmt.Errorf("Got Data Error: %s", d.ErrorData())
 		}
 		return err
 	}
 	return chain.Confirm(tx.Hash())
 }
 
-func MaybeDataErr(err error) string {
+func MaybeDataErr(err error) error {
 	d, ok := err.(rpc.DataError)
 	if ok {
-		return d.ErrorData().(string)
+		return d
 	}
-	return ""
+	return err
 }
 
 func UBigInt(i uint64) *big.Int {

@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"sort"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
 	deployment2 "github.com/smartcontractkit/ccip/integration-tests/deployment"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
@@ -398,7 +396,7 @@ func AddDON(
 		}, uint8(pluginType))
 		if err != nil {
 			//return err
-			return fmt.Errorf("%s", err.(rpc.DataError).ErrorData().(string))
+			return deployment.MaybeDataErr(err)
 		}
 		// TODO: assertions
 		//require.Equalf(t, offrampOCR3Configs[pluginType].ConfigDigest, ocrConfig.ConfigInfo.ConfigDigest, "%s OCR3 config digest mismatch", pluginType.String())

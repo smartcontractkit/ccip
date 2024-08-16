@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
@@ -44,11 +43,11 @@ func NewMemoryChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 					chain.Backend.Commit()
 					receipt, err := chain.Backend.TransactionReceipt(nil, tx)
 					if err != nil {
-						fmt.Println("failed to get receipt", err)
+						t.Log("failed to get receipt", err)
 						continue
 					}
 					if receipt.Status == 0 {
-						fmt.Printf("Status (reverted) %d for txhash %s\n", receipt.Status, tx.String())
+						t.Log("Status (reverted) %d for txhash %s\n", receipt.Status, tx.String())
 					}
 					return nil
 				}

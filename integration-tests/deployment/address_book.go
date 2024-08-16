@@ -31,7 +31,9 @@ func (m *AddressBookMap) Addresses() (map[uint64]map[string]string, error) {
 }
 
 func (m *AddressBookMap) AddressesForChain(chain uint64) (map[string]string, error) {
-	// TODO error
+	if _, exists := m.AddressesByChain[chain]; !exists {
+		return nil, fmt.Errorf("chain %d not found", chain)
+	}
 	return m.AddressesByChain[chain], nil
 }
 
@@ -43,7 +45,9 @@ func (m *AddressBookMap) Merge(ab AddressBook) error {
 	}
 	for chain, chainAddresses := range addresses {
 		for address, typeAndVersions := range chainAddresses {
-			return m.Save(chain, address, typeAndVersions)
+			if err := m.Save(chain, address, typeAndVersions); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

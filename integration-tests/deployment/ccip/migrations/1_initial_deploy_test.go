@@ -136,14 +136,12 @@ func Test0001_InitialDeploy(t *testing.T) {
 		if sel == homeChainSel {
 			continue
 		}
-		//require.NoError(t, ccipdeployment.AddLane(e, state, sel, dest))
 		msg := router.ClientEVM2AnyMessage{
 			Receiver:     common.LeftPadBytes(state.Receivers[dest].Address().Bytes(), 32),
 			Data:         []byte("hello"),
 			TokenAmounts: nil, // TODO: no tokens for now
-			//FeeToken:     common.HexToAddress("0x0"),
-			FeeToken:  state.Weth9s[sel].Address(),
-			ExtraArgs: nil, // TODO: no extra args for now, falls back to default
+			FeeToken:     state.Weth9s[sel].Address(),
+			ExtraArgs:    nil, // TODO: no extra args for now, falls back to default
 		}
 		fee, err := state.Routers[sel].GetFee(
 			&bind.CallOpts{Context: context.Background()}, dest, msg)
@@ -155,6 +153,8 @@ func Test0001_InitialDeploy(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NoError(t, chain.Confirm(tx.Hash()))
+
+		// TODO: should be able to avoid this by using native?
 		tx, err = state.Weth9s[sel].Approve(e.Chains[sel].DeployerKey,
 			state.Routers[sel].Address(), fee)
 		require.NoError(t, err)
@@ -202,14 +202,11 @@ func waitForCommitWithInterval(
 
 	for {
 		select {
-		case <-time.After(time.Minute):
-			t.Logf("Waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
-				dest.Selector, src.Selector, expectedSeqNumRange.String())
-			t.Error("Timed out waiting for commit report")
-			return
 		case <-ticker.C:
 			src.Client.(*backends.SimulatedBackend).Commit()
 			dest.Client.(*backends.SimulatedBackend).Commit()
+			t.Logf("Waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
+				dest.Selector, src.Selector, expectedSeqNumRange.String())
 		case subErr := <-subscription.Err():
 			t.Fatalf("Subscription error: %+v", subErr)
 		case report := <-sink:
@@ -237,9 +234,6 @@ func waitForExecWithSeqNr(t *testing.T,
 	defer tick.Stop()
 	for {
 		select {
-		case <-time.After(time.Minute):
-			t.Log("Timed out waiting for ExecutionStateChanged")
-			return
 		case <-tick.C:
 			// TODO: Clean this up
 			source.Client.(*backends.SimulatedBackend).Commit()

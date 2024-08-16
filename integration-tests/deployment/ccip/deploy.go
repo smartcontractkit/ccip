@@ -70,9 +70,8 @@ type Contracts interface {
 }
 
 type ContractDeploy[C Contracts] struct {
-	// We just return keep all the deploy return values
+	// We just keep all the deploy return values
 	// since some will be empty if there's an error.
-	// and we want to avoid repeating that
 	Address  common.Address
 	Contract C
 	Tx       *types.Transaction
