@@ -3,7 +3,7 @@ package migrations
 import (
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/deployment/ccip"
+	ccipdeployment "github.com/smartcontractkit/chainlink/integration-tests/deployment/ccip"
 )
 
 // We expect the migration input to be unique per migration.

@@ -1,7 +1,7 @@
 package memory
 
 import (
-	"fmt"
+	"context"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
@@ -42,24 +42,23 @@ func NewMemoryChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 			Confirm: func(tx common.Hash) error {
 				for {
 					chain.Backend.Commit()
-					receipt, err := chain.Backend.TransactionReceipt(nil, tx)
+					receipt, err := chain.Backend.TransactionReceipt(context.Background(), tx)
 					if err != nil {
-						fmt.Println("failed to get receipt", err)
+						t.Log("failed to get receipt", err)
 						continue
 					}
 					if receipt.Status == 0 {
-						fmt.Printf("Status (reverted) %d for txhash %s\n", receipt.Status, tx.String())
+						t.Logf("Status (reverted) %d for txhash %s\n", receipt.Status, tx.String())
 					}
 					return nil
 				}
-				return nil
 			},
 		}
 	}
 	return chains
 }
 
-func NewNodes(t *testing.T, chains map[uint64]deployment.Chain, numNodes, numBootstraps int, registryConfig RegistryConfig) map[string]Node {
+func NewNodes(t *testing.T, logLevel zapcore.Level, chains map[uint64]deployment.Chain, numNodes, numBootstraps int, registryConfig RegistryConfig) map[string]Node {
 	mchains := make(map[uint64]EVMChain)
 	for _, chain := range chains {
 		evmChainID, err := chainsel.ChainIdFromSelector(chain.Selector)
@@ -72,7 +71,6 @@ func NewNodes(t *testing.T, chains map[uint64]deployment.Chain, numNodes, numBoo
 		}
 	}
 	nodesByPeerID := make(map[string]Node)
-	var nodeIDs []string
 	ports := freeport.GetN(t, numNodes)
 	var existingNumBootstraps int
 	for i := 0; i < numNodes; i++ {
@@ -81,10 +79,9 @@ func NewNodes(t *testing.T, chains map[uint64]deployment.Chain, numNodes, numBoo
 			bootstrap = true
 			existingNumBootstraps++
 		}
-		node := NewNode(t, ports[i], mchains, zapcore.InfoLevel, bootstrap, registryConfig)
+		node := NewNode(t, ports[i], mchains, logLevel, bootstrap, registryConfig)
 		nodesByPeerID[node.Keys.PeerID.String()] = *node
 		// Note in real env, this ID is allocated by JD.
-		nodeIDs = append(nodeIDs, node.Keys.PeerID.String())
 	}
 	return nodesByPeerID
 }
@@ -125,9 +122,9 @@ func NewMemoryEnvironmentFromChainsNodes(t *testing.T,
 //}
 
 // To be used by tests and any kind of deployment logic.
-func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, config MemoryEnvironmentConfig) deployment.Environment {
+func NewMemoryEnvironment(t *testing.T, lggr logger.Logger, logLevel zapcore.Level, config MemoryEnvironmentConfig) deployment.Environment {
 	chains := NewMemoryChains(t, config.Chains)
-	nodes := NewNodes(t, chains, config.Nodes, config.Bootstraps, config.RegistryConfig)
+	nodes := NewNodes(t, logLevel, chains, config.Nodes, config.Bootstraps, config.RegistryConfig)
 	var nodeIDs []string
 	for id := range nodes {
 		nodeIDs = append(nodeIDs, id)

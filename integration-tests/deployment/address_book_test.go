@@ -37,4 +37,35 @@ func TestAddressBook(t *testing.T) {
 		},
 	})
 
+	// Test merge
+	ab2 := NewMemoryAddressBook()
+	require.NoError(t, ab2.Save(3, "0x3", "OnRamp 1.0.0"))
+	require.NoError(t, ab.Merge(ab2))
+	// Other address book should remain unchanged.
+	addresses, err = ab2.Addresses()
+	require.NoError(t, err)
+	assert.DeepEqual(t, addresses, map[uint64]map[string]string{
+		3: {
+			"0x3": "OnRamp 1.0.0",
+		},
+	})
+	// Existing addressbook should contain the new elements.
+	addresses, err = ab.Addresses()
+	require.NoError(t, err)
+	assert.DeepEqual(t, addresses, map[uint64]map[string]string{
+		1: {
+			"0x1": "OnRamp 1.0.0",
+			"0x2": "OnRamp 1.0.0",
+		},
+		2: {
+			"0x1": "OnRamp 1.0.0",
+			"0x2": "OnRamp 1.2.0",
+		},
+		3: {
+			"0x3": "OnRamp 1.0.0",
+		},
+	})
+
+	// Merge to an existing chain.
+	require.NoError(t, ab2.Save(2, "0x3", "OffRamp 1.0.0"))
 }

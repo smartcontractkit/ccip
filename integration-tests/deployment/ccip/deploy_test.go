@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment/memory"
 
@@ -14,7 +15,7 @@ import (
 
 func TestDeployCCIPContracts(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	e := memory.NewMemoryEnvironment(t, lggr, memory.MemoryEnvironmentConfig{
+	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
 		Chains: 1,
 		Nodes:  1,
 	})
@@ -27,6 +28,7 @@ func TestDeployCCIPContracts(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert expect every deployed address to be in the address book.
+	// TODO: Add the rest of CCIPv2 representation
 	b, err := json.MarshalIndent(snap, "", "	")
 	require.NoError(t, err)
 	fmt.Println(string(b))
@@ -34,7 +36,7 @@ func TestDeployCCIPContracts(t *testing.T) {
 
 func TestJobSpecGeneration(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	e := memory.NewMemoryEnvironment(t, lggr, memory.MemoryEnvironmentConfig{
+	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
 		Chains: 1,
 		Nodes:  1,
 	})
@@ -43,4 +45,5 @@ func TestJobSpecGeneration(t *testing.T) {
 	for node, jb := range js {
 		fmt.Println(node, jb)
 	}
+	// TODO: Add job assertions
 }

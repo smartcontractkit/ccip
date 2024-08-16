@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,10 +12,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	jobv1 "github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/job/v1"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
@@ -54,7 +57,6 @@ func Test0001_InitialDeploy(t *testing.T) {
 		homeChainSel = chainSel
 		break
 	}
-	t.Log("home chain", homeChainEVM)
 	ab, err := ccipdeployment.DeployCapReg(lggr, chains, homeChainSel)
 	require.NoError(t, err)
 
@@ -66,7 +68,7 @@ func Test0001_InitialDeploy(t *testing.T) {
 		capReg = common.HexToAddress(addr)
 		break
 	}
-	nodes := memory.NewNodes(t, chains, 4, 1, memory.RegistryConfig{
+	nodes := memory.NewNodes(t, zapcore.InfoLevel, chains, 4, 1, memory.RegistryConfig{
 		EVMChainID: homeChainEVM,
 		Contract:   capReg,
 	})
@@ -99,7 +101,7 @@ func Test0001_InitialDeploy(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ensure capreg logs are up to date.
-	ReplayAllLogs(nodes, chains)
+	require.NoError(t, ReplayAllLogs(nodes, chains))
 
 	// Apply the jobs.
 	for nodeID, jobs := range output.JobSpecs {
@@ -114,10 +116,11 @@ func Test0001_InitialDeploy(t *testing.T) {
 		}
 	}
 	// Wait for plugins to register filters?
+	// TODO: Investigate how to avoid.
 	time.Sleep(30 * time.Second)
 
 	// Ensure job related logs are up to date.
-	ReplayAllLogs(nodes, chains)
+	require.NoError(t, ReplayAllLogs(nodes, chains))
 
 	// Send a request from every router
 	// Add all lanes
@@ -128,56 +131,93 @@ func Test0001_InitialDeploy(t *testing.T) {
 			}
 		}
 	}
-	for sel, chain := range e.Chains {
-		dest := homeChainSel
-		if sel == homeChainSel {
-			continue
-		}
-		//require.NoError(t, ccipdeployment.AddLane(e, state, sel, dest))
-		msg := router.ClientEVM2AnyMessage{
-			Receiver:     common.LeftPadBytes(state.Receivers[dest].Address().Bytes(), 32),
-			Data:         []byte("hello"),
-			TokenAmounts: nil, // TODO: no tokens for now
-			//FeeToken:     common.HexToAddress("0x0"),
-			FeeToken:  state.Weth9s[sel].Address(),
-			ExtraArgs: nil, // TODO: no extra args for now, falls back to default
-		}
-		fee, err := state.Routers[sel].GetFee(
-			&bind.CallOpts{Context: context.Background()}, dest, msg)
-		require.NoError(t, err, ccipdeployment.MaybeDataErr(err))
-		tx, err := state.Weth9s[sel].Deposit(&bind.TransactOpts{
-			From:   e.Chains[sel].DeployerKey.From,
-			Signer: e.Chains[sel].DeployerKey.Signer,
-			Value:  fee,
-		})
-		require.NoError(t, err)
-		require.NoError(t, chain.Confirm(tx.Hash()))
-		tx, err = state.Weth9s[sel].Approve(e.Chains[sel].DeployerKey,
-			state.Routers[sel].Address(), fee)
-		require.NoError(t, err)
-		require.NoError(t, chain.Confirm(tx.Hash()))
 
-		t.Logf("Sending CCIP request from chain selector %d to chain selector %d",
-			sel, dest)
-		tx, err = state.Routers[sel].CcipSend(e.Chains[sel].DeployerKey, homeChainSel, msg)
-		require.NoError(t, err)
-		require.NoError(t, chain.Confirm(tx.Hash()))
-		waitForCommitWithInterval(t, chain, e.Chains[homeChainSel],
-			state.EvmOffRampsV160[homeChainSel],
-			ccipocr3.SeqNumRange{1, 1},
-		)
-		break
+	// Send a message from each chain to every other chain.
+	for src, srcChain := range e.Chains {
+		for dest := range e.Chains {
+			if src == dest {
+				continue
+			}
+			msg := router.ClientEVM2AnyMessage{
+				Receiver:     common.LeftPadBytes(state.Receivers[dest].Address().Bytes(), 32),
+				Data:         []byte("hello"),
+				TokenAmounts: nil, // TODO: no tokens for now
+				FeeToken:     state.Weth9s[src].Address(),
+				ExtraArgs:    nil, // TODO: no extra args for now, falls back to default
+			}
+			fee, err := state.Routers[src].GetFee(
+				&bind.CallOpts{Context: context.Background()}, dest, msg)
+			require.NoError(t, err, deployment.MaybeDataErr(err))
+			tx, err := state.Weth9s[src].Deposit(&bind.TransactOpts{
+				From:   e.Chains[src].DeployerKey.From,
+				Signer: e.Chains[src].DeployerKey.Signer,
+				Value:  fee,
+			})
+			require.NoError(t, err)
+			require.NoError(t, srcChain.Confirm(tx.Hash()))
+
+			// TODO: should be able to avoid this by using native?
+			tx, err = state.Weth9s[src].Approve(e.Chains[src].DeployerKey,
+				state.Routers[src].Address(), fee)
+			require.NoError(t, err)
+			require.NoError(t, srcChain.Confirm(tx.Hash()))
+
+			t.Logf("Sending CCIP request from chain selector %d to chain selector %d",
+				src, dest)
+			tx, err = state.Routers[src].CcipSend(e.Chains[src].DeployerKey, dest, msg)
+			require.NoError(t, err)
+			require.NoError(t, srcChain.Confirm(tx.Hash()))
+		}
 	}
+
+	// Wait for all commit reports to land.
+	var wg sync.WaitGroup
+	for src, srcChain := range e.Chains {
+		for dest, dstChain := range e.Chains {
+			if src == dest {
+				continue
+			}
+			srcChain := srcChain
+			dstChain := dstChain
+			wg.Add(1)
+			go func(src, dest uint64) {
+				defer wg.Done()
+				waitForCommitWithInterval(t, srcChain, dstChain, state.EvmOffRampsV160[dest], ccipocr3.SeqNumRange{1, 1})
+			}(src, dest)
+		}
+	}
+	wg.Wait()
+
+	// Wait for all exec reports to land
+	for src, srcChain := range e.Chains {
+		for dest, dstChain := range e.Chains {
+			if src == dest {
+				continue
+			}
+			srcChain := srcChain
+			dstChain := dstChain
+			wg.Add(1)
+			go func(src, dest uint64) {
+				defer wg.Done()
+				waitForExecWithSeqNr(t, srcChain, dstChain, state.EvmOffRampsV160[dest], 1)
+			}(src, dest)
+		}
+	}
+	wg.Wait()
+
 	// TODO: Apply the proposal.
 }
 
-func ReplayAllLogs(nodes map[string]memory.Node, chains map[uint64]deployment.Chain) {
+func ReplayAllLogs(nodes map[string]memory.Node, chains map[uint64]deployment.Chain) error {
 	for _, node := range nodes {
 		for sel := range chains {
 			chainID, _ := chainsel.ChainIdFromSelector(sel)
-			node.App.ReplayFromBlock(big.NewInt(int64(chainID)), 1, false)
+			if err := node.App.ReplayFromBlock(big.NewInt(int64(chainID)), 1, false); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 func waitForCommitWithInterval(
@@ -193,17 +233,16 @@ func waitForCommitWithInterval(
 	}, sink)
 	require.NoError(t, err)
 	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 
+	//revive:disable
 	for {
 		select {
 		case <-ticker.C:
 			src.Client.(*backends.SimulatedBackend).Commit()
 			dest.Client.(*backends.SimulatedBackend).Commit()
-		case <-time.After(time.Minute):
 			t.Logf("Waiting for commit report on chain selector %d from source selector %d expected seq nr range %s",
 				dest.Selector, src.Selector, expectedSeqNumRange.String())
-			t.Error("Timed out waiting for commit report")
-			return
 		case subErr := <-subscription.Err():
 			t.Fatalf("Subscription error: %+v", subErr)
 		case report := <-sink:
@@ -224,16 +263,33 @@ func waitForCommitWithInterval(
 	}
 }
 
-// CCIP relies on block timestamps, but SimulatedBackend uses by default clock starting from 1970-01-01
-// This trick is used to move the clock closer to the current time. We set first block to be X hours ago.
-// Tests create plenty of transactions so this number can't be too low, every new block mined will tick the clock,
-// if you mine more than "X hours" transactions, SimulatedBackend will panic because generated timestamps will be in the future.
-func tweakChainTimestamp(t *testing.T, backend *backends.SimulatedBackend, tweak time.Duration) {
-	blockTime := time.Unix(int64(backend.Blockchain().CurrentHeader().Time), 0)
-	sinceBlockTime := time.Since(blockTime)
-	diff := sinceBlockTime - tweak
-	err := backend.AdjustTime(diff)
-	require.NoError(t, err, "unable to adjust time on simulated chain")
-	backend.Commit()
-	backend.Commit()
+func waitForExecWithSeqNr(t *testing.T,
+	source, dest deployment.Chain,
+	offramp *evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp,
+	expectedSeqNr uint64) {
+	tick := time.NewTicker(5 * time.Second)
+	defer tick.Stop()
+	for range tick.C {
+		// TODO: Clean this up
+		source.Client.(*backends.SimulatedBackend).Commit()
+		dest.Client.(*backends.SimulatedBackend).Commit()
+		scc, err := offramp.GetSourceChainConfig(nil, source.Selector)
+		require.NoError(t, err)
+		t.Logf("Waiting for ExecutionStateChanged on chain  %d from chain %d with expected sequence number %d, current onchain minSeqNr: %d",
+			dest.Selector, source.Selector, expectedSeqNr, scc.MinSeqNr)
+		iter, err := offramp.FilterExecutionStateChanged(nil,
+			[]uint64{source.Selector}, []uint64{expectedSeqNr}, nil)
+		require.NoError(t, err)
+		var count int
+		for iter.Next() {
+			if iter.Event.SequenceNumber == expectedSeqNr && iter.Event.SourceChainSelector == source.Selector {
+				count++
+			}
+		}
+		if count == 1 {
+			t.Logf("Received ExecutionStateChanged on chain %d from chain %d with expected sequence number %d",
+				dest.Selector, source.Selector, expectedSeqNr)
+			return
+		}
+	}
 }

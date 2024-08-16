@@ -2,6 +2,8 @@ package deployment
 
 import "fmt"
 
+// AddressBook is a simple interface for storing and retrieving contract addresses across
+// chains. It is family agnostic.
 type AddressBook interface {
 	Save(chainSelector uint64, address string, typeAndVersion string) error
 	Addresses() (map[uint64]map[string]string, error)
@@ -31,7 +33,9 @@ func (m *AddressBookMap) Addresses() (map[uint64]map[string]string, error) {
 }
 
 func (m *AddressBookMap) AddressesForChain(chain uint64) (map[string]string, error) {
-	// TODO error
+	if _, exists := m.AddressesByChain[chain]; !exists {
+		return nil, fmt.Errorf("chain %d not found", chain)
+	}
 	return m.AddressesByChain[chain], nil
 }
 
@@ -43,7 +47,9 @@ func (m *AddressBookMap) Merge(ab AddressBook) error {
 	}
 	for chain, chainAddresses := range addresses {
 		for address, typeAndVersions := range chainAddresses {
-			return m.Save(chain, address, typeAndVersions)
+			if err := m.Save(chain, address, typeAndVersions); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -4,21 +4,22 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"sort"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
+
+	deployment2 "github.com/smartcontractkit/ccip/integration-tests/deployment"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
@@ -98,7 +99,7 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 			ConfigurationContract: ccipConfig.Address,
 		},
 	})
-	if err := ConfirmIfNoError(chain, tx, err); err != nil {
+	if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
 		lggr.Errorw("Failed to add capabilities", "err", err)
 		return ab, err
 	}
@@ -109,7 +110,7 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 			Name:  "NodeOperator",
 		},
 	})
-	if err := ConfirmIfNoError(chain, tx, err); err != nil {
+	if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
 		lggr.Errorw("Failed to add node operators", "err", err)
 		return ab, err
 	}
@@ -144,10 +145,7 @@ func AddNodes(
 	if err != nil {
 		return err
 	}
-	if err := chain.Confirm(tx.Hash()); err != nil {
-		return err
-	}
-	return nil
+	return chain.Confirm(tx.Hash())
 }
 
 func SetupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) ccip_config.CCIPConfigTypesChainConfigInfo {
@@ -206,7 +204,7 @@ func AddDON(
 	f uint8,
 	bootstrapP2PID [32]byte,
 	p2pIDs [][32]byte,
-	nodes []Node,
+	nodes []deployment2.Node,
 ) error {
 	sortP2PIDS(p2pIDs)
 	// Get OCR3 Config from helper
@@ -214,7 +212,7 @@ func AddDON(
 	var oracles []confighelper2.OracleIdentityExtra
 	for _, node := range nodes {
 		schedule = append(schedule, 1)
-		cfg := node.selToOCRConfig[dest.Selector]
+		cfg := node.SelToOCRConfig[dest.Selector]
 		oracles = append(oracles, confighelper2.OracleIdentityExtra{
 			OracleIdentity: confighelper2.OracleIdentity{
 				OnchainPublicKey:  cfg.OnchainPublicKey,
@@ -241,9 +239,6 @@ func AddDON(
 				// TODO: implement token price writes
 				// TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(tokenPriceBatchWriteFrequency),
 			})
-			if err2 != nil {
-				return err2
-			}
 		} else {
 			encodedOffchainConfig, err2 = pluginconfig.EncodeExecuteOffchainConfig(pluginconfig.ExecuteOffchainConfig{
 				BatchGasLimit:             BatchGasLimit,
@@ -253,9 +248,9 @@ func AddDON(
 				RootSnoozeTime:            *commonconfig.MustNewDuration(RootSnoozeTime),
 				BatchingStrategyID:        BatchingStrategyID,
 			})
-			if err2 != nil {
-				return err2
-			}
+		}
+		if err2 != nil {
+			return err2
 		}
 		signers, transmitters, configF, _, offchainConfigVersion, offchainConfig, err2 := ocr3confighelper.ContractSetConfigArgsForTests(
 			DeltaProgress,
@@ -276,8 +271,8 @@ func AddDON(
 			int(f),
 			[]byte{}, // empty OnChainConfig
 		)
-		if err != nil {
-			return err
+		if err2 != nil {
+			return err2
 		}
 
 		signersBytes := make([][]byte, len(signers))
@@ -326,7 +321,7 @@ func AddDON(
 			Config:       encodedConfigs,
 		},
 	}, false, false, f)
-	if err := ConfirmIfNoError(home, tx, err); err != nil {
+	if err := deployment.ConfirmIfNoError(home, tx, err); err != nil {
 		return err
 	}
 
@@ -387,7 +382,7 @@ func AddDON(
 	//uni.backend.Commit()
 
 	tx, err = offRamp.SetOCR3Configs(dest.DeployerKey, offrampOCR3Configs)
-	if err := ConfirmIfNoError(dest, tx, err); err != nil {
+	if err := deployment.ConfirmIfNoError(dest, tx, err); err != nil {
 		return err
 	}
 
@@ -397,7 +392,7 @@ func AddDON(
 		}, uint8(pluginType))
 		if err != nil {
 			//return err
-			return fmt.Errorf("%s", err.(rpc.DataError).ErrorData().(string))
+			return deployment.MaybeDataErr(err)
 		}
 		// TODO: assertions
 		//require.Equalf(t, offrampOCR3Configs[pluginType].ConfigDigest, ocrConfig.ConfigInfo.ConfigDigest, "%s OCR3 config digest mismatch", pluginType.String())
