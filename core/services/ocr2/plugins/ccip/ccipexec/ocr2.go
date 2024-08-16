@@ -487,7 +487,6 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	} else if !healthy {
 		return false, nil, ccip.ErrChainIsNotHealthy
 	}
-	// Default consensus threshold is F+1
 	f := r.getF()
 	lggr.Infof("Consensus threshold F set to: %d", f)
 
