@@ -47,27 +47,38 @@ type BatchContext struct {
 
 type BatchingStrategy interface {
 	BuildBatch(ctx context.Context, batchCtx *BatchContext) ([]ccip.ObservedMessage, []messageExecStatus)
+	GetBatchingStrategyID() uint32
 }
 
-type BestEffortBatchingStrategy struct{}
+type BestEffortBatchingStrategy struct {
+	BatchingStrategyID uint32
+}
 
 type ZKOverflowBatchingStrategy struct {
-	statuschecker statuschecker.CCIPTransactionStatusChecker
+	BatchingStrategyID uint32
+	statuschecker      statuschecker.CCIPTransactionStatusChecker
 }
 
 func NewBatchingStrategy(batchingStrategyID uint32, statusChecker statuschecker.CCIPTransactionStatusChecker) (BatchingStrategy, error) {
 	var batchingStrategy BatchingStrategy
 	switch batchingStrategyID {
 	case 0:
-		batchingStrategy = &BestEffortBatchingStrategy{}
+		batchingStrategy = &BestEffortBatchingStrategy{
+			BatchingStrategyID: batchingStrategyID,
+		}
 	case 1:
 		batchingStrategy = &ZKOverflowBatchingStrategy{
-			statuschecker: statusChecker,
+			BatchingStrategyID: batchingStrategyID,
+			statuschecker:      statusChecker,
 		}
 	default:
 		return nil, errors.Errorf("unknown batching strategy ID %d", batchingStrategyID)
 	}
 	return batchingStrategy, nil
+}
+
+func (s *BestEffortBatchingStrategy) GetBatchingStrategyID() uint32 {
+	return s.BatchingStrategyID
 }
 
 // BestEffortBatchingStrategy is a batching strategy that tries to batch as many messages as possible (up to certain limits).
@@ -93,6 +104,10 @@ func (s *BestEffortBatchingStrategy) BuildBatch(
 		batchBuilder.addToBatch(msg, tokenData)
 	}
 	return batchBuilder.batch, batchBuilder.statuses
+}
+
+func (s *ZKOverflowBatchingStrategy) GetBatchingStrategyID() uint32 {
+	return s.BatchingStrategyID
 }
 
 // ZKOverflowBatchingStrategy is a batching strategy for ZK chains overflowing under certain conditions.
