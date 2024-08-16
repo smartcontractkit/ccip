@@ -19,7 +19,7 @@ TokenPool = '1.4.0'
 CommitStore = '1.2.0'
 
 [CCIP.Env]
-TTL = '8h'
+TTL = '10h'
 
 [CCIP.Env.Network]
 selected_networks= ['PRIVATE-CHAIN-1', 'PRIVATE-CHAIN-2']
