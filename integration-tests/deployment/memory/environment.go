@@ -47,7 +47,7 @@ func NewMemoryChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 						continue
 					}
 					if receipt.Status == 0 {
-						t.Log("Status (reverted) %d for txhash %s\n", receipt.Status, tx.String())
+						t.Logf("Status (reverted) %d for txhash %s\n", receipt.Status, tx.String())
 					}
 					return nil
 				}
