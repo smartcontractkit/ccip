@@ -201,9 +201,9 @@ func (_CCIPConfig *CCIPConfigTransactorRaw) Transact(opts *bind.TransactOpts, me
 	return _CCIPConfig.Contract.contract.Transact(opts, method, params...)
 }
 
-func (_CCIPConfig *CCIPConfigCaller) GetAllChainConfigs(opts *bind.CallOpts) ([]CCIPConfigTypesChainConfigInfo, error) {
+func (_CCIPConfig *CCIPConfigCaller) GetAllChainConfigs(opts *bind.CallOpts, pageIndex *big.Int, pageSize *big.Int) ([]CCIPConfigTypesChainConfigInfo, error) {
 	var out []interface{}
-	err := _CCIPConfig.contract.Call(opts, &out, "getAllChainConfigs")
+	err := _CCIPConfig.contract.Call(opts, &out, "getAllChainConfigs", pageIndex, pageSize)
 
 	if err != nil {
 		return *new([]CCIPConfigTypesChainConfigInfo), err
@@ -215,12 +215,12 @@ func (_CCIPConfig *CCIPConfigCaller) GetAllChainConfigs(opts *bind.CallOpts) ([]
 
 }
 
-func (_CCIPConfig *CCIPConfigSession) GetAllChainConfigs() ([]CCIPConfigTypesChainConfigInfo, error) {
-	return _CCIPConfig.Contract.GetAllChainConfigs(&_CCIPConfig.CallOpts)
+func (_CCIPConfig *CCIPConfigSession) GetAllChainConfigs(pageIndex *big.Int, pageSize *big.Int) ([]CCIPConfigTypesChainConfigInfo, error) {
+	return _CCIPConfig.Contract.GetAllChainConfigs(&_CCIPConfig.CallOpts, pageIndex, pageSize)
 }
 
-func (_CCIPConfig *CCIPConfigCallerSession) GetAllChainConfigs() ([]CCIPConfigTypesChainConfigInfo, error) {
-	return _CCIPConfig.Contract.GetAllChainConfigs(&_CCIPConfig.CallOpts)
+func (_CCIPConfig *CCIPConfigCallerSession) GetAllChainConfigs(pageIndex *big.Int, pageSize *big.Int) ([]CCIPConfigTypesChainConfigInfo, error) {
+	return _CCIPConfig.Contract.GetAllChainConfigs(&_CCIPConfig.CallOpts, pageIndex, pageSize)
 }
 
 func (_CCIPConfig *CCIPConfigCaller) GetCapabilityConfiguration(opts *bind.CallOpts, arg0 uint32) ([]byte, error) {
@@ -1069,7 +1069,7 @@ func (_CCIPConfig *CCIPConfig) Address() common.Address {
 }
 
 type CCIPConfigInterface interface {
-	GetAllChainConfigs(opts *bind.CallOpts) ([]CCIPConfigTypesChainConfigInfo, error)
+	GetAllChainConfigs(opts *bind.CallOpts, pageIndex *big.Int, pageSize *big.Int) ([]CCIPConfigTypesChainConfigInfo, error)
 
 	GetCapabilityConfiguration(opts *bind.CallOpts, arg0 uint32) ([]byte, error)
 
