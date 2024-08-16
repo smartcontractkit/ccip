@@ -2,6 +2,8 @@ package deployment
 
 import "fmt"
 
+// AddressBook is a simple interface for storing and retrieving contract addresses across
+// chains. It is family agnostic.
 type AddressBook interface {
 	Save(chainSelector uint64, address string, typeAndVersion string) error
 	Addresses() (map[uint64]map[string]string, error)
