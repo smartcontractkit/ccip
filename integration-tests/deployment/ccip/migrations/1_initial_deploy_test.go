@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -130,49 +131,75 @@ func Test0001_InitialDeploy(t *testing.T) {
 		}
 	}
 
-	// Send a message from each chain to the home chain.
-	for sel, chain := range e.Chains {
-		dest := homeChainSel
-		if sel == homeChainSel {
-			continue
-		}
-		msg := router.ClientEVM2AnyMessage{
-			Receiver:     common.LeftPadBytes(state.Receivers[dest].Address().Bytes(), 32),
-			Data:         []byte("hello"),
-			TokenAmounts: nil, // TODO: no tokens for now
-			FeeToken:     state.Weth9s[sel].Address(),
-			ExtraArgs:    nil, // TODO: no extra args for now, falls back to default
-		}
-		fee, err := state.Routers[sel].GetFee(
-			&bind.CallOpts{Context: context.Background()}, dest, msg)
-		require.NoError(t, err, deployment.MaybeDataErr(err))
-		tx, err := state.Weth9s[sel].Deposit(&bind.TransactOpts{
-			From:   e.Chains[sel].DeployerKey.From,
-			Signer: e.Chains[sel].DeployerKey.Signer,
-			Value:  fee,
-		})
-		require.NoError(t, err)
-		require.NoError(t, chain.Confirm(tx.Hash()))
+	// Send a message from each chain to every other chain.
+	for src, srcChain := range e.Chains {
+		for dest, _ := range e.Chains {
+			if src == dest {
+				continue
+			}
+			msg := router.ClientEVM2AnyMessage{
+				Receiver:     common.LeftPadBytes(state.Receivers[dest].Address().Bytes(), 32),
+				Data:         []byte("hello"),
+				TokenAmounts: nil, // TODO: no tokens for now
+				FeeToken:     state.Weth9s[src].Address(),
+				ExtraArgs:    nil, // TODO: no extra args for now, falls back to default
+			}
+			fee, err := state.Routers[src].GetFee(
+				&bind.CallOpts{Context: context.Background()}, dest, msg)
+			require.NoError(t, err, deployment.MaybeDataErr(err))
+			tx, err := state.Weth9s[src].Deposit(&bind.TransactOpts{
+				From:   e.Chains[src].DeployerKey.From,
+				Signer: e.Chains[src].DeployerKey.Signer,
+				Value:  fee,
+			})
+			require.NoError(t, err)
+			require.NoError(t, srcChain.Confirm(tx.Hash()))
 
-		// TODO: should be able to avoid this by using native?
-		tx, err = state.Weth9s[sel].Approve(e.Chains[sel].DeployerKey,
-			state.Routers[sel].Address(), fee)
-		require.NoError(t, err)
-		require.NoError(t, chain.Confirm(tx.Hash()))
+			// TODO: should be able to avoid this by using native?
+			tx, err = state.Weth9s[src].Approve(e.Chains[src].DeployerKey,
+				state.Routers[src].Address(), fee)
+			require.NoError(t, err)
+			require.NoError(t, srcChain.Confirm(tx.Hash()))
 
-		t.Logf("Sending CCIP request from chain selector %d to chain selector %d",
-			sel, dest)
-		tx, err = state.Routers[sel].CcipSend(e.Chains[sel].DeployerKey, homeChainSel, msg)
-		require.NoError(t, err)
-		require.NoError(t, chain.Confirm(tx.Hash()))
-		waitForCommitWithInterval(t, chain, e.Chains[homeChainSel],
-			state.EvmOffRampsV160[homeChainSel],
-			ccipocr3.SeqNumRange{1, 1},
-		)
-		waitForExecWithSeqNr(t,
-			state.EvmOffRampsV160[homeChainSel],
-			chain, e.Chains[homeChainSel], 1)
+			t.Logf("Sending CCIP request from chain selector %d to chain selector %d",
+				src, dest)
+			tx, err = state.Routers[src].CcipSend(e.Chains[src].DeployerKey, dest, msg)
+			require.NoError(t, err)
+			require.NoError(t, srcChain.Confirm(tx.Hash()))
+		}
 	}
+
+	// Wait for all commit reports to land.
+	var wg sync.WaitGroup
+	for src, srcChain := range e.Chains {
+		for dest, dstChain := range e.Chains {
+			if src == dest {
+				continue
+			}
+			wg.Add(1)
+			go func(src, dest uint64) {
+				defer wg.Done()
+				waitForCommitWithInterval(t, srcChain, dstChain, state.EvmOffRampsV160[dest], ccipocr3.SeqNumRange{1, 1})
+			}(src, dest)
+		}
+	}
+	wg.Wait()
+
+	// Wait for all exec reports to land
+	for src, srcChain := range e.Chains {
+		for dest, dstChain := range e.Chains {
+			if src == dest {
+				continue
+			}
+			wg.Add(1)
+			go func(src, dest uint64) {
+				defer wg.Done()
+				waitForExecWithSeqNr(t, srcChain, dstChain, state.EvmOffRampsV160[dest], 1)
+			}(src, dest)
+		}
+	}
+	wg.Wait()
+
 	// TODO: Apply the proposal.
 }
 
@@ -228,8 +255,9 @@ func waitForCommitWithInterval(
 }
 
 func waitForExecWithSeqNr(t *testing.T,
+	source, dest deployment.Chain,
 	offramp *evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp,
-	source, dest deployment.Chain, expectedSeqNr uint64) {
+	expectedSeqNr uint64) {
 	tick := time.NewTicker(5 * time.Second)
 	defer tick.Stop()
 	for {
