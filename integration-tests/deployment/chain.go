@@ -40,6 +40,7 @@ func NewChains(logger logger.Logger, configs []ChainConfig) (map[uint64]Chain, e
 		if err != nil {
 			return nil, fmt.Errorf("failed to get selector from chain id %d: %w", chainCfg.ChainId, err)
 		}
+		// TODO : better client handling
 		ec, err := ethclient.Dial(chainCfg.WsRpc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial ws rpc %s: %w", chainCfg.WsRpc, err)

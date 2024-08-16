@@ -13,7 +13,7 @@ import (
 )
 
 type JobClient struct {
-	Nodes map[string]Node
+	Nodes map[string]InMemoryNode
 }
 
 func (j JobClient) GetNode(ctx context.Context, in *nodev1.GetNodeRequest, opts ...grpc.CallOption) (*nodev1.GetNodeResponse, error) {
@@ -121,6 +121,6 @@ func (j JobClient) DeleteJob(ctx context.Context, in *jobv1.DeleteJobRequest, op
 	panic("implement me")
 }
 
-func NewMemoryJobClient(nodesByPeerID map[string]Node) *JobClient {
+func NewMemoryJobClient(nodesByPeerID map[string]InMemoryNode) *JobClient {
 	return &JobClient{nodesByPeerID}
 }

@@ -12,12 +12,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
+
+	"github.com/smartcontractkit/ccip/integration-tests/deployment"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	v2toml "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
@@ -29,8 +32,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/testutils/heavyweight"
@@ -53,17 +54,12 @@ func Context(tb testing.TB) context.Context {
 	return ctx
 }
 
-type Node struct {
+type InMemoryNode struct {
 	App chainlink.Application
 	// Transmitter key/OCR keys for this node
-	Keys       Keys
+	Keys       deployment.Keys
 	Addr       net.TCPAddr
 	IsBoostrap bool
-}
-
-type RegistryConfig struct {
-	EVMChainID uint64
-	Contract   common.Address
 }
 
 // Creates a CL node which is:
@@ -76,35 +72,35 @@ func NewNode(
 	chains map[uint64]EVMChain,
 	logLevel zapcore.Level,
 	bootstrap bool,
-	registryConfig RegistryConfig,
-) *Node {
+	registryConfig deployment.RegistryConfig,
+) *InMemoryNode {
 	// Do not want to load fixtures as they contain a dummy chainID.
 	// Create database and initial configuration.
 	cfg, db := heavyweight.FullTestDBNoFixturesV2(t, func(c *chainlink.Config, s *chainlink.Secrets) {
-		c.Insecure.OCRDevelopmentMode = ptr(true) // Disables ocr spec validation so we can have fast polling for the test.
+		c.Insecure.OCRDevelopmentMode = ptr.Ptr(true) // Disables ocr spec validation so we can have fast polling for the test.
 
-		c.Feature.LogPoller = ptr(true)
+		c.Feature.LogPoller = ptr.Ptr(true)
 
 		// P2P V2 configs.
-		c.P2P.V2.Enabled = ptr(true)
+		c.P2P.V2.Enabled = ptr.Ptr(true)
 		c.P2P.V2.DeltaDial = config.MustNewDuration(500 * time.Millisecond)
 		c.P2P.V2.DeltaReconcile = config.MustNewDuration(5 * time.Second)
 		c.P2P.V2.ListenAddresses = &[]string{fmt.Sprintf("127.0.0.1:%d", port)}
 
 		// Enable Capabilities, This is a pre-requisite for registrySyncer to work.
 		if registryConfig.Contract != common.HexToAddress("0x0") {
-			c.Capabilities.ExternalRegistry.NetworkID = ptr(relay.NetworkEVM)
-			c.Capabilities.ExternalRegistry.ChainID = ptr(strconv.FormatUint(uint64(registryConfig.EVMChainID), 10))
-			c.Capabilities.ExternalRegistry.Address = ptr(registryConfig.Contract.String())
+			c.Capabilities.ExternalRegistry.NetworkID = ptr.Ptr(relay.NetworkEVM)
+			c.Capabilities.ExternalRegistry.ChainID = ptr.Ptr(strconv.FormatUint(uint64(registryConfig.EVMChainID), 10))
+			c.Capabilities.ExternalRegistry.Address = ptr.Ptr(registryConfig.Contract.String())
 		}
 
 		// OCR configs
-		c.OCR.Enabled = ptr(false)
-		c.OCR.DefaultTransactionQueueDepth = ptr(uint32(200))
-		c.OCR2.Enabled = ptr(true)
+		c.OCR.Enabled = ptr.Ptr(false)
+		c.OCR.DefaultTransactionQueueDepth = ptr.Ptr(uint32(200))
+		c.OCR2.Enabled = ptr.Ptr(true)
 		c.OCR2.ContractPollInterval = config.MustNewDuration(5 * time.Second)
 
-		c.Log.Level = ptr(configv2.LogLevel(logLevel))
+		c.Log.Level = ptr.Ptr(configv2.LogLevel(logLevel))
 
 		var chainConfigs v2toml.EVMConfigs
 		for chainID := range chains {
@@ -180,7 +176,7 @@ func NewNode(
 	})
 	keys := CreateKeys(t, app, chains)
 
-	return &Node{
+	return &InMemoryNode{
 		App:        app,
 		Keys:       keys,
 		Addr:       net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
@@ -188,14 +184,8 @@ func NewNode(
 	}
 }
 
-type Keys struct {
-	PeerID                   p2pkey.PeerID
-	TransmittersByEVMChainID map[uint64]common.Address
-	OCRKeyBundle             ocr2key.KeyBundle
-}
-
 func CreateKeys(t *testing.T,
-	app chainlink.Application, chains map[uint64]EVMChain) Keys {
+	app chainlink.Application, chains map[uint64]EVMChain) deployment.Keys {
 	ctx := Context(t)
 	require.NoError(t, app.GetKeyStore().Unlock(ctx, "password"))
 	_, err := app.GetKeyStore().P2P().Create(ctx)
@@ -230,7 +220,7 @@ func CreateKeys(t *testing.T,
 
 	keybundle, err := app.GetKeyStore().OCR2().Create(ctx, chaintype.EVM)
 	require.NoError(t, err)
-	return Keys{
+	return deployment.Keys{
 		PeerID:                   peerID,
 		TransmittersByEVMChainID: transmitters,
 		OCRKeyBundle:             keybundle,
@@ -240,19 +230,17 @@ func CreateKeys(t *testing.T,
 func createConfigV2Chain(chainID uint64) *v2toml.EVMConfig {
 	chainIDBig := evmutils.NewI(int64(chainID))
 	chain := v2toml.Defaults(chainIDBig)
-	chain.GasEstimator.LimitDefault = ptr(uint64(5e6))
+	chain.GasEstimator.LimitDefault = ptr.Ptr(uint64(5e6))
 	chain.LogPollInterval = config.MustNewDuration(1000 * time.Millisecond)
-	chain.Transactions.ForwardersEnabled = ptr(false)
-	chain.FinalityDepth = ptr(uint32(2))
+	chain.Transactions.ForwardersEnabled = ptr.Ptr(false)
+	chain.FinalityDepth = ptr.Ptr(uint32(2))
 	return &v2toml.EVMConfig{
 		ChainID: chainIDBig,
-		Enabled: ptr(true),
+		Enabled: ptr.Ptr(true),
 		Chain:   chain,
 		Nodes:   v2toml.EVMNodes{&v2toml.Node{}},
 	}
 }
-
-func ptr[T any](v T) *T { return &v }
 
 var _ keystore.Eth = &EthKeystoreSim{}
 

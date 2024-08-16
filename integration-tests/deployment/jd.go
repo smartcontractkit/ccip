@@ -26,6 +26,7 @@ func NewClientConnection(cfg JDConfig) (*grpc.ClientConn, error) {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	}
+
 	conn, err := grpc.NewClient(cfg.Server, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect Job Distributor service. Err: %w", err)

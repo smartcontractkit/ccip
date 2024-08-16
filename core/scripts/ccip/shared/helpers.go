@@ -2,15 +2,12 @@ package shared
 
 import (
 	"context"
-	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/require"
 
-	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
@@ -41,12 +38,4 @@ func WaitForMined(lggr logger.Logger, client ethereum.TransactionReader, hash co
 		time.Sleep(RetryTiming)
 	}
 	return errors.New("No tx found within the given timeout")
-}
-
-func RequireNoError(t *testing.T, err error) {
-	if err != nil {
-		jErr, _ := evmclient.ExtractRPCError(err)
-		t.Log(jErr)
-	}
-	require.NoError(t, err)
 }

@@ -38,5 +38,3 @@ type NodeDetail struct {
 // Node Operations
 //  - Approve Job by Node :
 //      1. Approve Job with Node's FeedsManagerClient ( How to create the FeedsManagerClient client to approve the job?)
-
-// what is the purpose of https://github.com/smartcontractkit/ccip/blob/ccip-develop/core/services/feeds/rpc_handlers.go ?
