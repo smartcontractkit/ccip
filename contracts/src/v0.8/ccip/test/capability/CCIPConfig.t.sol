@@ -167,7 +167,7 @@ contract CCIPConfig_chainConfig is CCIPConfigSetup {
     assertEq(configs[1].chainSelector, 2, "chain selector must match");
   }
 
-  function test_paginate_ccipconfig() public {
+  function test_getPaginatedCCIPConfigs_Success() public {
     bytes32[] memory chainReaders = new bytes32[](1);
     chainReaders[0] = keccak256(abi.encode(1));
     CCIPConfigTypes.ChainConfigInfo[] memory adds = new CCIPConfigTypes.ChainConfigInfo[](2);
