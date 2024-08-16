@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -10,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/smartcontractkit/chain-selectors"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	types2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	types3 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -61,9 +62,10 @@ func (e Environment) AllChainSelectors() []uint64 {
 func ConfirmIfNoError(chain Chain, tx *types.Transaction, err error) error {
 	if err != nil {
 		//revive:disable
-		d, ok := err.(rpc.DataError)
+		var d rpc.DataError
+		ok := errors.As(err, &d)
 		if ok {
-			return fmt.Errorf("Got Data Error: %s", d.ErrorData())
+			return fmt.Errorf("got Data Error: %s", d.ErrorData())
 		}
 		return err
 	}
@@ -72,7 +74,8 @@ func ConfirmIfNoError(chain Chain, tx *types.Transaction, err error) error {
 
 func MaybeDataErr(err error) error {
 	//revive:disable
-	d, ok := err.(rpc.DataError)
+	var d rpc.DataError
+	ok := errors.As(err, &d)
 	if ok {
 		return d
 	}

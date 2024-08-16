@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	jobv1 "github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/job/v1"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
@@ -268,30 +269,27 @@ func waitForExecWithSeqNr(t *testing.T,
 	expectedSeqNr uint64) {
 	tick := time.NewTicker(5 * time.Second)
 	defer tick.Stop()
-	for {
-		select {
-		case <-tick.C:
-			// TODO: Clean this up
-			source.Client.(*backends.SimulatedBackend).Commit()
-			dest.Client.(*backends.SimulatedBackend).Commit()
-			scc, err := offramp.GetSourceChainConfig(nil, source.Selector)
-			require.NoError(t, err)
-			t.Logf("Waiting for ExecutionStateChanged on chain  %d from chain %d with expected sequence number %d, current onchain minSeqNr: %d",
-				dest.Selector, source.Selector, expectedSeqNr, scc.MinSeqNr)
-			iter, err := offramp.FilterExecutionStateChanged(nil,
-				[]uint64{source.Selector}, []uint64{expectedSeqNr}, nil)
-			require.NoError(t, err)
-			var count int
-			for iter.Next() {
-				if iter.Event.SequenceNumber == expectedSeqNr && iter.Event.SourceChainSelector == source.Selector {
-					count++
-				}
+	for range tick.C {
+		// TODO: Clean this up
+		source.Client.(*backends.SimulatedBackend).Commit()
+		dest.Client.(*backends.SimulatedBackend).Commit()
+		scc, err := offramp.GetSourceChainConfig(nil, source.Selector)
+		require.NoError(t, err)
+		t.Logf("Waiting for ExecutionStateChanged on chain  %d from chain %d with expected sequence number %d, current onchain minSeqNr: %d",
+			dest.Selector, source.Selector, expectedSeqNr, scc.MinSeqNr)
+		iter, err := offramp.FilterExecutionStateChanged(nil,
+			[]uint64{source.Selector}, []uint64{expectedSeqNr}, nil)
+		require.NoError(t, err)
+		var count int
+		for iter.Next() {
+			if iter.Event.SequenceNumber == expectedSeqNr && iter.Event.SourceChainSelector == source.Selector {
+				count++
 			}
-			if count == 1 {
-				t.Logf("Received ExecutionStateChanged on chain %d from chain %d with expected sequence number %d",
-					dest.Selector, source.Selector, expectedSeqNr)
-				return
-			}
+		}
+		if count == 1 {
+			t.Logf("Received ExecutionStateChanged on chain %d from chain %d with expected sequence number %d",
+				dest.Selector, source.Selector, expectedSeqNr)
+			return
 		}
 	}
 }
