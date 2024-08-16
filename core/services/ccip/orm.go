@@ -3,6 +3,7 @@ package ccip
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
@@ -60,6 +61,7 @@ func (o *orm) GetGasPricesByDestChain(ctx context.Context, destChainSelector uin
 		FROM ccip.observed_gas_prices
 		WHERE chain_selector = $1;
 	`
+	o.withAnalyze(ctx, "GetGasPricesByDestChain", stmt, destChainSelector)
 	err := o.ds.SelectContext(ctx, &gasPrices, stmt, destChainSelector)
 	if err != nil {
 		return nil, err
@@ -75,6 +77,7 @@ func (o *orm) GetTokenPricesByDestChain(ctx context.Context, destChainSelector u
 		FROM ccip.observed_token_prices
 		WHERE chain_selector = $1;
 	`
+	o.withAnalyze(ctx, "GetTokenPricesByDestChain", stmt, destChainSelector)
 	err := o.ds.SelectContext(ctx, &tokenPrices, stmt, destChainSelector)
 	if err != nil {
 		return nil, err
@@ -166,6 +169,8 @@ func (o *orm) pickOnlyRelevantTokensForUpdate(
 		WHERE chain_selector = $1 and token_addr = ANY($2);
 	`
 
+	o.withAnalyze(ctx, "pickOnlyRelevantTokensForUpdate", stmt, destChainSelector, tokenAddrsToBytes(tokenPrices))
+
 	var dbTokenPrices []tokenPriceRow
 	if err := o.ds.SelectContext(ctx, &dbTokenPrices, stmt, destChainSelector, tokenAddrsToBytes(tokenPrices)); err != nil {
 		return nil, err
@@ -210,4 +215,17 @@ func tokenAddrsToBytes(tokens []TokenPrice) [][]byte {
 		addrs = append(addrs, []byte(tk.TokenAddr))
 	}
 	return addrs
+}
+
+func (o *orm) withAnalyze(ctx context.Context, queryName string, query string, args ...interface{}) {
+	query = "EXPLAIN (ANALYZE, BUFFERS) " + query
+
+	var response []string
+	err := o.ds.SelectContext(ctx, &response, query, args...)
+	if err != nil {
+		return
+	}
+	if len(response) > 0 {
+		o.lggr.Infow("Analyze query", "query", queryName, "response", strings.Join(response, "\n"))
+	}
 }
