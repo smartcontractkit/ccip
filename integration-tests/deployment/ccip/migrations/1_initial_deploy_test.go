@@ -100,7 +100,7 @@ func Test0001_InitialDeploy(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ensure capreg logs are up to date.
-	ReplayAllLogs(nodes, chains)
+	require.NoError(t, ReplayAllLogs(nodes, chains))
 
 	// Apply the jobs.
 	for nodeID, jobs := range output.JobSpecs {
@@ -119,7 +119,7 @@ func Test0001_InitialDeploy(t *testing.T) {
 	time.Sleep(30 * time.Second)
 
 	// Ensure job related logs are up to date.
-	ReplayAllLogs(nodes, chains)
+	require.NoError(t, ReplayAllLogs(nodes, chains))
 
 	// Send a request from every router
 	// Add all lanes
@@ -133,7 +133,7 @@ func Test0001_InitialDeploy(t *testing.T) {
 
 	// Send a message from each chain to every other chain.
 	for src, srcChain := range e.Chains {
-		for dest, _ := range e.Chains {
+		for dest := range e.Chains {
 			if src == dest {
 				continue
 			}
@@ -176,6 +176,8 @@ func Test0001_InitialDeploy(t *testing.T) {
 			if src == dest {
 				continue
 			}
+			srcChain := srcChain
+			dstChain := dstChain
 			wg.Add(1)
 			go func(src, dest uint64) {
 				defer wg.Done()
@@ -191,6 +193,8 @@ func Test0001_InitialDeploy(t *testing.T) {
 			if src == dest {
 				continue
 			}
+			srcChain := srcChain
+			dstChain := dstChain
 			wg.Add(1)
 			go func(src, dest uint64) {
 				defer wg.Done()
@@ -203,13 +207,16 @@ func Test0001_InitialDeploy(t *testing.T) {
 	// TODO: Apply the proposal.
 }
 
-func ReplayAllLogs(nodes map[string]memory.Node, chains map[uint64]deployment.Chain) {
+func ReplayAllLogs(nodes map[string]memory.Node, chains map[uint64]deployment.Chain) error {
 	for _, node := range nodes {
 		for sel := range chains {
 			chainID, _ := chainsel.ChainIdFromSelector(sel)
-			node.App.ReplayFromBlock(big.NewInt(int64(chainID)), 1, false)
+			if err := node.App.ReplayFromBlock(big.NewInt(int64(chainID)), 1, false); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 func waitForCommitWithInterval(
@@ -227,6 +234,7 @@ func waitForCommitWithInterval(
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
+	//revive:disable
 	for {
 		select {
 		case <-ticker.C:

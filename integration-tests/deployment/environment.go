@@ -60,6 +60,7 @@ func (e Environment) AllChainSelectors() []uint64 {
 
 func ConfirmIfNoError(chain Chain, tx *types.Transaction, err error) error {
 	if err != nil {
+		//revive:disable
 		d, ok := err.(rpc.DataError)
 		if ok {
 			return fmt.Errorf("Got Data Error: %s", d.ErrorData())
@@ -70,6 +71,7 @@ func ConfirmIfNoError(chain Chain, tx *types.Transaction, err error) error {
 }
 
 func MaybeDataErr(err error) error {
+	//revive:disable
 	d, ok := err.(rpc.DataError)
 	if ok {
 		return d

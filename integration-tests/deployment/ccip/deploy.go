@@ -123,7 +123,7 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 		e.Logger.Errorw("Failed to get node info", "err", err)
 		return ab, err
 	}
-	cap, err := c.CapabilityRegistry[c.HomeChainSel].GetHashedCapabilityId(
+	cr, err := c.CapabilityRegistry[c.HomeChainSel].GetHashedCapabilityId(
 		&bind.CallOpts{}, CapabilityLabelledName, CapabilityVersion)
 	if err != nil {
 		e.Logger.Errorw("Failed to get hashed capability id", "err", err)
@@ -134,7 +134,7 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 		c.CapabilityRegistry[c.HomeChainSel],
 		e.Chains[c.HomeChainSel],
 		nodes.PeerIDs(c.HomeChainSel), // Doesn't actually matter which sel here
-		[][32]byte{cap},
+		[][32]byte{cr},
 	); err != nil {
 		return ab, err
 	}
@@ -435,7 +435,7 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 
 		// For each chain, we create a DON on the home chain.
 		if err := AddDON(e.Logger,
-			cap,
+			cr,
 			c.CapabilityRegistry[c.HomeChainSel],
 			c.CCIPConfig[c.HomeChainSel],
 			offRamp.Contract,
@@ -498,7 +498,7 @@ func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) 
 		return err
 	}
 
-	// Enable dest in price registy
+	// Enable dest in price registry
 	tx, err = state.PriceRegistries[from].ApplyDestChainConfigUpdates(e.Chains[from].DeployerKey,
 		[]price_registry.PriceRegistryDestChainConfigArgs{
 			{
@@ -528,10 +528,7 @@ func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) 
 			OffRamp:             state.EvmOffRampsV160[to].Address(),
 		},
 	})
-	if err := deployment.ConfirmIfNoError(e.Chains[to], tx, err); err != nil {
-		return err
-	}
-	return nil
+	return deployment.ConfirmIfNoError(e.Chains[to], tx, err)
 }
 
 func defaultPriceRegistryDestChainConfig() price_registry.PriceRegistryDestChainConfig {

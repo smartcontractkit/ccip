@@ -143,10 +143,7 @@ func AddNodes(
 	if err != nil {
 		return err
 	}
-	if err := chain.Confirm(tx.Hash()); err != nil {
-		return err
-	}
-	return nil
+	return chain.Confirm(tx.Hash())
 }
 
 func SetupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) ccip_config.CCIPConfigTypesChainConfigInfo {
@@ -240,9 +237,6 @@ func AddDON(
 				// TODO: implement token price writes
 				// TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(tokenPriceBatchWriteFrequency),
 			})
-			if err2 != nil {
-				return err2
-			}
 		} else {
 			encodedOffchainConfig, err2 = pluginconfig.EncodeExecuteOffchainConfig(pluginconfig.ExecuteOffchainConfig{
 				BatchGasLimit:             BatchGasLimit,
@@ -252,9 +246,9 @@ func AddDON(
 				RootSnoozeTime:            *commonconfig.MustNewDuration(RootSnoozeTime),
 				BatchingStrategyID:        BatchingStrategyID,
 			})
-			if err2 != nil {
-				return err2
-			}
+		}
+		if err2 != nil {
+			return err2
 		}
 		signers, transmitters, configF, _, offchainConfigVersion, offchainConfig, err2 := ocr3confighelper.ContractSetConfigArgsForTests(
 			DeltaProgress,

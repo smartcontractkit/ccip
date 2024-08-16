@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
@@ -41,7 +42,7 @@ func NewMemoryChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 			Confirm: func(tx common.Hash) error {
 				for {
 					chain.Backend.Commit()
-					receipt, err := chain.Backend.TransactionReceipt(nil, tx)
+					receipt, err := chain.Backend.TransactionReceipt(context.Background(), tx)
 					if err != nil {
 						t.Log("failed to get receipt", err)
 						continue
@@ -51,7 +52,6 @@ func NewMemoryChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 					}
 					return nil
 				}
-				return nil
 			},
 		}
 	}
@@ -71,7 +71,6 @@ func NewNodes(t *testing.T, logLevel zapcore.Level, chains map[uint64]deployment
 		}
 	}
 	nodesByPeerID := make(map[string]Node)
-	var nodeIDs []string
 	ports := freeport.GetN(t, numNodes)
 	var existingNumBootstraps int
 	for i := 0; i < numNodes; i++ {
@@ -83,7 +82,6 @@ func NewNodes(t *testing.T, logLevel zapcore.Level, chains map[uint64]deployment
 		node := NewNode(t, ports[i], mchains, logLevel, bootstrap, registryConfig)
 		nodesByPeerID[node.Keys.PeerID.String()] = *node
 		// Note in real env, this ID is allocated by JD.
-		nodeIDs = append(nodeIDs, node.Keys.PeerID.String())
 	}
 	return nodesByPeerID
 }
