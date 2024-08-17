@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/web/sdk/internal/generated"
 )
 
-type client struct {
+type Client struct {
 	gqlClient   graphql.Client
 	credentials Credentials
 	endpoints   endpoints
@@ -30,14 +30,19 @@ type Credentials struct {
 	Password string `json:"password"`
 }
 
-func New(baseURI string, creds Credentials) (*client, error) { //nolint:revive
+type Config struct {
+	BaseURI string `json:"baseURI"`
+	Credentials
+}
+
+func New(cfg Config) (*Client, error) { //nolint:revive
 	endpoints := endpoints{
-		Sessions: baseURI + "/sessions",
-		Query:    baseURI + "/query",
+		Sessions: cfg.BaseURI + "/sessions",
+		Query:    cfg.BaseURI + "/query",
 	}
-	c := &client{
+	c := &Client{
 		endpoints:   endpoints,
-		credentials: creds,
+		credentials: cfg.Credentials,
 	}
 
 	if err := c.login(); err != nil {
@@ -52,43 +57,43 @@ func New(baseURI string, creds Credentials) (*client, error) { //nolint:revive
 	return c, nil
 }
 
-func (c *client) GetCSAKeys(ctx context.Context) (*generated.GetCSAKeysResponse, error) {
+func (c *Client) GetCSAKeys(ctx context.Context) (*generated.GetCSAKeysResponse, error) {
 	return generated.GetCSAKeys(ctx, c.gqlClient)
 }
 
-func (c *client) GetJob(ctx context.Context, id string) (*generated.GetJobResponse, error) {
+func (c *Client) GetJob(ctx context.Context, id string) (*generated.GetJobResponse, error) {
 	return generated.GetJob(ctx, c.gqlClient, id)
 }
 
-func (c *client) ListJobs(ctx context.Context, offset, limit int) (*generated.ListJobsResponse, error) {
+func (c *Client) ListJobs(ctx context.Context, offset, limit int) (*generated.ListJobsResponse, error) {
 	return generated.ListJobs(ctx, c.gqlClient, offset, limit)
 }
 
-func (c *client) GetJobProposal(ctx context.Context, id string) (*generated.GetJobProposalResponse, error) {
+func (c *Client) GetJobProposal(ctx context.Context, id string) (*generated.GetJobProposalResponse, error) {
 	return generated.GetJobProposal(ctx, c.gqlClient, id)
 }
 
-func (c *client) GetBridge(ctx context.Context, id string) (*generated.GetBridgeResponse, error) {
+func (c *Client) GetBridge(ctx context.Context, id string) (*generated.GetBridgeResponse, error) {
 	return generated.GetBridge(ctx, c.gqlClient, id)
 }
 
-func (c *client) ListBridges(ctx context.Context, offset, limit int) (*generated.ListBridgesResponse, error) {
+func (c *Client) ListBridges(ctx context.Context, offset, limit int) (*generated.ListBridgesResponse, error) {
 	return generated.ListBridges(ctx, c.gqlClient, offset, limit)
 }
 
-func (c *client) GetFeedsManager(ctx context.Context, id string) (*generated.GetFeedsManagerResponse, error) {
+func (c *Client) GetFeedsManager(ctx context.Context, id string) (*generated.GetFeedsManagerResponse, error) {
 	return generated.GetFeedsManager(ctx, c.gqlClient, id)
 }
 
-func (c *client) ListFeedsManagers(ctx context.Context) (*generated.ListFeedsManagersResponse, error) {
+func (c *Client) ListFeedsManagers(ctx context.Context) (*generated.ListFeedsManagersResponse, error) {
 	return generated.ListFeedsManagers(ctx, c.gqlClient)
 }
 
-func (c *client) CreateFeedsManager(ctx context.Context, cmd generated.CreateFeedsManagerInput) (*generated.CreateFeedsManagerResponse, error) {
+func (c *Client) CreateFeedsManager(ctx context.Context, cmd generated.CreateFeedsManagerInput) (*generated.CreateFeedsManagerResponse, error) {
 	return generated.CreateFeedsManager(ctx, c.gqlClient, cmd)
 }
 
-func (c *client) login() error {
+func (c *Client) login() error {
 	b, err := json.Marshal(c.credentials)
 	if err != nil {
 		return fmt.Errorf("failed to marshal credentials: %w", err)

@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink/integration-tests/web/sdk
 
-go 1.21.7
+go 1.22.5
 
 require (
 	github.com/Khan/genqlient v0.7.0
@@ -17,3 +17,5 @@ require (
 	golang.org/x/tools v0.18.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
+
+replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
