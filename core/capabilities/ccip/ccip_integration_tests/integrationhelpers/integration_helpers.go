@@ -9,13 +9,16 @@ import (
 	"testing"
 	"time"
 
-	configsevm "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	configsevm "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/configs/evm"
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -263,6 +266,12 @@ func (t *TestUniverse) AddDONToRegistry(
 
 	var ocr3Configs []ocr3_config_encoder.CCIPConfigTypesOCR3Config
 	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
+		var ofCfg []byte
+		if pluginType == cctypes.PluginTypeCCIPCommit {
+			ofCfg = defaultCommitOCC()
+		} else {
+			ofCfg = defaultExecOCC()
+		}
 		ocr3Configs = append(ocr3Configs, ocr3_config_encoder.CCIPConfigTypesOCR3Config{
 			PluginType:            uint8(pluginType),
 			ChainSelector:         chainSelector,
@@ -273,7 +282,7 @@ func (t *TestUniverse) AddDONToRegistry(
 			P2pIds:                p2pIDs,
 			Signers:               signers,
 			Transmitters:          transmitters,
-			OffchainConfig:        []byte("offchain config"),
+			OffchainConfig:        ofCfg,
 		})
 	}
 
@@ -302,4 +311,43 @@ func SetupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg
 			Config:  cfg,
 		},
 	}
+}
+
+func defaultCommitOCC() []byte {
+	cfg, err := pluginconfig.EncodeCommitOffchainConfig(
+		pluginconfig.CommitOffchainConfig{
+			RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(time.Second),
+			TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(time.Second),
+			PriceSources: map[ocrtypes.Account]pluginconfig.ArbitrumPriceSource{
+				"0x2e03388D351BF87CF2409EFf18C45Df59775Fbb2": {
+					AggregatorAddress: "0x3e03388D351BF87CF2409EFf18C45Df59775Fbb2",
+					DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+				},
+			},
+			TokenDecimals: map[ocrtypes.Account]uint8{
+				"0x2e03388D351BF87CF2409EFf18C45Df59775Fbb2": 18,
+			},
+			TokenPriceChainSelector: 1,
+		})
+	if err != nil {
+		panic(err)
+	}
+	return cfg
+}
+
+func defaultExecOCC() []byte {
+	encodedOffchainConfig, err := pluginconfig.EncodeExecuteOffchainConfig(pluginconfig.ExecuteOffchainConfig{
+		BatchGasLimit:             6_500_000,
+		RelativeBoostPerWaitHour:  1.5,
+		MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
+		InflightCacheExpiry:       *commonconfig.MustNewDuration(10 * time.Minute),
+		RootSnoozeTime:            *commonconfig.MustNewDuration(30 * time.Minute),
+		BatchingStrategyID:        0,
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
+	return encodedOffchainConfig
 }

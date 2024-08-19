@@ -49,10 +49,11 @@ import (
 )
 
 var (
-	homeChainID                = chainsel.GETH_TESTNET.EvmChainID
-	ccipSendRequestedTopic     = evm_2_evm_multi_onramp.EVM2EVMMultiOnRampCCIPSendRequested{}.Topic()
-	commitReportAcceptedTopic  = evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReportAccepted{}.Topic()
-	executionStateChangedTopic = evm_2_evm_multi_offramp.EVM2EVMMultiOffRampExecutionStateChanged{}.Topic()
+	homeChainID                 = chainsel.GETH_TESTNET.EvmChainID
+	ccipSendRequestedTopic      = evm_2_evm_multi_onramp.EVM2EVMMultiOnRampCCIPSendRequested{}.Topic()
+	commitReportAcceptedTopic   = evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReportAccepted{}.Topic()
+	executionStateChangedTopic  = evm_2_evm_multi_offramp.EVM2EVMMultiOffRampExecutionStateChanged{}.Topic()
+	initialMockAggregatorAnswer = big.NewInt(9e18)
 )
 
 const (
@@ -80,6 +81,7 @@ const (
 	MaxDurationObservation                  = 5 * time.Second
 	MaxDurationShouldAcceptAttestedReport   = 10 * time.Second
 	MaxDurationShouldTransmitAcceptedReport = 10 * time.Second
+	Decimals18                              = 18
 )
 
 func e18Mult(amount uint64) *big.Int {
@@ -174,6 +176,9 @@ func createUniverses(
 
 	homeChainBase, ok := chains[homeChainID]
 	require.True(t, ok, "home chain backend not available")
+
+	// Set up home chain first
+	homeChainUniverse := setupHomeChain(t, homeChainBase.owner, homeChainBase.backend)
 
 	// deploy the ccip contracts on all chains
 	universes = make(map[uint64]onchainUniverse)
@@ -270,8 +275,6 @@ func createUniverses(
 
 		universes[chainID] = universe
 	}
-	// Set up home chain first
-	homeChainUniverse := setupHomeChain(t, homeChainBase.owner, homeChainBase.backend)
 
 	// Once we have all chains created and contracts deployed, we can set up the initial configurations and wire chains together
 	connectUniverses(t, universes)
@@ -391,7 +394,7 @@ func setupHomeChain(t *testing.T, owner *bind.TransactOpts, backend *backends.Si
 	require.NoError(t, err, "failed to add node operator to the capability registry")
 	backend.Commit()
 
-	aggAddr, _, aggContract, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(owner, backend, 18, big.NewInt(5e18))
+	aggAddr, _, aggContract, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(owner, backend, Decimals18, initialMockAggregatorAnswer)
 	require.NoError(t, err)
 	backend.Commit()
 

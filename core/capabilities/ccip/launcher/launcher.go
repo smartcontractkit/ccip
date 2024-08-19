@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 
 	"go.uber.org/multierr"
@@ -413,12 +414,50 @@ func createDON(
 	}, nil
 }
 
+func validateOCRConfigs(
+	pluginType cctypes.PluginType,
+	ocrConfigs []ccipreaderpkg.OCR3ConfigWithMeta,
+) error {
+	if len(ocrConfigs) != 1 {
+		return fmt.Errorf("expected exactly one OCR config, got %d", len(ocrConfigs))
+	}
+
+	if ocrConfigs[0].Config.PluginType != uint8(pluginType) {
+		return fmt.Errorf("expected OCR config to be for plugin type %d, got %d", pluginType, ocrConfigs[0].Config.PluginType)
+	}
+
+	offchainConfig := ocrConfigs[0].Config.OffchainConfig
+	switch pluginType {
+	case cctypes.PluginTypeCCIPCommit:
+		cfg, err := pluginconfig.DecodeCommitOffchainConfig(offchainConfig)
+		if err != nil {
+			return fmt.Errorf("failed to decode commit offchain config: %w", err)
+		}
+		if err1 := cfg.Validate(); err1 != nil {
+			return fmt.Errorf("failed to validate commit offchain config: %w", err1)
+		}
+	case cctypes.PluginTypeCCIPExec:
+		cfg, err := pluginconfig.DecodeExecuteOffchainConfig(offchainConfig)
+		if err != nil {
+			return fmt.Errorf("failed to decode exec offchain config: %w", err)
+		}
+		if err1 := cfg.Validate(); err1 != nil {
+			return fmt.Errorf("failed to validate execute offchain config: %w", err1)
+		}
+	}
+	return nil
+}
+
 func createOracle(
 	p2pID ragep2ptypes.PeerID,
 	oracleCreator cctypes.OracleCreator,
 	pluginType cctypes.PluginType,
 	ocrConfigs []ccipreaderpkg.OCR3ConfigWithMeta,
 ) (pluginOracle, bootstrapOracle cctypes.CCIPOracle, err error) {
+	if err := validateOCRConfigs(pluginType, ocrConfigs); err != nil {
+		return nil, nil, fmt.Errorf("invalide OCR configs: %w", err)
+	}
+
 	pluginOracle, err = oracleCreator.CreatePluginOracle(pluginType, cctypes.OCR3ConfigWithMeta(ocrConfigs[0]))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create CCIP plugin oracle (plugintype: %d): %w", pluginType, err)

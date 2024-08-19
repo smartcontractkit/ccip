@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/validate"
+	"golang.org/x/exp/rand"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
@@ -277,11 +278,16 @@ func commitBlocksBackground(t *testing.T, universes map[uint64]onchainUniverse, 
 		var round int64
 		for {
 			round++
+			var answer = initialMockAggregatorAnswer
 			select {
 			case <-tick.C:
 				for _, uni := range universes {
 					if uni.chainID == homeChainID {
 						agg := homeChainUni.mockAggregator
+						rand.Seed(uint64(time.Now().UnixNano()))
+						randomNumber := rand.Intn(5)
+						// answer = previous round answer + (previous round answer * random percentage)
+						answer = new(big.Int).Add(answer, new(big.Int).Div(new(big.Int).Mul(answer, big.NewInt(int64(randomNumber))), big.NewInt(100)))
 						_, err := agg.UpdateRoundData(uni.owner, big.NewInt(round), big.NewInt(5e18), big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
 						if err != nil {
 							panic(fmt.Errorf("unable to update round data: %w", err))
