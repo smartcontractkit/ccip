@@ -88,8 +88,8 @@ func TestHomeChainReader(t *testing.T) {
 
 	// Wait for the home chain reader to read the expected amount of chain configs.
 	gomega.NewWithT(t).Eventually(func() bool {
-		configs, _ := uni.HomeChainReader.GetAllChainConfigs()
-		return len(configs) == len(inputConfig)-1
+		chainConfigs, _ := uni.HomeChainReader.GetAllChainConfigs()
+		return len(chainConfigs) == len(inputConfig)-1
 	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue())
 	configs, err = uni.HomeChainReader.GetAllChainConfigs()
 	require.NoError(t, err)
