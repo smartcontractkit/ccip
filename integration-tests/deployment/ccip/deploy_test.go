@@ -23,6 +23,7 @@ func TestDeployCCIPContracts(t *testing.T) {
 	// Deploy all the CCIP contracts.
 	homeChain := e.AllChainSelectors()[0]
 	capRegAddresses, err := DeployCapReg(lggr, e.Chains, homeChain)
+	require.NoError(t, err)
 	s, err := GenerateOnchainState(e, capRegAddresses)
 	require.NoError(t, err)
 	ab, err := DeployCCIPContracts(e, DeployCCIPContractConfig{
