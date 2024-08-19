@@ -495,6 +495,9 @@ func (h *homeChain) AddDON(
 						DeviationPPB:      ccipocr3.BigInt{Int: big.NewInt(1)},
 					},
 				},
+				TokenDecimals: map[ocrtypes.Account]uint8{
+					ocrtypes.Account(uni.weth.Address().Hex()): 18,
+				},
 				TokenPriceChainSelector: getSelector(h.chainID),
 			})
 			require.NoError(t, err2)
