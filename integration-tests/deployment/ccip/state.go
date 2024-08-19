@@ -202,7 +202,7 @@ func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (
 					return state, err
 				}
 				state.EvmOffRampsV160[chainSelector] = offRamp
-			case deployment.NewTypeAndVersion(ARMProxy, deployment.Version1_1_0).String():
+			case deployment.NewTypeAndVersion(ARMProxy, deployment.Version1_0_0).String():
 				armProxy, err := arm_proxy_contract.NewARMProxyContract(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err

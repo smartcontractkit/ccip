@@ -2,6 +2,7 @@ package ccipdeployment
 
 import (
 	"encoding/hex"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -74,7 +75,8 @@ type ContractDeploy[C Contracts] struct {
 	Err      error
 }
 
-// TODO: pull up to general deployment pkg
+// TODO: pull up to general deployment pkg somehow
+// without exposing all product specific contracts?
 func deployContract[C Contracts](
 	lggr logger.Logger,
 	chain deployment.Chain,
@@ -114,9 +116,12 @@ type DeployCCIPContractConfig struct {
 func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (deployment.AddressBook, error) {
 	ab := deployment.NewMemoryAddressBook()
 	nodes, err := deployment.NodeInfo(e.NodeIDs, e.Offchain)
-	if err != nil {
+	if err != nil || len(nodes) == 0 {
 		e.Logger.Errorw("Failed to get node info", "err", err)
 		return ab, err
+	}
+	if _, ok := c.CapabilityRegistry[c.HomeChainSel]; !ok {
+		return ab, fmt.Errorf("Capability registry not found for home chain %d, needs to be deployed first", c.HomeChainSel)
 	}
 	cr, err := c.CapabilityRegistry[c.HomeChainSel].GetHashedCapabilityId(
 		&bind.CallOpts{}, CapabilityLabelledName, CapabilityVersion)
