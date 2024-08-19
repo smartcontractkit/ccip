@@ -177,86 +177,86 @@ func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (
 					return state, err
 				}
 				state.Timelocks[chainSelector] = tl
-			case MCMS_1_0_0:
+			case deployment.NewTypeAndVersion(ManyChainMultisig, deployment.Version1_0_0).String():
 				mcms, err := owner_wrappers.NewManyChainMultiSig(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.Mcms[chainSelector] = mcms
 				state.McmsAddrs[chainSelector] = common.HexToAddress(address)
-			case CapabilitiesRegistry_1_0_0:
+			case deployment.NewTypeAndVersion(CapabilitiesRegistry, deployment.Version1_0_0).String():
 				cr, err := capabilities_registry.NewCapabilitiesRegistry(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.CapabilityRegistry[chainSelector] = cr
-			case EVM2EVMMultiOnRamp_1_6_0:
+			case deployment.NewTypeAndVersion(EVM2EVMMultiOnRamp, deployment.Version1_6_0_dev).String():
 				onRamp, err := evm_2_evm_multi_onramp.NewEVM2EVMMultiOnRamp(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.EvmOnRampsV160[chainSelector] = onRamp
-			case EVM2EVMMultiOffRamp_1_6_0:
+			case deployment.NewTypeAndVersion(EVM2EVMMultiOffRamp, deployment.Version1_6_0_dev).String():
 				offRamp, err := evm_2_evm_multi_offramp.NewEVM2EVMMultiOffRamp(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.EvmOffRampsV160[chainSelector] = offRamp
-			case ARMProxy_1_1_0:
+			case deployment.NewTypeAndVersion(ARMProxy, deployment.Version1_1_0).String():
 				armProxy, err := arm_proxy_contract.NewARMProxyContract(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.ArmProxies[chainSelector] = armProxy
-			case MockARM_1_0_0:
+			case deployment.NewTypeAndVersion(MockARM, deployment.Version1_0_0).String():
 				mockARM, err := mock_arm_contract.NewMockARMContract(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.MockArms[chainSelector] = mockARM
-			case WETH9_1_0_0:
+			case deployment.NewTypeAndVersion(WETH9, deployment.Version1_0_0).String():
 				weth9, err := weth9.NewWETH9(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.Weth9s[chainSelector] = weth9
-			case NonceManager_1_6_0:
+			case deployment.NewTypeAndVersion(NonceManager, deployment.Version1_6_0_dev).String():
 				nm, err := nonce_manager.NewNonceManager(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.NonceManagers[chainSelector] = nm
-			case TokenAdminRegistry_1_5_0:
+			case deployment.NewTypeAndVersion(TokenAdminRegistry, deployment.Version1_5_0).String():
 				tm, err := token_admin_registry.NewTokenAdminRegistry(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.TokenAdminRegistries[chainSelector] = tm
-			case Router_1_2_0:
+			case deployment.NewTypeAndVersion(Router, deployment.Version1_2_0).String():
 				r, err := router.NewRouter(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.Routers[chainSelector] = r
-			case PriceRegistry_1_6_0:
+			case deployment.NewTypeAndVersion(PriceRegistry, deployment.Version1_6_0_dev).String():
 				pr, err := price_registry.NewPriceRegistry(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.PriceRegistries[chainSelector] = pr
-			case LinkToken_1_0_0:
+			case deployment.NewTypeAndVersion(LinkToken, deployment.Version1_0_0).String():
 				lt, err := burn_mint_erc677.NewBurnMintERC677(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.LinkTokens[chainSelector] = lt
-			case CCIPConfig_1_6_0:
+			case deployment.NewTypeAndVersion(CCIPConfig, deployment.Version1_6_0_dev).String():
 				cc, err := ccip_config.NewCCIPConfig(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.CCIPConfig[chainSelector] = cc
-			case CCIPReceiver_1_0_0:
+			case deployment.NewTypeAndVersion(CCIPReceiver, deployment.Version1_0_0).String():
 				mr, err := maybe_revert_message_receiver.NewMaybeRevertMessageReceiver(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
