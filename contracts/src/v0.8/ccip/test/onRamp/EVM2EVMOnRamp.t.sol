@@ -35,7 +35,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     s_onRamp = new EVM2EVMOnRampHelper(
       staticConfig,
       dynamicConfig,
-      getOutboundRateLimiterConfig(),
+      _getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
       getNopsAndWeights()
@@ -486,14 +486,14 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     vm.startPrank(OWNER);
     // Set a high price to trip the ARL
     uint224 tokenPrice = 3 ** 128;
-    Internal.PriceUpdates memory priceUpdates = getSingleTokenPriceUpdateStruct(s_sourceTokens[0], tokenPrice);
+    Internal.PriceUpdates memory priceUpdates = _getSingleTokenPriceUpdateStruct(s_sourceTokens[0], tokenPrice);
     s_priceRegistry.updatePrices(priceUpdates);
     vm.startPrank(address(s_sourceRouter));
 
     vm.expectRevert(
       abi.encodeWithSelector(
         RateLimiter.AggregateValueMaxCapacityExceeded.selector,
-        getOutboundRateLimiterConfig().capacity,
+        _getOutboundRateLimiterConfig().capacity,
         (message.tokenAmounts[0].amount * tokenPrice) / 1e18
       )
     );
@@ -661,7 +661,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     vm.stopPrank();
     vm.startPrank(OWNER);
 
-    Internal.PriceUpdates memory priceUpdates = getSingleTokenPriceUpdateStruct(wrongToken, 1);
+    Internal.PriceUpdates memory priceUpdates = _getSingleTokenPriceUpdateStruct(wrongToken, 1);
     s_priceRegistry.updatePrices(priceUpdates);
 
     // Change back to the router
@@ -682,7 +682,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     vm.expectRevert(
       abi.encodeWithSelector(
         RateLimiter.AggregateValueMaxCapacityExceeded.selector,
-        getOutboundRateLimiterConfig().capacity,
+        _getOutboundRateLimiterConfig().capacity,
         (message.tokenAmounts[0].amount * s_sourceTokenPrices[0]) / 1e18
       )
     );
@@ -694,7 +694,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     // Set token price to 0
     vm.stopPrank();
     vm.startPrank(OWNER);
-    s_priceRegistry.updatePrices(getSingleTokenPriceUpdateStruct(CUSTOM_TOKEN, 0));
+    s_priceRegistry.updatePrices(_getSingleTokenPriceUpdateStruct(CUSTOM_TOKEN, 0));
 
     vm.startPrank(address(s_sourceRouter));
 
@@ -785,8 +785,8 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
       remotePoolAddress: abi.encode(s_destTokenPool),
       remoteTokenAddress: abi.encode(s_destToken),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     newPool.applyChainUpdates(chainUpdates);
 
@@ -906,7 +906,7 @@ contract EVM2EVMOnRamp_forwardFromRouter_upgrade is EVM2EVMOnRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
       generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
-      getOutboundRateLimiterConfig(),
+      _getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
       getNopsAndWeights()
@@ -1004,8 +1004,8 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
       remotePoolAddress: abi.encode(address(111111)),
       remoteTokenAddress: abi.encode(s_destToken),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     wrappedNativePool.applyChainUpdates(wrappedNativeChainUpdate);
     s_tokenAdminRegistry.setPool(s_sourceRouter.getWrappedNative(), address(wrappedNativePool));
@@ -1019,8 +1019,8 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
       remotePoolAddress: abi.encode(makeAddr("random")),
       remoteTokenAddress: abi.encode(s_destToken),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     customPool.applyChainUpdates(customChainUpdate);
     s_tokenAdminRegistry.setPool(CUSTOM_TOKEN, address(customPool));

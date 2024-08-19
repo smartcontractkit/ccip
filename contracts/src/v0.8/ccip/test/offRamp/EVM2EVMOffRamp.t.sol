@@ -43,7 +43,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig =
       generateDynamicOffRampConfig(address(s_destRouter), address(s_priceRegistry));
 
-    s_offRamp = new EVM2EVMOffRampHelper(staticConfig, getInboundRateLimiterConfig());
+    s_offRamp = new EVM2EVMOffRampHelper(staticConfig, _getInboundRateLimiterConfig());
 
     s_offRamp.setOCR2Config(
       s_valid_signers, s_valid_transmitters, s_f, abi.encode(dynamicConfig), s_offchainConfigVersion, abi.encode("")
@@ -104,7 +104,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         rmnProxy: address(s_mockRMN),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      getInboundRateLimiterConfig()
+      _getInboundRateLimiterConfig()
     );
   }
 }
@@ -1855,7 +1855,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   function test_OverValueWithARLOff_Success() public {
     // Set a high price to trip the ARL
     uint224 tokenPrice = 3 ** 128;
-    Internal.PriceUpdates memory priceUpdates = getSingleTokenPriceUpdateStruct(s_destFeeToken, tokenPrice);
+    Internal.PriceUpdates memory priceUpdates = _getSingleTokenPriceUpdateStruct(s_destFeeToken, tokenPrice);
     s_priceRegistry.updatePrices(priceUpdates);
 
     Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
@@ -1872,7 +1872,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     vm.expectRevert(
       abi.encodeWithSelector(
         RateLimiter.AggregateValueMaxCapacityExceeded.selector,
-        getInboundRateLimiterConfig().capacity,
+        _getInboundRateLimiterConfig().capacity,
         (amount1 * tokenPrice) / 1e18
       )
     );
@@ -2032,7 +2032,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
 
   function test_PriceNotFoundForToken_Reverts() public {
     // Set token price to 0
-    s_priceRegistry.updatePrices(getSingleTokenPriceUpdateStruct(s_destFeeToken, 0));
+    s_priceRegistry.updatePrices(_getSingleTokenPriceUpdateStruct(s_destFeeToken, 0));
 
     Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     uint256 amount1 = 100;

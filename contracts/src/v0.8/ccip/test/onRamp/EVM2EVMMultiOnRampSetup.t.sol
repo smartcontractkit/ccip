@@ -9,14 +9,13 @@ import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {EVM2EVMMultiOnRamp} from "../../onRamp/EVM2EVMMultiOnRamp.sol";
-import {TokenSetup} from "../TokenSetup.t.sol";
 import {EVM2EVMMultiOnRampHelper} from "../helpers/EVM2EVMMultiOnRampHelper.sol";
 import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
-import {PriceRegistryFeeSetup} from "../priceRegistry/PriceRegistry.t.sol";
+import {PriceRegistryFeeSetup} from "../priceRegistry/PriceRegistrySetup.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
+contract EVM2EVMMultiOnRampSetup is PriceRegistryFeeSetup {
   uint256 internal immutable i_tokenAmount0 = 9;
   uint256 internal immutable i_tokenAmount1 = 7;
 
@@ -27,9 +26,8 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
   address[] internal s_offRamps;
   NonceManager internal s_outboundNonceManager;
 
-  function setUp() public virtual override(TokenSetup, PriceRegistryFeeSetup) {
-    TokenSetup.setUp();
-    PriceRegistryFeeSetup.setUp();
+  function setUp() public virtual override {
+    super.setUp();
 
     s_outboundMessageValidator = new MessageInterceptorHelper();
     s_outboundNonceManager = new NonceManager(new address[](0));

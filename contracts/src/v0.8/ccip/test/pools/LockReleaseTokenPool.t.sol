@@ -44,8 +44,8 @@ contract LockReleaseTokenPoolSetup is RouterSetup {
       remotePoolAddress: abi.encode(s_destPoolAddress),
       remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
 
     s_lockReleaseTokenPool.applyChainUpdates(chainUpdate);
@@ -77,7 +77,7 @@ contract LockReleaseTokenPool_setRebalancer is LockReleaseTokenPoolSetup {
 
 contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
   function test_Fuzz_LockOrBurnNoAllowList_Success(uint256 amount) public {
-    amount = bound(amount, 1, getOutboundRateLimiterConfig().capacity);
+    amount = bound(amount, 1, _getOutboundRateLimiterConfig().capacity);
     vm.startPrank(s_allowedOnRamp);
 
     vm.expectEmit();
@@ -176,8 +176,8 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
       remotePoolAddress: abi.encode(s_sourcePoolAddress),
       remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
 
     s_lockReleaseTokenPool.applyChainUpdates(chainUpdate);
@@ -219,7 +219,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     deal(address(s_token), address(s_lockReleaseTokenPool), amount);
     vm.startPrank(s_allowedOffRamp);
 
-    uint256 capacity = getInboundRateLimiterConfig().capacity;
+    uint256 capacity = _getInboundRateLimiterConfig().capacity;
     // Determine if we hit the rate limit or the txs should succeed.
     if (amount > capacity) {
       vm.expectRevert(

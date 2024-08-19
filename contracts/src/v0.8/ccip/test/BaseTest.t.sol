@@ -87,15 +87,15 @@ contract BaseTest is Test {
     s_mockRMN = new MockRMN();
   }
 
-  function getOutboundRateLimiterConfig() internal pure returns (RateLimiter.Config memory) {
+  function _getOutboundRateLimiterConfig() internal pure returns (RateLimiter.Config memory) {
     return RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e15});
   }
 
-  function getInboundRateLimiterConfig() internal pure returns (RateLimiter.Config memory) {
+  function _getInboundRateLimiterConfig() internal pure returns (RateLimiter.Config memory) {
     return RateLimiter.Config({isEnabled: true, capacity: 222e30, rate: 1e18});
   }
 
-  function getSingleTokenPriceUpdateStruct(
+  function _getSingleTokenPriceUpdateStruct(
     address token,
     uint224 price
   ) internal pure returns (Internal.PriceUpdates memory) {
@@ -104,19 +104,6 @@ contract BaseTest is Test {
 
     Internal.PriceUpdates memory priceUpdates =
       Internal.PriceUpdates({tokenPriceUpdates: tokenPriceUpdates, gasPriceUpdates: new Internal.GasPriceUpdate[](0)});
-
-    return priceUpdates;
-  }
-
-  function getSingleGasPriceUpdateStruct(
-    uint64 chainSelector,
-    uint224 usdPerUnitGas
-  ) internal pure returns (Internal.PriceUpdates memory) {
-    Internal.GasPriceUpdate[] memory gasPriceUpdates = new Internal.GasPriceUpdate[](1);
-    gasPriceUpdates[0] = Internal.GasPriceUpdate({destChainSelector: chainSelector, usdPerUnitGas: usdPerUnitGas});
-
-    Internal.PriceUpdates memory priceUpdates =
-      Internal.PriceUpdates({tokenPriceUpdates: new Internal.TokenPriceUpdate[](0), gasPriceUpdates: gasPriceUpdates});
 
     return priceUpdates;
   }

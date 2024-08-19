@@ -12,7 +12,7 @@ import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
 import {OCR2Abstract} from "../../ocr/OCR2Abstract.sol";
 import {CommitStoreHelper} from "../helpers/CommitStoreHelper.sol";
 import {OCR2BaseSetup} from "../ocr/OCR2Base.t.sol";
-import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
+import {PriceRegistrySetup} from "../priceRegistry/PriceRegistrySetup.t.sol";
 
 contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
   CommitStoreHelper internal s_commitStore;
@@ -296,7 +296,7 @@ contract CommitStore_report is CommitStoreSetup {
     uint64 max1 = 12;
 
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       interval: CommitStore.Interval(1, max1),
       merkleRoot: "test #2"
     });
@@ -316,7 +316,7 @@ contract CommitStore_report is CommitStoreSetup {
       IPriceRegistry(s_commitStore.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value;
 
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       interval: CommitStore.Interval(1, maxSeq),
       merkleRoot: "stale report 1"
     });
@@ -348,7 +348,7 @@ contract CommitStore_report is CommitStoreSetup {
 
   function test_OnlyTokenPriceUpdates_Success() public {
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       interval: CommitStore.Interval(0, 0),
       merkleRoot: ""
     });
@@ -362,7 +362,7 @@ contract CommitStore_report is CommitStoreSetup {
 
   function test_OnlyGasPriceUpdates_Success() public {
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       interval: CommitStore.Interval(0, 0),
       merkleRoot: ""
     });
@@ -380,7 +380,7 @@ contract CommitStore_report is CommitStoreSetup {
     uint224 tokenPrice2 = 5e18;
 
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice1),
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice1),
       interval: CommitStore.Interval(0, 0),
       merkleRoot: ""
     });
@@ -392,7 +392,7 @@ contract CommitStore_report is CommitStoreSetup {
     assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
 
     report = CommitStore.CommitReport({
-      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice2),
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice2),
       interval: CommitStore.Interval(1, maxSeq),
       merkleRoot: "stale report"
     });
@@ -458,7 +458,7 @@ contract CommitStore_report is CommitStoreSetup {
 
   function test_ZeroEpochAndRound_Revert() public {
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       interval: CommitStore.Interval(0, 0),
       merkleRoot: bytes32(0)
     });
@@ -470,7 +470,7 @@ contract CommitStore_report is CommitStoreSetup {
 
   function test_OnlyPriceUpdateStaleReport_Revert() public {
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       interval: CommitStore.Interval(0, 0),
       merkleRoot: bytes32(0)
     });

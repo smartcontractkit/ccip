@@ -257,13 +257,13 @@ contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
     onRampUpdates[0] = TokenPool1_2.RampUpdate({
       ramp: address(s_onRamp),
       allowed: true,
-      rateLimiterConfig: getInboundRateLimiterConfig()
+      rateLimiterConfig: _getInboundRateLimiterConfig()
     });
     TokenPool1_2.RampUpdate[] memory offRampUpdates = new TokenPool1_2.RampUpdate[](1);
     offRampUpdates[0] = TokenPool1_2.RampUpdate({
       ramp: address(s_offRamp),
       allowed: true,
-      rateLimiterConfig: getInboundRateLimiterConfig()
+      rateLimiterConfig: _getInboundRateLimiterConfig()
     });
     BurnMintTokenPool1_2(address(s_legacyPool)).applyRampUpdates(onRampUpdates, offRampUpdates);
   }
@@ -277,14 +277,14 @@ contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
     legacyChainUpdates[0] = TokenPool1_4.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     legacyChainUpdates[1] = TokenPool1_4.ChainUpdate({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     BurnMintTokenPool1_4(address(s_legacyPool)).applyChainUpdates(legacyChainUpdates);
   }
@@ -303,16 +303,16 @@ contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
       remotePoolAddress: abi.encode(s_destTokenPool),
       remoteTokenAddress: abi.encode(s_destToken),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     chainUpdates[1] = TokenPool.ChainUpdate({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       remotePoolAddress: abi.encode(s_sourcePool),
       remoteTokenAddress: abi.encode(s_sourceToken),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     s_newPool.applyChainUpdates(chainUpdates);
 
@@ -392,10 +392,10 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
 
     TokenPool1_2.RampUpdate[] memory onRampUpdates = new TokenPool1_2.RampUpdate[](1);
     onRampUpdates[0] =
-      TokenPool1_2.RampUpdate({ramp: address(s_pool), allowed: true, rateLimiterConfig: getInboundRateLimiterConfig()});
+      TokenPool1_2.RampUpdate({ramp: address(s_pool), allowed: true, rateLimiterConfig: _getInboundRateLimiterConfig()});
     TokenPool1_2.RampUpdate[] memory offRampUpdates = new TokenPool1_2.RampUpdate[](1);
     offRampUpdates[0] =
-      TokenPool1_2.RampUpdate({ramp: address(s_pool), allowed: true, rateLimiterConfig: getInboundRateLimiterConfig()});
+      TokenPool1_2.RampUpdate({ramp: address(s_pool), allowed: true, rateLimiterConfig: _getInboundRateLimiterConfig()});
     BurnMintTokenPool1_2(address(s_legacyPool)).applyRampUpdates(onRampUpdates, offRampUpdates);
   }
 
@@ -406,8 +406,8 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
       remotePoolAddress: abi.encode(s_destPool),
       remoteTokenAddress: abi.encode(s_destToken),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
 
     BurnMintTokenPoolAndProxy(address(s_pool)).applyChainUpdates(chains);
@@ -553,8 +553,8 @@ contract LockReleaseTokenPoolAndProxySetup is RouterSetup {
       remotePoolAddress: abi.encode(s_destPoolAddress),
       remoteTokenAddress: abi.encode(address(s_token)),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
 
     s_lockReleaseTokenPoolAndProxy.applyChainUpdates(chainUpdate);
