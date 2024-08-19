@@ -2,8 +2,6 @@
 pragma solidity 0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
-
-import {IAny2EVMOffRamp} from "../../interfaces/IAny2EVMOffRamp.sol";
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
 
@@ -16,7 +14,6 @@ import {Internal} from "../../libraries/Internal.sol";
 import {MultiOCR3Base} from "../../ocr/MultiOCR3Base.sol";
 import {EVM2EVMMultiOffRamp} from "../../offRamp/EVM2EVMMultiOffRamp.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
-import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {EVM2EVMMultiOffRampHelper} from "../helpers/EVM2EVMMultiOffRampHelper.sol";
@@ -24,11 +21,8 @@ import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
-import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {MultiOCR3BaseSetup} from "../ocr/MultiOCR3BaseSetup.t.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
-
-import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3BaseSetup {
   uint64 internal constant SOURCE_CHAIN_SELECTOR_1 = SOURCE_CHAIN_SELECTOR;
@@ -286,7 +280,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     uint64 sequenceNumber,
     uint256[] memory amounts
   ) internal view returns (Internal.Any2EVMRampMessage memory) {
-    Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory tokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       tokenAmounts[i].amount = amounts[i];
     }
@@ -348,7 +342,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     bytes memory onRamp
   ) internal view returns (Internal.Any2EVMRampMessage[] memory) {
     Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](2);
-    Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory tokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     tokenAmounts[0].amount = 1e18;
     tokenAmounts[1].amount = 5e18;
     messages[0] = _generateAny2EVMMessage(sourceChainSelector, onRamp, 1, tokenAmounts, false);

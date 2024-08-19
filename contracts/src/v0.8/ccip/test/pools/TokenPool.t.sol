@@ -5,7 +5,6 @@ import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {Router} from "../../Router.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
-import {BaseTest} from "../BaseTest.t.sol";
 import {TokenPoolHelper} from "../helpers/TokenPoolHelper.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
 

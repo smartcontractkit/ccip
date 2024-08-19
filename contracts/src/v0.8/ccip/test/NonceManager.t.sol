@@ -12,7 +12,6 @@ import {EVM2EVMMultiOnRamp} from "../onRamp/EVM2EVMMultiOnRamp.sol";
 import {EVM2EVMOnRamp} from "../onRamp/EVM2EVMOnRamp.sol";
 
 import {BaseTest} from "./BaseTest.t.sol";
-import {EVM2EVMMultiOnRampHelper} from "./helpers/EVM2EVMMultiOnRampHelper.sol";
 import {EVM2EVMOffRampHelper} from "./helpers/EVM2EVMOffRampHelper.sol";
 import {EVM2EVMOnRampHelper} from "./helpers/EVM2EVMOnRampHelper.sol";
 import {MockCommitStore} from "./mocks/MockCommitStore.sol";

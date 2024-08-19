@@ -2,14 +2,12 @@
 pragma solidity 0.8.24;
 
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
-import {IPoolV1} from "../../interfaces/IPool.sol";
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
 
 import {GenericReceiver} from "../../../shared/test/testhelpers/GenericReceiver.sol";
 import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
-import {RMN} from "../../RMN.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -25,8 +23,6 @@ import {ConformingReceiver} from "../helpers/receivers/ConformingReceiver.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MaybeRevertMessageReceiverNo165} from "../helpers/receivers/MaybeRevertMessageReceiverNo165.sol";
 import {ReentrancyAbuser} from "../helpers/receivers/ReentrancyAbuser.sol";
-import {MockCommitStore} from "../mocks/MockCommitStore.sol";
-import {OCR2Base} from "../ocr/OCR2Base.t.sol";
 import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.t.sol";
 import {EVM2EVMOffRampSetup} from "./EVM2EVMOffRampSetup.t.sol";
 import {stdError} from "forge-std/Test.sol";
@@ -1796,7 +1792,7 @@ contract EVM2EVMOffRamp__releaseOrMintToken is EVM2EVMOffRampSetup {
 
 contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   function test_releaseOrMintTokens_Success() public {
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     IERC20 dstToken1 = IERC20(s_destFeeToken);
     uint256 startingBalance = dstToken1.balanceOf(OWNER);
     uint256 amount1 = 100;
@@ -1835,7 +1831,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   }
 
   function test_releaseOrMintTokens_destDenominatedDecimals_Success() public {
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     uint256 amount = 100;
     uint256 destinationDenominationMultiplier = 1000;
     srcTokenAmounts[1].amount = amount;
@@ -1862,7 +1858,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     Internal.PriceUpdates memory priceUpdates = getSingleTokenPriceUpdateStruct(s_destFeeToken, tokenPrice);
     s_priceRegistry.updatePrices(priceUpdates);
 
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     uint256 amount1 = 100;
     srcTokenAmounts[0].amount = amount1;
 
@@ -1900,7 +1896,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   // Revert
 
   function test_TokenHandlingError_Reverts() public {
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
 
     bytes memory unknownError = bytes("unknown error");
     s_maybeRevertingPool.setShouldRevert(unknownError);
@@ -1919,7 +1915,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
 
   function test_releaseOrMintTokens_InvalidDataLengthReturnData_Revert() public {
     uint256 amount = 100;
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     srcTokenAmounts[0].amount = amount;
 
     bytes memory originalSender = abi.encode(OWNER);
@@ -1956,7 +1952,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   }
 
   function test_releaseOrMintTokens_InvalidEVMAddress_Revert() public {
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
 
     bytes memory originalSender = abi.encode(OWNER);
     bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
@@ -1980,7 +1976,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   }
 
   function test_RateLimitErrors_Reverts() public {
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
 
     bytes[] memory rateLimitErrors = new bytes[](5);
     rateLimitErrors[0] = abi.encodeWithSelector(RateLimiter.BucketOverfilled.selector);
@@ -2038,7 +2034,7 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
     // Set token price to 0
     s_priceRegistry.updatePrices(getSingleTokenPriceUpdateStruct(s_destFeeToken, 0));
 
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     uint256 amount1 = 100;
     srcTokenAmounts[0].amount = amount1;
 

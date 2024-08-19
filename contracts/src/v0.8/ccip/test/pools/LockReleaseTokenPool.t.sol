@@ -5,13 +5,10 @@ import {IPoolV1} from "../../interfaces/IPool.sol";
 
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {Router} from "../../Router.sol";
-import {Internal} from "../../libraries/Internal.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
-import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
-import {BaseTest} from "../BaseTest.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
@@ -298,8 +295,8 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
         amount: 1e5,
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-        sourcePoolAddress: generateSourceTokenData().sourcePoolAddress,
-        sourcePoolData: generateSourceTokenData().extraData,
+        sourcePoolAddress: _generateSourceTokenData().sourcePoolAddress,
+        sourcePoolData: _generateSourceTokenData().extraData,
         offchainTokenData: ""
       })
     );

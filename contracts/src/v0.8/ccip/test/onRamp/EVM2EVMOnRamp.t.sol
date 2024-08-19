@@ -9,7 +9,8 @@ import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "../../libraries/USDPriceWith18Decimals.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
-import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
+import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import "./EVM2EVMOnRampSetup.t.sol";
 

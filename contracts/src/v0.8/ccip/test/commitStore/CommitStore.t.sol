@@ -214,7 +214,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreRealRMNSetup {
     rootsToReset[2] = "3";
 
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getEmptyPriceUpdates(),
+      priceUpdates: _getEmptyPriceUpdates(),
       interval: CommitStore.Interval(1, 2),
       merkleRoot: rootsToReset[0]
     });
@@ -222,7 +222,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreRealRMNSetup {
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
 
     report = CommitStore.CommitReport({
-      priceUpdates: getEmptyPriceUpdates(),
+      priceUpdates: _getEmptyPriceUpdates(),
       interval: CommitStore.Interval(3, 4),
       merkleRoot: rootsToReset[1]
     });
@@ -230,7 +230,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreRealRMNSetup {
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
 
     report = CommitStore.CommitReport({
-      priceUpdates: getEmptyPriceUpdates(),
+      priceUpdates: _getEmptyPriceUpdates(),
       interval: CommitStore.Interval(5, 5),
       merkleRoot: rootsToReset[2]
     });
@@ -273,7 +273,7 @@ contract CommitStore_report is CommitStoreSetup {
     uint64 max1 = 931;
     bytes32 root = "Only a single root";
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getEmptyPriceUpdates(),
+      priceUpdates: _getEmptyPriceUpdates(),
       interval: CommitStore.Interval(1, max1),
       merkleRoot: root
     });
@@ -329,7 +329,7 @@ contract CommitStore_report is CommitStoreSetup {
     assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
 
     report = CommitStore.CommitReport({
-      priceUpdates: getEmptyPriceUpdates(),
+      priceUpdates: _getEmptyPriceUpdates(),
       interval: CommitStore.Interval(maxSeq + 1, maxSeq * 2),
       merkleRoot: "stale report 2"
     });
@@ -427,7 +427,7 @@ contract CommitStore_report is CommitStoreSetup {
 
   function test_InvalidRootRevert() public {
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getEmptyPriceUpdates(),
+      priceUpdates: _getEmptyPriceUpdates(),
       interval: CommitStore.Interval(1, 4),
       merkleRoot: bytes32(0)
     });
@@ -439,7 +439,7 @@ contract CommitStore_report is CommitStoreSetup {
   function test_InvalidInterval_Revert() public {
     CommitStore.Interval memory interval = CommitStore.Interval(2, 2);
     CommitStore.CommitReport memory report =
-      CommitStore.CommitReport({priceUpdates: getEmptyPriceUpdates(), interval: interval, merkleRoot: bytes32(0)});
+      CommitStore.CommitReport({priceUpdates: _getEmptyPriceUpdates(), interval: interval, merkleRoot: bytes32(0)});
 
     vm.expectRevert(abi.encodeWithSelector(CommitStore.InvalidInterval.selector, interval));
 
@@ -449,7 +449,7 @@ contract CommitStore_report is CommitStoreSetup {
   function test_InvalidIntervalMinLargerThanMax_Revert() public {
     CommitStore.Interval memory interval = CommitStore.Interval(1, 0);
     CommitStore.CommitReport memory report =
-      CommitStore.CommitReport({priceUpdates: getEmptyPriceUpdates(), interval: interval, merkleRoot: bytes32(0)});
+      CommitStore.CommitReport({priceUpdates: _getEmptyPriceUpdates(), interval: interval, merkleRoot: bytes32(0)});
 
     vm.expectRevert(abi.encodeWithSelector(CommitStore.InvalidInterval.selector, interval));
 
@@ -485,14 +485,14 @@ contract CommitStore_report is CommitStoreSetup {
 
   function test_RootAlreadyCommitted_Revert() public {
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getEmptyPriceUpdates(),
+      priceUpdates: _getEmptyPriceUpdates(),
       interval: CommitStore.Interval(1, 2),
       merkleRoot: "Only a single root"
     });
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
 
     report = CommitStore.CommitReport({
-      priceUpdates: getEmptyPriceUpdates(),
+      priceUpdates: _getEmptyPriceUpdates(),
       interval: CommitStore.Interval(3, 3),
       merkleRoot: "Only a single root"
     });
@@ -510,7 +510,7 @@ contract CommitStore_verify is CommitStoreRealRMNSetup {
     s_commitStore.report(
       abi.encode(
         CommitStore.CommitReport({
-          priceUpdates: getEmptyPriceUpdates(),
+          priceUpdates: _getEmptyPriceUpdates(),
           interval: CommitStore.Interval(1, 2),
           merkleRoot: leaves[0]
         })
@@ -529,7 +529,7 @@ contract CommitStore_verify is CommitStoreRealRMNSetup {
     s_commitStore.report(
       abi.encode(
         CommitStore.CommitReport({
-          priceUpdates: getEmptyPriceUpdates(),
+          priceUpdates: _getEmptyPriceUpdates(),
           interval: CommitStore.Interval(1, 2),
           merkleRoot: leaves[0]
         })

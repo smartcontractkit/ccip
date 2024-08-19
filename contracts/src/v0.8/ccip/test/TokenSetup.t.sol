@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IPoolV1} from "../interfaces/IPool.sol";
-
 import {BurnMintERC677} from "../../shared/token/ERC677/BurnMintERC677.sol";
 import {Client} from "../libraries/Client.sol";
 import {BurnMintTokenPool} from "../pools/BurnMintTokenPool.sol";
@@ -138,7 +136,7 @@ contract TokenSetup is RouterSetup {
     }
   }
 
-  function getCastedSourceEVMTokenAmountsWithZeroAmounts()
+  function _getCastedSourceEVMTokenAmountsWithZeroAmounts()
     internal
     view
     returns (Client.EVMTokenAmount[] memory tokenAmounts)
@@ -147,6 +145,7 @@ contract TokenSetup is RouterSetup {
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       tokenAmounts[i].token = s_sourceTokens[i];
     }
+    return tokenAmounts;
   }
 
   function _setPool(

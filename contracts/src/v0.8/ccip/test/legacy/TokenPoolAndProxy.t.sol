@@ -5,7 +5,6 @@ import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IPoolPriorTo1_5} from "../../interfaces/IPoolPriorTo1_5.sol";
 
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
-import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Pool} from "../../libraries/Pool.sol";
@@ -14,8 +13,6 @@ import {BurnMintTokenPoolAndProxy} from "../../pools/BurnMintTokenPoolAndProxy.s
 import {BurnWithFromMintTokenPoolAndProxy} from "../../pools/BurnWithFromMintTokenPoolAndProxy.sol";
 import {LockReleaseTokenPoolAndProxy} from "../../pools/LockReleaseTokenPoolAndProxy.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
-import {TokenSetup} from "../TokenSetup.t.sol";
-import {EVM2EVMOnRampHelper} from "../helpers/EVM2EVMOnRampHelper.sol";
 import {EVM2EVMOnRampSetup} from "../onRamp/EVM2EVMOnRampSetup.t.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
 import {BurnMintTokenPool1_2, TokenPool1_2} from "./BurnMintTokenPool1_2.sol";

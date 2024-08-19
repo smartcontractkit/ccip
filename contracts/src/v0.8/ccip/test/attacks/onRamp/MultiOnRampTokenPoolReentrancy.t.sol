@@ -11,8 +11,6 @@ import {ReentrantMaliciousTokenPool} from "./ReentrantMaliciousTokenPool.sol";
 
 import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-import {console} from "forge-std/console.sol";
-
 /// @title MultiOnRampTokenPoolReentrancy
 /// Attempts to perform a reentrancy exploit on Onramp with a malicious TokenPool
 contract MultiOnRampTokenPoolReentrancy is EVM2EVMMultiOnRampSetup {

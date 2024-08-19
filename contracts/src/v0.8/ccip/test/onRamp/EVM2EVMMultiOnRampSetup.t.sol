@@ -1,19 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../NonceManager.sol";
-import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {EVM2EVMMultiOnRamp} from "../../onRamp/EVM2EVMMultiOnRamp.sol";
-import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
-import {TokenPool} from "../../pools/TokenPool.sol";
-import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {EVM2EVMMultiOnRampHelper} from "../helpers/EVM2EVMMultiOnRampHelper.sol";
 import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
@@ -59,7 +54,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
   }
 
   function _generateTokenMessage() public view returns (Client.EVM2AnyMessage memory) {
-    Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory tokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     tokenAmounts[0].amount = i_tokenAmount0;
     tokenAmounts[1].amount = i_tokenAmount1;
     return Client.EVM2AnyMessage({
