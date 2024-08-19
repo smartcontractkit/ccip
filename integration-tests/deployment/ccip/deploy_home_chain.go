@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"time"
 
@@ -232,20 +233,30 @@ func AddDON(
 		var encodedOffchainConfig []byte
 		var err2 error
 		if pluginType == cctypes.PluginTypeCCIPCommit {
-			encodedOffchainConfig, err2 = pluginconfig.EncodeCommitOffchainConfig(pluginconfig.CommitOffchainConfig{
-				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(RemoteGasPriceBatchWriteFrequency),
+			occ := pluginconfig.CommitOffchainConfig{
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(RemoteGasPriceBatchWriteFrequency),
+				MaxReportTransmissionCheckAttempts: 5,
+				NewMsgScanBatchSize:                256,
 				// TODO: implement token price writes
 				// TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(tokenPriceBatchWriteFrequency),
-			})
+			}
+			if err3 := occ.Validate(); err3 != nil {
+				return fmt.Errorf("failed to validate commit offchain config: %w", err3)
+			}
+			encodedOffchainConfig, err2 = pluginconfig.EncodeCommitOffchainConfig(occ)
 		} else {
-			encodedOffchainConfig, err2 = pluginconfig.EncodeExecuteOffchainConfig(pluginconfig.ExecuteOffchainConfig{
+			occ := pluginconfig.ExecuteOffchainConfig{
 				BatchGasLimit:             BatchGasLimit,
 				RelativeBoostPerWaitHour:  RelativeBoostPerWaitHour,
 				MessageVisibilityInterval: *commonconfig.MustNewDuration(FirstBlockAge),
 				InflightCacheExpiry:       *commonconfig.MustNewDuration(InflightCacheExpiry),
 				RootSnoozeTime:            *commonconfig.MustNewDuration(RootSnoozeTime),
 				BatchingStrategyID:        BatchingStrategyID,
-			})
+			}
+			if err3 := occ.Validate(); err3 != nil {
+				return fmt.Errorf("failed to validate execute offchain config: %w", err3)
+			}
+			encodedOffchainConfig, err2 = pluginconfig.EncodeExecuteOffchainConfig(occ)
 		}
 		if err2 != nil {
 			return err2
