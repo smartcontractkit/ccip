@@ -454,7 +454,7 @@ func createOracle(
 	pluginType cctypes.PluginType,
 	ocrConfigs []ccipreaderpkg.OCR3ConfigWithMeta,
 ) (pluginOracle, bootstrapOracle cctypes.CCIPOracle, err error) {
-	if err := validateOCRConfigs(pluginType, ocrConfigs); err != nil {
+	if err = validateOCRConfigs(pluginType, ocrConfigs); err != nil {
 		return nil, nil, fmt.Errorf("invalide OCR configs: %w", err)
 	}
 

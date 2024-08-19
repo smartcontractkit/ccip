@@ -59,6 +59,8 @@ func TestIntegration_Launcher(t *testing.T) {
 		FinalityDepth:           -1,
 		OptimisticConfirmations: 1,
 	})
+	require.NoError(t, err)
+
 	chainAConf := it.SetupConfigInfo(it.ChainA, p2pIDs, it.FChainA, encodedChainConfig)
 	chainBConf := it.SetupConfigInfo(it.ChainB, p2pIDs[1:], it.FChainB, encodedChainConfig)
 	chainCConf := it.SetupConfigInfo(it.ChainC, p2pIDs[2:], it.FChainC, encodedChainConfig)
