@@ -3,11 +3,4 @@ vendor
 **/**/network_config.toml
 **/**/secrets.toml
 
-**/**/geth/data-temp_*/geth/nodes
-**/**/geth/data-temp_*/geth/lightchaindata
-**/**/geth/data-temp_*/geth/chaindata
-**/**/geth/data-temp_*/geth/transactions.rlp
-**/**/geth/data-temp_*/geth/transactions.rlp.bak
-**/**/geth/data-temp_*/geth/LOCK
-**/**/geth/data-temp_*/geth/nodekey
-**/**/geth/data-temp_*/geth/blobpool
+**/**/geth
