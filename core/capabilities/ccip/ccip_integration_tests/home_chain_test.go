@@ -74,7 +74,19 @@ func TestHomeChainReader(t *testing.T) {
 			Config:         mustDecodeChainConfig(t, c.ChainConfig.Config),
 		}
 	}
+
+	// log expectedChainConfigs
+	for k, v := range expectedChainConfigs {
+		t.Logf("expectedChainConfigs[%v] = %v\n", k, v)
+	}
+
 	configs, err := homeChain.GetAllChainConfigs()
+
+	// log configs
+	for k, v := range configs {
+		t.Logf("configs[%v] = %v\n", k, v)
+	}
+
 	require.NoError(t, err)
 	require.Equal(t, expectedChainConfigs, configs)
 	//=================================Remove ChainC from OnChainConfig=========================================
