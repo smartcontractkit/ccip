@@ -65,20 +65,20 @@ type Contract struct {
 	Address        common.Address `json:"address"`
 }
 
-type TokenAdminRegistry struct {
+type TokenAdminRegistryView struct {
 	Contract
 	Tokens []common.Address `json:"tokens"`
 }
 
-type NonceManager struct {
+type NonceManagerView struct {
 	Contract
 	AuthorizedCallers []common.Address `json:"authorizedCallers"`
 }
 
 type Chain struct {
 	// TODO: this will have to be versioned for getting state during upgrades.
-	TokenAdminRegistry TokenAdminRegistry `json:"tokenAdminRegistry"`
-	NonceManager       NonceManager       `json:"nonceManager"`
+	TokenAdminRegistry TokenAdminRegistryView `json:"tokenAdminRegistry"`
+	NonceManager       NonceManagerView       `json:"nonceManager"`
 }
 
 func (s CCIPOnChainState) Snapshot(chains []uint64) (CCIPSnapShot, error) {
@@ -105,7 +105,7 @@ func (s CCIPOnChainState) Snapshot(chains []uint64) (CCIPSnapShot, error) {
 			if err != nil {
 				return snapshot, err
 			}
-			c.TokenAdminRegistry = TokenAdminRegistry{
+			c.TokenAdminRegistry = TokenAdminRegistryView{
 				Contract: Contract{
 					TypeAndVersion: tv,
 					Address:        ta.Address(),
@@ -122,7 +122,7 @@ func (s CCIPOnChainState) Snapshot(chains []uint64) (CCIPSnapShot, error) {
 			if err != nil {
 				return snapshot, err
 			}
-			c.NonceManager = NonceManager{
+			c.NonceManager = NonceManagerView{
 				Contract: Contract{
 					TypeAndVersion: tv,
 					Address:        nm.Address(),
@@ -170,8 +170,8 @@ func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (
 	}
 	for chainSelector, addresses := range addresses {
 		for address, tvStr := range addresses {
-			switch tvStr {
-			case RBAC_Timelock_1_0_0:
+			switch tvStr.String() {
+			case deployment.NewTypeAndVersion(RBACTimelock, deployment.Version1_0_0).String():
 				tl, err := owner_wrappers.NewRBACTimelock(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
