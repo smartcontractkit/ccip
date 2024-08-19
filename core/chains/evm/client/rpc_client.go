@@ -111,15 +111,14 @@ type rawclient struct {
 }
 
 type rpcClient struct {
-	rpcLog                     logger.SugaredLogger
-	name                       string
-	id                         int32
-	chainID                    *big.Int
-	tier                       commonclient.NodeTier
-	largePayloadRpcTimeout     time.Duration
-	rpcTimeout                 time.Duration
-	finalizedBlockPollInterval time.Duration
-	chainType                  chaintype.ChainType
+	rpcLog                 logger.SugaredLogger
+	name                   string
+	id                     int32
+	chainID                *big.Int
+	tier                   commonclient.NodeTier
+	largePayloadRpcTimeout time.Duration
+	rpcTimeout             time.Duration
+	chainType              chaintype.ChainType
 
 	ws   rawclient
 	http *rawclient
@@ -153,7 +152,6 @@ func NewRPCClient(
 	id int32,
 	chainID *big.Int,
 	tier commonclient.NodeTier,
-	finalizedBlockPollInterval time.Duration,
 	largePayloadRpcTimeout time.Duration,
 	rpcTimeout time.Duration,
 	chainType chaintype.ChainType,
