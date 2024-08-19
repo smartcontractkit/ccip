@@ -16,10 +16,10 @@ import (
 	owner_wrappers "github.com/smartcontractkit/ccip-owner-contracts/gethwrappers"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
@@ -33,8 +33,8 @@ type CCIPOnChainState struct {
 	// Populated go bindings for the appropriate version for all contracts.
 	// We would hold 2 versions of each contract here. Once we upgrade we can phase out the old one.
 	// When generating bindings, make sure the package name corresponds to the version.
-	EvmOnRampsV160       map[uint64]*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp
-	EvmOffRampsV160      map[uint64]*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp
+	EvmOnRampsV160       map[uint64]*onramp.OnRamp
+	EvmOffRampsV160      map[uint64]*offramp.OffRamp
 	PriceRegistries      map[uint64]*price_registry.PriceRegistry
 	ArmProxies           map[uint64]*arm_proxy_contract.ARMProxyContract
 	NonceManagers        map[uint64]*nonce_manager.NonceManager
@@ -146,8 +146,8 @@ func SnapshotState(e deployment.Environment, ab deployment.AddressBook) (CCIPSna
 
 func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (CCIPOnChainState, error) {
 	state := CCIPOnChainState{
-		EvmOnRampsV160:       make(map[uint64]*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp),
-		EvmOffRampsV160:      make(map[uint64]*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp),
+		EvmOnRampsV160:       make(map[uint64]*onramp.OnRamp),
+		EvmOffRampsV160:      make(map[uint64]*offramp.OffRamp),
 		PriceRegistries:      make(map[uint64]*price_registry.PriceRegistry),
 		ArmProxies:           make(map[uint64]*arm_proxy_contract.ARMProxyContract),
 		NonceManagers:        make(map[uint64]*nonce_manager.NonceManager),
@@ -190,14 +190,14 @@ func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (
 					return state, err
 				}
 				state.CapabilityRegistry[chainSelector] = cr
-			case EVM2EVMMultiOnRamp_1_6_0:
-				onRamp, err := evm_2_evm_multi_onramp.NewEVM2EVMMultiOnRamp(common.HexToAddress(address), e.Chains[chainSelector].Client)
+			case OnRamp_1_6_0:
+				onRamp, err := onramp.NewOnRamp(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
 				state.EvmOnRampsV160[chainSelector] = onRamp
-			case EVM2EVMMultiOffRamp_1_6_0:
-				offRamp, err := evm_2_evm_multi_offramp.NewEVM2EVMMultiOffRamp(common.HexToAddress(address), e.Chains[chainSelector].Client)
+			case OffRamp_1_6_0:
+				offRamp, err := offramp.NewOffRamp(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}
