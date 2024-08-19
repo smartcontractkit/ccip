@@ -68,7 +68,8 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
     Internal.MessageExecutionState state,
-    bytes returnData
+    bytes returnData,
+    uint256 gasUsed
   );
   event SourceChainSelectorAdded(uint64 sourceChainSelector);
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
@@ -372,6 +373,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     // Execute messages
     bool manualExecution = manualExecGasLimits.length != 0;
     for (uint256 i = 0; i < numMsgs; ++i) {
+      uint256 gasStart = gasleft();
       Internal.Any2EVMRampMessage memory message = report.messages[i];
 
       Internal.MessageExecutionState originalState =
@@ -465,7 +467,12 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       }
 
       emit ExecutionStateChanged(
-        sourceChainSelector, message.header.sequenceNumber, message.header.messageId, newState, returnData
+        sourceChainSelector,
+        message.header.sequenceNumber,
+        message.header.messageId,
+        newState,
+        returnData,
+        gasStart - gasleft()
       );
     }
   }
@@ -794,9 +801,8 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   // │                      Tokens and pools                        │
   // ================================================================
 
-  /// @notice Uses a pool to release or mint a token to a receiver address in two steps. First, the pool is called
-  /// to release the tokens to the offRamp, then the offRamp calls the token contract to transfer the tokens to the
-  /// receiver. This is done to ensure the exact number of tokens, the pool claims to release are actually transferred.
+  /// @notice Uses a pool to release or mint a token to a receiver address, with balance checks before and after the
+  /// transfer. This is done to ensure the exact number of tokens the pool claims to release are actually transferred.
   /// @dev The local token address is validated through the TokenAdminRegistry. If, due to some misconfiguration, the
   /// token is unknown to the registry, the offRamp will revert. The tx, and the tokens, can be retrieved by
   /// registering the token on this chain, and re-trying the msg.
