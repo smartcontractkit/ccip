@@ -15,7 +15,7 @@ import (
 
 	owner_wrappers "github.com/smartcontractkit/ccip-owner-contracts/gethwrappers"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
@@ -41,7 +41,7 @@ type CCIPOnChainState struct {
 	TokenAdminRegistries map[uint64]*token_admin_registry.TokenAdminRegistry
 	Routers              map[uint64]*router.Router
 	Weth9s               map[uint64]*weth9.WETH9
-	MockArms             map[uint64]*mock_arm_contract.MockARMContract
+	MockArms             map[uint64]*mock_rmn_contract.MockRMNContract
 	// TODO: May need to support older link too
 	LinkTokens map[uint64]*burn_mint_erc677.BurnMintERC677
 	// Note we only expect one of these (on the home chain)
@@ -153,7 +153,7 @@ func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (
 		NonceManagers:        make(map[uint64]*nonce_manager.NonceManager),
 		TokenAdminRegistries: make(map[uint64]*token_admin_registry.TokenAdminRegistry),
 		Routers:              make(map[uint64]*router.Router),
-		MockArms:             make(map[uint64]*mock_arm_contract.MockARMContract),
+		MockArms:             make(map[uint64]*mock_rmn_contract.MockRMNContract),
 		LinkTokens:           make(map[uint64]*burn_mint_erc677.BurnMintERC677),
 		Weth9s:               make(map[uint64]*weth9.WETH9),
 		Mcms:                 make(map[uint64]*owner_wrappers.ManyChainMultiSig),
@@ -209,7 +209,7 @@ func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (
 				}
 				state.ArmProxies[chainSelector] = armProxy
 			case MockARM_1_0_0:
-				mockARM, err := mock_arm_contract.NewMockARMContract(common.HexToAddress(address), e.Chains[chainSelector].Client)
+				mockARM, err := mock_rmn_contract.NewMockRMNContract(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}

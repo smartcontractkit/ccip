@@ -4,7 +4,7 @@ package ccip
 
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CommitStore/CommitStore.abi ../../../contracts/solc/v0.8.24/CommitStore/CommitStore.bin CommitStore commit_store
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CommitStoreHelper/CommitStoreHelper.abi ../../../contracts/solc/v0.8.24/CommitStoreHelper/CommitStoreHelper.bin CommitStoreHelper commit_store_helper
-//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/RMN/RMN.abi ../../../contracts/solc/v0.8.24/RMN/RMN.bin ARMContract arm_contract
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/RMN/RMN.abi ../../../contracts/solc/v0.8.24/RMN/RMN.bin RMNContract rmn_contract
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/ARMProxy/ARMProxy.abi ../../../contracts/solc/v0.8.24/ARMProxy/ARMProxy.bin RMNProxyContract rmn_proxy_contract
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/TokenAdminRegistry/TokenAdminRegistry.abi ../../../contracts/solc/v0.8.24/TokenAdminRegistry/TokenAdminRegistry.bin TokenAdminRegistry token_admin_registry
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/RegistryModuleOwnerCustom/RegistryModuleOwnerCustom.abi ../../../contracts/solc/v0.8.24/RegistryModuleOwnerCustom/RegistryModuleOwnerCustom.bin RegistryModuleOwnerCustom registry_module_owner_custom

@@ -348,16 +348,16 @@ func (o *LMTestSetupOutputs) DeployLMChainContracts(
 
 	// Deploy Mock ARM contract
 	lggr.Info().Msg("Deploying Mock ARM contract")
-	mockARMContract, err := cd.DeployMockARMContract()
+	mockRMNContract, err := cd.DeployMockRMNContract()
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to deploy Mock ARM contract: %w", err))
 	}
-	lggr.Info().Str("Address", mockARMContract.String()).Msg("Deployed Mock ARM contract")
-	lmCommon.MockArm = mockARMContract
+	lggr.Info().Str("Address", mockRMNContract.String()).Msg("Deployed Mock ARM contract")
+	lmCommon.MockArm = mockRMNContract
 
 	// Deploy ARM Proxy contract
 	lggr.Info().Msg("Deploying ARM Proxy contract")
-	RMNProxyContract, err := cd.DeployArmProxy(*mockARMContract)
+	RMNProxyContract, err := cd.DeployArmProxy(*mockRMNContract)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to deploy ARM Proxy contract: %w", err))
 	}

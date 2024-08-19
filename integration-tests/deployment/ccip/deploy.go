@@ -15,7 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
@@ -60,7 +60,7 @@ type Contracts interface {
 		*router.Router |
 		*token_admin_registry.TokenAdminRegistry |
 		*weth9.WETH9 |
-		*mock_arm_contract.MockARMContract |
+		*mock_rmn_contract.MockRMNContract |
 		*owner_helpers.ManyChainMultiSig |
 		*owner_helpers.RBACTimelock |
 		*offramp.OffRamp |
@@ -159,12 +159,12 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 
 		// TODO: Still waiting for RMNRemote/RMNHome contracts etc.
 		mockARM, err := deployContract(e.Logger, chain, ab,
-			func(chain deployment.Chain) ContractDeploy[*mock_arm_contract.MockARMContract] {
-				mockARMAddr, tx, mockARM, err2 := mock_arm_contract.DeployMockARMContract(
+			func(chain deployment.Chain) ContractDeploy[*mock_rmn_contract.MockRMNContract] {
+				mockARMAddr, tx, mockARM, err2 := mock_rmn_contract.DeployMockRMNContract(
 					chain.DeployerKey,
 					chain.Client,
 				)
-				return ContractDeploy[*mock_arm_contract.MockARMContract]{
+				return ContractDeploy[*mock_rmn_contract.MockRMNContract]{
 					mockARMAddr, mockARM, tx, MockARM_1_0_0, err2,
 				}
 			})

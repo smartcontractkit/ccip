@@ -36,7 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_0_0"
 	lock_release_token_pool "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_4_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
@@ -182,7 +182,7 @@ type Common struct {
 	CustomToken       *link_token_interface.LinkToken
 	WrappedNative     *weth9.WETH9
 	WrappedNativePool *lock_release_token_pool_1_0_0.LockReleaseTokenPool
-	ARM               *mock_arm_contract.MockARMContract
+	ARM               *mock_rmn_contract.MockRMNContract
 	ARMProxy          *rmn_proxy_contract.RMNProxyContract
 	PriceRegistry     *price_registry_1_2_0.PriceRegistry
 }
@@ -789,12 +789,12 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	sourceChain, sourceUser := testhelpers.SetupChain(t)
 	destChain, destUser := testhelpers.SetupChain(t)
 
-	armSourceAddress, _, _, err := mock_arm_contract.DeployMockARMContract(
+	armSourceAddress, _, _, err := mock_rmn_contract.DeployMockRMNContract(
 		sourceUser,
 		sourceChain,
 	)
 	require.NoError(t, err)
-	sourceARM, err := mock_arm_contract.NewMockARMContract(armSourceAddress, sourceChain)
+	sourceARM, err := mock_rmn_contract.NewMockRMNContract(armSourceAddress, sourceChain)
 	require.NoError(t, err)
 	armProxySourceAddress, _, _, err := rmn_proxy_contract.DeployRMNProxyContract(
 		sourceUser,
@@ -806,7 +806,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	sourceChain.Commit()
 
-	armDestAddress, _, _, err := mock_arm_contract.DeployMockARMContract(
+	armDestAddress, _, _, err := mock_rmn_contract.DeployMockRMNContract(
 		destUser,
 		destChain,
 	)
@@ -818,7 +818,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	)
 	require.NoError(t, err)
 	destChain.Commit()
-	destARM, err := mock_arm_contract.NewMockARMContract(armDestAddress, destChain)
+	destARM, err := mock_rmn_contract.NewMockRMNContract(armDestAddress, destChain)
 	require.NoError(t, err)
 	destARMProxy, err := rmn_proxy_contract.NewRMNProxyContract(armProxyDestAddress, destChain)
 	require.NoError(t, err)

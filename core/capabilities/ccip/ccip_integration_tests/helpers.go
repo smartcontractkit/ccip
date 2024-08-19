@@ -26,7 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ocr3_config_encoder"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
@@ -103,7 +103,7 @@ type onchainUniverse struct {
 	weth               *weth9.WETH9
 	router             *router.Router
 	rmnProxy           *rmn_proxy_contract.RMNProxyContract
-	rmn                *mock_arm_contract.MockARMContract
+	rmn                *mock_rmn_contract.MockRMNContract
 	onramp             *onramp.OnRamp
 	offramp            *offramp.OffRamp
 	priceRegistry      *price_registry.PriceRegistry
@@ -179,7 +179,7 @@ func createUniverses(
 		backend := base.backend
 		// deploy the CCIP contracts
 		linkToken := deployLinkToken(t, owner, backend, chainID)
-		rmn := deployMockARMContract(t, owner, backend, chainID)
+		rmn := deployMockRMNContract(t, owner, backend, chainID)
 		rmnProxy := deployRMNProxyContract(t, owner, backend, rmn.Address(), chainID)
 		weth := deployWETHContract(t, owner, backend, chainID)
 		rout := deployRouter(t, owner, backend, weth.Address(), rmnProxy.Address(), chainID)
@@ -858,11 +858,11 @@ func deployLinkToken(t *testing.T, owner *bind.TransactOpts, backend *backends.S
 	return linkToken
 }
 
-func deployMockARMContract(t *testing.T, owner *bind.TransactOpts, backend *backends.SimulatedBackend, chainID uint64) *mock_arm_contract.MockARMContract {
-	rmnAddr, _, _, err := mock_arm_contract.DeployMockARMContract(owner, backend)
+func deployMockRMNContract(t *testing.T, owner *bind.TransactOpts, backend *backends.SimulatedBackend, chainID uint64) *mock_rmn_contract.MockRMNContract {
+	rmnAddr, _, _, err := mock_rmn_contract.DeployMockRMNContract(owner, backend)
 	require.NoErrorf(t, err, "failed to deploy mock arm on chain id %d", chainID)
 	backend.Commit()
-	rmn, err := mock_arm_contract.NewMockARMContract(rmnAddr, backend)
+	rmn, err := mock_rmn_contract.NewMockRMNContract(rmnAddr, backend)
 	require.NoError(t, err)
 	return rmn
 }
