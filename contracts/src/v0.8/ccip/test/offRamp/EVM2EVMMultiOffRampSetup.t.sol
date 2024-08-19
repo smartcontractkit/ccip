@@ -504,7 +504,7 @@ contract EVM2EVMMultiOffRampSetup is TokenSetup, PriceRegistrySetup, MultiOCR3Ba
     bytes memory returnData
   ) public {
     Vm.Log[] memory logs = vm.getRecordedLogs();
-    for (uint256 i = 0; i < logs.length; i++) {
+    for (uint256 i = 0; i < logs.length; ++i) {
       if (logs[i].topics[0] == EXECUTION_STATE_CHANGE_TOPIC_HASH) {
         uint64 logSourceChainSelector = uint64(uint256(logs[i].topics[1]));
         uint64 logSequenceNumber = uint64(uint256(logs[i].topics[2]));
