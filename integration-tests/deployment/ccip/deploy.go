@@ -15,12 +15,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
@@ -53,7 +53,7 @@ var (
 
 type Contracts interface {
 	*capabilities_registry.CapabilitiesRegistry |
-		*arm_proxy_contract.ARMProxyContract |
+		*rmn_proxy_contract.RMNProxyContract |
 		*ccip_config.CCIPConfig |
 		*nonce_manager.NonceManager |
 		*price_registry.PriceRegistry |
@@ -214,13 +214,13 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 		e.Logger.Infow("deployed timelock", "addr", mcm.Address)
 
 		armProxy, err := deployContract(e.Logger, chain, ab,
-			func(chain deployment.Chain) ContractDeploy[*arm_proxy_contract.ARMProxyContract] {
-				armProxyAddr, tx, armProxy, err2 := arm_proxy_contract.DeployARMProxyContract(
+			func(chain deployment.Chain) ContractDeploy[*rmn_proxy_contract.RMNProxyContract] {
+				armProxyAddr, tx, armProxy, err2 := rmn_proxy_contract.DeployRMNProxyContract(
 					chain.DeployerKey,
 					chain.Client,
 					mockARM.Address,
 				)
-				return ContractDeploy[*arm_proxy_contract.ARMProxyContract]{
+				return ContractDeploy[*rmn_proxy_contract.RMNProxyContract]{
 					armProxyAddr, armProxy, tx, ARMProxy_1_1_0, err2,
 				}
 			})

@@ -24,7 +24,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
@@ -33,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
@@ -102,7 +102,7 @@ type onchainUniverse struct {
 	linkToken          *link_token.LinkToken
 	weth               *weth9.WETH9
 	router             *router.Router
-	rmnProxy           *arm_proxy_contract.ARMProxyContract
+	rmnProxy           *rmn_proxy_contract.RMNProxyContract
 	rmn                *mock_arm_contract.MockARMContract
 	onramp             *onramp.OnRamp
 	offramp            *offramp.OffRamp
@@ -180,7 +180,7 @@ func createUniverses(
 		// deploy the CCIP contracts
 		linkToken := deployLinkToken(t, owner, backend, chainID)
 		rmn := deployMockARMContract(t, owner, backend, chainID)
-		rmnProxy := deployARMProxyContract(t, owner, backend, rmn.Address(), chainID)
+		rmnProxy := deployRMNProxyContract(t, owner, backend, rmn.Address(), chainID)
 		weth := deployWETHContract(t, owner, backend, chainID)
 		rout := deployRouter(t, owner, backend, weth.Address(), rmnProxy.Address(), chainID)
 		priceRegistry := deployPriceRegistry(t, owner, backend, linkToken.Address(), weth.Address(), big.NewInt(1e18), chainID)
@@ -867,11 +867,11 @@ func deployMockARMContract(t *testing.T, owner *bind.TransactOpts, backend *back
 	return rmn
 }
 
-func deployARMProxyContract(t *testing.T, owner *bind.TransactOpts, backend *backends.SimulatedBackend, rmnAddr common.Address, chainID uint64) *arm_proxy_contract.ARMProxyContract {
-	rmnProxyAddr, _, _, err := arm_proxy_contract.DeployARMProxyContract(owner, backend, rmnAddr)
+func deployRMNProxyContract(t *testing.T, owner *bind.TransactOpts, backend *backends.SimulatedBackend, rmnAddr common.Address, chainID uint64) *rmn_proxy_contract.RMNProxyContract {
+	rmnProxyAddr, _, _, err := rmn_proxy_contract.DeployRMNProxyContract(owner, backend, rmnAddr)
 	require.NoErrorf(t, err, "failed to deploy arm proxy on chain id %d", chainID)
 	backend.Commit()
-	rmnProxy, err := arm_proxy_contract.NewARMProxyContract(rmnProxyAddr, backend)
+	rmnProxy, err := rmn_proxy_contract.NewRMNProxyContract(rmnProxyAddr, backend)
 	require.NoError(t, err)
 	return rmnProxy
 }

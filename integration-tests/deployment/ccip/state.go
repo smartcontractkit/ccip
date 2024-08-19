@@ -15,12 +15,12 @@ import (
 
 	owner_wrappers "github.com/smartcontractkit/ccip-owner-contracts/gethwrappers"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
@@ -36,7 +36,7 @@ type CCIPOnChainState struct {
 	EvmOnRampsV160       map[uint64]*onramp.OnRamp
 	EvmOffRampsV160      map[uint64]*offramp.OffRamp
 	PriceRegistries      map[uint64]*price_registry.PriceRegistry
-	ArmProxies           map[uint64]*arm_proxy_contract.ARMProxyContract
+	ArmProxies           map[uint64]*rmn_proxy_contract.RMNProxyContract
 	NonceManagers        map[uint64]*nonce_manager.NonceManager
 	TokenAdminRegistries map[uint64]*token_admin_registry.TokenAdminRegistry
 	Routers              map[uint64]*router.Router
@@ -149,7 +149,7 @@ func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (
 		EvmOnRampsV160:       make(map[uint64]*onramp.OnRamp),
 		EvmOffRampsV160:      make(map[uint64]*offramp.OffRamp),
 		PriceRegistries:      make(map[uint64]*price_registry.PriceRegistry),
-		ArmProxies:           make(map[uint64]*arm_proxy_contract.ARMProxyContract),
+		ArmProxies:           make(map[uint64]*rmn_proxy_contract.RMNProxyContract),
 		NonceManagers:        make(map[uint64]*nonce_manager.NonceManager),
 		TokenAdminRegistries: make(map[uint64]*token_admin_registry.TokenAdminRegistry),
 		Routers:              make(map[uint64]*router.Router),
@@ -203,7 +203,7 @@ func GenerateOnchainState(e deployment.Environment, ab deployment.AddressBook) (
 				}
 				state.EvmOffRampsV160[chainSelector] = offRamp
 			case ARMProxy_1_1_0:
-				armProxy, err := arm_proxy_contract.NewARMProxyContract(common.HexToAddress(address), e.Chains[chainSelector].Client)
+				armProxy, err := rmn_proxy_contract.NewRMNProxyContract(common.HexToAddress(address), e.Chains[chainSelector].Client)
 				if err != nil {
 					return state, err
 				}

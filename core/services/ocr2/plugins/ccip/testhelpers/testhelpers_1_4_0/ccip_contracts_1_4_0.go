@@ -28,7 +28,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	burn_mint_token_pool "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool_1_4_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_2_0"
 	evm_2_evm_offramp "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_2_0"
@@ -39,6 +38,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
@@ -183,7 +183,7 @@ type Common struct {
 	WrappedNative     *weth9.WETH9
 	WrappedNativePool *lock_release_token_pool_1_0_0.LockReleaseTokenPool
 	ARM               *mock_arm_contract.MockARMContract
-	ARMProxy          *arm_proxy_contract.ARMProxyContract
+	ARMProxy          *rmn_proxy_contract.RMNProxyContract
 	PriceRegistry     *price_registry_1_2_0.PriceRegistry
 }
 
@@ -796,13 +796,13 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	sourceARM, err := mock_arm_contract.NewMockARMContract(armSourceAddress, sourceChain)
 	require.NoError(t, err)
-	armProxySourceAddress, _, _, err := arm_proxy_contract.DeployARMProxyContract(
+	armProxySourceAddress, _, _, err := rmn_proxy_contract.DeployRMNProxyContract(
 		sourceUser,
 		sourceChain,
 		armSourceAddress,
 	)
 	require.NoError(t, err)
-	sourceARMProxy, err := arm_proxy_contract.NewARMProxyContract(armProxySourceAddress, sourceChain)
+	sourceARMProxy, err := rmn_proxy_contract.NewRMNProxyContract(armProxySourceAddress, sourceChain)
 	require.NoError(t, err)
 	sourceChain.Commit()
 
@@ -811,7 +811,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		destChain,
 	)
 	require.NoError(t, err)
-	armProxyDestAddress, _, _, err := arm_proxy_contract.DeployARMProxyContract(
+	armProxyDestAddress, _, _, err := rmn_proxy_contract.DeployRMNProxyContract(
 		destUser,
 		destChain,
 		armDestAddress,
@@ -820,7 +820,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	destChain.Commit()
 	destARM, err := mock_arm_contract.NewMockARMContract(armDestAddress, destChain)
 	require.NoError(t, err)
-	destARMProxy, err := arm_proxy_contract.NewARMProxyContract(armProxyDestAddress, destChain)
+	destARMProxy, err := rmn_proxy_contract.NewRMNProxyContract(armProxyDestAddress, destChain)
 	require.NoError(t, err)
 
 	// Deploy link token and pool on source chain
