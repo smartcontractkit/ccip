@@ -24,7 +24,7 @@ import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
-/// @dev The EVM2EVMMultiOnRamp and EVM2EVMMultiOffRamp form an xchain upgradeable unit. Any change to one of them
+/// @dev The OnRamp and EVM2EVMMultiOffRamp form an xchain upgradeable unit. Any change to one of them
 /// results an onchain upgrade of both contracts.
 /// @dev MultiOCR3Base is used to store multiple OCR configs for both the OffRamp and the CommitStore.
 /// The execution plugin type has to be configured without signature verification, and the commit

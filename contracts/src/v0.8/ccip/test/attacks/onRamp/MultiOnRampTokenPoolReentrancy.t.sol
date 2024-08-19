@@ -3,9 +3,9 @@ pragma solidity 0.8.24;
 
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
-import {EVM2EVMMultiOnRamp} from "../../../onRamp/EVM2EVMMultiOnRamp.sol";
+import {OnRamp} from "../../../onRamp/OnRamp.sol";
 import {TokenPool} from "../../../pools/TokenPool.sol";
-import {EVM2EVMMultiOnRampSetup} from "../../onRamp/EVM2EVMMultiOnRampSetup.t.sol";
+import {OnRampSetup} from "../../onRamp/OnRampSetup.t.sol";
 import {FacadeClient} from "./FacadeClient.sol";
 import {ReentrantMaliciousTokenPool} from "./ReentrantMaliciousTokenPool.sol";
 
@@ -15,7 +15,7 @@ import {console} from "forge-std/console.sol";
 
 /// @title MultiOnRampTokenPoolReentrancy
 /// Attempts to perform a reentrancy exploit on Onramp with a malicious TokenPool
-contract MultiOnRampTokenPoolReentrancy is EVM2EVMMultiOnRampSetup {
+contract MultiOnRampTokenPoolReentrancy is OnRampSetup {
   FacadeClient internal s_facadeClient;
   ReentrantMaliciousTokenPool internal s_maliciousTokenPool;
   IERC20 internal s_sourceToken;
@@ -23,7 +23,7 @@ contract MultiOnRampTokenPoolReentrancy is EVM2EVMMultiOnRampSetup {
   address internal immutable i_receiver = makeAddr("receiver");
 
   function setUp() public virtual override {
-    EVM2EVMMultiOnRampSetup.setUp();
+    OnRampSetup.setUp();
 
     s_sourceToken = IERC20(s_sourceTokens[0]);
     s_feeToken = IERC20(s_sourceTokens[0]);
@@ -109,9 +109,9 @@ contract MultiOnRampTokenPoolReentrancy is EVM2EVMMultiOnRampSetup {
     Internal.EVM2AnyRampMessage memory msgEvent2 = _messageToEvent(message2, 2, 2, expectedFee, address(s_facadeClient));
 
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, msgEvent2);
+    emit OnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, msgEvent2);
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, msgEvent1);
+    emit OnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, msgEvent1);
 
     s_facadeClient.send(amount);
   }

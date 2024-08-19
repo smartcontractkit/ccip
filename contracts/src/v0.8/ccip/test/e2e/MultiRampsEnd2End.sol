@@ -6,18 +6,18 @@ import {NonceManager} from "../../NonceManager.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import "../helpers/MerkleHelper.sol";
 import "../offRamp/EVM2EVMMultiOffRampSetup.t.sol";
-import "../onRamp/EVM2EVMMultiOnRampSetup.t.sol";
+import "../onRamp/OnRampSetup.t.sol";
 
 /// @notice This E2E test implements the following scenario:
 /// 1. Send multiple messages from multiple source chains to a single destination chain (2 messages from source chain 1 and 1 from
 /// source chain 2).
 /// 2. Commit multiple merkle roots (1 for each source chain).
 /// 3. Batch execute all the committed messages.
-contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
+contract MultiRampsE2E is OnRampSetup, EVM2EVMMultiOffRampSetup {
   using Internal for Internal.Any2EVMRampMessage;
 
   Router internal s_sourceRouter2;
-  EVM2EVMMultiOnRampHelper internal s_onRamp2;
+  OnRampHelper internal s_onRamp2;
   TokenAdminRegistry internal s_tokenAdminRegistry2;
   NonceManager internal s_nonceManager2;
 
@@ -25,8 +25,8 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
 
   mapping(address destPool => address sourcePool) internal s_sourcePoolByDestPool;
 
-  function setUp() public virtual override(EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup) {
-    EVM2EVMMultiOnRampSetup.setUp();
+  function setUp() public virtual override(OnRampSetup, EVM2EVMMultiOffRampSetup) {
+    OnRampSetup.setUp();
     EVM2EVMMultiOffRampSetup.setUp();
 
     // Deploy new source router for the new source chain
@@ -62,7 +62,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
 
     (
       // Deploy the new source chain onramp
-      // Outsource to shared helper function with EVM2EVMMultiOnRampSetup
+      // Outsource to shared helper function with OnRampSetup
       s_onRamp2,
       s_metadataHash2
     ) = _deployOnRamp(
@@ -234,7 +234,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
     );
 
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, msgEvent);
+    emit OnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, msgEvent);
 
     vm.resumeGasMetering();
     router.ccipSend(DEST_CHAIN_SELECTOR, message);

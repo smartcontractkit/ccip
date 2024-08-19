@@ -10,24 +10,25 @@ import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
-import {EVM2EVMMultiOnRamp} from "../../onRamp/EVM2EVMMultiOnRamp.sol";
+import {OnRamp} from "../../onRamp/OnRamp.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
-import {EVM2EVMMultiOnRampHelper} from "../helpers/EVM2EVMMultiOnRampHelper.sol";
+
 import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
+import {OnRampHelper} from "../helpers/OnRampHelper.sol";
 import {PriceRegistryFeeSetup} from "../priceRegistry/PriceRegistry.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
+contract OnRampSetup is TokenSetup, PriceRegistryFeeSetup {
   uint256 internal immutable i_tokenAmount0 = 9;
   uint256 internal immutable i_tokenAmount1 = 7;
 
   bytes32 internal s_metadataHash;
 
-  EVM2EVMMultiOnRampHelper internal s_onRamp;
+  OnRampHelper internal s_onRamp;
   MessageInterceptorHelper internal s_outboundMessageValidator;
   address[] internal s_offRamps;
   NonceManager internal s_outboundNonceManager;
@@ -91,16 +92,9 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
     );
   }
 
-  function _generateDynamicMultiOnRampConfig(address priceRegistry)
-    internal
-    pure
-    returns (EVM2EVMMultiOnRamp.DynamicConfig memory)
-  {
-    return EVM2EVMMultiOnRamp.DynamicConfig({
-      priceRegistry: priceRegistry,
-      messageValidator: address(0),
-      feeAggregator: FEE_AGGREGATOR
-    });
+  function _generateDynamicMultiOnRampConfig(address priceRegistry) internal pure returns (OnRamp.DynamicConfig memory) {
+    return
+      OnRamp.DynamicConfig({priceRegistry: priceRegistry, messageValidator: address(0), feeAggregator: FEE_AGGREGATOR});
   }
 
   // Slicing is only available for calldata. So we have to build a new bytes array.
@@ -112,14 +106,9 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
     return result;
   }
 
-  function _generateDestChainConfigArgs(IRouter router)
-    internal
-    pure
-    returns (EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory)
-  {
-    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory destChainConfigs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](1);
-    destChainConfigs[0] =
-      EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: router});
+  function _generateDestChainConfigArgs(IRouter router) internal pure returns (OnRamp.DestChainConfigArgs[] memory) {
+    OnRamp.DestChainConfigArgs[] memory destChainConfigs = new OnRamp.DestChainConfigArgs[](1);
+    destChainConfigs[0] = OnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: router});
     return destChainConfigs;
   }
 
@@ -128,9 +117,9 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
     IRouter router,
     address nonceManager,
     address tokenAdminRegistry
-  ) internal returns (EVM2EVMMultiOnRampHelper, bytes32 metadataHash) {
-    EVM2EVMMultiOnRampHelper onRamp = new EVM2EVMMultiOnRampHelper(
-      EVM2EVMMultiOnRamp.StaticConfig({
+  ) internal returns (OnRampHelper, bytes32 metadataHash) {
+    OnRampHelper onRamp = new OnRampHelper(
+      OnRamp.StaticConfig({
         chainSelector: sourceChainSelector,
         rmnProxy: address(s_mockRMN),
         nonceManager: nonceManager,
@@ -164,7 +153,7 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
       resetPrank = true;
     }
 
-    EVM2EVMMultiOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
+    OnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
     dynamicConfig.messageValidator = address(s_outboundMessageValidator);
     s_onRamp.setDynamicConfig(dynamicConfig);
 
@@ -174,19 +163,13 @@ contract EVM2EVMMultiOnRampSetup is TokenSetup, PriceRegistryFeeSetup {
     }
   }
 
-  function _assertStaticConfigsEqual(
-    EVM2EVMMultiOnRamp.StaticConfig memory a,
-    EVM2EVMMultiOnRamp.StaticConfig memory b
-  ) internal pure {
+  function _assertStaticConfigsEqual(OnRamp.StaticConfig memory a, OnRamp.StaticConfig memory b) internal pure {
     assertEq(a.chainSelector, b.chainSelector);
     assertEq(a.rmnProxy, b.rmnProxy);
     assertEq(a.tokenAdminRegistry, b.tokenAdminRegistry);
   }
 
-  function _assertDynamicConfigsEqual(
-    EVM2EVMMultiOnRamp.DynamicConfig memory a,
-    EVM2EVMMultiOnRamp.DynamicConfig memory b
-  ) internal pure {
+  function _assertDynamicConfigsEqual(OnRamp.DynamicConfig memory a, OnRamp.DynamicConfig memory b) internal pure {
     assertEq(a.priceRegistry, b.priceRegistry);
   }
 }

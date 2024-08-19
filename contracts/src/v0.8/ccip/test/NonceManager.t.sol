@@ -8,16 +8,15 @@ import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {EVM2EVMMultiOffRamp} from "../offRamp/EVM2EVMMultiOffRamp.sol";
-import {EVM2EVMMultiOnRamp} from "../onRamp/EVM2EVMMultiOnRamp.sol";
 import {EVM2EVMOnRamp} from "../onRamp/EVM2EVMOnRamp.sol";
-
+import {OnRamp} from "../onRamp/OnRamp.sol";
 import {BaseTest} from "./BaseTest.t.sol";
-import {EVM2EVMMultiOnRampHelper} from "./helpers/EVM2EVMMultiOnRampHelper.sol";
 import {EVM2EVMOffRampHelper} from "./helpers/EVM2EVMOffRampHelper.sol";
 import {EVM2EVMOnRampHelper} from "./helpers/EVM2EVMOnRampHelper.sol";
+import {OnRampHelper} from "./helpers/OnRampHelper.sol";
 import {MockCommitStore} from "./mocks/MockCommitStore.sol";
 import {EVM2EVMMultiOffRampSetup} from "./offRamp/EVM2EVMMultiOffRampSetup.t.sol";
-import {EVM2EVMMultiOnRampSetup} from "./onRamp/EVM2EVMMultiOnRampSetup.t.sol";
+import {OnRampSetup} from "./onRamp/OnRampSetup.t.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract NonceManager_typeAndVersion is Test {
@@ -88,7 +87,7 @@ contract NonceManager_NonceIncrementation is BaseTest {
   }
 }
 
-contract NonceManager_applyPreviousRampsUpdates is EVM2EVMMultiOnRampSetup {
+contract NonceManager_applyPreviousRampsUpdates is OnRampSetup {
   function test_SingleRampUpdate() public {
     address prevOnRamp = makeAddr("prevOnRamp");
     address prevOffRamp = makeAddr("prevOffRamp");
@@ -190,7 +189,7 @@ contract NonceManager_applyPreviousRampsUpdates is EVM2EVMMultiOnRampSetup {
   }
 }
 
-contract NonceManager_OnRampUpgrade is EVM2EVMMultiOnRampSetup {
+contract NonceManager_OnRampUpgrade is OnRampSetup {
   uint256 internal constant FEE_AMOUNT = 1234567890;
   EVM2EVMOnRampHelper internal s_prevOnRamp;
 
@@ -267,7 +266,7 @@ contract NonceManager_OnRampUpgrade is EVM2EVMMultiOnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, FEE_AMOUNT, OWNER));
+    emit OnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, FEE_AMOUNT, OWNER));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, FEE_AMOUNT, OWNER);
   }
 
@@ -294,18 +293,14 @@ contract NonceManager_OnRampUpgrade is EVM2EVMMultiOnRampSetup {
 
     // new onramp nonce should start from 2, while sequence number start from 1
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(
-      DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, startNonce + 2, FEE_AMOUNT, OWNER)
-    );
+    emit OnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, startNonce + 2, FEE_AMOUNT, OWNER));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, FEE_AMOUNT, OWNER);
 
     assertEq(startNonce + 2, s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER));
 
     // after another send, nonce should be 3, and sequence number be 2
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(
-      DEST_CHAIN_SELECTOR, _messageToEvent(message, 2, startNonce + 3, FEE_AMOUNT, OWNER)
-    );
+    emit OnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 2, startNonce + 3, FEE_AMOUNT, OWNER));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, FEE_AMOUNT, OWNER);
 
     assertEq(startNonce + 3, s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER));
@@ -320,9 +315,7 @@ contract NonceManager_OnRampUpgrade is EVM2EVMMultiOnRampSetup {
     address newSender = address(1234567);
     // new onramp nonce should start from 1 for new sender
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.CCIPSendRequested(
-      DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, FEE_AMOUNT, newSender)
-    );
+    emit OnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, FEE_AMOUNT, newSender));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, FEE_AMOUNT, newSender);
   }
 }
