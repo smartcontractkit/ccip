@@ -45,8 +45,8 @@ var (
 	// 1.6
 	CapabilitiesRegistry_1_0_0 = "CapabilitiesRegistry 1.0.0"
 	CCIPConfig_1_6_0           = "CCIPConfig 1.6.0-dev"
-	EVM2EVMMultiOnRamp_1_6_0   = "EVM2EVMMultiOnRamp 1.6.0-dev"
-	EVM2EVMMultiOffRamp_1_6_0  = "EVM2EVMMultiOffRamp 1.6.0-dev"
+	EVM2EVMMultiOnRamp_1_6_0   = "OnRamp 1.6.0-dev"
+	EVM2EVMMultiOffRamp_1_6_0  = "OffRamp 1.6.0-dev"
 	NonceManager_1_6_0         = "NonceManager 1.6.0-dev"
 	PriceRegistry_1_6_0        = "PriceRegistry 1.6.0-dev"
 )

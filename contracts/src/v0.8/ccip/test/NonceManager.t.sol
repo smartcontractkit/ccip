@@ -7,7 +7,7 @@ import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
-import {EVM2EVMMultiOffRamp} from "../offRamp/EVM2EVMMultiOffRamp.sol";
+import {OffRamp} from "../offRamp/OffRamp.sol";
 import {EVM2EVMOnRamp} from "../onRamp/EVM2EVMOnRamp.sol";
 import {OnRamp} from "../onRamp/OnRamp.sol";
 import {BaseTest} from "./BaseTest.t.sol";
@@ -15,7 +15,7 @@ import {EVM2EVMOffRampHelper} from "./helpers/EVM2EVMOffRampHelper.sol";
 import {EVM2EVMOnRampHelper} from "./helpers/EVM2EVMOnRampHelper.sol";
 import {OnRampHelper} from "./helpers/OnRampHelper.sol";
 import {MockCommitStore} from "./mocks/MockCommitStore.sol";
-import {EVM2EVMMultiOffRampSetup} from "./offRamp/EVM2EVMMultiOffRampSetup.t.sol";
+import {OffRampSetup} from "./offRamp/OffRampSetup.t.sol";
 import {OnRampSetup} from "./onRamp/OnRampSetup.t.sol";
 import {Test} from "forge-std/Test.sol";
 
@@ -320,7 +320,7 @@ contract NonceManager_OnRampUpgrade is OnRampSetup {
   }
 }
 
-contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
+contract NonceManager_OffRampUpgrade is OffRampSetup {
   EVM2EVMOffRampHelper internal s_prevOffRamp;
   EVM2EVMOffRampHelper[] internal s_nestedPrevOffRamps;
 
@@ -360,21 +360,20 @@ contract NonceManager_OffRampUpgrade is EVM2EVMMultiOffRampSetup {
     );
     s_inboundNonceManager.applyPreviousRampsUpdates(previousRamps);
 
-    EVM2EVMMultiOffRamp.SourceChainConfigArgs[] memory sourceChainConfigs =
-      new EVM2EVMMultiOffRamp.SourceChainConfigArgs[](3);
-    sourceChainConfigs[0] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
+    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](3);
+    sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
       router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
       isEnabled: true,
       onRamp: ON_RAMP_ADDRESS_1
     });
-    sourceChainConfigs[1] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
+    sourceChainConfigs[1] = OffRamp.SourceChainConfigArgs({
       router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_2,
       isEnabled: true,
       onRamp: ON_RAMP_ADDRESS_2
     });
-    sourceChainConfigs[2] = EVM2EVMMultiOffRamp.SourceChainConfigArgs({
+    sourceChainConfigs[2] = OffRamp.SourceChainConfigArgs({
       router: s_destRouter,
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_3,
       isEnabled: true,
