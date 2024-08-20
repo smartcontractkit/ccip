@@ -2343,7 +2343,7 @@ contract OffRamp__releaseOrMintSingleToken is OffRampSetup {
       destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
       extraData: "",
       amount: amount,
-      destGasAmount: abi.encode( DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+      destGasAmount: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
     });
 
     vm.mockCall(
@@ -2442,7 +2442,7 @@ contract OffRamp__releaseOrMintSingleToken is OffRampSetup {
       destTokenAddress: abi.encode(destToken),
       extraData: "",
       amount: amount,
-      destGasAmount: abi.encode( DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+      destGasAmount: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
     });
 
     bytes memory revertData = "call reverted :o";

@@ -381,7 +381,8 @@ contract PriceRegistryFeeSetup is PriceRegistrySetup {
     });
 
     for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-      messageEvent.tokenAmounts[i] = _getSourceTokenData(message.tokenAmounts[i], tokenAdminRegistry, DEST_CHAIN_SELECTOR);
+      messageEvent.tokenAmounts[i] =
+        _getSourceTokenData(message.tokenAmounts[i], tokenAdminRegistry, DEST_CHAIN_SELECTOR);
     }
 
     messageEvent.header.messageId = Internal._hash(messageEvent, metadataHash);
@@ -400,7 +401,7 @@ contract PriceRegistryFeeSetup is PriceRegistrySetup {
 
     uint32 expectedDestGasAmount;
     PriceRegistry.TokenTransferFeeConfig memory tokenTransferFeeConfig =
-                PriceRegistry(s_priceRegistry).getTokenTransferFeeConfig(destChainSelector, tokenAmount.token);
+      PriceRegistry(s_priceRegistry).getTokenTransferFeeConfig(destChainSelector, tokenAmount.token);
     expectedDestGasAmount =
       tokenTransferFeeConfig.isEnabled ? tokenTransferFeeConfig.destGasOverhead : DEFAULT_TOKEN_DEST_GAS_OVERHEAD;
 
