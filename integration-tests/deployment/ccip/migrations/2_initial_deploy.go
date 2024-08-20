@@ -11,7 +11,7 @@ import (
 // Note if the migration is a deployment and it fails we have 2 options:
 // - Just throw away the addresses, fix issue and try again (potentially expensive on mainnet)
 // - Roll forward with another migration completing the deployment
-func Apply0001(env deployment.Environment, c ccipdeployment.DeployCCIPContractConfig) (deployment.MigrationOutput, error) {
+func Apply0002(env deployment.Environment, c ccipdeployment.DeployCCIPContractConfig) (deployment.MigrationOutput, error) {
 	ab, err := ccipdeployment.DeployCCIPContracts(env, c)
 	if err != nil {
 		env.Logger.Errorw("Failed to deploy CCIP contracts", "err", err, "addresses", ab)

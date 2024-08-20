@@ -9,9 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 
@@ -27,70 +25,20 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
-// Context returns a context with the test's deadline, if available.
-func Context(tb testing.TB) context.Context {
-	ctx := context.Background()
-	var cancel func()
-	switch t := tb.(type) {
-	case *testing.T:
-		if d, ok := t.Deadline(); ok {
-			ctx, cancel = context.WithDeadline(ctx, d)
-		}
-	}
-	if cancel == nil {
-		ctx, cancel = context.WithCancel(ctx)
-	}
-	tb.Cleanup(cancel)
-	return ctx
-}
-
-func Test0001_InitialDeploy(t *testing.T) {
+func Test0002_InitialDeploy(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	ctx := Context(t)
-	chains := memory.NewMemoryChains(t, 3)
-	homeChainSel := uint64(0)
-	homeChainEVM := uint64(0)
-	// First chain is home chain.
-	for chainSel := range chains {
-		homeChainEVM, _ = chainsel.ChainIdFromSelector(chainSel)
-		homeChainSel = chainSel
-		break
-	}
-	ab, err := ccipdeployment.DeployCapReg(lggr, chains, homeChainSel)
-	require.NoError(t, err)
+	ctx := ccipdeployment.Context(t)
+	tenv := ccipdeployment.NewDeployedTestEnvironment(t, lggr)
+	e := tenv.Env
+	nodes := tenv.Nodes
+	chains := e.Chains
 
-	addrs, err := ab.AddressesForChain(homeChainSel)
-	require.NoError(t, err)
-	require.Len(t, addrs, 2)
-	capReg := common.Address{}
-	for addr := range addrs {
-		capReg = common.HexToAddress(addr)
-		break
-	}
-	nodes := memory.NewNodes(t, zapcore.InfoLevel, chains, 4, 1, memory.RegistryConfig{
-		EVMChainID: homeChainEVM,
-		Contract:   capReg,
-	})
-	for _, node := range nodes {
-		require.NoError(t, node.App.Start(ctx))
-	}
-
-	e := memory.NewMemoryEnvironmentFromChainsNodes(t, lggr, chains, nodes)
-	state, err := ccipdeployment.GenerateOnchainState(e, ab)
-	require.NoError(t, err)
-
-	capabilities, err := state.CapabilityRegistry[homeChainSel].GetCapabilities(nil)
-	require.NoError(t, err)
-	require.Len(t, capabilities, 1)
-	ccipCap, err := state.CapabilityRegistry[homeChainSel].GetHashedCapabilityId(nil,
-		ccipdeployment.CapabilityLabelledName, ccipdeployment.CapabilityVersion)
-	require.NoError(t, err)
-	_, err = state.CapabilityRegistry[homeChainSel].GetCapability(nil, ccipCap)
+	state, err := ccipdeployment.GenerateOnchainState(tenv.Env, tenv.Ab)
 	require.NoError(t, err)
 
 	// Apply migration
-	output, err := Apply0001(e, ccipdeployment.DeployCCIPContractConfig{
-		HomeChainSel: homeChainSel,
+	output, err := Apply0002(tenv.Env, ccipdeployment.DeployCCIPContractConfig{
+		HomeChainSel: tenv.HomeChainSel,
 		// Capreg/config already exist.
 		CCIPOnChainState: state,
 	})
