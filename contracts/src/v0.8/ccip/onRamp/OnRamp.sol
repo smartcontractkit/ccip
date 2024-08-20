@@ -193,9 +193,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     }
 
     // Validate pool return data after it is populated (view function - no state changes)
-    IPriceRegistry(s_dynamicConfig.priceRegistry).validatePoolReturnData(
+    bytes[] memory destExecDataPerToken = IPriceRegistry(s_dynamicConfig.priceRegistry).validatePoolReturnDataAndGetDestExecData(
       destChainSelector, newMessage.tokenAmounts, message.tokenAmounts
     );
+
+    for (uint256 i = 0; i < newMessage.tokenAmounts.length; ++i) {
+      newMessage.tokenAmounts[i].destGasAmount = destExecDataPerToken[i];
+    }
 
     // Override extraArgs with latest version
     newMessage.extraArgs = convertedExtraArgs;
@@ -248,20 +252,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     );
 
     // NOTE: pool data validations are outsourced to the PriceRegistry to handle family-specific logic handling
-    PriceRegistry.TokenTransferFeeConfig memory tokenTransferFeeConfig =
-      PriceRegistry(s_dynamicConfig.priceRegistry).getTokenTransferFeeConfig(destChainSelector, tokenAndAmount.token);
-    uint32 defaultGasOverhead =
-      PriceRegistry(s_dynamicConfig.priceRegistry).getDestChainConfig(destChainSelector).defaultTokenDestGasOverhead;
+
     return Internal.RampTokenAmount({
       sourcePoolAddress: abi.encode(sourcePool),
       destTokenAddress: poolReturnData.destTokenAddress,
       extraData: poolReturnData.destPoolData,
       amount: tokenAndAmount.amount,
-      // The user will be billed either the default or the override, so we send the exact amount that we billed for
-      // to the destination chain to be used for the token releaseOrMint and transfer.
-      destGasAmount: tokenTransferFeeConfig.isEnabled
-        ? abi.encode(tokenTransferFeeConfig.destGasOverhead)
-        : abi.encode(defaultGasOverhead)
+      destGasAmount: "" // This is set in the validatePoolReturnDataAndGetDestExecData function
     });
   }
 
