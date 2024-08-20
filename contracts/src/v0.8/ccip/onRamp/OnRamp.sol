@@ -83,6 +83,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     // This is the local router address that is allowed to send messages to the destination chain.
     // This is NOT the receiving router address on the destination chain.
     IRouter router;
+    // This is the list of addresses allowed to send messages from onRamp
     EnumerableSet.AddressSet allowList;
   }
 
@@ -154,8 +155,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   ) external returns (bytes32) {
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
 
-    if (destChainConfig.allowListEnabled && destChainConfig.allowList.contains(originalSender)) {
-      revert SenderNotAllowed(originalSender);
+    if (destChainConfig.allowListEnabled) {
+      if (destChainConfig.allowList.contains(originalSender)) {
+        revert SenderNotAllowed(originalSender);
+      }
     }
 
     // NOTE: assumes the message has already been validated through the getFee call
@@ -360,7 +363,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
 
   /// @notice Gets whether the allowList functionality is enabled.
   /// @return true is enabled, false if not.
-  function getAllowListEnabled(uint64 destinationChainSelector) external view returns (bool) {
+  function isAllowListEnabled(uint64 destinationChainSelector) external view returns (bool) {
     return s_destChainConfigs[destinationChainSelector].allowListEnabled;
   }
 
@@ -371,8 +374,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   }
 
   modifier onlyOwnerOrAllowListAdmin() {
-    if (msg.sender != owner() && msg.sender != s_dynamicConfig.allowListAdmin) {
-      revert OnlyCallableByOwnerOrAllowlistAdmin();
+    if (msg.sender != owner()) {
+      if (msg.sender != s_dynamicConfig.allowListAdmin) {
+        revert OnlyCallableByOwnerOrAllowlistAdmin();
+      }
     }
     _;
   }
