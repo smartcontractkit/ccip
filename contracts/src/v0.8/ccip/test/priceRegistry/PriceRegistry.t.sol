@@ -10,7 +10,7 @@ import {Pool} from "../../libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "../../libraries/USDPriceWith18Decimals.sol";
 import {PriceRegistryHelper} from "../helpers/PriceRegistryHelper.sol";
 import {PriceRegistryFeeSetup, PriceRegistrySetup} from "./PriceRegistrySetup.t.sol";
-
+import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {KeystoneFeedsPermissionHandler} from "../../../keystone/KeystoneFeedsPermissionHandler.sol";
 import {Vm} from "forge-std/Vm.sol";
 
