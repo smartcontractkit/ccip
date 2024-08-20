@@ -381,18 +381,19 @@ func (p *priceService) observeTokenPriceUpdates(
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch token prices: %w", err)
 	}
+
+	// Verify no price returned by price getter is nil
+	for token, price := range rawTokenPricesUSD {
+		if price == nil {
+			return nil, fmt.Errorf("Token price is nil for token %s", token)
+		}
+	}
+
 	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
 
 	sourceNativeEvmAddr, err := ccipcalc.GenericAddrToEvm(p.sourceNative)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert source native to EVM address: %w", err)
-	}
-
-	// Verify no price returned by price getter is nil
-	for token, price := range rawTokenPricesUSD {
-		if price == nil {
-			return nil, fmt.Errorf("token price is nil for token %s", token)
-		}
 	}
 
 	// Filter out source native token only if source native not in dest tokens
