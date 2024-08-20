@@ -259,7 +259,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
       amount: tokenAndAmount.amount,
       // The user will be billed either the default or the override, so we send the exact amount that we billed for
       // to the destination chain to be used for the token releaseOrMint and transfer.
-      destGasAmount: tokenTransferFeeConfig.isEnabled ? tokenTransferFeeConfig.destGasOverhead : defaultGasOverhead
+      destGasAmount: tokenTransferFeeConfig.isEnabled ? abi.encode(tokenTransferFeeConfig.destGasOverhead) : abi.encode(defaultGasOverhead)
     });
   }
 

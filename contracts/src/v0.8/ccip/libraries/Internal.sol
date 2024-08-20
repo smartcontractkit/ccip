@@ -295,7 +295,7 @@ library Internal {
     // has to be set for the specific token.
     bytes extraData;
     uint256 amount; // Amount of tokens.
-    uint32 destGasAmount; // The amount of gas available for the releaseOrMint and transfer calls on the offRamp
+    bytes destGasAmount; // The amount of gas available for the releaseOrMint and transfer calls on the offRamp
   }
 
   /// @notice Family-agnostic header for OnRamp & OffRamp messages.
