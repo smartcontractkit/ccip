@@ -375,12 +375,6 @@ func (p *priceService) observeTokenPriceUpdates(
 		return nil, fmt.Errorf("get destination tokens: %w", err)
 	}
 	onchainDestTokens := ccipcommon.FlattenedAndSortedTokens(fee, bridged)
-
-	onchainTokensEvmAddr, err := ccipcalc.GenericAddrsToEvm(onchainDestTokens...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert sorted lane tokens to EVM addresses: %w", err)
-	}
-
 	lggr.Debugw("Destination tokens", "destTokens", onchainDestTokens)
 
 	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, []cciptypes.Address{})
@@ -389,20 +383,17 @@ func (p *priceService) observeTokenPriceUpdates(
 	}
 	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
 
-	// make sure that we got prices for at least the destTokens
-	for _, token := range onchainDestTokens {
-		if rawTokenPricesUSD[token] == nil {
-			return nil, fmt.Errorf("missing token price: %+v", token)
-		}
-	}
-
 	sourceNativeEvmAddr, err := ccipcalc.GenericAddrToEvm(p.sourceNative)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert source native to EVM address: %w", err)
 	}
 
-	// Check for case where sourceNative has same address as one of the dest tokens (example: WETH in Base and Optimism)
-	hasSameDestAddress := slices.Contains(onchainTokensEvmAddr, sourceNativeEvmAddr)
+	// verify no price is nil
+	for token, price := range rawTokenPricesUSD {
+		if price == nil {
+			return nil, fmt.Errorf("token price is nil for token %s", token)
+		}
+	}
 
 	// Filter out source native token only if source native not in dest tokens
 	var finalDestTokens []cciptypes.Address
@@ -416,6 +407,13 @@ func (p *priceService) observeTokenPriceUpdates(
 			finalDestTokens = append(finalDestTokens, token)
 		}
 	}
+
+	onchainTokensEvmAddr, err := ccipcalc.GenericAddrsToEvm(onchainDestTokens...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert sorted lane tokens to EVM addresses: %w", err)
+	}
+	// Check for case where sourceNative has same address as one of the dest tokens (example: WETH in Base and Optimism)
+	hasSameDestAddress := slices.Contains(onchainTokensEvmAddr, sourceNativeEvmAddr)
 
 	if hasSameDestAddress {
 		finalDestTokens = append(finalDestTokens, p.sourceNative)

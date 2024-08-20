@@ -376,6 +376,7 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 		priceGetterRespErr  error
 		expTokenPricesUSD   map[cciptypes.Address]*big.Int
 		expErr              bool
+		expDecimalErr       bool
 	}{
 		{
 			name: "base case with src native token not equals to dest token",
@@ -426,17 +427,36 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 			expErr:              true,
 		},
 		{
+			name: "price getter returns more prices than requested",
+			tokenDecimals: map[cciptypes.Address]uint8{ // only destination tokens
+				tokens[1]: 18,
+				tokens[2]: 12,
+			},
+			sourceNativeToken: sourceNativeToken,
+			priceGetterRespData: map[cciptypes.Address]*big.Int{ // should return all tokens (including source native token)
+				sourceNativeToken: val1e18(100),
+				tokens[1]:         val1e18(200),
+				tokens[2]:         val1e18(300),
+				tokens[3]:         val1e18(400),
+			},
+			priceGetterRespErr: nil,
+			expErr:             true,
+			expDecimalErr:      true,
+		},
+		{
 			name: "price getter skipped a requested price",
 			tokenDecimals: map[cciptypes.Address]uint8{
 				tokens[0]: 18,
-				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[0],
 			priceGetterRespData: map[cciptypes.Address]*big.Int{
 				tokens[0]: val1e18(100),
 			},
 			priceGetterRespErr: nil,
-			expErr:             true,
+			expTokenPricesUSD: map[cciptypes.Address]*big.Int{
+				tokens[0]: val1e18(100),
+			},
+			expErr: false,
 		},
 		{
 			name: "nil token price",
@@ -485,7 +505,11 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 			}, nil).Maybe()
 
 			destPriceReg := ccipdatamocks.NewPriceRegistryReader(t)
-			destPriceReg.On("GetTokensDecimals", mock.Anything, destTokens).Return(destDecimals, nil).Maybe()
+			if tc.expDecimalErr {
+				destPriceReg.On("GetTokensDecimals", mock.Anything, mock.Anything).Return(destDecimals, fmt.Errorf("Token not found")).Maybe()
+			} else {
+				destPriceReg.On("GetTokensDecimals", mock.Anything, destTokens).Return(destDecimals, nil).Maybe()
+			}
 			destPriceReg.On("GetFeeTokens", mock.Anything).Return([]cciptypes.Address{destTokens[0]}, nil).Maybe()
 
 			priceService := NewPriceService(
