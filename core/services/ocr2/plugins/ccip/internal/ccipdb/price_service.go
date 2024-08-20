@@ -388,7 +388,7 @@ func (p *priceService) observeTokenPriceUpdates(
 		return nil, fmt.Errorf("failed to convert source native to EVM address: %w", err)
 	}
 
-	// verify no price is nil
+	// Verify no price returned by price getter is nil
 	for token, price := range rawTokenPricesUSD {
 		if price == nil {
 			return nil, fmt.Errorf("token price is nil for token %s", token)
