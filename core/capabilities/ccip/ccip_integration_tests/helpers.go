@@ -54,6 +54,7 @@ var (
 	commitReportAcceptedTopic   = evm_2_evm_multi_offramp.EVM2EVMMultiOffRampCommitReportAccepted{}.Topic()
 	executionStateChangedTopic  = evm_2_evm_multi_offramp.EVM2EVMMultiOffRampExecutionStateChanged{}.Topic()
 	initialMockAggregatorAnswer = big.NewInt(9e18)
+	deviationPPB                = ccipocr3.NewBigIntFromInt64(2e5)
 )
 
 const (
@@ -64,6 +65,7 @@ const (
 	// These constants drive what is set in the plugin offchain configs.
 	FirstBlockAge                           = 8 * time.Hour
 	RemoteGasPriceBatchWriteFrequency       = 30 * time.Minute
+	TokenPriceBatchWriteFrequency           = 30 * time.Minute
 	BatchGasLimit                           = 6_500_000
 	RelativeBoostPerWaitHour                = 1.5
 	InflightCacheExpiry                     = 10 * time.Minute
@@ -475,11 +477,11 @@ func getPluginConfig(
 	if pluginType == cctypes.PluginTypeCCIPCommit {
 		encodedOffchainConfig, err2 = pluginconfig.EncodeCommitOffchainConfig(pluginconfig.CommitOffchainConfig{
 			RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(RemoteGasPriceBatchWriteFrequency),
-			TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(time.Second),
+			TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(TokenPriceBatchWriteFrequency),
 			PriceSources: map[ocrtypes.Account]pluginconfig.ArbitrumPriceSource{
 				ocrtypes.Account(uni.weth.Address().Hex()): {
 					AggregatorAddress: h.mockAggregatorAddress.Hex(),
-					DeviationPPB:      ccipocr3.BigInt{Int: big.NewInt(1)},
+					DeviationPPB:      deviationPPB,
 				},
 			},
 			TokenDecimals: map[ocrtypes.Account]uint8{
@@ -526,8 +528,6 @@ func (h *homeChain) AddDON(
 	var ocr3Configs []ocr3_config_encoder.CCIPConfigTypesOCR3Config
 	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
 		encodedOffchainConfig := getPluginConfig(t, pluginType, uni, *h)
-		// commit: len:337, cap:352
-		// exec: len:171, cap:176
 
 		signers, transmitters, configF, _, offchainConfigVersion, offchainConfig, err2 := ocr3confighelper.ContractSetConfigArgsForTests(
 			DeltaProgress,

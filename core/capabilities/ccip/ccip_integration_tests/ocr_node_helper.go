@@ -288,7 +288,7 @@ func commitBlocksBackground(t *testing.T, universes map[uint64]onchainUniverse, 
 						randomNumber := rand.Intn(5)
 						// answer = previous round answer + (previous round answer * random percentage)
 						answer = new(big.Int).Add(answer, new(big.Int).Div(new(big.Int).Mul(answer, big.NewInt(int64(randomNumber))), big.NewInt(100)))
-						_, err := agg.UpdateRoundData(uni.owner, big.NewInt(round), big.NewInt(5e18), big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
+						_, err := agg.UpdateRoundData(uni.owner, big.NewInt(round), answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
 						if err != nil {
 							panic(fmt.Errorf("unable to update round data: %w", err))
 						}
