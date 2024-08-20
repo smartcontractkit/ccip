@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -20,9 +21,21 @@ func TestAddressBook_Save(t *testing.T) {
 
 	err := ab.Save(chainsel.TEST_90000001.Selector, addr1, onRamp100)
 	require.NoError(t, err)
-	// Duplicate address will error
+
+	// Check input validation
+	err = ab.Save(chainsel.TEST_90000001.Selector, "asdlfkj", onRamp100)
+	require.Error(t, err)
+	assert.Equal(t, errors.Is(err, ErrInvalidAddress), true, "err %s", err)
+	err = ab.Save(0, addr1, onRamp100)
+	require.Error(t, err)
+	assert.Equal(t, errors.Is(err, ErrInvalidChainSelector), true)
+	// Duplicate
 	err = ab.Save(chainsel.TEST_90000001.Selector, addr1, onRamp100)
 	require.Error(t, err)
+	// Zero address
+	err = ab.Save(chainsel.TEST_90000001.Selector, common.HexToAddress("0x0").Hex(), onRamp100)
+	require.Error(t, err)
+
 	// Distinct address same TV will not
 	err = ab.Save(chainsel.TEST_90000001.Selector, addr2, onRamp100)
 	require.NoError(t, err)

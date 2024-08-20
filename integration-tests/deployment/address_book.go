@@ -6,7 +6,13 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+)
+
+var (
+	ErrInvalidChainSelector = fmt.Errorf("invalid chain selector")
+	ErrInvalidAddress       = fmt.Errorf("invalid address")
 )
 
 // ContractType is a simple string type for identifying contract types.
@@ -84,16 +90,16 @@ type AddressBookMap struct {
 func (m *AddressBookMap) Save(chainSelector uint64, address string, typeAndVersion TypeAndVersion) error {
 	_, exists := chainsel.ChainBySelector(chainSelector)
 	if !exists {
-		return fmt.Errorf("chain selector %d not found", chainSelector)
+		return errors.Wrapf(ErrInvalidChainSelector, "chain selector %d not found", chainSelector)
 	}
-	if address == "" {
-		return fmt.Errorf("address cannot be empty")
+	if address == "" || address == common.HexToAddress("0x0").Hex() {
+		return errors.Wrap(ErrInvalidAddress, "address cannot be empty")
 	}
 	if common.IsHexAddress(address) {
 		// IMPORTANT: WE ALWAYS STANDARDIZE ETHEREUM ADDRESS STRINGS TO EIP55
 		address = common.HexToAddress(address).Hex()
 	} else {
-		return fmt.Errorf("address %s is not a valid Ethereum address, only Ethereum addresses supported", address)
+		return errors.Wrapf(ErrInvalidAddress, "address %s is not a valid Ethereum address, only Ethereum addresses supported", address)
 	}
 	if typeAndVersion.Type == "" {
 		return fmt.Errorf("type cannot be empty")
