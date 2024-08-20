@@ -242,9 +242,10 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			// are merged we'll be able to use different bindings for different tokens.
 			// We'll just need to remove the condition len(priceSources) > 1, and it should work.
 			priceSources := commitOffchainConfig.PriceSources
-			if len(priceSources) == 0 {
-				return nil, fmt.Errorf("no price sources provided")
-			} else if len(priceSources) > 1 {
+			//if len(priceSources) == 0 {
+			//	return nil, fmt.Errorf("no price sources provided")
+			//} else
+			if len(priceSources) > 1 {
 				return nil, fmt.Errorf("can't have more than one price source for now")
 			}
 

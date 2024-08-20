@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
@@ -45,18 +46,26 @@ func Context(tb testing.TB) context.Context {
 	return ctx
 }
 
+var (
+	Decimals18                  uint8 = 18
+	initialMockAggregatorAnswer       = big.NewInt(9e18)
+	deviationPPB                      = ccipocr3.NewBigIntFromInt64(2e5)
+)
+
 func Test0001_InitialDeploy(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	ctx := Context(t)
 	chains := memory.NewMemoryChains(t, 3)
-	homeChainSel := uint64(0)
-	homeChainEVM := uint64(0)
-	// First chain is home chain.
-	for chainSel := range chains {
-		homeChainEVM, _ = chainsel.ChainIdFromSelector(chainSel)
-		homeChainSel = chainSel
-		break
+	chainSelectors := make([]uint64, 0, len(chains))
+	for sel := range chains {
+		chainSelectors = append(chainSelectors, sel)
 	}
+	// First chain is home chain.
+	homeChainEVM, _ := chainsel.ChainIdFromSelector(chainSelectors[0])
+	homeChainSel := chainSelectors[0]
+	// Second chain is the price feed chain.
+	priceFeedChainSel := chainSelectors[1]
+
 	ab, err := ccipdeployment.DeployCapReg(lggr, chains, homeChainSel)
 	require.NoError(t, err)
 
@@ -89,9 +98,15 @@ func Test0001_InitialDeploy(t *testing.T) {
 	_, err = state.CapabilityRegistry[homeChainSel].GetCapability(nil, ccipCap)
 	require.NoError(t, err)
 
+	_, _, aggContract, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(chains[priceFeedChainSel].DeployerKey,
+		chains[priceFeedChainSel].Client, Decimals18, initialMockAggregatorAnswer)
+	require.NoError(t, err)
 	// Apply migration
 	output, err := Apply0001(e, ccipdeployment.DeployCCIPContractConfig{
-		HomeChainSel: homeChainSel,
+		HomeChainSel:      homeChainSel,
+		PriceFeedChainSel: priceFeedChainSel,
+		PriceFeedContract: aggContract,
+
 		// Capreg/config already exist.
 		CCIPOnChainState: state,
 	})

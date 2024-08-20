@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	owner_helpers "github.com/smartcontractkit/ccip-owner-contracts/gethwrappers"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 
@@ -105,7 +106,9 @@ func deployContract[C Contracts](
 }
 
 type DeployCCIPContractConfig struct {
-	HomeChainSel uint64
+	HomeChainSel      uint64
+	PriceFeedChainSel uint64
+	PriceFeedContract *aggregator_v3_interface.AggregatorV3Interface
 	// Existing contracts which we want to skip deployment
 	// Leave empty if we want to deploy everything
 	// TODO: Add skips to deploy function.
@@ -438,6 +441,7 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 			cr,
 			c.CapabilityRegistry[c.HomeChainSel],
 			c.CCIPConfig[c.HomeChainSel],
+			c.Weth9s[chain.Selector],
 			offRamp.Contract,
 			chain,
 			e.Chains[c.HomeChainSel],

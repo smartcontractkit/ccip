@@ -48,6 +48,8 @@ type CCIPOnChainState struct {
 	CapabilityRegistry map[uint64]*capabilities_registry.CapabilitiesRegistry
 	CCIPConfig         map[uint64]*ccip_config.CCIPConfig
 	Mcms               map[uint64]*owner_wrappers.ManyChainMultiSig
+	// We'll have only one chain with price feeds (ARB so far will be the one)
+	// For simplicity we'll be adding it to home chain here.
 	// TODO: remove once we have Address() on wrappers
 	McmsAddrs map[uint64]common.Address
 	Timelocks map[uint64]*owner_wrappers.RBACTimelock

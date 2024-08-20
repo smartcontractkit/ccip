@@ -9,8 +9,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -33,6 +35,7 @@ const (
 
 	FirstBlockAge                           = 8 * time.Hour
 	RemoteGasPriceBatchWriteFrequency       = 30 * time.Minute
+	TokenPriceBatchWriteFrequency           = 30 * time.Minute
 	BatchGasLimit                           = 6_500_000
 	RelativeBoostPerWaitHour                = 1.5
 	InflightCacheExpiry                     = 10 * time.Minute
@@ -50,6 +53,10 @@ const (
 	MaxDurationObservation                  = 5 * time.Second
 	MaxDurationShouldAcceptAttestedReport   = 10 * time.Second
 	MaxDurationShouldTransmitAcceptedReport = 10 * time.Second
+)
+
+var (
+	deviationPPB = ccipocr3.NewBigIntFromInt64(2e5)
 )
 
 func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainSel uint64) (deployment.AddressBook, error) {
@@ -191,11 +198,54 @@ func AddChainConfig(
 	return chainConfig, nil
 }
 
+func getPluginConfig(
+	pluginType cctypes.PluginType,
+	weth *weth9.WETH9,
+	h deployment.Chain,
+) ([]byte, error) {
+	var encodedOffchainConfig []byte
+	var err2 error
+	if pluginType == cctypes.PluginTypeCCIPCommit {
+		encodedOffchainConfig, err2 = pluginconfig.EncodeCommitOffchainConfig(pluginconfig.CommitOffchainConfig{
+			RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(RemoteGasPriceBatchWriteFrequency),
+			TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(TokenPriceBatchWriteFrequency),
+			PriceSources:                      map[ocrtypes.Account]pluginconfig.ArbitrumPriceSource{
+				//ocrtypes.Account(weth.Address().Hex()): {
+				//  AggregatorAddress: h.mockAggregatorAddress.Hex(),
+				//	DeviationPPB: deviationPPB,
+				//},
+			},
+			TokenDecimals: map[ocrtypes.Account]uint8{
+				//ocrtypes.Account(weth.Address().Hex()): 18,
+			},
+			TokenPriceChainSelector: h.Selector,
+		})
+		if err2 != nil {
+			return nil, err2
+		}
+	} else {
+		encodedOffchainConfig, err2 = pluginconfig.EncodeExecuteOffchainConfig(pluginconfig.ExecuteOffchainConfig{
+			BatchGasLimit:             BatchGasLimit,
+			RelativeBoostPerWaitHour:  RelativeBoostPerWaitHour,
+			MessageVisibilityInterval: *commonconfig.MustNewDuration(FirstBlockAge),
+			InflightCacheExpiry:       *commonconfig.MustNewDuration(InflightCacheExpiry),
+			RootSnoozeTime:            *commonconfig.MustNewDuration(RootSnoozeTime),
+			BatchingStrategyID:        BatchingStrategyID,
+		})
+		if err2 != nil {
+			return nil, err2
+		}
+	}
+
+	return encodedOffchainConfig, nil
+}
+
 func AddDON(
 	lggr logger.Logger,
 	ccipCapabilityID [32]byte,
 	capReg *capabilities_registry.CapabilitiesRegistry,
 	ccipConfig *ccip_config.CCIPConfig,
+	weth *weth9.WETH9,
 	offRamp *evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp,
 	dest deployment.Chain,
 	home deployment.Chain,
@@ -229,24 +279,7 @@ func AddDON(
 	// Add DON on capability registry contract
 	var ocr3Configs []ocr3_config_encoder.CCIPConfigTypesOCR3Config
 	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
-		var encodedOffchainConfig []byte
-		var err2 error
-		if pluginType == cctypes.PluginTypeCCIPCommit {
-			encodedOffchainConfig, err2 = pluginconfig.EncodeCommitOffchainConfig(pluginconfig.CommitOffchainConfig{
-				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(RemoteGasPriceBatchWriteFrequency),
-				// TODO: implement token price writes
-				// TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(tokenPriceBatchWriteFrequency),
-			})
-		} else {
-			encodedOffchainConfig, err2 = pluginconfig.EncodeExecuteOffchainConfig(pluginconfig.ExecuteOffchainConfig{
-				BatchGasLimit:             BatchGasLimit,
-				RelativeBoostPerWaitHour:  RelativeBoostPerWaitHour,
-				MessageVisibilityInterval: *commonconfig.MustNewDuration(FirstBlockAge),
-				InflightCacheExpiry:       *commonconfig.MustNewDuration(InflightCacheExpiry),
-				RootSnoozeTime:            *commonconfig.MustNewDuration(RootSnoozeTime),
-				BatchingStrategyID:        BatchingStrategyID,
-			})
-		}
+		encodedOffchainConfig, err2 := getPluginConfig(pluginType, weth, home)
 		if err2 != nil {
 			return err2
 		}
