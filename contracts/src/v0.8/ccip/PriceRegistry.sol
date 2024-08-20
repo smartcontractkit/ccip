@@ -830,8 +830,8 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
       // The user will be billed either the default or the override, so we send the exact amount that we billed for
       // to the destination chain to be used for the token releaseOrMint and transfer.
       destExecDataPerToken[i] = abi.encode(destGasAmount);
-      return destExecDataPerToken;
     }
+    return destExecDataPerToken;
   }
 
   // ================================================================
