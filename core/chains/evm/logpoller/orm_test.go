@@ -416,9 +416,10 @@ func TestORM(t *testing.T) {
 	require.NoError(t, o1.InsertBlock(ctx, common.HexToHash("0x1238"), 17, time.Now(), 0))
 
 	filter0 := logpoller.Filter{
-		Name:      "permanent retention filter",
-		Addresses: []common.Address{common.HexToAddress("0x1234")},
-		EventSigs: types.HashArray{topic, topic2},
+		Name:        "permanent retention filter",
+		Addresses:   []common.Address{common.HexToAddress("0x1234")},
+		EventSigs:   types.HashArray{topic, topic2},
+		MaxLogsKept: 1,
 	}
 
 	filter12 := logpoller.Filter{ // retain both topic1 and topic2 on contract3 for at least 1ms
@@ -428,10 +429,11 @@ func TestORM(t *testing.T) {
 		Retention: time.Millisecond,
 	}
 	filter2 := logpoller.Filter{ // retain topic2 on contract3 for at least 1 hour
-		Name:      "long retention filter",
-		Addresses: []common.Address{common.HexToAddress("0x1236")},
-		EventSigs: types.HashArray{topic2},
-		Retention: time.Hour,
+		Name:        "long retention filter",
+		Addresses:   []common.Address{common.HexToAddress("0x1236")},
+		EventSigs:   types.HashArray{topic2},
+		Retention:   time.Hour,
+		MaxLogsKept: 5,
 	}
 
 	// Test inserting filters and reading them back
@@ -464,6 +466,12 @@ func TestORM(t *testing.T) {
 	// Importantly, it shouldn't delete any logs matching only filter0 (ret=0 meaning permanent retention).  Anything
 	// matching filter12 should be kept regardless of what other filters it matches.
 	assert.Len(t, logs, 7)
+
+	// filter0 has permanent retention, but MaxLogsKept=1. So of the 3 logs matching it, 2 of them should get
+	// pruned by DeleteExcessLogs
+	deleted, err = o1.DeleteExcessLogs(ctx, 0)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), deleted)
 
 	// Delete logs after should delete all logs.
 	err = o1.DeleteLogsAndBlocksAfter(ctx, 1)
@@ -2063,10 +2071,11 @@ func Benchmark_LogPruning(b *testing.B) {
 	past := time.Now().Add(-1 * time.Hour)
 
 	err := o.InsertFilter(ctx, logpoller.Filter{
-		Name:      "test filter",
-		EventSigs: []common.Hash{commitReportAccepted},
-		Addresses: []common.Address{commitStoreAddress},
-		Retention: 1 * time.Millisecond,
+		Name:        "test filter",
+		EventSigs:   []common.Hash{commitReportAccepted},
+		Addresses:   []common.Address{commitStoreAddress},
+		Retention:   1 * time.Millisecond,
+		MaxLogsKept: 1,
 	})
 	require.NoError(b, err)
 
@@ -2112,8 +2121,11 @@ func Benchmark_LogPruning(b *testing.B) {
 	runBenchmarking("DeleteExpiredLogsLimit1000", func(ctx context.Context) (int64, error) {
 		return o.DeleteExpiredLogs(ctx, 1000)
 	})
-	runBenchmarking("DeleteExcessLogs", func(ctx context.Context) (int64, error) {
+	runBenchmarking("DeleteExcessLogsNoPaging", func(ctx context.Context) (int64, error) {
 		return o.DeleteExcessLogs(ctx, 0)
+	})
+	runBenchmarking("DeleteExcessLogsLimit1000", func(ctx context.Context) (int64, error) {
+		return o.DeleteExpiredLogs(ctx, 1000)
 	})
 }
 

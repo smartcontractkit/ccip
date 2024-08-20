@@ -186,9 +186,48 @@ func (o *DSORM) LoadFilters(ctx context.Context) (map[string]Filter, error) {
 	return filters, err
 }
 
+const (
+	blocksFields = `evm_chain_id, block_hash, block_number, block_timestamp, finalized_block_number, created_at`
+	logsFields   = `evm_chain_id, log_index, block_hash, block_number, address, event_sig, topics, tx_hash, data, created_at, block_timestamp`
+)
+
+func blocksQuery(clause string) string {
+	return fmt.Sprintf(`SELECT %s FROM evm.log_poller_blocks %s`, blocksFields, clause)
+}
+func logsQuery(clause string) string {
+	return fmt.Sprintf(`SELECT %s FROM evm.logs %s`, logsFields, clause)
+}
+
+func withConfs(query string, confs evmtypes.Confirmations) string {
+	var lastConfirmedBlock string
+
+	if confs == evmtypes.Finalized {
+		lastConfirmedBlock = `MAX(finalized_block)`
+	} else {
+		lastConfirmedBlock = `MAX(block_number) - :confs`
+	}
+	return fmt.Sprintf(`%s AND block_number <= (
+			SELECT %s
+			FROM evm.log_poller_blocks
+			WHERE evm_chain_id = :evm_chain_id)`, query, lastConfirmedBlock)
+}
+
+func logsQueryWithConfs(clause string, confs evmtypes.Confirmations) string {
+	return withConfs(logsQuery(clause), confs)
+}
+
+func withLimit(clause string, limit int) string {
+	if limit == 0 {
+		return clause
+	}
+	return fmt.Sprintf("%s LIMIT %d", clause, limit)
+}
+
 func (o *DSORM) SelectBlockByHash(ctx context.Context, hash common.Hash) (*LogPollerBlock, error) {
 	var b LogPollerBlock
-	if err := o.ds.GetContext(ctx, &b, `SELECT * FROM evm.log_poller_blocks WHERE block_hash = $1 AND evm_chain_id = $2`, hash.Bytes(), ubig.New(o.chainID)); err != nil {
+	if err := o.ds.GetContext(ctx, &b,
+		blocksQuery(`WHERE block_hash = $1 AND evm_chain_id = $2`),
+		hash.Bytes(), ubig.New(o.chainID)); err != nil {
 		return nil, err
 	}
 	return &b, nil
@@ -196,7 +235,9 @@ func (o *DSORM) SelectBlockByHash(ctx context.Context, hash common.Hash) (*LogPo
 
 func (o *DSORM) SelectBlockByNumber(ctx context.Context, n int64) (*LogPollerBlock, error) {
 	var b LogPollerBlock
-	if err := o.ds.GetContext(ctx, &b, `SELECT * FROM evm.log_poller_blocks WHERE block_number = $1 AND evm_chain_id = $2`, n, ubig.New(o.chainID)); err != nil {
+	if err := o.ds.GetContext(ctx, &b,
+		blocksQuery(`WHERE block_number = $1 AND evm_chain_id = $2)`), n, ubig.New(o.chainID),
+	); err != nil {
 		return nil, err
 	}
 	return &b, nil
@@ -204,7 +245,9 @@ func (o *DSORM) SelectBlockByNumber(ctx context.Context, n int64) (*LogPollerBlo
 
 func (o *DSORM) SelectLatestBlock(ctx context.Context) (*LogPollerBlock, error) {
 	var b LogPollerBlock
-	if err := o.ds.GetContext(ctx, &b, `SELECT * FROM evm.log_poller_blocks WHERE evm_chain_id = $1 ORDER BY block_number DESC LIMIT 1`, ubig.New(o.chainID)); err != nil {
+	if err := o.ds.GetContext(ctx, &b,
+		blocksQuery(`WHERE evm_chain_id = $1 ORDER BY block_number DESC LIMIT 1`), ubig.New(o.chainID),
+	); err != nil {
 		return nil, err
 	}
 	return &b, nil
@@ -212,7 +255,10 @@ func (o *DSORM) SelectLatestBlock(ctx context.Context) (*LogPollerBlock, error) 
 
 func (o *DSORM) SelectOldestBlock(ctx context.Context, minAllowedBlockNumber int64) (*LogPollerBlock, error) {
 	var b LogPollerBlock
-	if err := o.ds.GetContext(ctx, &b, `SELECT * FROM evm.log_poller_blocks WHERE evm_chain_id = $1 AND block_number >= $2 ORDER BY block_number ASC LIMIT 1`, ubig.New(o.chainID), minAllowedBlockNumber); err != nil {
+	if err := o.ds.GetContext(ctx, &b,
+		blocksQuery(`WHERE evm_chain_id = $1 AND block_number >= $2 ORDER BY block_number ASC LIMIT 1`),
+		ubig.New(o.chainID), minAllowedBlockNumber,
+	); err != nil {
 		return nil, err
 	}
 	return &b, nil
@@ -225,15 +271,11 @@ func (o *DSORM) SelectLatestLogByEventSigWithConfs(ctx context.Context, eventSig
 	if err != nil {
 		return nil, err
 	}
-	query := fmt.Sprintf(`
-		SELECT * FROM evm.logs
-			WHERE evm_chain_id = :evm_chain_id
+	query := logsQueryWithConfs(
+		`WHERE evm_chain_id = :evm_chain_id
 			AND event_sig = :event_sig
-			AND address = :address
-			AND block_number <= %s
-			ORDER BY block_number desc, log_index DESC
-			LIMIT 1
-		`, nestedBlockNumberQuery(confs))
+			AND address = :address`, confs) +
+		`ORDER BY block_number desc, log_index DESC LIMIT 1`
 	var l Log
 
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -257,8 +299,7 @@ func (o *DSORM) DeleteBlocksBefore(ctx context.Context, end int64, limit int64) 
             				WHERE block_number <= $1
             				AND evm_chain_id = $2
 							LIMIT $3
-						)
-						AND evm_chain_id = $2`,
+						) AND evm_chain_id = $2`,
 			end, ubig.New(o.chainID), limit)
 		if err != nil {
 			return 0, err
@@ -353,33 +394,47 @@ func (o *DSORM) DeleteExpiredLogs(ctx context.Context, limit int64) (int64, erro
 
 // DeleteExcessLogs deletes any logs old enough that MaxLogsKept has been exceeded for every filter they match.
 func (o *DSORM) DeleteExcessLogs(ctx context.Context, limit int64) (int64, error) {
-	var rowIds []struct {
-		BlockNumber uint64
-		LogIndex    uint64
-	}
+	var rowIds []uint64
 
 	var limitClause string
 	if limit > 0 {
-		limitClause = fmt.Sprintf(" LIMIT %d", limit)
+		// We have to count the logs in descending order first, to know which ones to keep. But then reverse the order
+		// of them all if we want to delete only the oldest {limit} # of logs. Omitting this 2nd ORDER BY is fine if we're
+		// deleting all prunable logs, but if paging is enabled we don't want to have non-contiguous
+		// block ranges of logs in the db while waiting for the next page to be pruned
+		limitClause = fmt.Sprintf(" ORDER BY block_number, log_index LIMIT %d", limit)
 	}
 
 	query := `
-		SELECT block_number, log_index FROM (
-			SELECT max_logs_kept != 0 AND ROW_NUMBER() OVER(PARTITION BY f.id ORDER BY block_number, log_index DESC) > max_logs_kept AS old, block_number, log_index
-    		FROM evm.log_poller_filters f JOIN evm.logs l
-        		ON f.evm_chain_id = l.evm_chain_id AND f.address = l.address AND f.event = l.event_sig WHERE f.evm_chain_id=$1
-		) x GROUP BY block_number, log_index HAVING BOOL_AND(old)` + limitClause
+		WITH filters AS (SELECT name,
+				ARRAY_AGG(address) AS addresses, ARRAY_AGG(event) AS events,
+				(ARRAY_AGG(topic2) FILTER(WHERE topic2 IS NOT NULL)) AS topic2,
+				(ARRAY_AGG(topic3) FILTER(WHERE topic3 IS NOT NULL)) AS topic3,
+				(ARRAY_AGG(topic4) FILTER(WHERE topic4 IS NOT NULL)) AS topic4,
+				MAX(max_logs_kept) AS max_logs_kept -- Should all be the same, but just in case use MAX
+			FROM evm.log_poller_filters WHERE evm_chain_id=$1
+			GROUP BY name
+		) SELECT id FROM (
+			SELECT l.id, block_number, log_index, max_logs_kept != 0 AND
+				ROW_NUMBER() OVER(PARTITION BY f.name ORDER BY block_number, log_index DESC) > max_logs_kept AS old
+				FROM filters f JOIN evm.logs l ON l.evm_chain_id=$1 AND
+					l.address = ANY(f.addresses) AND
+					l.event_sig = ANY(f.events) AND
+					(f.topic2 IS NULL OR l.topics[1] = ANY(f.topic2)) AND
+					(f.topic3 IS NULL OR l.topics[2] = ANY(f.topic3)) AND
+					(f.topic4 IS NULL OR l.topics[3] = ANY(f.topic4))
+		) x GROUP BY id, block_number, log_index HAVING BOOL_AND(old)` + limitClause
 
 	err := o.ds.SelectContext(ctx, &rowIds, query, ubig.New(o.chainID))
 	if err != nil {
 		return 0, err
 	}
 
-	result, err := o.ds.ExecContext(ctx, `DELETE FROM evm.logs WHERE evm_chain_id = :evm_chain_id AND (block_number, log_index) IN rowIds`, rowIds)
-
+	result, err := o.ds.ExecContext(ctx, `DELETE FROM evm.logs WHERE id = ANY($1)`, rowIds)
 	if err != nil {
 		return 0, err
 	}
+
 	return result.RowsAffected()
 }
 
@@ -459,11 +514,11 @@ func (o *DSORM) SelectLogsByBlockRange(ctx context.Context, start, end int64) ([
 		return nil, err
 	}
 
-	query := `SELECT * FROM evm.logs
-        	WHERE evm_chain_id = :evm_chain_id
-        	AND block_number >= :start_block
-        	AND block_number <= :end_block
-        	ORDER BY block_number, log_index`
+	query := logsQuery(`
+        WHERE evm_chain_id = :evm_chain_id
+        AND block_number >= :start_block
+        AND block_number <= :end_block
+		ORDER BY block_number, log_index`)
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -488,13 +543,13 @@ func (o *DSORM) SelectLogs(ctx context.Context, start, end int64, address common
 		return nil, err
 	}
 
-	query := `SELECT * FROM evm.logs
-			WHERE evm_chain_id = :evm_chain_id
-			AND address = :address
-			AND event_sig = :event_sig
-			AND block_number >= :start_block
-			AND block_number <= :end_block
-			ORDER BY block_number, log_index`
+	query := logsQuery(`
+		WHERE evm_chain_id = :evm_chain_id
+		AND address = :address
+		AND event_sig = :event_sig
+		AND block_number >= :start_block
+		AND block_number <= :end_block
+		ORDER BY block_number, log_index`)
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -519,14 +574,12 @@ func (o *DSORM) SelectLogsCreatedAfter(ctx context.Context, address common.Addre
 		return nil, err
 	}
 
-	query := fmt.Sprintf(`
-		SELECT * FROM evm.logs
-				WHERE evm_chain_id = :evm_chain_id
-				AND address = :address
-				AND event_sig = :event_sig
-				AND block_timestamp > :block_timestamp_after
-				AND block_number <= %s
-				ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
+	query := logsQueryWithConfs(
+		`WHERE evm_chain_id = :evm_chain_id
+			AND address = :address
+			AND event_sig = :event_sig
+			AND block_timestamp > :block_timestamp_after`, confs) +
+		`ORDER BY block_number, log_index`
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -553,12 +606,12 @@ func (o *DSORM) SelectLogsWithSigs(ctx context.Context, start, end int64, addres
 		return nil, err
 	}
 
-	query := `SELECT * FROM evm.logs
-				WHERE evm_chain_id = :evm_chain_id
-				AND address = :address
-				AND event_sig = ANY(:event_sig_array)
-				AND block_number BETWEEN :start_block AND :end_block
-				ORDER BY block_number, log_index`
+	query := logsQuery(`
+		WHERE evm_chain_id = :evm_chain_id
+		AND address = :address
+		AND event_sig = ANY(:event_sig_array)
+		AND block_number BETWEEN :start_block AND :end_block
+		ORDER BY block_number, log_index`)
 
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
 	if err != nil {
@@ -581,11 +634,11 @@ func (o *DSORM) GetBlocksRange(ctx context.Context, start int64, end int64) ([]L
 		return nil, err
 	}
 
-	query := `SELECT * FROM evm.log_poller_blocks
+	query := blocksQuery(`
 			WHERE block_number >= :start_block
 			AND block_number <= :end_block
 			AND evm_chain_id = :evm_chain_id
-			ORDER BY block_number ASC`
+			ORDER BY block_number ASC`)
 
 	var blocks []LogPollerBlock
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -612,17 +665,14 @@ func (o *DSORM) SelectLatestLogEventSigsAddrsWithConfs(ctx context.Context, from
 		return nil, err
 	}
 
-	query := fmt.Sprintf(`
-		SELECT * FROM evm.logs WHERE (block_number, address, event_sig) IN (
+	query := logsQueryWithConfs(`WHERE (block_number, address, event_sig) IN (
 			SELECT MAX(block_number), address, event_sig FROM evm.logs
 				WHERE evm_chain_id = :evm_chain_id
 				AND event_sig = ANY(:event_sig_array)
 				AND address = ANY(:address_array)
-				AND block_number > :start_block
-				AND block_number <= %s
-			GROUP BY event_sig, address
-		)
-		ORDER BY block_number ASC`, nestedBlockNumberQuery(confs))
+				AND block_number > :start_block`, confs) +
+		`GROUP BY event_sig, address)
+			ORDER BY block_number ASC`
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -647,13 +697,11 @@ func (o *DSORM) SelectLatestBlockByEventSigsAddrsWithConfs(ctx context.Context, 
 	if err != nil {
 		return 0, err
 	}
-	query := fmt.Sprintf(`
-		SELECT COALESCE(MAX(block_number), 0) FROM evm.logs
-			WHERE evm_chain_id = :evm_chain_id
-			AND event_sig = ANY(:event_sig_array)
-			AND address = ANY(:address_array)
-			AND block_number > :start_block
-			AND block_number <= %s`, nestedBlockNumberQuery(confs))
+	query := withConfs(`SELECT COALESCE(MAX(block_number), 0) FROM evm.logs
+		WHERE evm_chain_id = :evm_chain_id
+		AND event_sig = ANY(:event_sig_array)
+		AND address = ANY(:address_array)
+		AND block_number > :start_block`, confs)
 
 	var blockNumber int64
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -678,14 +726,12 @@ func (o *DSORM) SelectLogsDataWordRange(ctx context.Context, address common.Addr
 		return nil, err
 	}
 
-	query := fmt.Sprintf(`SELECT * FROM evm.logs
-			WHERE evm_chain_id = :evm_chain_id
-			AND address = :address
-			AND event_sig = :event_sig
-			AND substring(data from 32*:word_index+1 for 32) >= :word_value_min
-			AND substring(data from 32*:word_index+1 for 32) <= :word_value_max
-			AND block_number <= %s
-			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
+	query := logsQueryWithConfs(`WHERE evm_chain_id = :evm_chain_id
+		AND address = :address
+		AND event_sig = :event_sig
+		AND substring(data from 32*:word_index+1 for 32) >= :word_value_min
+		AND substring(data from 32*:word_index+1 for 32) <= :word_value_max`, confs) +
+		`ORDER BY block_number, log_index`
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -709,14 +755,11 @@ func (o *DSORM) SelectLogsDataWordGreaterThan(ctx context.Context, address commo
 		return nil, err
 	}
 
-	query := fmt.Sprintf(`
-		SELECT * FROM evm.logs
-			WHERE evm_chain_id = :evm_chain_id
-			AND address = :address
-			AND event_sig = :event_sig
-			AND substring(data from 32*:word_index+1 for 32) >= :word_value_min
-			AND block_number <= %s
-			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
+	query := logsQueryWithConfs(`WHERE evm_chain_id = :evm_chain_id
+		AND address = :address
+		AND event_sig = :event_sig
+		AND substring(data from 32*:word_index+1 for 32) >= :word_value_min`, confs) +
+		`ORDER BY block_number, log_index`
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -740,15 +783,12 @@ func (o *DSORM) SelectLogsDataWordBetween(ctx context.Context, address common.Ad
 	if err != nil {
 		return nil, err
 	}
-	query := fmt.Sprintf(`
-		SELECT * FROM evm.logs
-			WHERE evm_chain_id = :evm_chain_id
-			AND address = :address
-			AND event_sig = :event_sig
-			AND substring(data from 32*:word_index_min+1 for 32) <= :word_value
-			AND substring(data from 32*:word_index_max+1 for 32) >= :word_value
-			AND block_number <= %s
-			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
+	query := logsQueryWithConfs(`WHERE evm_chain_id = :evm_chain_id
+		AND address = :address
+		AND event_sig = :event_sig
+		AND substring(data from 32*:word_index_min+1 for 32) <= :word_value
+		AND substring(data from 32*:word_index_max+1 for 32) >= :word_value`, confs) +
+		`ORDER BY block_number, log_index`
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -772,14 +812,11 @@ func (o *DSORM) SelectIndexedLogsTopicGreaterThan(ctx context.Context, address c
 		return nil, err
 	}
 
-	query := fmt.Sprintf(`
-		SELECT * FROM evm.logs
-			WHERE evm_chain_id = :evm_chain_id
-			AND address = :address
-			AND event_sig = :event_sig
-			AND topics[:topic_index] >= :topic_value_min
-			AND block_number <= %s
-			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
+	query := logsQueryWithConfs(`WHERE evm_chain_id = :evm_chain_id
+		AND address = :address
+		AND event_sig = :event_sig
+		AND topics[:topic_index] >= :topic_value_min`, confs) +
+		`ORDER BY block_number, log_index`
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -804,15 +841,12 @@ func (o *DSORM) SelectIndexedLogsTopicRange(ctx context.Context, address common.
 		return nil, err
 	}
 
-	query := fmt.Sprintf(`
-			SELECT * FROM evm.logs
-				WHERE evm_chain_id = :evm_chain_id
-				AND address = :address
-				AND event_sig = :event_sig
-				AND topics[:topic_index] >= :topic_value_min
-				AND topics[:topic_index] <= :topic_value_max
-				AND block_number <= %s
-			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
+	query := logsQueryWithConfs(`WHERE evm_chain_id = :evm_chain_id
+		AND address = :address
+		AND event_sig = :event_sig
+		AND topics[:topic_index] >= :topic_value_min
+		AND topics[:topic_index] <= :topic_value_max`, confs) +
+		`ORDER BY block_number, log_index`
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -836,14 +870,12 @@ func (o *DSORM) SelectIndexedLogs(ctx context.Context, address common.Address, e
 		return nil, err
 	}
 
-	query := fmt.Sprintf(`
-		SELECT * FROM evm.logs
-			WHERE evm_chain_id = :evm_chain_id
-			AND address = :address
-			AND event_sig = :event_sig
-			AND topics[:topic_index] = ANY(:topic_values)
-			AND block_number <= %s
-			ORDER BY block_number, log_index`, nestedBlockNumberQuery(confs))
+	query := logsQueryWithConfs(`
+		WHERE evm_chain_id = :evm_chain_id
+		AND address = :address
+		AND event_sig = :event_sig
+		AND topics[:topic_index] = ANY(:topic_values)`, confs) +
+		`ORDER BY block_number, log_index`
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -869,14 +901,14 @@ func (o *DSORM) SelectIndexedLogsByBlockRange(ctx context.Context, start, end in
 		return nil, err
 	}
 
-	query := `SELECT * FROM evm.logs
+	query := logsQuery(`
 				WHERE evm_chain_id = :evm_chain_id
 				AND address = :address
 				AND event_sig = :event_sig
 				AND topics[:topic_index] = ANY(:topic_values)
 				AND block_number >= :start_block
 				AND block_number <= :end_block
-				ORDER BY block_number, log_index`
+				ORDER BY block_number, log_index`)
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -902,16 +934,13 @@ func (o *DSORM) SelectIndexedLogsCreatedAfter(ctx context.Context, address commo
 		return nil, err
 	}
 
-	query := fmt.Sprintf(`
-		SELECT * FROM evm.logs
-			WHERE evm_chain_id = :evm_chain_id
-			AND address = :address
-			AND event_sig = :event_sig
-			AND topics[:topic_index] = ANY(:topic_values)
-			AND block_timestamp > :block_timestamp_after
-			AND block_number <= %s
-			ORDER BY block_number, log_index
-		`, nestedBlockNumberQuery(confs))
+	query := logsQueryWithConfs(`
+		WHERE evm_chain_id = :evm_chain_id
+		AND address = :address
+		AND event_sig = :event_sig
+		AND topics[:topic_index] = ANY(:topic_values)
+		AND block_timestamp > :block_timestamp_after`, confs) +
+		`ORDER BY block_number, log_index`
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -935,12 +964,12 @@ func (o *DSORM) SelectIndexedLogsByTxHash(ctx context.Context, address common.Ad
 		return nil, err
 	}
 
-	query := `SELECT * FROM evm.logs
+	query := logsQuery(`
 			WHERE evm_chain_id = :evm_chain_id
 			AND address = :address
 			AND event_sig = :event_sig
 			AND tx_hash = :tx_hash
-			ORDER BY block_number, log_index`
+			ORDER BY block_number, log_index`)
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -970,25 +999,21 @@ func (o *DSORM) SelectIndexedLogsWithSigsExcluding(ctx context.Context, sigA, si
 		return nil, err
 	}
 
-	nestedQuery := nestedBlockNumberQuery(confs)
-	query := fmt.Sprintf(`
-		SELECT * FROM   evm.logs
-		WHERE   evm_chain_id = :evm_chain_id
-		AND     address = :address
-		AND     event_sig = :sigA
-		AND 	block_number BETWEEN :start_block AND :end_block
-		AND 	block_number <= %s
-		EXCEPT
-		SELECT     a.* FROM       evm.logs AS a
-		INNER JOIN evm.logs B
-		ON         a.evm_chain_id = b.evm_chain_id
-		AND        a.address = b.address
-		AND        a.topics[:topic_index] = b.topics[:topic_index]
-		AND        a.event_sig = :sigA
-		AND        b.event_sig = :sigB
-	    AND 	   b.block_number BETWEEN :start_block AND :end_block
-		AND		   b.block_number <= %s
-		ORDER BY block_number, log_index`, nestedQuery, nestedQuery)
+	query := logsQueryWithConfs(`
+			WHERE      evm_chain_id = :evm_chain_id
+			AND        address = :address
+			AND        event_sig = :sigA
+			AND        block_number BETWEEN :start_block AND :end_block`, confs) +
+		withConfs(`EXCEPT
+			SELECT     a.* FROM evm.logs AS a
+			INNER JOIN evm.logs B
+			ON         a.evm_chain_id = b.evm_chain_id
+			AND        a.address = b.address
+			AND        a.topics[:topic_index] = b.topics[:topic_index]
+			AND        a.event_sig = :sigA
+			AND        b.event_sig = :sigB
+			AND        b.block_number BETWEEN :start_block AND :end_block`, confs) +
+		`ORDER BY block_number, log_index`
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -1025,21 +1050,4 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter query.KeyFilter, limitA
 	}
 
 	return logs, nil
-}
-
-func nestedBlockNumberQuery(confs evmtypes.Confirmations) string {
-	if confs == evmtypes.Finalized {
-		return `
-				(SELECT finalized_block_number
-				FROM evm.log_poller_blocks
-				WHERE evm_chain_id = :evm_chain_id
-				ORDER BY block_number DESC LIMIT 1) `
-	}
-	// Intentionally wrap with greatest() function and don't return negative block numbers when :confs > :block_number
-	// It doesn't impact logic of the outer query, because block numbers are never less or equal to 0 (guarded by log_poller_blocks_block_number_check)
-	return `
-			(SELECT greatest(block_number - :confs, 0)
-			FROM evm.log_poller_blocks
-			WHERE evm_chain_id = :evm_chain_id
-			ORDER BY block_number DESC LIMIT 1) `
 }
