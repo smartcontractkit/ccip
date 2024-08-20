@@ -1289,19 +1289,18 @@ contract OffRamp_manuallyExecute is OffRampSetup {
 
     s_reverting_receiver.setRevert(false);
 
-    vm.expectEmit();
-    emit OffRamp.ExecutionStateChanged(
+    uint256[][] memory gasLimitOverrides = new uint256[][](1);
+    gasLimitOverrides[0] = new uint256[](messages.length);
+
+    vm.recordLogs();
+    s_offRamp.manuallyExecute(_generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), gasLimitOverrides);
+    assertExecutionStateChangedEventLogs(
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      "",
-      30937
+      ""
     );
-
-    uint256[][] memory gasLimitOverrides = new uint256[][](1);
-    gasLimitOverrides[0] = new uint256[](messages.length);
-    s_offRamp.manuallyExecute(_generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), gasLimitOverrides);
   }
 
   function test_manuallyExecute_WithGasOverride_Success() public {
@@ -1313,21 +1312,18 @@ contract OffRamp_manuallyExecute is OffRampSetup {
 
     s_reverting_receiver.setRevert(false);
 
-    vm.expectEmit(true, true, true, true);
-    emit OffRamp.ExecutionStateChanged(
+    uint256[][] memory gasLimitOverrides = new uint256[][](1);
+    gasLimitOverrides[0] = _getGasLimitsFromMessages(messages);
+    gasLimitOverrides[0][0] += 1;
+    vm.recordLogs();
+    s_offRamp.manuallyExecute(_generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), gasLimitOverrides);
+    assertExecutionStateChangedEventLogs(
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
-      "",
-      31011
+      ""
     );
-
-    uint256[][] memory gasLimitOverrides = new uint256[][](1);
-    gasLimitOverrides[0] = _getGasLimitsFromMessages(messages);
-    gasLimitOverrides[0][0] += 1;
-
-    s_offRamp.manuallyExecute(_generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), gasLimitOverrides);
   }
 
   function test_manuallyExecute_DoesNotRevertIfUntouched_Success() public {
@@ -1390,44 +1386,18 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     gasLimitOverrides[0] = _getGasLimitsFromMessages(messages1);
     gasLimitOverrides[1] = _getGasLimitsFromMessages(messages2);
 
-    uint256[] memory expectedGasUsed = new uint256[](3);
-    expectedGasUsed[0] = 31022;
-    expectedGasUsed[1] = 22453;
-    expectedGasUsed[2] = 22453;
+    vm.recordLogs();
+    s_offRamp.manuallyExecute(reports, gasLimitOverrides);
 
-    for (uint256 i = 0; i < 3; ++i) {
-      vm.expectEmit(true, true, true, true);
-      emit OffRamp.ExecutionStateChanged(
+    for (uint64 i = 0; i < 3; ++i) {
+      assertExecutionStateChangedEventLogs(
         SOURCE_CHAIN_SELECTOR_1,
         messages1[i].header.sequenceNumber,
         messages1[i].header.messageId,
         Internal.MessageExecutionState.SUCCESS,
-        "",
-        expectedGasUsed[i]
+        ""
       );
-
-      gasLimitOverrides[0][i] += 1;
     }
-
-    expectedGasUsed = new uint256[](2);
-    expectedGasUsed[0] = 24527;
-    expectedGasUsed[1] = 22454;
-
-    for (uint256 i = 0; i < 2; ++i) {
-      vm.expectEmit(true, true, true, false);
-      emit OffRamp.ExecutionStateChanged(
-        SOURCE_CHAIN_SELECTOR_3,
-        messages2[i].header.sequenceNumber,
-        messages2[i].header.messageId,
-        Internal.MessageExecutionState.SUCCESS,
-        "",
-        expectedGasUsed[i]
-      );
-
-      gasLimitOverrides[1][i] += 1;
-    }
-
-    s_offRamp.manuallyExecute(reports, gasLimitOverrides);
   }
 
   function test_manuallyExecute_WithPartialMessages_Success() public {
@@ -1689,7 +1659,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       destTokenAddress: abi.encode(s_destTokenBySourceToken[s_sourceFeeToken]),
       extraData: "",
       amount: tokenAmount,
-      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+      destGasAmount: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
     });
 
     messages[0].receiver = address(receiver);
@@ -2242,7 +2212,7 @@ contract OffRamp_trialExecute is OffRampSetup {
       destTokenAddress: abi.encode(address(0)),
       extraData: "",
       amount: message.tokenAmounts[0].amount,
-      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+      destGasAmount: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
     });
 
     message.header.messageId = Internal._hash(message, ON_RAMP_ADDRESS_1);
@@ -2260,7 +2230,7 @@ contract OffRamp_trialExecute is OffRampSetup {
       destTokenAddress: abi.encode(notAContract),
       extraData: "",
       amount: message.tokenAmounts[0].amount,
-      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+      destGasAmount: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
     });
 
     message.header.messageId = Internal._hash(message, ON_RAMP_ADDRESS_1);
@@ -2292,7 +2262,7 @@ contract OffRamp__releaseOrMintSingleToken is OffRampSetup {
       destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
       extraData: "",
       amount: amount,
-      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+      destGasAmount: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
     });
 
     vm.expectCall(
@@ -2326,7 +2296,7 @@ contract OffRamp__releaseOrMintSingleToken is OffRampSetup {
       destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
       extraData: "",
       amount: amount,
-      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+      destGasAmount: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
     });
 
     // Mock the call so returns 2 slots of data
@@ -2348,7 +2318,7 @@ contract OffRamp__releaseOrMintSingleToken is OffRampSetup {
       destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
       extraData: "",
       amount: amount,
-      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+      destGasAmount: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
     });
 
     bytes memory revertData = "failed to balanceOf";
@@ -2373,7 +2343,7 @@ contract OffRamp__releaseOrMintSingleToken is OffRampSetup {
       destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
       extraData: "",
       amount: amount,
-      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+      destGasAmount: abi.encode( DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
     });
 
     vm.mockCall(
@@ -2401,7 +2371,7 @@ contract OffRamp__releaseOrMintSingleToken is OffRampSetup {
       destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
       extraData: "",
       amount: amount,
-      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+      destGasAmount: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
     });
 
     // This should make the call fail if it does not skip the check
@@ -2429,7 +2399,7 @@ contract OffRamp__releaseOrMintSingleToken is OffRampSetup {
       destTokenAddress: abi.encode(destToken),
       extraData: "",
       amount: amount,
-      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+      destGasAmount: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
     });
 
     // Address(0) should always revert
@@ -2472,7 +2442,7 @@ contract OffRamp__releaseOrMintSingleToken is OffRampSetup {
       destTokenAddress: abi.encode(destToken),
       extraData: "",
       amount: amount,
-      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+      destGasAmount: abi.encode( DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
     });
 
     bytes memory revertData = "call reverted :o";
@@ -2629,7 +2599,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
       destTokenAddress: abi.encode(s_offRamp),
       extraData: "",
       amount: 1,
-      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+      destGasAmount: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
     });
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.NotACompatiblePool.selector, address(0)));
@@ -2682,7 +2652,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
       destTokenAddress: abi.encode(destPool),
       extraData: unusedVar,
       amount: 1,
-      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
+      destGasAmount: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
     });
 
     try s_offRamp.releaseOrMintTokens(
