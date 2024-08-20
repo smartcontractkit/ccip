@@ -236,7 +236,6 @@ contract PriceRegistrySetup is TokenSetup {
         maxPerMsgGasLimit: MAX_GAS_LIMIT,
         defaultTokenFeeUSDCents: DEFAULT_TOKEN_FEE_USD_CENTS,
         defaultTokenDestGasOverhead: DEFAULT_TOKEN_DEST_GAS_OVERHEAD,
-        defaultTokenDestBytesOverhead: DEFAULT_TOKEN_BYTES_OVERHEAD,
         defaultTxGasLimit: GAS_LIMIT,
         gasMultiplierWeiPerEth: 5e17,
         networkFeeUSDCents: 1_00,
@@ -300,7 +299,6 @@ contract PriceRegistrySetup is TokenSetup {
     assertEq(a.destDataAvailabilityMultiplierBps, b.destDataAvailabilityMultiplierBps);
     assertEq(a.defaultTokenFeeUSDCents, b.defaultTokenFeeUSDCents);
     assertEq(a.defaultTokenDestGasOverhead, b.defaultTokenDestGasOverhead);
-    assertEq(a.defaultTokenDestBytesOverhead, b.defaultTokenDestBytesOverhead);
     assertEq(a.defaultTxGasLimit, b.defaultTxGasLimit);
   }
 }
@@ -383,7 +381,8 @@ contract PriceRegistryFeeSetup is PriceRegistrySetup {
     });
 
     for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-      messageEvent.tokenAmounts[i] = _getSourceTokenData(message.tokenAmounts[i], tokenAdminRegistry);
+      messageEvent.tokenAmounts[i] =
+        _getSourceTokenData(message.tokenAmounts[i], tokenAdminRegistry, DEST_CHAIN_SELECTOR);
     }
 
     messageEvent.header.messageId = Internal._hash(messageEvent, metadataHash);
@@ -392,15 +391,26 @@ contract PriceRegistryFeeSetup is PriceRegistrySetup {
 
   function _getSourceTokenData(
     Client.EVMTokenAmount memory tokenAmount,
-    TokenAdminRegistry tokenAdminRegistry
+    TokenAdminRegistry tokenAdminRegistry,
+    uint64 destChainSelector
   ) internal view returns (Internal.RampTokenAmount memory) {
     address destToken = s_destTokenBySourceToken[tokenAmount.token];
+
+    uint256 tokenTransferFeeConfigArgIndex;
+    uint256 tokenTransferFeeConfigsIndex;
+
+    uint32 expectedDestGasAmount;
+    PriceRegistry.TokenTransferFeeConfig memory tokenTransferFeeConfig =
+      PriceRegistry(s_priceRegistry).getTokenTransferFeeConfig(destChainSelector, tokenAmount.token);
+    expectedDestGasAmount =
+      tokenTransferFeeConfig.isEnabled ? tokenTransferFeeConfig.destGasOverhead : DEFAULT_TOKEN_DEST_GAS_OVERHEAD;
 
     return Internal.RampTokenAmount({
       sourcePoolAddress: abi.encode(tokenAdminRegistry.getTokenConfig(tokenAmount.token).tokenPool),
       destTokenAddress: abi.encode(destToken),
       extraData: "",
-      amount: tokenAmount.amount
+      amount: tokenAmount.amount,
+      destGasAmount: abi.encode(expectedDestGasAmount)
     });
   }
 
