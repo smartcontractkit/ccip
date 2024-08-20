@@ -800,13 +800,13 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
   /// @inheritdoc IPriceRegistry
   /// @dev precondition - rampTokenAmounts and sourceTokenAmounts lengths must be equal
-  function validatePoolReturnData(
+  function validatePoolReturnDataAndGetDestExecData(
     uint64 destChainSelector,
     Internal.RampTokenAmount[] calldata rampTokenAmounts,
     Client.EVMTokenAmount[] calldata sourceTokenAmounts
-  ) external view {
+  ) external view returns (bytes[] memory destExecDataPerToken) {
     bytes4 chainFamilySelector = s_destChainConfigs[destChainSelector].chainFamilySelector;
-
+    destExecDataPerToken = new bytes[](rampTokenAmounts.length);
     for (uint256 i = 0; i < rampTokenAmounts.length; ++i) {
       address sourceToken = sourceTokenAmounts[i].token;
 
@@ -821,6 +821,15 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
       }
 
       _validateDestFamilyAddress(chainFamilySelector, rampTokenAmounts[i].destTokenAddress);
+      PriceRegistry.TokenTransferFeeConfig memory tokenTransferFeeConfig = s_tokenTransferFeeConfig[destChainSelector][sourceToken];
+      uint32 defaultGasOverhead = s_destChainConfigs[destChainSelector].defaultTokenDestGasOverhead;
+      uint32 destGasAmount = tokenTransferFeeConfig.isEnabled
+        ? tokenTransferFeeConfig.destGasOverhead
+        : defaultGasOverhead;
+
+      // The user will be billed either the default or the override, so we send the exact amount that we billed for
+      // to the destination chain to be used for the token releaseOrMint and transfer.
+      destExecDataPerToken[i] = abi.encode(destGasAmount);
     }
   }
 
