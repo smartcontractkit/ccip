@@ -1,4 +1,4 @@
-package change_set
+package changeset
 
 import (
 	"context"
