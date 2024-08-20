@@ -15,12 +15,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/nonce_manager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_admin_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	MockARM              deployment.ContractType = "MockARM"
+	MockARM              deployment.ContractType = "MockRMN"
 	LinkToken            deployment.ContractType = "LinkToken"
 	ARMProxy             deployment.ContractType = "ARMProxy"
 	WETH9                deployment.ContractType = "WETH9"
@@ -40,26 +40,26 @@ var (
 	ManyChainMultisig    deployment.ContractType = "ManyChainMultiSig"
 	CCIPConfig           deployment.ContractType = "CCIPConfig"
 	RBACTimelock         deployment.ContractType = "RBACTimelock"
-	EVM2EVMMultiOnRamp   deployment.ContractType = "EVM2EVMMultiOnRamp"
-	EVM2EVMMultiOffRamp  deployment.ContractType = "EVM2EVMMultiOffRamp"
+	OnRamp               deployment.ContractType = "OnRamp"
+	OffRamp              deployment.ContractType = "OffRamp"
 	CCIPReceiver         deployment.ContractType = "CCIPReceiver"
 	CapabilitiesRegistry deployment.ContractType = "CapabilitiesRegistry"
 )
 
 type Contracts interface {
 	*capabilities_registry.CapabilitiesRegistry |
-		*arm_proxy_contract.ARMProxyContract |
+		*rmn_proxy_contract.RMNProxyContract |
 		*ccip_config.CCIPConfig |
 		*nonce_manager.NonceManager |
 		*price_registry.PriceRegistry |
 		*router.Router |
 		*token_admin_registry.TokenAdminRegistry |
 		*weth9.WETH9 |
-		*mock_arm_contract.MockARMContract |
+		*mock_rmn_contract.MockRMNContract |
 		*owner_helpers.ManyChainMultiSig |
 		*owner_helpers.RBACTimelock |
-		*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp |
-		*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp |
+		*offramp.OffRamp |
+		*onramp.OnRamp |
 		*burn_mint_erc677.BurnMintERC677 |
 		*maybe_revert_message_receiver.MaybeRevertMessageReceiver
 }
@@ -223,12 +223,12 @@ func DeployChainContracts(e deployment.Environment, chain deployment.Chain, ab d
 
 	// TODO: Still waiting for RMNRemote/RMNHome contracts etc.
 	mockARM, err := deployContract(e.Logger, chain, ab,
-		func(chain deployment.Chain) ContractDeploy[*mock_arm_contract.MockARMContract] {
-			mockARMAddr, tx, mockARM, err2 := mock_arm_contract.DeployMockARMContract(
+		func(chain deployment.Chain) ContractDeploy[*mock_rmn_contract.MockRMNContract] {
+			mockARMAddr, tx, mockARM, err2 := mock_rmn_contract.DeployMockRMNContract(
 				chain.DeployerKey,
 				chain.Client,
 			)
-			return ContractDeploy[*mock_arm_contract.MockARMContract]{
+			return ContractDeploy[*mock_rmn_contract.MockRMNContract]{
 				mockARMAddr, mockARM, tx, deployment.NewTypeAndVersion(MockARM, deployment.Version1_0_0), err2,
 			}
 		})
@@ -277,22 +277,22 @@ func DeployChainContracts(e deployment.Environment, chain deployment.Chain, ab d
 	}
 	e.Logger.Infow("deployed timelock", "addr", mcm.Address)
 
-	armProxy, err := deployContract(e.Logger, chain, ab,
-		func(chain deployment.Chain) ContractDeploy[*arm_proxy_contract.ARMProxyContract] {
-			armProxyAddr, tx, armProxy, err2 := arm_proxy_contract.DeployARMProxyContract(
+	rmnProxy, err := deployContract(e.Logger, chain, ab,
+		func(chain deployment.Chain) ContractDeploy[*rmn_proxy_contract.RMNProxyContract] {
+			rmnProxyAddr, tx, rmnProxy, err2 := rmn_proxy_contract.DeployRMNProxyContract(
 				chain.DeployerKey,
 				chain.Client,
 				mockARM.Address,
 			)
-			return ContractDeploy[*arm_proxy_contract.ARMProxyContract]{
-				armProxyAddr, armProxy, tx, deployment.NewTypeAndVersion(ARMProxy, deployment.Version1_0_0), err2,
+			return ContractDeploy[*rmn_proxy_contract.RMNProxyContract]{
+				rmnProxyAddr, rmnProxy, tx, deployment.NewTypeAndVersion(ARMProxy, deployment.Version1_0_0), err2,
 			}
 		})
 	if err != nil {
-		e.Logger.Errorw("Failed to deploy armProxy", "err", err)
+		e.Logger.Errorw("Failed to deploy rmnProxy", "err", err)
 		return ab, err
 	}
-	e.Logger.Infow("deployed armProxy", "addr", armProxy.Address)
+	e.Logger.Infow("deployed rmnProxy", "addr", rmnProxy.Address)
 
 	weth9, err := deployContract(e.Logger, chain, ab,
 		func(chain deployment.Chain) ContractDeploy[*weth9.WETH9] {
@@ -334,7 +334,7 @@ func DeployChainContracts(e deployment.Environment, chain deployment.Chain, ab d
 				chain.DeployerKey,
 				chain.Client,
 				weth9.Address,
-				armProxy.Address,
+				rmnProxy.Address,
 			)
 			return ContractDeploy[*router.Router]{
 				routerAddr, routerC, tx, deployment.NewTypeAndVersion(Router, deployment.Version1_2_0), err2,
@@ -413,24 +413,24 @@ func DeployChainContracts(e deployment.Environment, chain deployment.Chain, ab d
 	}
 
 	onRamp, err := deployContract(e.Logger, chain, ab,
-		func(chain deployment.Chain) ContractDeploy[*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp] {
-			onRampAddr, tx, onRamp, err2 := evm_2_evm_multi_onramp.DeployEVM2EVMMultiOnRamp(
+		func(chain deployment.Chain) ContractDeploy[*onramp.OnRamp] {
+			onRampAddr, tx, onRamp, err2 := onramp.DeployOnRamp(
 				chain.DeployerKey,
 				chain.Client,
-				evm_2_evm_multi_onramp.EVM2EVMMultiOnRampStaticConfig{
+				onramp.OnRampStaticConfig{
 					ChainSelector:      chain.Selector,
-					RmnProxy:           armProxy.Address,
+					RmnProxy:           rmnProxy.Address,
 					NonceManager:       nonceManager.Address,
 					TokenAdminRegistry: tokenAdminRegistry.Address,
 				},
-				evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDynamicConfig{
+				onramp.OnRampDynamicConfig{
 					PriceRegistry: priceRegistry.Address,
 					FeeAggregator: common.HexToAddress("0x1"), // TODO real fee aggregator
 				},
-				[]evm_2_evm_multi_onramp.EVM2EVMMultiOnRampDestChainConfigArgs{},
+				[]onramp.OnRampDestChainConfigArgs{},
 			)
-			return ContractDeploy[*evm_2_evm_multi_onramp.EVM2EVMMultiOnRamp]{
-				onRampAddr, onRamp, tx, deployment.NewTypeAndVersion(EVM2EVMMultiOnRamp, deployment.Version1_6_0_dev), err2,
+			return ContractDeploy[*onramp.OnRamp]{
+				onRampAddr, onRamp, tx, deployment.NewTypeAndVersion(OnRamp, deployment.Version1_6_0_dev), err2,
 			}
 		})
 	if err != nil {
@@ -440,26 +440,26 @@ func DeployChainContracts(e deployment.Environment, chain deployment.Chain, ab d
 	e.Logger.Infow("deployed onramp", "addr", onRamp.Address)
 
 	offRamp, err := deployContract(e.Logger, chain, ab,
-		func(chain deployment.Chain) ContractDeploy[*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp] {
-			offRampAddr, tx, offRamp, err2 := evm_2_evm_multi_offramp.DeployEVM2EVMMultiOffRamp(
+		func(chain deployment.Chain) ContractDeploy[*offramp.OffRamp] {
+			offRampAddr, tx, offRamp, err2 := offramp.DeployOffRamp(
 				chain.DeployerKey,
 				chain.Client,
-				evm_2_evm_multi_offramp.EVM2EVMMultiOffRampStaticConfig{
+				offramp.OffRampStaticConfig{
 					ChainSelector:      chain.Selector,
-					RmnProxy:           armProxy.Address,
+					RmnProxy:           rmnProxy.Address,
 					NonceManager:       nonceManager.Address,
 					TokenAdminRegistry: tokenAdminRegistry.Address,
 				},
-				evm_2_evm_multi_offramp.EVM2EVMMultiOffRampDynamicConfig{
+				offramp.OffRampDynamicConfig{
 					PriceRegistry:                           priceRegistry.Address,
 					PermissionLessExecutionThresholdSeconds: uint32(86400),
 					MaxTokenTransferGas:                     uint32(200_000),
 					MaxPoolReleaseOrMintGas:                 uint32(200_000),
 				},
-				[]evm_2_evm_multi_offramp.EVM2EVMMultiOffRampSourceChainConfigArgs{},
+				[]offramp.OffRampSourceChainConfigArgs{},
 			)
-			return ContractDeploy[*evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp]{
-				offRampAddr, offRamp, tx, deployment.NewTypeAndVersion(EVM2EVMMultiOffRamp, deployment.Version1_6_0_dev), err2,
+			return ContractDeploy[*offramp.OffRamp]{
+				offRampAddr, offRamp, tx, deployment.NewTypeAndVersion(OffRamp, deployment.Version1_6_0_dev), err2,
 			}
 		})
 	if err != nil {
