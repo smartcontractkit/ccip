@@ -78,8 +78,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     // The following three properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token
     uint16 defaultTokenFeeUSDCents; //           │ Default token fee charged per token transfer
     uint32 defaultTokenDestGasOverhead; // ──────╯ Default gas charged to execute the token transfer on the destination chain
-    uint32 defaultTokenDestBytesOverhead; // ────╮ Default extra data availability bytes charged per token transfer
-    uint32 defaultTxGasLimit; //                 │ Default gas limit for a tx
+    uint32 defaultTxGasLimit; //─────────────────╮ Default gas limit for a tx
     uint64 gasMultiplierWeiPerEth; //            │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
     uint32 networkFeeUSDCents; //                │ Flat network fee to charge for messages,  multiples of 0.01 USD
     bool enforceOutOfOrder; //                   │ Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
@@ -569,7 +568,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
       if (!transferFeeConfig.isEnabled) {
         tokenTransferFeeUSDWei += uint256(destChainConfig.defaultTokenFeeUSDCents) * 1e16;
         tokenTransferGas += destChainConfig.defaultTokenDestGasOverhead;
-        tokenTransferBytesOverhead += destChainConfig.defaultTokenDestBytesOverhead;
+        tokenTransferBytesOverhead += Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES;
         continue;
       }
 
@@ -801,13 +800,13 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
   /// @inheritdoc IPriceRegistry
   /// @dev precondition - rampTokenAmounts and sourceTokenAmounts lengths must be equal
-  function validatePoolReturnData(
+  function validatePoolReturnDataAndGetDestExecData(
     uint64 destChainSelector,
     Internal.RampTokenAmount[] calldata rampTokenAmounts,
     Client.EVMTokenAmount[] calldata sourceTokenAmounts
-  ) external view {
+  ) external view returns (bytes[] memory destExecDataPerToken) {
     bytes4 chainFamilySelector = s_destChainConfigs[destChainSelector].chainFamilySelector;
-
+    destExecDataPerToken = new bytes[](rampTokenAmounts.length);
     for (uint256 i = 0; i < rampTokenAmounts.length; ++i) {
       address sourceToken = sourceTokenAmounts[i].token;
 
@@ -822,6 +821,16 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
       }
 
       _validateDestFamilyAddress(chainFamilySelector, rampTokenAmounts[i].destTokenAddress);
+      PriceRegistry.TokenTransferFeeConfig memory tokenTransferFeeConfig =
+        s_tokenTransferFeeConfig[destChainSelector][sourceToken];
+      uint32 defaultGasOverhead = s_destChainConfigs[destChainSelector].defaultTokenDestGasOverhead;
+      uint32 destGasAmount =
+        tokenTransferFeeConfig.isEnabled ? tokenTransferFeeConfig.destGasOverhead : defaultGasOverhead;
+
+      // The user will be billed either the default or the override, so we send the exact amount that we billed for
+      // to the destination chain to be used for the token releaseOrMint and transfer.
+      destExecDataPerToken[i] = abi.encode(destGasAmount);
+      return destExecDataPerToken;
     }
   }
 
@@ -853,7 +862,6 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
       if (
         destChainSelector == 0 || destChainConfig.defaultTxGasLimit == 0
           || destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
-          || destChainConfig.defaultTokenDestBytesOverhead < Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES
           || destChainConfig.defaultTxGasLimit > destChainConfig.maxPerMsgGasLimit
       ) {
         revert InvalidDestChainConfig(destChainSelector);
