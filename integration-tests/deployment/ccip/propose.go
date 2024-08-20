@@ -25,7 +25,7 @@ func GenerateAcceptOwnershipProposal(
 	chains []uint64,
 	ab deployment.AddressBook,
 ) (deployment.Proposal, error) {
-	state, err := GenerateOnchainState(e, ab)
+	state, err := LoadOnchainState(e, ab)
 	if err != nil {
 		return deployment.Proposal{}, err
 	}

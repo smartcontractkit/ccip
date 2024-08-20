@@ -33,7 +33,7 @@ func Test0002_InitialDeploy(t *testing.T) {
 	nodes := tenv.Nodes
 	chains := e.Chains
 
-	state, err := ccipdeployment.GenerateOnchainState(tenv.Env, tenv.Ab)
+	state, err := ccipdeployment.LoadOnchainState(tenv.Env, tenv.Ab)
 	require.NoError(t, err)
 
 	// Apply migration
@@ -44,7 +44,7 @@ func Test0002_InitialDeploy(t *testing.T) {
 	})
 	require.NoError(t, err)
 	// Get new state after migration.
-	state, err = ccipdeployment.GenerateOnchainState(e, output.AddressBook)
+	state, err = ccipdeployment.LoadOnchainState(e, output.AddressBook)
 	require.NoError(t, err)
 
 	// Ensure capreg logs are up to date.
@@ -86,16 +86,16 @@ func Test0002_InitialDeploy(t *testing.T) {
 				continue
 			}
 			msg := router.ClientEVM2AnyMessage{
-				Receiver:     common.LeftPadBytes(state.Receivers[dest].Address().Bytes(), 32),
+				Receiver:     common.LeftPadBytes(state.Chains[dest].Receiver.Address().Bytes(), 32),
 				Data:         []byte("hello"),
 				TokenAmounts: nil, // TODO: no tokens for now
-				FeeToken:     state.Weth9s[src].Address(),
+				FeeToken:     state.Chains[src].Weth9.Address(),
 				ExtraArgs:    nil, // TODO: no extra args for now, falls back to default
 			}
-			fee, err := state.Routers[src].GetFee(
+			fee, err := state.Chains[src].Router.GetFee(
 				&bind.CallOpts{Context: context.Background()}, dest, msg)
 			require.NoError(t, err, deployment.MaybeDataErr(err))
-			tx, err := state.Weth9s[src].Deposit(&bind.TransactOpts{
+			tx, err := state.Chains[src].Weth9.Deposit(&bind.TransactOpts{
 				From:   e.Chains[src].DeployerKey.From,
 				Signer: e.Chains[src].DeployerKey.Signer,
 				Value:  fee,
@@ -104,14 +104,14 @@ func Test0002_InitialDeploy(t *testing.T) {
 			require.NoError(t, srcChain.Confirm(tx.Hash()))
 
 			// TODO: should be able to avoid this by using native?
-			tx, err = state.Weth9s[src].Approve(e.Chains[src].DeployerKey,
-				state.Routers[src].Address(), fee)
+			tx, err = state.Chains[src].Weth9.Approve(e.Chains[src].DeployerKey,
+				state.Chains[src].Router.Address(), fee)
 			require.NoError(t, err)
 			require.NoError(t, srcChain.Confirm(tx.Hash()))
 
 			t.Logf("Sending CCIP request from chain selector %d to chain selector %d",
 				src, dest)
-			tx, err = state.Routers[src].CcipSend(e.Chains[src].DeployerKey, dest, msg)
+			tx, err = state.Chains[src].Router.CcipSend(e.Chains[src].DeployerKey, dest, msg)
 			require.NoError(t, err)
 			require.NoError(t, srcChain.Confirm(tx.Hash()))
 		}
@@ -129,7 +129,7 @@ func Test0002_InitialDeploy(t *testing.T) {
 			wg.Add(1)
 			go func(src, dest uint64) {
 				defer wg.Done()
-				waitForCommitWithInterval(t, srcChain, dstChain, state.EvmOffRampsV160[dest], ccipocr3.SeqNumRange{1, 1})
+				waitForCommitWithInterval(t, srcChain, dstChain, state.Chains[dest].EvmOffRampV160, ccipocr3.SeqNumRange{1, 1})
 			}(src, dest)
 		}
 	}
@@ -146,7 +146,7 @@ func Test0002_InitialDeploy(t *testing.T) {
 			wg.Add(1)
 			go func(src, dest deployment.Chain) {
 				defer wg.Done()
-				waitForExecWithSeqNr(t, src, dest, state.EvmOffRampsV160[dest.Selector], 1)
+				waitForExecWithSeqNr(t, src, dest, state.Chains[dest.Selector].EvmOffRampV160, 1)
 			}(srcChain, dstChain)
 		}
 	}
