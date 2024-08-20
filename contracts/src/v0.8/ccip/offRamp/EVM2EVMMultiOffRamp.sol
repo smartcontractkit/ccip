@@ -19,8 +19,8 @@ import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {MultiOCR3Base} from "../ocr/MultiOCR3Base.sol";
 
-import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/ERC165Checker.sol";
+import {IERC20} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
+import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/ERC165Checker.sol";
 
 /// @notice EVM2EVMOffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
@@ -33,7 +33,6 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
 
-  error AlreadyExecuted(uint64 sourceChainSelector, uint64 sequenceNumber);
   error ZeroChainSelectorNotAllowed();
   error ExecutionError(bytes32 messageId, bytes err);
   error SourceChainNotEnabled(uint64 sourceChainSelector);
@@ -48,6 +47,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   error CanOnlySelfCall();
   error ReceiverError(bytes err);
   error TokenHandlingError(bytes err);
+  error ReleaseOrMintBalanceMismatch(uint256 amountReleased, uint256 balancePre, uint256 balancePost);
   error EmptyReport();
   error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
@@ -68,7 +68,8 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
     Internal.MessageExecutionState state,
-    bytes returnData
+    bytes returnData,
+    uint256 gasUsed
   );
   event SourceChainSelectorAdded(uint64 sourceChainSelector);
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
@@ -372,6 +373,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     // Execute messages
     bool manualExecution = manualExecGasLimits.length != 0;
     for (uint256 i = 0; i < numMsgs; ++i) {
+      uint256 gasStart = gasleft();
       Internal.Any2EVMRampMessage memory message = report.messages[i];
 
       Internal.MessageExecutionState originalState =
@@ -465,7 +467,12 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       }
 
       emit ExecutionStateChanged(
-        sourceChainSelector, message.header.sequenceNumber, message.header.messageId, newState, returnData
+        sourceChainSelector,
+        message.header.sequenceNumber,
+        message.header.messageId,
+        newState,
+        returnData,
+        gasStart - gasleft()
       );
     }
   }
@@ -496,7 +503,10 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// its execution and enforce atomicity among successful message processing and token transfer.
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts
   /// (for example smart contract wallets) without an associated message.
-  function executeSingleMessage(Internal.Any2EVMRampMessage memory message, bytes[] memory offchainTokenData) external {
+  function executeSingleMessage(
+    Internal.Any2EVMRampMessage memory message,
+    bytes[] calldata offchainTokenData
+  ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
@@ -791,9 +801,8 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   // │                      Tokens and pools                        │
   // ================================================================
 
-  /// @notice Uses a pool to release or mint a token to a receiver address in two steps. First, the pool is called
-  /// to release the tokens to the offRamp, then the offRamp calls the token contract to transfer the tokens to the
-  /// receiver. This is done to ensure the exact number of tokens, the pool claims to release are actually transferred.
+  /// @notice Uses a pool to release or mint a token to a receiver address, with balance checks before and after the
+  /// transfer. This is done to ensure the exact number of tokens the pool claims to release are actually transferred.
   /// @dev The local token address is validated through the TokenAdminRegistry. If, due to some misconfiguration, the
   /// token is unknown to the registry, the offRamp will revert. The tx, and the tokens, can be retrieved by
   /// registering the token on this chain, and re-trying the msg.
@@ -823,12 +832,17 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       revert NotACompatiblePool(localPoolAddress);
     }
 
+    // We retrieve the local token balance of the receiver before the pool call.
+    (uint256 balancePre, uint256 gasLeft) =
+      _getBalanceOfReceiver(receiver, localToken, s_dynamicConfig.maxPoolReleaseOrMintGas);
+
     // We determined that the pool address is a valid EVM address, but that does not mean the code at this
     // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location
     // contains a contract. If it doesn't it reverts with a known error, which we catch gracefully.
     // We call the pool with exact gas to increase resistance against malicious tokens or token pools.
     // We protects against return data bombs by capping the return data size at MAX_RET_BYTES.
-    (bool success, bytes memory returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
+    (bool success, bytes memory returnData, uint256 gasUsedReleaseOrMint) = CallWithExactGas
+      ._callWithExactGasSafeReturnData(
       abi.encodeCall(
         IPoolV1.releaseOrMint,
         Pool.ReleaseOrMintInV1({
@@ -843,7 +857,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         })
       ),
       localPoolAddress,
-      s_dynamicConfig.maxPoolReleaseOrMintGas,
+      gasLeft,
       Internal.GAS_FOR_CALL_EXACT_CHECK,
       Internal.MAX_RET_BYTES
     );
@@ -855,21 +869,44 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     if (returnData.length != Pool.CCIP_POOL_V1_RET_BYTES) {
       revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
     }
+
     uint256 localAmount = abi.decode(returnData, (uint256));
-    // Since token pools send the tokens to the msg.sender, which is this offRamp, we need to
-    // transfer them to the final receiver. We use the _callWithExactGasSafeReturnData function because
-    // the token contracts are not considered trusted.
-    (success, returnData,) = CallWithExactGas._callWithExactGasSafeReturnData(
-      abi.encodeCall(IERC20.transferFrom, (localPoolAddress, receiver, localAmount)),
-      localToken,
-      s_dynamicConfig.maxTokenTransferGas,
+    // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case
+    // of a lockRelease pool.
+    if (receiver != localPoolAddress) {
+      (uint256 balancePost,) = _getBalanceOfReceiver(receiver, localToken, gasLeft - gasUsedReleaseOrMint);
+
+      // First we check if the subtraction would result in an underflow to ensure we revert with a clear error
+      if (balancePost < balancePre || balancePost - balancePre != localAmount) {
+        revert ReleaseOrMintBalanceMismatch(localAmount, balancePre, balancePost);
+      }
+    }
+
+    return Client.EVMTokenAmount({token: localToken, amount: localAmount});
+  }
+
+  function _getBalanceOfReceiver(
+    address receiver,
+    address token,
+    uint256 gasLimit
+  ) internal returns (uint256 balance, uint256 gasLeft) {
+    (bool success, bytes memory returnData, uint256 gasUsed) = CallWithExactGas._callWithExactGasSafeReturnData(
+      abi.encodeCall(IERC20.balanceOf, (receiver)),
+      token,
+      gasLimit,
       Internal.GAS_FOR_CALL_EXACT_CHECK,
       Internal.MAX_RET_BYTES
     );
-
     if (!success) revert TokenHandlingError(returnData);
 
-    return Client.EVMTokenAmount({token: localToken, amount: localAmount});
+    // If the call was successful, the returnData should contain only the balance.
+    if (returnData.length != Internal.MAX_BALANCE_OF_RET_BYTES) {
+      revert InvalidDataLength(Internal.MAX_BALANCE_OF_RET_BYTES, returnData.length);
+    }
+
+    // Return the decoded balance, which cannot fail as we checked the length, and the gas that is left
+    // after this call.
+    return (abi.decode(returnData, (uint256)), gasLimit - gasUsed);
   }
 
   /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
@@ -887,7 +924,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
-    bytes[] memory offchainTokenData
+    bytes[] calldata offchainTokenData
   ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
     destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
