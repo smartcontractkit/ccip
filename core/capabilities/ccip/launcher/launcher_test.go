@@ -5,15 +5,9 @@ import (
 	"math/big"
 	"reflect"
 	"testing"
-	"time"
 
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
-	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/stretchr/testify/mock"
@@ -52,7 +46,7 @@ func Test_createOracle(t *testing.T) {
 				myP2PKey,
 				mocks.NewOracleCreator(t),
 				cctypes.PluginTypeCCIPCommit,
-				ocr3WithMetaCommit(nil),
+				ocr3WithMetaP2p(nil),
 			},
 			func(t *testing.T, args args, oracleCreator *mocks.OracleCreator) {
 				oracleCreator.
@@ -67,7 +61,7 @@ func Test_createOracle(t *testing.T) {
 				myP2PKey,
 				mocks.NewOracleCreator(t),
 				cctypes.PluginTypeCCIPCommit,
-				ocr3WithMetaCommit(&myP2PKey),
+				ocr3WithMetaP2p(&myP2PKey),
 			},
 			func(t *testing.T, args args, oracleCreator *mocks.OracleCreator) {
 				oracleCreator.
@@ -85,7 +79,7 @@ func Test_createOracle(t *testing.T) {
 				myP2PKey,
 				mocks.NewOracleCreator(t),
 				cctypes.PluginTypeCCIPCommit,
-				ocr3WithMetaCommit(nil),
+				ocr3WithMetaP2p(nil),
 			},
 			func(t *testing.T, args args, oracleCreator *mocks.OracleCreator) {
 				oracleCreator.
@@ -100,7 +94,7 @@ func Test_createOracle(t *testing.T) {
 				myP2PKey,
 				mocks.NewOracleCreator(t),
 				cctypes.PluginTypeCCIPCommit,
-				ocr3WithMetaCommit(&myP2PKey),
+				ocr3WithMetaP2p(&myP2PKey),
 			},
 			func(t *testing.T, args args, oracleCreator *mocks.OracleCreator) {
 				oracleCreator.
@@ -175,10 +169,10 @@ func Test_createDON(t *testing.T) {
 			func(t *testing.T, args args, oracleCreator *mocks.OracleCreator, homeChainReader *mocks.HomeChainReader) {
 				homeChainReader.
 					On("GetOCRConfigs", mock.Anything, uint32(1), uint8(cctypes.PluginTypeCCIPCommit)).
-					Return(ocr3WithMetaCommit(nil), nil)
+					Return(ocr3WithMetaP2p(nil), nil)
 				homeChainReader.
 					On("GetOCRConfigs", mock.Anything, uint32(1), uint8(cctypes.PluginTypeCCIPExec)).
-					Return(ocr3WithMetaExec(nil), nil)
+					Return(ocr3WithMetaP2p(nil), nil)
 				oracleCreator.
 					On("CreatePluginOracle", cctypes.PluginTypeCCIPCommit, mock.Anything).
 					Return(mocks.NewCCIPOracle(t), nil)
@@ -336,9 +330,9 @@ func Test_launcher_processDiff(t *testing.T) {
 					return mocks.NewHomeChainReader(t)
 				}, func(m *mocks.HomeChainReader) {
 					m.On("GetOCRConfigs", mock.Anything, uint32(1), uint8(cctypes.PluginTypeCCIPCommit)).
-						Return(ocr3WithMetaCommit(nil), nil)
+						Return(ocr3WithMetaP2p(nil), nil)
 					m.On("GetOCRConfigs", mock.Anything, uint32(1), uint8(cctypes.PluginTypeCCIPExec)).
-						Return(ocr3WithMetaExec(nil), nil)
+						Return(ocr3WithMetaP2p(nil), nil)
 				}),
 				oracleCreator: newMock(t, func(t *testing.T) *mocks.OracleCreator {
 					return mocks.NewOracleCreator(t)
@@ -467,82 +461,13 @@ func Test_launcher_processDiff(t *testing.T) {
 	}
 }
 
-func defaultCommitOCC() []byte {
-	cfg, err := pluginconfig.EncodeCommitOffchainConfig(
-		pluginconfig.CommitOffchainConfig{
-			RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(time.Second),
-			TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(time.Second),
-			PriceSources: map[ocrtypes.Account]pluginconfig.ArbitrumPriceSource{
-				"0x2e03388D351BF87CF2409EFf18C45Df59775Fbb2": {
-					AggregatorAddress: "0x3e03388D351BF87CF2409EFf18C45Df59775Fbb2",
-					DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
-				},
-			},
-			TokenDecimals: map[ocrtypes.Account]uint8{
-				"0x2e03388D351BF87CF2409EFf18C45Df59775Fbb2": 18,
-			},
-			TokenPriceChainSelector: 1,
-		})
-	if err != nil {
-		panic(err)
-	}
-	return cfg
-}
-
-func defaultExecOCC() []byte {
-	encodedOffchainConfig, err := pluginconfig.EncodeExecuteOffchainConfig(pluginconfig.ExecuteOffchainConfig{
-		BatchGasLimit:             6_500_000,
-		RelativeBoostPerWaitHour:  1.5,
-		MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
-		InflightCacheExpiry:       *commonconfig.MustNewDuration(10 * time.Minute),
-		RootSnoozeTime:            *commonconfig.MustNewDuration(30 * time.Minute),
-		BatchingStrategyID:        0,
-	})
-
-	if err != nil {
-		panic(err)
-	}
-
-	return encodedOffchainConfig
-}
-
-func ocr3WithMetaExec(bootstrapPeerID *ragep2ptypes.PeerID) []ccipreaderpkg.OCR3ConfigWithMeta {
+func ocr3WithMetaP2p(bootstrapPeerID *ragep2ptypes.PeerID) []ccipreaderpkg.OCR3ConfigWithMeta {
 	var config ccipreaderpkg.OCR3Config
+	config = ccipreaderpkg.OCR3Config{}
 
 	if bootstrapPeerID != nil {
 		config = ccipreaderpkg.OCR3Config{
 			BootstrapP2PIds: [][32]byte{*bootstrapPeerID},
-			OffchainConfig:  defaultExecOCC(),
-			PluginType:      uint8(cctypes.PluginTypeCCIPExec),
-		}
-	} else {
-		config = ccipreaderpkg.OCR3Config{
-			OffchainConfig: defaultExecOCC(),
-			PluginType:     uint8(cctypes.PluginTypeCCIPExec),
-		}
-	}
-
-	return []ccipreaderpkg.OCR3ConfigWithMeta{
-		{
-			Config:       config,
-			ConfigCount:  1,
-			ConfigDigest: testutils.Random32Byte(),
-		},
-	}
-}
-func ocr3WithMetaCommit(bootstrapPeerID *ragep2ptypes.PeerID) []ccipreaderpkg.OCR3ConfigWithMeta {
-	var config ccipreaderpkg.OCR3Config
-
-	if bootstrapPeerID != nil {
-		config = ccipreaderpkg.OCR3Config{
-			BootstrapP2PIds: [][32]byte{*bootstrapPeerID},
-			OffchainConfig:  defaultCommitOCC(),
-			PluginType:      uint8(cctypes.PluginTypeCCIPCommit),
-		}
-	} else {
-		config = ccipreaderpkg.OCR3Config{
-			OffchainConfig: defaultCommitOCC(),
-			PluginType:     uint8(cctypes.PluginTypeCCIPCommit),
 		}
 	}
 

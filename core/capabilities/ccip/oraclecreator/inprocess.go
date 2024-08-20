@@ -169,8 +169,8 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			return nil, fmt.Errorf("failed to decode execute offchain config: %w, raw: %s",
 				err2, string(publicConfig.ReportingPluginConfig))
 		}
-		if execOffchainConfig.BatchGasLimit == 0 && destChainFamily == relay.NetworkEVM {
-			return nil, fmt.Errorf("BatchGasLimit not set in execute offchain config, must be > 0")
+		if err3 := execOffchainConfig.Validate(); err3 != nil {
+			return nil, fmt.Errorf("failed to validate execute offchain config: %w", err3)
 		}
 		execBatchGasLimit = execOffchainConfig.BatchGasLimit
 	} else if pluginType == cctypes.PluginTypeCCIPCommit {
@@ -179,7 +179,9 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 			return nil, fmt.Errorf("failed to decode commit offchain config: %w, raw: %s",
 				err2, string(publicConfig.ReportingPluginConfig))
 		}
-
+		if err3 := commitOffchainCfg.Validate(); err3 != nil {
+			return nil, fmt.Errorf("failed to validate commit offchain config: %w", err3)
+		}
 		commitOffchainConfig = &commitOffchainCfg
 	}
 

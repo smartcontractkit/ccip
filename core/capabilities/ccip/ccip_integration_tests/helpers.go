@@ -464,7 +464,7 @@ func AddChainConfig(
 	return chainConfig
 }
 
-func getOffchainConfig(
+func getPluginConfig(
 	t *testing.T,
 	pluginType cctypes.PluginType,
 	uni onchainUniverse,
@@ -525,7 +525,7 @@ func (h *homeChain) AddDON(
 	// Add DON on capability registry contract
 	var ocr3Configs []ocr3_config_encoder.CCIPConfigTypesOCR3Config
 	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
-		encodedOffchainConfig := getOffchainConfig(t, pluginType, uni, *h)
+		encodedOffchainConfig := getPluginConfig(t, pluginType, uni, *h)
 		// commit: len:337, cap:352
 		// exec: len:171, cap:176
 
