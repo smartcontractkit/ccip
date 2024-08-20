@@ -322,8 +322,9 @@ func (p *priceService) observeGasPriceUpdates(
 		return nil, fmt.Errorf("gasPriceEstimator is not set yet")
 	}
 
+	// Price getter should only return the source native token pricen as the tokens param is not empty
 	// Include wrapped native to identify the source native USD price, notice USD is in 1e18 scale, i.e. $1 = 1e18
-	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, []cciptypes.Address{})
+	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, []cciptypes.Address{p.sourceNative})
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch source native price (%s): %w", p.sourceNative, err)
@@ -369,14 +370,7 @@ func (p *priceService) observeTokenPriceUpdates(
 	if p.destPriceRegistryReader == nil {
 		return nil, fmt.Errorf("destPriceRegistry is not set yet")
 	}
-
-	fee, bridged, err := ccipcommon.GetDestinationTokens(ctx, p.offRampReader, p.destPriceRegistryReader)
-	if err != nil {
-		return nil, fmt.Errorf("get destination tokens: %w", err)
-	}
-	onchainDestTokens := ccipcommon.FlattenedAndSortedTokens(fee, bridged)
-	lggr.Debugw("Destination tokens", "destTokens", onchainDestTokens)
-
+	// Price getter should return all token prices in USD, including source native token (as the tokens param is empty)
 	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, []cciptypes.Address{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch token prices: %w", err)
@@ -408,6 +402,13 @@ func (p *priceService) observeTokenPriceUpdates(
 			finalDestTokens = append(finalDestTokens, token)
 		}
 	}
+
+	fee, bridged, err := ccipcommon.GetDestinationTokens(ctx, p.offRampReader, p.destPriceRegistryReader)
+	if err != nil {
+		return nil, fmt.Errorf("get destination tokens: %w", err)
+	}
+	onchainDestTokens := ccipcommon.FlattenedAndSortedTokens(fee, bridged)
+	lggr.Debugw("Destination tokens", "destTokens", onchainDestTokens)
 
 	onchainTokensEvmAddr, err := ccipcalc.GenericAddrsToEvm(onchainDestTokens...)
 	if err != nil {

@@ -320,7 +320,7 @@ func TestPriceService_observeGasPriceUpdates(t *testing.T) {
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
 			defer gasPriceEstimator.AssertExpectations(t)
 
-			priceGetter.On("TokenPricesUSD", mock.Anything, []cciptypes.Address{}).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
+			priceGetter.On("TokenPricesUSD", mock.Anything, []cciptypes.Address{tc.sourceNativeToken}).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
 
 			if tc.maxGasPrice > 0 {
 				gasPriceEstimator.On("GetGasPrice", mock.Anything).Return(tc.feeEstimatorRespFee, tc.feeEstimatorRespErr)
@@ -827,6 +827,10 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 
 	gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
 	defer gasPriceEstimator.AssertExpectations(t)
+
+	priceGetter.On("TokenPricesUSD", mock.Anything, []cciptypes.Address{sourceNative}).Return(map[cciptypes.Address]*big.Int{
+		tokens[0]: val1e18(tokenPrices[0]),
+	}, nil)
 
 	priceGetter.On("TokenPricesUSD", mock.Anything, []cciptypes.Address{}).Return(map[cciptypes.Address]*big.Int{
 		tokens[0]: val1e18(tokenPrices[0]),

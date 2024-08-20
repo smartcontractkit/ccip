@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/parseutil"
@@ -83,6 +83,7 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.
 		return nil, errors.Errorf("expected map output of price pipeline, got %T", finalResult.Values[0])
 	}
 
+	providedTokensSet := mapset.NewSet(tokens...)
 	tokenPrices := make(map[cciptypes.Address]*big.Int)
 	for tokenAddressStr, rawPrice := range prices {
 		tokenAddressStr := ccipcalc.HexToAddress(tokenAddressStr)
@@ -91,7 +92,10 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.
 			return nil, err
 		}
 
-		tokenPrices[tokenAddressStr] = castedPrice
+		// Add the price if tokens is empty or the token is in the provided set
+		if len(tokens) == 0 || providedTokensSet.Contains(tokenAddressStr) {
+			tokenPrices[tokenAddressStr] = castedPrice
+		}
 	}
 
 	// The mapping of token address to source of token price has to live offchain.

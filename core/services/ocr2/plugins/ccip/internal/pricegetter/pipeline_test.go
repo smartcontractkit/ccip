@@ -64,6 +64,30 @@ func TestDataSource(t *testing.T) {
 		linkTokenAddress: big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1000000000000000000)),
 		usdcTokenAddress: big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1000000000000000000)),
 	})
+
+	// Specifically ask for all prices present in spec
+	pricesWithInput, errWithInput := priceGetter.TokenPricesUSD(context.Background(), []cciptypes.Address{
+		linkTokenAddress,
+		usdcTokenAddress,
+	})
+	require.NoError(t, errWithInput)
+	assert.Equal(t, pricesWithInput, map[cciptypes.Address]*big.Int{
+		linkTokenAddress: big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1000000000000000000)),
+		usdcTokenAddress: big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1000000000000000000)),
+	})
+
+	// Ask a non-existent price.
+	_, err = priceGetter.TokenPricesUSD(context.Background(), []cciptypes.Address{
+		ccipcalc.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e11"),
+	})
+	require.Error(t, err)
+
+	// Ask only one price
+	prices, err = priceGetter.TokenPricesUSD(context.Background(), []cciptypes.Address{linkTokenAddress})
+	require.NoError(t, err)
+	assert.Equal(t, prices, map[cciptypes.Address]*big.Int{
+		linkTokenAddress: big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1000000000000000000)),
+	})
 }
 
 func TestParsingDifferentFormats(t *testing.T) {
