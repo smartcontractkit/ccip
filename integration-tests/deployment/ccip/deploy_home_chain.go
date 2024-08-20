@@ -21,8 +21,8 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ocr3_config_encoder"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 )
 
@@ -52,7 +52,7 @@ const (
 	MaxDurationShouldTransmitAcceptedReport = 10 * time.Second
 )
 
-func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainSel uint64) (deployment.AddressBook, error) {
+func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainSel uint64) (deployment.AddressBook, common.Address, error) {
 	ab := deployment.NewMemoryAddressBook()
 	chain := chains[chainSel]
 	capReg, err := deployContract(lggr, chain, ab,
@@ -67,7 +67,7 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 		})
 	if err != nil {
 		lggr.Errorw("Failed to deploy capreg", "err", err)
-		return ab, err
+		return ab, common.Address{}, err
 	}
 	lggr.Infow("deployed capreg", "addr", capReg.Address)
 	ccipConfig, err := deployContract(
@@ -84,7 +84,7 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 		})
 	if err != nil {
 		lggr.Errorw("Failed to deploy ccip config", "err", err)
-		return ab, err
+		return ab, common.Address{}, err
 	}
 	lggr.Infow("deployed ccip config", "addr", ccipConfig.Address)
 
@@ -99,7 +99,7 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 	})
 	if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
 		lggr.Errorw("Failed to add capabilities", "err", err)
-		return ab, err
+		return ab, common.Address{}, err
 	}
 	// TODO: Just one for testing.
 	tx, err = capReg.Contract.AddNodeOperators(chain.DeployerKey, []capabilities_registry.CapabilitiesRegistryNodeOperator{
@@ -110,9 +110,9 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 	})
 	if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
 		lggr.Errorw("Failed to add node operators", "err", err)
-		return ab, err
+		return ab, common.Address{}, err
 	}
-	return ab, nil
+	return ab, capReg.Address, nil
 }
 
 func sortP2PIDS(p2pIDs [][32]byte) {
@@ -194,7 +194,7 @@ func AddDON(
 	ccipCapabilityID [32]byte,
 	capReg *capabilities_registry.CapabilitiesRegistry,
 	ccipConfig *ccip_config.CCIPConfig,
-	offRamp *evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp,
+	offRamp *offramp.OffRamp,
 	dest deployment.Chain,
 	home deployment.Chain,
 	f uint8,
@@ -349,7 +349,7 @@ func AddDON(
 	}
 
 	// get the config digest from the ccip config contract and set config on the offramp.
-	var offrampOCR3Configs []evm_2_evm_multi_offramp.MultiOCR3BaseOCRConfigArgs
+	var offrampOCR3Configs []offramp.MultiOCR3BaseOCRConfigArgs
 	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
 		ocrConfig, err2 := ccipConfig.GetOCRConfig(&bind.CallOpts{
 			Context: context.Background(),
@@ -361,7 +361,7 @@ func AddDON(
 			return errors.New("expected exactly one OCR3 config")
 		}
 
-		offrampOCR3Configs = append(offrampOCR3Configs, evm_2_evm_multi_offramp.MultiOCR3BaseOCRConfigArgs{
+		offrampOCR3Configs = append(offrampOCR3Configs, offramp.MultiOCR3BaseOCRConfigArgs{
 			ConfigDigest:                   ocrConfig[0].ConfigDigest,
 			OcrPluginType:                  uint8(pluginType),
 			F:                              f,
