@@ -22,7 +22,7 @@ CREATE TABLE ccip.observed_gas_prices
     PRIMARY KEY (chain_selector, source_chain_selector)
 );
 
-create index idx_ccip_gas_prices_chain_gas_price_timestamp on ccip.observed_token_prices (chain_selector);
+create index idx_ccip_gas_prices_chain_gas_price_timestamp on ccip.observed_token_prices (chain_selector) include (token_addr, token_price);
 
 -- +goose Down
 DROP TABLE ccip.observed_token_prices;
