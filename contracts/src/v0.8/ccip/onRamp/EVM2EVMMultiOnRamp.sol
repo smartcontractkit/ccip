@@ -50,8 +50,6 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPSendRequested(uint64 indexed destChainSelector, Internal.EVM2AnyRampMessage message);
   event AllowListAdminSet(address indexed allowListAdmin);
-  event AllowListAdd(address sender);
-  event AllowListRemove(address sender);
   event AllowListDisabled(uint64 destChainSelector);
   event AllowListEnabled(uint64 destChainSelector);
 
@@ -404,19 +402,14 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     if (!destChainConfig.allowListEnabled) revert AllowListNotEnabled();
 
     for (uint256 i = 0; i < removes.length; ++i) {
-      address toRemove = removes[i];
-      if (destChainConfig.allowList.remove(toRemove)) {
-        emit AllowListRemove(toRemove);
-      }
+      destChainConfig.allowList.remove(removes[i]);
     }
     for (uint256 i = 0; i < adds.length; ++i) {
       address toAdd = adds[i];
       if (toAdd == address(0)) {
         continue;
       }
-      if (destChainConfig.allowList.add(toAdd)) {
-        emit AllowListAdd(toAdd);
-      }
+      destChainConfig.allowList.add(toAdd);
     }
   }
 
