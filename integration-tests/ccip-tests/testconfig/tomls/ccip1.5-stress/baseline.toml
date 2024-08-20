@@ -19,7 +19,7 @@ TokenPool = 'latest'
 CommitStore = 'latest'
 
 [CCIP.Env]
-TTL = '8h'
+TTL = '10h'
 
 [CCIP.Env.Network]
 selected_networks= ['PRIVATE-CHAIN-1', 'PRIVATE-CHAIN-2']
@@ -66,7 +66,7 @@ block_time = 1
 [CCIP.Env.NewCLCluster]
 NoOfNodes = 17
 NodeMemory = '10Gi'
-NodeCPU = '6'
+NodeCPU = '4'
 DBMemory = '16Gi'
 DBCPU = '4'
 DBStorageClass = 'gp3'
@@ -154,7 +154,7 @@ DynamicPriceUpdateInterval ='15s'
 CCIPOwnerTokens = true
 
 [CCIP.Groups.load.LoadProfile]
-TestDuration = '4h'
+TestDuration = '6h'
 TimeUnit = '5s'
 RequestPerUnitTime = [1]
 OptimizeSpace = true
