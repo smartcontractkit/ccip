@@ -206,3 +206,115 @@ mutation CreateFeedsManager($input: CreateFeedsManagerInput!) {
     }
   }
 }
+
+mutation UpdateFeedsManager($id: ID!, $input: UpdateFeedsManagerInput!) {
+  updateFeedsManager(id: $id, input: $input) {
+    ... on UpdateFeedsManagerSuccess {
+      feedsManager {
+        ...FeedsManagerParts
+      }
+    }
+    ... on NotFoundError {
+      message
+      code
+    }
+    ... on InputErrors {
+      errors {
+        message
+        code
+        path
+      }
+    }
+  }
+}
+
+#####################
+# Job Proposals
+#####################
+
+mutation ApproveJobProposalSpec($id: ID!, $force: Boolean) {
+  approveJobProposalSpec(id: $id, force: $force) {
+    ... on ApproveJobProposalSpecSuccess {
+      spec {
+        id
+        definition
+        version
+        status
+        statusUpdatedAt
+        createdAt
+        updatedAt
+      }
+    }
+    ... on JobAlreadyExistsError {
+      message
+      code
+    }
+    ... on NotFoundError {
+      message
+      code
+    }
+  }
+}
+
+mutation CancelJobProposalSpec($id: ID!) {
+  cancelJobProposalSpec(id: $id) {
+    ... on CancelJobProposalSpecSuccess {
+      spec {
+        id
+        definition
+        version
+        status
+        statusUpdatedAt
+        createdAt
+        updatedAt
+      }
+    }
+    ... on NotFoundError {
+      message
+      code
+    }
+  }
+}
+
+mutation RejectJobProposalSpec($id: ID!) {
+  rejectJobProposalSpec(id: $id) {
+    ... on RejectJobProposalSpecSuccess {
+      spec {
+        id
+        definition
+        version
+        status
+        statusUpdatedAt
+        createdAt
+        updatedAt
+      }
+    }
+    ... on NotFoundError {
+      message
+      code
+    }
+  }
+}
+
+mutation UpdateJobProposalSpecDefinition(
+  $id: ID!
+  $input: UpdateJobProposalSpecDefinitionInput!
+) {
+  updateJobProposalSpecDefinition(id: $id, input: $input) {
+    ... on UpdateJobProposalSpecDefinitionSuccess {
+      spec {
+        id
+        definition
+        version
+        status
+        statusUpdatedAt
+        createdAt
+        updatedAt
+      }
+    }
+    ... on NotFoundError {
+      message
+      code
+    }
+  }
+}

@@ -13,6 +13,23 @@ import (
 	"github.com/smartcontractkit/ccip/integration-tests/web/sdk/internal/generated"
 )
 
+type Client interface {
+	GetCSAKeys(ctx context.Context) (*generated.GetCSAKeysResponse, error)
+	GetJob(ctx context.Context, id string) (*generated.GetJobResponse, error)
+	ListJobs(ctx context.Context, offset, limit int) (*generated.ListJobsResponse, error)
+	GetBridge(ctx context.Context, id string) (*generated.GetBridgeResponse, error)
+	ListBridges(ctx context.Context, offset, limit int) (*generated.ListBridgesResponse, error)
+	GetFeedsManager(ctx context.Context, id string) (*generated.GetFeedsManagerResponse, error)
+	ListFeedsManagers(ctx context.Context) (*generated.ListFeedsManagersResponse, error)
+	CreateFeedsManager(ctx context.Context, cmd generated.CreateFeedsManagerInput) (*generated.CreateFeedsManagerResponse, error)
+	UpdateFeedsManager(ctx context.Context, id string, cmd generated.UpdateFeedsManagerInput) (*generated.UpdateFeedsManagerResponse, error)
+	GetJobProposal(ctx context.Context, id string) (*generated.GetJobProposalResponse, error)
+	ApproveJobProposalSpec(ctx context.Context, id string, force bool) (*generated.ApproveJobProposalSpecResponse, error)
+	CancelJobProposalSpec(ctx context.Context, id string) (*generated.CancelJobProposalSpecResponse, error)
+	RejectJobProposalSpec(ctx context.Context, id string) (*generated.RejectJobProposalSpecResponse, error)
+	UpdateJobProposalSpecDefinition(ctx context.Context, id string, cmd generated.UpdateJobProposalSpecDefinitionInput) (*generated.UpdateJobProposalSpecDefinitionResponse, error)
+}
+
 type client struct {
 	gqlClient   graphql.Client
 	credentials Credentials
@@ -30,7 +47,7 @@ type Credentials struct {
 	Password string `json:"password"`
 }
 
-func New(baseURI string, creds Credentials) (*client, error) { //nolint:revive
+func New(baseURI string, creds Credentials) (Client, error) {
 	endpoints := endpoints{
 		Sessions: baseURI + "/sessions",
 		Query:    baseURI + "/query",
@@ -64,10 +81,6 @@ func (c *client) ListJobs(ctx context.Context, offset, limit int) (*generated.Li
 	return generated.ListJobs(ctx, c.gqlClient, offset, limit)
 }
 
-func (c *client) GetJobProposal(ctx context.Context, id string) (*generated.GetJobProposalResponse, error) {
-	return generated.GetJobProposal(ctx, c.gqlClient, id)
-}
-
 func (c *client) GetBridge(ctx context.Context, id string) (*generated.GetBridgeResponse, error) {
 	return generated.GetBridge(ctx, c.gqlClient, id)
 }
@@ -86,6 +99,30 @@ func (c *client) ListFeedsManagers(ctx context.Context) (*generated.ListFeedsMan
 
 func (c *client) CreateFeedsManager(ctx context.Context, cmd generated.CreateFeedsManagerInput) (*generated.CreateFeedsManagerResponse, error) {
 	return generated.CreateFeedsManager(ctx, c.gqlClient, cmd)
+}
+
+func (c *client) UpdateFeedsManager(ctx context.Context, id string, cmd generated.UpdateFeedsManagerInput) (*generated.UpdateFeedsManagerResponse, error) {
+	return generated.UpdateFeedsManager(ctx, c.gqlClient, id, cmd)
+}
+
+func (c *client) GetJobProposal(ctx context.Context, id string) (*generated.GetJobProposalResponse, error) {
+	return generated.GetJobProposal(ctx, c.gqlClient, id)
+}
+
+func (c *client) ApproveJobProposalSpec(ctx context.Context, id string, force bool) (*generated.ApproveJobProposalSpecResponse, error) {
+	return generated.ApproveJobProposalSpec(ctx, c.gqlClient, id, force)
+}
+
+func (c *client) CancelJobProposalSpec(ctx context.Context, id string) (*generated.CancelJobProposalSpecResponse, error) {
+	return generated.CancelJobProposalSpec(ctx, c.gqlClient, id)
+}
+
+func (c *client) RejectJobProposalSpec(ctx context.Context, id string) (*generated.RejectJobProposalSpecResponse, error) {
+	return generated.RejectJobProposalSpec(ctx, c.gqlClient, id)
+}
+
+func (c *client) UpdateJobProposalSpecDefinition(ctx context.Context, id string, cmd generated.UpdateJobProposalSpecDefinitionInput) (*generated.UpdateJobProposalSpecDefinitionResponse, error) {
+	return generated.UpdateJobProposalSpecDefinition(ctx, c.gqlClient, id, cmd)
 }
 
 func (c *client) login() error {

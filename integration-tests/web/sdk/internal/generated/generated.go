@@ -11,6 +11,272 @@ import (
 	"github.com/smartcontractkit/chainlink/core/web/gqlscalar"
 )
 
+// ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload includes the requested fields of the GraphQL interface ApproveJobProposalSpecPayload.
+//
+// ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload is implemented by the following types:
+// ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccess
+// ApproveJobProposalSpecApproveJobProposalSpecJobAlreadyExistsError
+// ApproveJobProposalSpecApproveJobProposalSpecNotFoundError
+type ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload interface {
+	implementsGraphQLInterfaceApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() string
+}
+
+func (v *ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccess) implementsGraphQLInterfaceApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload() {
+}
+func (v *ApproveJobProposalSpecApproveJobProposalSpecJobAlreadyExistsError) implementsGraphQLInterfaceApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload() {
+}
+func (v *ApproveJobProposalSpecApproveJobProposalSpecNotFoundError) implementsGraphQLInterfaceApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload() {
+}
+
+func __unmarshalApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload(b []byte, v *ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "ApproveJobProposalSpecSuccess":
+		*v = new(ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccess)
+		return json.Unmarshal(b, *v)
+	case "JobAlreadyExistsError":
+		*v = new(ApproveJobProposalSpecApproveJobProposalSpecJobAlreadyExistsError)
+		return json.Unmarshal(b, *v)
+	case "NotFoundError":
+		*v = new(ApproveJobProposalSpecApproveJobProposalSpecNotFoundError)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing ApproveJobProposalSpecPayload.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload(v *ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccess:
+		typename = "ApproveJobProposalSpecSuccess"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccess
+		}{typename, v}
+		return json.Marshal(result)
+	case *ApproveJobProposalSpecApproveJobProposalSpecJobAlreadyExistsError:
+		typename = "JobAlreadyExistsError"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*ApproveJobProposalSpecApproveJobProposalSpecJobAlreadyExistsError
+		}{typename, v}
+		return json.Marshal(result)
+	case *ApproveJobProposalSpecApproveJobProposalSpecNotFoundError:
+		typename = "NotFoundError"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*ApproveJobProposalSpecApproveJobProposalSpecNotFoundError
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload: "%T"`, v)
+	}
+}
+
+// ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccess includes the requested fields of the GraphQL type ApproveJobProposalSpecSuccess.
+type ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccess struct {
+	Typename string                                                                                       `json:"__typename"`
+	Spec     ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec `json:"spec"`
+}
+
+// GetTypename returns ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccess.Typename, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccess) GetTypename() string {
+	return v.Typename
+}
+
+// GetSpec returns ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccess.Spec, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccess) GetSpec() ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec {
+	return v.Spec
+}
+
+// ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec includes the requested fields of the GraphQL type JobProposalSpec.
+type ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec struct {
+	Id              string     `json:"id"`
+	Definition      string     `json:"definition"`
+	Version         int        `json:"version"`
+	Status          SpecStatus `json:"status"`
+	StatusUpdatedAt string     `json:"statusUpdatedAt"`
+	CreatedAt       string     `json:"createdAt"`
+	UpdatedAt       string     `json:"updatedAt"`
+}
+
+// GetId returns ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec.Id, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec) GetId() string {
+	return v.Id
+}
+
+// GetDefinition returns ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec.Definition, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec) GetDefinition() string {
+	return v.Definition
+}
+
+// GetVersion returns ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec.Version, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec) GetVersion() int {
+	return v.Version
+}
+
+// GetStatus returns ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec.Status, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec) GetStatus() SpecStatus {
+	return v.Status
+}
+
+// GetStatusUpdatedAt returns ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec.StatusUpdatedAt, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec) GetStatusUpdatedAt() string {
+	return v.StatusUpdatedAt
+}
+
+// GetCreatedAt returns ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec.CreatedAt, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec) GetCreatedAt() string {
+	return v.CreatedAt
+}
+
+// GetUpdatedAt returns ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec.UpdatedAt, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecSuccessSpecJobProposalSpec) GetUpdatedAt() string {
+	return v.UpdatedAt
+}
+
+// ApproveJobProposalSpecApproveJobProposalSpecJobAlreadyExistsError includes the requested fields of the GraphQL type JobAlreadyExistsError.
+type ApproveJobProposalSpecApproveJobProposalSpecJobAlreadyExistsError struct {
+	Typename string    `json:"__typename"`
+	Message  string    `json:"message"`
+	Code     ErrorCode `json:"code"`
+}
+
+// GetTypename returns ApproveJobProposalSpecApproveJobProposalSpecJobAlreadyExistsError.Typename, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecJobAlreadyExistsError) GetTypename() string {
+	return v.Typename
+}
+
+// GetMessage returns ApproveJobProposalSpecApproveJobProposalSpecJobAlreadyExistsError.Message, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecJobAlreadyExistsError) GetMessage() string {
+	return v.Message
+}
+
+// GetCode returns ApproveJobProposalSpecApproveJobProposalSpecJobAlreadyExistsError.Code, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecJobAlreadyExistsError) GetCode() ErrorCode {
+	return v.Code
+}
+
+// ApproveJobProposalSpecApproveJobProposalSpecNotFoundError includes the requested fields of the GraphQL type NotFoundError.
+type ApproveJobProposalSpecApproveJobProposalSpecNotFoundError struct {
+	Typename string    `json:"__typename"`
+	Message  string    `json:"message"`
+	Code     ErrorCode `json:"code"`
+}
+
+// GetTypename returns ApproveJobProposalSpecApproveJobProposalSpecNotFoundError.Typename, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecNotFoundError) GetTypename() string {
+	return v.Typename
+}
+
+// GetMessage returns ApproveJobProposalSpecApproveJobProposalSpecNotFoundError.Message, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecNotFoundError) GetMessage() string {
+	return v.Message
+}
+
+// GetCode returns ApproveJobProposalSpecApproveJobProposalSpecNotFoundError.Code, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecApproveJobProposalSpecNotFoundError) GetCode() ErrorCode {
+	return v.Code
+}
+
+// ApproveJobProposalSpecResponse is returned by ApproveJobProposalSpec on success.
+type ApproveJobProposalSpecResponse struct {
+	ApproveJobProposalSpec ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload `json:"-"`
+}
+
+// GetApproveJobProposalSpec returns ApproveJobProposalSpecResponse.ApproveJobProposalSpec, and is useful for accessing the field via an interface.
+func (v *ApproveJobProposalSpecResponse) GetApproveJobProposalSpec() ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload {
+	return v.ApproveJobProposalSpec
+}
+
+func (v *ApproveJobProposalSpecResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*ApproveJobProposalSpecResponse
+		ApproveJobProposalSpec json.RawMessage `json:"approveJobProposalSpec"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.ApproveJobProposalSpecResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.ApproveJobProposalSpec
+		src := firstPass.ApproveJobProposalSpec
+		if len(src) != 0 && string(src) != "null" {
+			err = __unmarshalApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload(
+				src, dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal ApproveJobProposalSpecResponse.ApproveJobProposalSpec: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalApproveJobProposalSpecResponse struct {
+	ApproveJobProposalSpec json.RawMessage `json:"approveJobProposalSpec"`
+}
+
+func (v *ApproveJobProposalSpecResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *ApproveJobProposalSpecResponse) __premarshalJSON() (*__premarshalApproveJobProposalSpecResponse, error) {
+	var retval __premarshalApproveJobProposalSpecResponse
+
+	{
+
+		dst := &retval.ApproveJobProposalSpec
+		src := v.ApproveJobProposalSpec
+		var err error
+		*dst, err = __marshalApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload(
+			&src)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"unable to marshal ApproveJobProposalSpecResponse.ApproveJobProposalSpec: %w", err)
+		}
+	}
+	return &retval, nil
+}
+
 // BridgeParts includes the GraphQL fields of Bridge requested by the fragment BridgeParts.
 type BridgeParts struct {
 	Id                     string `json:"id"`
@@ -42,6 +308,234 @@ func (v *BridgeParts) GetMinimumContractPayment() string { return v.MinimumContr
 
 // GetCreatedAt returns BridgeParts.CreatedAt, and is useful for accessing the field via an interface.
 func (v *BridgeParts) GetCreatedAt() string { return v.CreatedAt }
+
+// CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload includes the requested fields of the GraphQL interface CancelJobProposalSpecPayload.
+//
+// CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload is implemented by the following types:
+// CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccess
+// CancelJobProposalSpecCancelJobProposalSpecNotFoundError
+type CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload interface {
+	implementsGraphQLInterfaceCancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() string
+}
+
+func (v *CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccess) implementsGraphQLInterfaceCancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload() {
+}
+func (v *CancelJobProposalSpecCancelJobProposalSpecNotFoundError) implementsGraphQLInterfaceCancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload() {
+}
+
+func __unmarshalCancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload(b []byte, v *CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "CancelJobProposalSpecSuccess":
+		*v = new(CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccess)
+		return json.Unmarshal(b, *v)
+	case "NotFoundError":
+		*v = new(CancelJobProposalSpecCancelJobProposalSpecNotFoundError)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing CancelJobProposalSpecPayload.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalCancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload(v *CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccess:
+		typename = "CancelJobProposalSpecSuccess"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccess
+		}{typename, v}
+		return json.Marshal(result)
+	case *CancelJobProposalSpecCancelJobProposalSpecNotFoundError:
+		typename = "NotFoundError"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*CancelJobProposalSpecCancelJobProposalSpecNotFoundError
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload: "%T"`, v)
+	}
+}
+
+// CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccess includes the requested fields of the GraphQL type CancelJobProposalSpecSuccess.
+type CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccess struct {
+	Typename string                                                                                    `json:"__typename"`
+	Spec     CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec `json:"spec"`
+}
+
+// GetTypename returns CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccess.Typename, and is useful for accessing the field via an interface.
+func (v *CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccess) GetTypename() string {
+	return v.Typename
+}
+
+// GetSpec returns CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccess.Spec, and is useful for accessing the field via an interface.
+func (v *CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccess) GetSpec() CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec {
+	return v.Spec
+}
+
+// CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec includes the requested fields of the GraphQL type JobProposalSpec.
+type CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec struct {
+	Id              string     `json:"id"`
+	Definition      string     `json:"definition"`
+	Version         int        `json:"version"`
+	Status          SpecStatus `json:"status"`
+	StatusUpdatedAt string     `json:"statusUpdatedAt"`
+	CreatedAt       string     `json:"createdAt"`
+	UpdatedAt       string     `json:"updatedAt"`
+}
+
+// GetId returns CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec.Id, and is useful for accessing the field via an interface.
+func (v *CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec) GetId() string {
+	return v.Id
+}
+
+// GetDefinition returns CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec.Definition, and is useful for accessing the field via an interface.
+func (v *CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec) GetDefinition() string {
+	return v.Definition
+}
+
+// GetVersion returns CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec.Version, and is useful for accessing the field via an interface.
+func (v *CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec) GetVersion() int {
+	return v.Version
+}
+
+// GetStatus returns CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec.Status, and is useful for accessing the field via an interface.
+func (v *CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec) GetStatus() SpecStatus {
+	return v.Status
+}
+
+// GetStatusUpdatedAt returns CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec.StatusUpdatedAt, and is useful for accessing the field via an interface.
+func (v *CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec) GetStatusUpdatedAt() string {
+	return v.StatusUpdatedAt
+}
+
+// GetCreatedAt returns CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec.CreatedAt, and is useful for accessing the field via an interface.
+func (v *CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec) GetCreatedAt() string {
+	return v.CreatedAt
+}
+
+// GetUpdatedAt returns CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec.UpdatedAt, and is useful for accessing the field via an interface.
+func (v *CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecSuccessSpecJobProposalSpec) GetUpdatedAt() string {
+	return v.UpdatedAt
+}
+
+// CancelJobProposalSpecCancelJobProposalSpecNotFoundError includes the requested fields of the GraphQL type NotFoundError.
+type CancelJobProposalSpecCancelJobProposalSpecNotFoundError struct {
+	Typename string    `json:"__typename"`
+	Message  string    `json:"message"`
+	Code     ErrorCode `json:"code"`
+}
+
+// GetTypename returns CancelJobProposalSpecCancelJobProposalSpecNotFoundError.Typename, and is useful for accessing the field via an interface.
+func (v *CancelJobProposalSpecCancelJobProposalSpecNotFoundError) GetTypename() string {
+	return v.Typename
+}
+
+// GetMessage returns CancelJobProposalSpecCancelJobProposalSpecNotFoundError.Message, and is useful for accessing the field via an interface.
+func (v *CancelJobProposalSpecCancelJobProposalSpecNotFoundError) GetMessage() string {
+	return v.Message
+}
+
+// GetCode returns CancelJobProposalSpecCancelJobProposalSpecNotFoundError.Code, and is useful for accessing the field via an interface.
+func (v *CancelJobProposalSpecCancelJobProposalSpecNotFoundError) GetCode() ErrorCode { return v.Code }
+
+// CancelJobProposalSpecResponse is returned by CancelJobProposalSpec on success.
+type CancelJobProposalSpecResponse struct {
+	CancelJobProposalSpec CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload `json:"-"`
+}
+
+// GetCancelJobProposalSpec returns CancelJobProposalSpecResponse.CancelJobProposalSpec, and is useful for accessing the field via an interface.
+func (v *CancelJobProposalSpecResponse) GetCancelJobProposalSpec() CancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload {
+	return v.CancelJobProposalSpec
+}
+
+func (v *CancelJobProposalSpecResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*CancelJobProposalSpecResponse
+		CancelJobProposalSpec json.RawMessage `json:"cancelJobProposalSpec"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.CancelJobProposalSpecResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.CancelJobProposalSpec
+		src := firstPass.CancelJobProposalSpec
+		if len(src) != 0 && string(src) != "null" {
+			err = __unmarshalCancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload(
+				src, dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal CancelJobProposalSpecResponse.CancelJobProposalSpec: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalCancelJobProposalSpecResponse struct {
+	CancelJobProposalSpec json.RawMessage `json:"cancelJobProposalSpec"`
+}
+
+func (v *CancelJobProposalSpecResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *CancelJobProposalSpecResponse) __premarshalJSON() (*__premarshalCancelJobProposalSpecResponse, error) {
+	var retval __premarshalCancelJobProposalSpecResponse
+
+	{
+
+		dst := &retval.CancelJobProposalSpec
+		src := v.CancelJobProposalSpec
+		var err error
+		*dst, err = __marshalCancelJobProposalSpecCancelJobProposalSpecCancelJobProposalSpecPayload(
+			&src)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"unable to marshal CancelJobProposalSpecResponse.CancelJobProposalSpec: %w", err)
+		}
+	}
+	return &retval, nil
+}
 
 // CreateFeedsManagerCreateFeedsManagerCreateFeedsManagerPayload includes the requested fields of the GraphQL interface CreateFeedsManagerPayload.
 //
@@ -2701,6 +3195,234 @@ func (v *OCR2Spec) GetPluginType() string { return v.PluginType }
 // GetPluginConfig returns OCR2Spec.PluginConfig, and is useful for accessing the field via an interface.
 func (v *OCR2Spec) GetPluginConfig() gqlscalar.Map { return v.PluginConfig }
 
+// RejectJobProposalSpecRejectJobProposalSpecNotFoundError includes the requested fields of the GraphQL type NotFoundError.
+type RejectJobProposalSpecRejectJobProposalSpecNotFoundError struct {
+	Typename string    `json:"__typename"`
+	Message  string    `json:"message"`
+	Code     ErrorCode `json:"code"`
+}
+
+// GetTypename returns RejectJobProposalSpecRejectJobProposalSpecNotFoundError.Typename, and is useful for accessing the field via an interface.
+func (v *RejectJobProposalSpecRejectJobProposalSpecNotFoundError) GetTypename() string {
+	return v.Typename
+}
+
+// GetMessage returns RejectJobProposalSpecRejectJobProposalSpecNotFoundError.Message, and is useful for accessing the field via an interface.
+func (v *RejectJobProposalSpecRejectJobProposalSpecNotFoundError) GetMessage() string {
+	return v.Message
+}
+
+// GetCode returns RejectJobProposalSpecRejectJobProposalSpecNotFoundError.Code, and is useful for accessing the field via an interface.
+func (v *RejectJobProposalSpecRejectJobProposalSpecNotFoundError) GetCode() ErrorCode { return v.Code }
+
+// RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload includes the requested fields of the GraphQL interface RejectJobProposalSpecPayload.
+//
+// RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload is implemented by the following types:
+// RejectJobProposalSpecRejectJobProposalSpecNotFoundError
+// RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccess
+type RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload interface {
+	implementsGraphQLInterfaceRejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() string
+}
+
+func (v *RejectJobProposalSpecRejectJobProposalSpecNotFoundError) implementsGraphQLInterfaceRejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload() {
+}
+func (v *RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccess) implementsGraphQLInterfaceRejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload() {
+}
+
+func __unmarshalRejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload(b []byte, v *RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "NotFoundError":
+		*v = new(RejectJobProposalSpecRejectJobProposalSpecNotFoundError)
+		return json.Unmarshal(b, *v)
+	case "RejectJobProposalSpecSuccess":
+		*v = new(RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccess)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing RejectJobProposalSpecPayload.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalRejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload(v *RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *RejectJobProposalSpecRejectJobProposalSpecNotFoundError:
+		typename = "NotFoundError"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*RejectJobProposalSpecRejectJobProposalSpecNotFoundError
+		}{typename, v}
+		return json.Marshal(result)
+	case *RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccess:
+		typename = "RejectJobProposalSpecSuccess"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccess
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload: "%T"`, v)
+	}
+}
+
+// RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccess includes the requested fields of the GraphQL type RejectJobProposalSpecSuccess.
+type RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccess struct {
+	Typename string                                                                                    `json:"__typename"`
+	Spec     RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec `json:"spec"`
+}
+
+// GetTypename returns RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccess.Typename, and is useful for accessing the field via an interface.
+func (v *RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccess) GetTypename() string {
+	return v.Typename
+}
+
+// GetSpec returns RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccess.Spec, and is useful for accessing the field via an interface.
+func (v *RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccess) GetSpec() RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec {
+	return v.Spec
+}
+
+// RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec includes the requested fields of the GraphQL type JobProposalSpec.
+type RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec struct {
+	Id              string     `json:"id"`
+	Definition      string     `json:"definition"`
+	Version         int        `json:"version"`
+	Status          SpecStatus `json:"status"`
+	StatusUpdatedAt string     `json:"statusUpdatedAt"`
+	CreatedAt       string     `json:"createdAt"`
+	UpdatedAt       string     `json:"updatedAt"`
+}
+
+// GetId returns RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec.Id, and is useful for accessing the field via an interface.
+func (v *RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec) GetId() string {
+	return v.Id
+}
+
+// GetDefinition returns RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec.Definition, and is useful for accessing the field via an interface.
+func (v *RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec) GetDefinition() string {
+	return v.Definition
+}
+
+// GetVersion returns RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec.Version, and is useful for accessing the field via an interface.
+func (v *RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec) GetVersion() int {
+	return v.Version
+}
+
+// GetStatus returns RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec.Status, and is useful for accessing the field via an interface.
+func (v *RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec) GetStatus() SpecStatus {
+	return v.Status
+}
+
+// GetStatusUpdatedAt returns RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec.StatusUpdatedAt, and is useful for accessing the field via an interface.
+func (v *RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec) GetStatusUpdatedAt() string {
+	return v.StatusUpdatedAt
+}
+
+// GetCreatedAt returns RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec.CreatedAt, and is useful for accessing the field via an interface.
+func (v *RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec) GetCreatedAt() string {
+	return v.CreatedAt
+}
+
+// GetUpdatedAt returns RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec.UpdatedAt, and is useful for accessing the field via an interface.
+func (v *RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecSuccessSpecJobProposalSpec) GetUpdatedAt() string {
+	return v.UpdatedAt
+}
+
+// RejectJobProposalSpecResponse is returned by RejectJobProposalSpec on success.
+type RejectJobProposalSpecResponse struct {
+	RejectJobProposalSpec RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload `json:"-"`
+}
+
+// GetRejectJobProposalSpec returns RejectJobProposalSpecResponse.RejectJobProposalSpec, and is useful for accessing the field via an interface.
+func (v *RejectJobProposalSpecResponse) GetRejectJobProposalSpec() RejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload {
+	return v.RejectJobProposalSpec
+}
+
+func (v *RejectJobProposalSpecResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*RejectJobProposalSpecResponse
+		RejectJobProposalSpec json.RawMessage `json:"rejectJobProposalSpec"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.RejectJobProposalSpecResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.RejectJobProposalSpec
+		src := firstPass.RejectJobProposalSpec
+		if len(src) != 0 && string(src) != "null" {
+			err = __unmarshalRejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload(
+				src, dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal RejectJobProposalSpecResponse.RejectJobProposalSpec: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalRejectJobProposalSpecResponse struct {
+	RejectJobProposalSpec json.RawMessage `json:"rejectJobProposalSpec"`
+}
+
+func (v *RejectJobProposalSpecResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *RejectJobProposalSpecResponse) __premarshalJSON() (*__premarshalRejectJobProposalSpecResponse, error) {
+	var retval __premarshalRejectJobProposalSpecResponse
+
+	{
+
+		dst := &retval.RejectJobProposalSpec
+		src := v.RejectJobProposalSpec
+		var err error
+		*dst, err = __marshalRejectJobProposalSpecRejectJobProposalSpecRejectJobProposalSpecPayload(
+			&src)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"unable to marshal RejectJobProposalSpecResponse.RejectJobProposalSpec: %w", err)
+		}
+	}
+	return &retval, nil
+}
+
 type SpecStatus string
 
 const (
@@ -2710,6 +3432,600 @@ const (
 	SpecStatusRejected  SpecStatus = "REJECTED"
 	SpecStatusCancelled SpecStatus = "CANCELLED"
 )
+
+type UpdateFeedsManagerInput struct {
+	Name      string `json:"name"`
+	Uri       string `json:"uri"`
+	PublicKey string `json:"publicKey"`
+}
+
+// GetName returns UpdateFeedsManagerInput.Name, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerInput) GetName() string { return v.Name }
+
+// GetUri returns UpdateFeedsManagerInput.Uri, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerInput) GetUri() string { return v.Uri }
+
+// GetPublicKey returns UpdateFeedsManagerInput.PublicKey, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerInput) GetPublicKey() string { return v.PublicKey }
+
+// UpdateFeedsManagerResponse is returned by UpdateFeedsManager on success.
+type UpdateFeedsManagerResponse struct {
+	UpdateFeedsManager UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload `json:"-"`
+}
+
+// GetUpdateFeedsManager returns UpdateFeedsManagerResponse.UpdateFeedsManager, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerResponse) GetUpdateFeedsManager() UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload {
+	return v.UpdateFeedsManager
+}
+
+func (v *UpdateFeedsManagerResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*UpdateFeedsManagerResponse
+		UpdateFeedsManager json.RawMessage `json:"updateFeedsManager"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.UpdateFeedsManagerResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.UpdateFeedsManager
+		src := firstPass.UpdateFeedsManager
+		if len(src) != 0 && string(src) != "null" {
+			err = __unmarshalUpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload(
+				src, dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal UpdateFeedsManagerResponse.UpdateFeedsManager: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalUpdateFeedsManagerResponse struct {
+	UpdateFeedsManager json.RawMessage `json:"updateFeedsManager"`
+}
+
+func (v *UpdateFeedsManagerResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *UpdateFeedsManagerResponse) __premarshalJSON() (*__premarshalUpdateFeedsManagerResponse, error) {
+	var retval __premarshalUpdateFeedsManagerResponse
+
+	{
+
+		dst := &retval.UpdateFeedsManager
+		src := v.UpdateFeedsManager
+		var err error
+		*dst, err = __marshalUpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload(
+			&src)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"unable to marshal UpdateFeedsManagerResponse.UpdateFeedsManager: %w", err)
+		}
+	}
+	return &retval, nil
+}
+
+// UpdateFeedsManagerUpdateFeedsManagerInputErrors includes the requested fields of the GraphQL type InputErrors.
+type UpdateFeedsManagerUpdateFeedsManagerInputErrors struct {
+	Typename string                                                            `json:"__typename"`
+	Errors   []UpdateFeedsManagerUpdateFeedsManagerInputErrorsErrorsInputError `json:"errors"`
+}
+
+// GetTypename returns UpdateFeedsManagerUpdateFeedsManagerInputErrors.Typename, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerInputErrors) GetTypename() string { return v.Typename }
+
+// GetErrors returns UpdateFeedsManagerUpdateFeedsManagerInputErrors.Errors, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerInputErrors) GetErrors() []UpdateFeedsManagerUpdateFeedsManagerInputErrorsErrorsInputError {
+	return v.Errors
+}
+
+// UpdateFeedsManagerUpdateFeedsManagerInputErrorsErrorsInputError includes the requested fields of the GraphQL type InputError.
+type UpdateFeedsManagerUpdateFeedsManagerInputErrorsErrorsInputError struct {
+	Message string    `json:"message"`
+	Code    ErrorCode `json:"code"`
+	Path    string    `json:"path"`
+}
+
+// GetMessage returns UpdateFeedsManagerUpdateFeedsManagerInputErrorsErrorsInputError.Message, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerInputErrorsErrorsInputError) GetMessage() string {
+	return v.Message
+}
+
+// GetCode returns UpdateFeedsManagerUpdateFeedsManagerInputErrorsErrorsInputError.Code, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerInputErrorsErrorsInputError) GetCode() ErrorCode {
+	return v.Code
+}
+
+// GetPath returns UpdateFeedsManagerUpdateFeedsManagerInputErrorsErrorsInputError.Path, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerInputErrorsErrorsInputError) GetPath() string {
+	return v.Path
+}
+
+// UpdateFeedsManagerUpdateFeedsManagerNotFoundError includes the requested fields of the GraphQL type NotFoundError.
+type UpdateFeedsManagerUpdateFeedsManagerNotFoundError struct {
+	Typename string    `json:"__typename"`
+	Message  string    `json:"message"`
+	Code     ErrorCode `json:"code"`
+}
+
+// GetTypename returns UpdateFeedsManagerUpdateFeedsManagerNotFoundError.Typename, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerNotFoundError) GetTypename() string { return v.Typename }
+
+// GetMessage returns UpdateFeedsManagerUpdateFeedsManagerNotFoundError.Message, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerNotFoundError) GetMessage() string { return v.Message }
+
+// GetCode returns UpdateFeedsManagerUpdateFeedsManagerNotFoundError.Code, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerNotFoundError) GetCode() ErrorCode { return v.Code }
+
+// UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload includes the requested fields of the GraphQL interface UpdateFeedsManagerPayload.
+//
+// UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload is implemented by the following types:
+// UpdateFeedsManagerUpdateFeedsManagerInputErrors
+// UpdateFeedsManagerUpdateFeedsManagerNotFoundError
+// UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccess
+type UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload interface {
+	implementsGraphQLInterfaceUpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() string
+}
+
+func (v *UpdateFeedsManagerUpdateFeedsManagerInputErrors) implementsGraphQLInterfaceUpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload() {
+}
+func (v *UpdateFeedsManagerUpdateFeedsManagerNotFoundError) implementsGraphQLInterfaceUpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload() {
+}
+func (v *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccess) implementsGraphQLInterfaceUpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload() {
+}
+
+func __unmarshalUpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload(b []byte, v *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "InputErrors":
+		*v = new(UpdateFeedsManagerUpdateFeedsManagerInputErrors)
+		return json.Unmarshal(b, *v)
+	case "NotFoundError":
+		*v = new(UpdateFeedsManagerUpdateFeedsManagerNotFoundError)
+		return json.Unmarshal(b, *v)
+	case "UpdateFeedsManagerSuccess":
+		*v = new(UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccess)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing UpdateFeedsManagerPayload.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalUpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload(v *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *UpdateFeedsManagerUpdateFeedsManagerInputErrors:
+		typename = "InputErrors"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*UpdateFeedsManagerUpdateFeedsManagerInputErrors
+		}{typename, v}
+		return json.Marshal(result)
+	case *UpdateFeedsManagerUpdateFeedsManagerNotFoundError:
+		typename = "NotFoundError"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*UpdateFeedsManagerUpdateFeedsManagerNotFoundError
+		}{typename, v}
+		return json.Marshal(result)
+	case *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccess:
+		typename = "UpdateFeedsManagerSuccess"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccess
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerPayload: "%T"`, v)
+	}
+}
+
+// UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccess includes the requested fields of the GraphQL type UpdateFeedsManagerSuccess.
+type UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccess struct {
+	Typename     string                                                                    `json:"__typename"`
+	FeedsManager UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager `json:"feedsManager"`
+}
+
+// GetTypename returns UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccess.Typename, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccess) GetTypename() string {
+	return v.Typename
+}
+
+// GetFeedsManager returns UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccess.FeedsManager, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccess) GetFeedsManager() UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager {
+	return v.FeedsManager
+}
+
+// UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager includes the requested fields of the GraphQL type FeedsManager.
+type UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager struct {
+	FeedsManagerParts `json:"-"`
+}
+
+// GetId returns UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager.Id, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager) GetId() string {
+	return v.FeedsManagerParts.Id
+}
+
+// GetName returns UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager.Name, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager) GetName() string {
+	return v.FeedsManagerParts.Name
+}
+
+// GetUri returns UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager.Uri, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager) GetUri() string {
+	return v.FeedsManagerParts.Uri
+}
+
+// GetPublicKey returns UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager.PublicKey, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager) GetPublicKey() string {
+	return v.FeedsManagerParts.PublicKey
+}
+
+// GetIsConnectionActive returns UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager.IsConnectionActive, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager) GetIsConnectionActive() bool {
+	return v.FeedsManagerParts.IsConnectionActive
+}
+
+// GetCreatedAt returns UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager.CreatedAt, and is useful for accessing the field via an interface.
+func (v *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager) GetCreatedAt() string {
+	return v.FeedsManagerParts.CreatedAt
+}
+
+func (v *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(
+		b, &v.FeedsManagerParts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type __premarshalUpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager struct {
+	Id string `json:"id"`
+
+	Name string `json:"name"`
+
+	Uri string `json:"uri"`
+
+	PublicKey string `json:"publicKey"`
+
+	IsConnectionActive bool `json:"isConnectionActive"`
+
+	CreatedAt string `json:"createdAt"`
+}
+
+func (v *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *UpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager) __premarshalJSON() (*__premarshalUpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager, error) {
+	var retval __premarshalUpdateFeedsManagerUpdateFeedsManagerUpdateFeedsManagerSuccessFeedsManager
+
+	retval.Id = v.FeedsManagerParts.Id
+	retval.Name = v.FeedsManagerParts.Name
+	retval.Uri = v.FeedsManagerParts.Uri
+	retval.PublicKey = v.FeedsManagerParts.PublicKey
+	retval.IsConnectionActive = v.FeedsManagerParts.IsConnectionActive
+	retval.CreatedAt = v.FeedsManagerParts.CreatedAt
+	return &retval, nil
+}
+
+type UpdateJobProposalSpecDefinitionInput struct {
+	Definition string `json:"definition"`
+}
+
+// GetDefinition returns UpdateJobProposalSpecDefinitionInput.Definition, and is useful for accessing the field via an interface.
+func (v *UpdateJobProposalSpecDefinitionInput) GetDefinition() string { return v.Definition }
+
+// UpdateJobProposalSpecDefinitionResponse is returned by UpdateJobProposalSpecDefinition on success.
+type UpdateJobProposalSpecDefinitionResponse struct {
+	UpdateJobProposalSpecDefinition UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload `json:"-"`
+}
+
+// GetUpdateJobProposalSpecDefinition returns UpdateJobProposalSpecDefinitionResponse.UpdateJobProposalSpecDefinition, and is useful for accessing the field via an interface.
+func (v *UpdateJobProposalSpecDefinitionResponse) GetUpdateJobProposalSpecDefinition() UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload {
+	return v.UpdateJobProposalSpecDefinition
+}
+
+func (v *UpdateJobProposalSpecDefinitionResponse) UnmarshalJSON(b []byte) error {
+
+	if string(b) == "null" {
+		return nil
+	}
+
+	var firstPass struct {
+		*UpdateJobProposalSpecDefinitionResponse
+		UpdateJobProposalSpecDefinition json.RawMessage `json:"updateJobProposalSpecDefinition"`
+		graphql.NoUnmarshalJSON
+	}
+	firstPass.UpdateJobProposalSpecDefinitionResponse = v
+
+	err := json.Unmarshal(b, &firstPass)
+	if err != nil {
+		return err
+	}
+
+	{
+		dst := &v.UpdateJobProposalSpecDefinition
+		src := firstPass.UpdateJobProposalSpecDefinition
+		if len(src) != 0 && string(src) != "null" {
+			err = __unmarshalUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload(
+				src, dst)
+			if err != nil {
+				return fmt.Errorf(
+					"unable to unmarshal UpdateJobProposalSpecDefinitionResponse.UpdateJobProposalSpecDefinition: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+type __premarshalUpdateJobProposalSpecDefinitionResponse struct {
+	UpdateJobProposalSpecDefinition json.RawMessage `json:"updateJobProposalSpecDefinition"`
+}
+
+func (v *UpdateJobProposalSpecDefinitionResponse) MarshalJSON() ([]byte, error) {
+	premarshaled, err := v.__premarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(premarshaled)
+}
+
+func (v *UpdateJobProposalSpecDefinitionResponse) __premarshalJSON() (*__premarshalUpdateJobProposalSpecDefinitionResponse, error) {
+	var retval __premarshalUpdateJobProposalSpecDefinitionResponse
+
+	{
+
+		dst := &retval.UpdateJobProposalSpecDefinition
+		src := v.UpdateJobProposalSpecDefinition
+		var err error
+		*dst, err = __marshalUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload(
+			&src)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"unable to marshal UpdateJobProposalSpecDefinitionResponse.UpdateJobProposalSpecDefinition: %w", err)
+		}
+	}
+	return &retval, nil
+}
+
+// UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionNotFoundError includes the requested fields of the GraphQL type NotFoundError.
+type UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionNotFoundError struct {
+	Typename string    `json:"__typename"`
+	Message  string    `json:"message"`
+	Code     ErrorCode `json:"code"`
+}
+
+// GetTypename returns UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionNotFoundError.Typename, and is useful for accessing the field via an interface.
+func (v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionNotFoundError) GetTypename() string {
+	return v.Typename
+}
+
+// GetMessage returns UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionNotFoundError.Message, and is useful for accessing the field via an interface.
+func (v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionNotFoundError) GetMessage() string {
+	return v.Message
+}
+
+// GetCode returns UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionNotFoundError.Code, and is useful for accessing the field via an interface.
+func (v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionNotFoundError) GetCode() ErrorCode {
+	return v.Code
+}
+
+// UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload includes the requested fields of the GraphQL interface UpdateJobProposalSpecDefinitionPayload.
+//
+// UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload is implemented by the following types:
+// UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionNotFoundError
+// UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccess
+type UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload interface {
+	implementsGraphQLInterfaceUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload()
+	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
+	GetTypename() string
+}
+
+func (v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionNotFoundError) implementsGraphQLInterfaceUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload() {
+}
+func (v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccess) implementsGraphQLInterfaceUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload() {
+}
+
+func __unmarshalUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload(b []byte, v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload) error {
+	if string(b) == "null" {
+		return nil
+	}
+
+	var tn struct {
+		TypeName string `json:"__typename"`
+	}
+	err := json.Unmarshal(b, &tn)
+	if err != nil {
+		return err
+	}
+
+	switch tn.TypeName {
+	case "NotFoundError":
+		*v = new(UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionNotFoundError)
+		return json.Unmarshal(b, *v)
+	case "UpdateJobProposalSpecDefinitionSuccess":
+		*v = new(UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccess)
+		return json.Unmarshal(b, *v)
+	case "":
+		return fmt.Errorf(
+			"response was missing UpdateJobProposalSpecDefinitionPayload.__typename")
+	default:
+		return fmt.Errorf(
+			`unexpected concrete type for UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload: "%v"`, tn.TypeName)
+	}
+}
+
+func __marshalUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload(v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload) ([]byte, error) {
+
+	var typename string
+	switch v := (*v).(type) {
+	case *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionNotFoundError:
+		typename = "NotFoundError"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionNotFoundError
+		}{typename, v}
+		return json.Marshal(result)
+	case *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccess:
+		typename = "UpdateJobProposalSpecDefinitionSuccess"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccess
+		}{typename, v}
+		return json.Marshal(result)
+	case nil:
+		return []byte("null"), nil
+	default:
+		return nil, fmt.Errorf(
+			`unexpected concrete type for UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionPayload: "%T"`, v)
+	}
+}
+
+// UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccess includes the requested fields of the GraphQL type UpdateJobProposalSpecDefinitionSuccess.
+type UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccess struct {
+	Typename string                                                                                                                  `json:"__typename"`
+	Spec     UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec `json:"spec"`
+}
+
+// GetTypename returns UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccess.Typename, and is useful for accessing the field via an interface.
+func (v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccess) GetTypename() string {
+	return v.Typename
+}
+
+// GetSpec returns UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccess.Spec, and is useful for accessing the field via an interface.
+func (v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccess) GetSpec() UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec {
+	return v.Spec
+}
+
+// UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec includes the requested fields of the GraphQL type JobProposalSpec.
+type UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec struct {
+	Id              string     `json:"id"`
+	Definition      string     `json:"definition"`
+	Version         int        `json:"version"`
+	Status          SpecStatus `json:"status"`
+	StatusUpdatedAt string     `json:"statusUpdatedAt"`
+	CreatedAt       string     `json:"createdAt"`
+	UpdatedAt       string     `json:"updatedAt"`
+}
+
+// GetId returns UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec.Id, and is useful for accessing the field via an interface.
+func (v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec) GetId() string {
+	return v.Id
+}
+
+// GetDefinition returns UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec.Definition, and is useful for accessing the field via an interface.
+func (v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec) GetDefinition() string {
+	return v.Definition
+}
+
+// GetVersion returns UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec.Version, and is useful for accessing the field via an interface.
+func (v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec) GetVersion() int {
+	return v.Version
+}
+
+// GetStatus returns UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec.Status, and is useful for accessing the field via an interface.
+func (v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec) GetStatus() SpecStatus {
+	return v.Status
+}
+
+// GetStatusUpdatedAt returns UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec.StatusUpdatedAt, and is useful for accessing the field via an interface.
+func (v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec) GetStatusUpdatedAt() string {
+	return v.StatusUpdatedAt
+}
+
+// GetCreatedAt returns UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec.CreatedAt, and is useful for accessing the field via an interface.
+func (v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec) GetCreatedAt() string {
+	return v.CreatedAt
+}
+
+// GetUpdatedAt returns UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec.UpdatedAt, and is useful for accessing the field via an interface.
+func (v *UpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionUpdateJobProposalSpecDefinitionSuccessSpecJobProposalSpec) GetUpdatedAt() string {
+	return v.UpdatedAt
+}
+
+// __ApproveJobProposalSpecInput is used internally by genqlient
+type __ApproveJobProposalSpecInput struct {
+	Id    string `json:"id"`
+	Force bool   `json:"force"`
+}
+
+// GetId returns __ApproveJobProposalSpecInput.Id, and is useful for accessing the field via an interface.
+func (v *__ApproveJobProposalSpecInput) GetId() string { return v.Id }
+
+// GetForce returns __ApproveJobProposalSpecInput.Force, and is useful for accessing the field via an interface.
+func (v *__ApproveJobProposalSpecInput) GetForce() bool { return v.Force }
+
+// __CancelJobProposalSpecInput is used internally by genqlient
+type __CancelJobProposalSpecInput struct {
+	Id string `json:"id"`
+}
+
+// GetId returns __CancelJobProposalSpecInput.Id, and is useful for accessing the field via an interface.
+func (v *__CancelJobProposalSpecInput) GetId() string { return v.Id }
 
 // __CreateFeedsManagerInput is used internally by genqlient
 type __CreateFeedsManagerInput struct {
@@ -2774,6 +4090,146 @@ func (v *__ListJobsInput) GetOffset() int { return v.Offset }
 
 // GetLimit returns __ListJobsInput.Limit, and is useful for accessing the field via an interface.
 func (v *__ListJobsInput) GetLimit() int { return v.Limit }
+
+// __RejectJobProposalSpecInput is used internally by genqlient
+type __RejectJobProposalSpecInput struct {
+	Id string `json:"id"`
+}
+
+// GetId returns __RejectJobProposalSpecInput.Id, and is useful for accessing the field via an interface.
+func (v *__RejectJobProposalSpecInput) GetId() string { return v.Id }
+
+// __UpdateFeedsManagerInput is used internally by genqlient
+type __UpdateFeedsManagerInput struct {
+	Id    string                  `json:"id"`
+	Input UpdateFeedsManagerInput `json:"input"`
+}
+
+// GetId returns __UpdateFeedsManagerInput.Id, and is useful for accessing the field via an interface.
+func (v *__UpdateFeedsManagerInput) GetId() string { return v.Id }
+
+// GetInput returns __UpdateFeedsManagerInput.Input, and is useful for accessing the field via an interface.
+func (v *__UpdateFeedsManagerInput) GetInput() UpdateFeedsManagerInput { return v.Input }
+
+// __UpdateJobProposalSpecDefinitionInput is used internally by genqlient
+type __UpdateJobProposalSpecDefinitionInput struct {
+	Id    string                               `json:"id"`
+	Input UpdateJobProposalSpecDefinitionInput `json:"input"`
+}
+
+// GetId returns __UpdateJobProposalSpecDefinitionInput.Id, and is useful for accessing the field via an interface.
+func (v *__UpdateJobProposalSpecDefinitionInput) GetId() string { return v.Id }
+
+// GetInput returns __UpdateJobProposalSpecDefinitionInput.Input, and is useful for accessing the field via an interface.
+func (v *__UpdateJobProposalSpecDefinitionInput) GetInput() UpdateJobProposalSpecDefinitionInput {
+	return v.Input
+}
+
+// The query or mutation executed by ApproveJobProposalSpec.
+const ApproveJobProposalSpec_Operation = `
+mutation ApproveJobProposalSpec ($id: ID!, $force: Boolean) {
+	approveJobProposalSpec(id: $id, force: $force) {
+		__typename
+		... on ApproveJobProposalSpecSuccess {
+			spec {
+				id
+				definition
+				version
+				status
+				statusUpdatedAt
+				createdAt
+				updatedAt
+			}
+		}
+		... on JobAlreadyExistsError {
+			message
+			code
+		}
+		... on NotFoundError {
+			message
+			code
+		}
+	}
+}
+`
+
+func ApproveJobProposalSpec(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	id string,
+	force bool,
+) (*ApproveJobProposalSpecResponse, error) {
+	req_ := &graphql.Request{
+		OpName: "ApproveJobProposalSpec",
+		Query:  ApproveJobProposalSpec_Operation,
+		Variables: &__ApproveJobProposalSpecInput{
+			Id:    id,
+			Force: force,
+		},
+	}
+	var err_ error
+
+	var data_ ApproveJobProposalSpecResponse
+	resp_ := &graphql.Response{Data: &data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return &data_, err_
+}
+
+// The query or mutation executed by CancelJobProposalSpec.
+const CancelJobProposalSpec_Operation = `
+mutation CancelJobProposalSpec ($id: ID!) {
+	cancelJobProposalSpec(id: $id) {
+		__typename
+		... on CancelJobProposalSpecSuccess {
+			spec {
+				id
+				definition
+				version
+				status
+				statusUpdatedAt
+				createdAt
+				updatedAt
+			}
+		}
+		... on NotFoundError {
+			message
+			code
+		}
+	}
+}
+`
+
+func CancelJobProposalSpec(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	id string,
+) (*CancelJobProposalSpecResponse, error) {
+	req_ := &graphql.Request{
+		OpName: "CancelJobProposalSpec",
+		Query:  CancelJobProposalSpec_Operation,
+		Variables: &__CancelJobProposalSpecInput{
+			Id: id,
+		},
+	}
+	var err_ error
+
+	var data_ CancelJobProposalSpecResponse
+	resp_ := &graphql.Response{Data: &data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return &data_, err_
+}
 
 // The query or mutation executed by CreateFeedsManager.
 const CreateFeedsManager_Operation = `
@@ -3289,6 +4745,169 @@ func ListJobs(
 	var err_ error
 
 	var data_ ListJobsResponse
+	resp_ := &graphql.Response{Data: &data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return &data_, err_
+}
+
+// The query or mutation executed by RejectJobProposalSpec.
+const RejectJobProposalSpec_Operation = `
+mutation RejectJobProposalSpec ($id: ID!) {
+	rejectJobProposalSpec(id: $id) {
+		__typename
+		... on RejectJobProposalSpecSuccess {
+			spec {
+				id
+				definition
+				version
+				status
+				statusUpdatedAt
+				createdAt
+				updatedAt
+			}
+		}
+		... on NotFoundError {
+			message
+			code
+		}
+	}
+}
+`
+
+func RejectJobProposalSpec(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	id string,
+) (*RejectJobProposalSpecResponse, error) {
+	req_ := &graphql.Request{
+		OpName: "RejectJobProposalSpec",
+		Query:  RejectJobProposalSpec_Operation,
+		Variables: &__RejectJobProposalSpecInput{
+			Id: id,
+		},
+	}
+	var err_ error
+
+	var data_ RejectJobProposalSpecResponse
+	resp_ := &graphql.Response{Data: &data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return &data_, err_
+}
+
+// The query or mutation executed by UpdateFeedsManager.
+const UpdateFeedsManager_Operation = `
+mutation UpdateFeedsManager ($id: ID!, $input: UpdateFeedsManagerInput!) {
+	updateFeedsManager(id: $id, input: $input) {
+		__typename
+		... on UpdateFeedsManagerSuccess {
+			feedsManager {
+				... FeedsManagerParts
+			}
+		}
+		... on NotFoundError {
+			message
+			code
+		}
+		... on InputErrors {
+			errors {
+				message
+				code
+				path
+			}
+		}
+	}
+}
+fragment FeedsManagerParts on FeedsManager {
+	id
+	name
+	uri
+	publicKey
+	isConnectionActive
+	createdAt
+}
+`
+
+func UpdateFeedsManager(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	id string,
+	input UpdateFeedsManagerInput,
+) (*UpdateFeedsManagerResponse, error) {
+	req_ := &graphql.Request{
+		OpName: "UpdateFeedsManager",
+		Query:  UpdateFeedsManager_Operation,
+		Variables: &__UpdateFeedsManagerInput{
+			Id:    id,
+			Input: input,
+		},
+	}
+	var err_ error
+
+	var data_ UpdateFeedsManagerResponse
+	resp_ := &graphql.Response{Data: &data_}
+
+	err_ = client_.MakeRequest(
+		ctx_,
+		req_,
+		resp_,
+	)
+
+	return &data_, err_
+}
+
+// The query or mutation executed by UpdateJobProposalSpecDefinition.
+const UpdateJobProposalSpecDefinition_Operation = `
+mutation UpdateJobProposalSpecDefinition ($id: ID!, $input: UpdateJobProposalSpecDefinitionInput!) {
+	updateJobProposalSpecDefinition(id: $id, input: $input) {
+		__typename
+		... on UpdateJobProposalSpecDefinitionSuccess {
+			spec {
+				id
+				definition
+				version
+				status
+				statusUpdatedAt
+				createdAt
+				updatedAt
+			}
+		}
+		... on NotFoundError {
+			message
+			code
+		}
+	}
+}
+`
+
+func UpdateJobProposalSpecDefinition(
+	ctx_ context.Context,
+	client_ graphql.Client,
+	id string,
+	input UpdateJobProposalSpecDefinitionInput,
+) (*UpdateJobProposalSpecDefinitionResponse, error) {
+	req_ := &graphql.Request{
+		OpName: "UpdateJobProposalSpecDefinition",
+		Query:  UpdateJobProposalSpecDefinition_Operation,
+		Variables: &__UpdateJobProposalSpecDefinitionInput{
+			Id:    id,
+			Input: input,
+		},
+	}
+	var err_ error
+
+	var data_ UpdateJobProposalSpecDefinitionResponse
 	resp_ := &graphql.Response{Data: &data_}
 
 	err_ = client_.MakeRequest(
