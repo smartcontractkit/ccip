@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/Khan/genqlient/graphql"
-	"github.com/smartcontractkit/chainlink/core/web/gqlscalar"
+	"github.com/smartcontractkit/chainlink/v2/core/web/gqlscalar"
 )
 
 // ApproveJobProposalSpecApproveJobProposalSpecApproveJobProposalSpecPayload includes the requested fields of the GraphQL interface ApproveJobProposalSpecPayload.
@@ -2335,6 +2335,14 @@ func (v *JobPartsErrorsJobError) GetCreatedAt() string { return v.CreatedAt }
 // GetUpdatedAt returns JobPartsErrorsJobError.UpdatedAt, and is useful for accessing the field via an interface.
 func (v *JobPartsErrorsJobError) GetUpdatedAt() string { return v.UpdatedAt }
 
+// JobPartsSpecBlockHeaderFeederSpec includes the requested fields of the GraphQL type BlockHeaderFeederSpec.
+type JobPartsSpecBlockHeaderFeederSpec struct {
+	Typename string `json:"__typename"`
+}
+
+// GetTypename returns JobPartsSpecBlockHeaderFeederSpec.Typename, and is useful for accessing the field via an interface.
+func (v *JobPartsSpecBlockHeaderFeederSpec) GetTypename() string { return v.Typename }
+
 // JobPartsSpecBlockhashStoreSpec includes the requested fields of the GraphQL type BlockhashStoreSpec.
 type JobPartsSpecBlockhashStoreSpec struct {
 	Typename string `json:"__typename"`
@@ -2375,35 +2383,51 @@ type JobPartsSpecFluxMonitorSpec struct {
 // GetTypename returns JobPartsSpecFluxMonitorSpec.Typename, and is useful for accessing the field via an interface.
 func (v *JobPartsSpecFluxMonitorSpec) GetTypename() string { return v.Typename }
 
+// JobPartsSpecGatewaySpec includes the requested fields of the GraphQL type GatewaySpec.
+type JobPartsSpecGatewaySpec struct {
+	Typename string `json:"__typename"`
+}
+
+// GetTypename returns JobPartsSpecGatewaySpec.Typename, and is useful for accessing the field via an interface.
+func (v *JobPartsSpecGatewaySpec) GetTypename() string { return v.Typename }
+
 // JobPartsSpecJobSpec includes the requested fields of the GraphQL interface JobSpec.
 //
 // JobPartsSpecJobSpec is implemented by the following types:
+// JobPartsSpecBlockHeaderFeederSpec
 // JobPartsSpecBlockhashStoreSpec
 // JobPartsSpecBootstrapSpec
 // JobPartsSpecCronSpec
 // JobPartsSpecDirectRequestSpec
 // JobPartsSpecFluxMonitorSpec
+// JobPartsSpecGatewaySpec
 // JobPartsSpecKeeperSpec
 // JobPartsSpecOCR2Spec
 // JobPartsSpecOCRSpec
+// JobPartsSpecStandardCapabilitiesSpec
 // JobPartsSpecVRFSpec
 // JobPartsSpecWebhookSpec
+// JobPartsSpecWorkflowSpec
 type JobPartsSpecJobSpec interface {
 	implementsGraphQLInterfaceJobPartsSpecJobSpec()
 	// GetTypename returns the receiver's concrete GraphQL type-name (see interface doc for possible values).
 	GetTypename() string
 }
 
-func (v *JobPartsSpecBlockhashStoreSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec() {}
-func (v *JobPartsSpecBootstrapSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()      {}
-func (v *JobPartsSpecCronSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()           {}
-func (v *JobPartsSpecDirectRequestSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()  {}
-func (v *JobPartsSpecFluxMonitorSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()    {}
-func (v *JobPartsSpecKeeperSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()         {}
-func (v *JobPartsSpecOCR2Spec) implementsGraphQLInterfaceJobPartsSpecJobSpec()           {}
-func (v *JobPartsSpecOCRSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()            {}
-func (v *JobPartsSpecVRFSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()            {}
-func (v *JobPartsSpecWebhookSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()        {}
+func (v *JobPartsSpecBlockHeaderFeederSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()    {}
+func (v *JobPartsSpecBlockhashStoreSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()       {}
+func (v *JobPartsSpecBootstrapSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()            {}
+func (v *JobPartsSpecCronSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()                 {}
+func (v *JobPartsSpecDirectRequestSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()        {}
+func (v *JobPartsSpecFluxMonitorSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()          {}
+func (v *JobPartsSpecGatewaySpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()              {}
+func (v *JobPartsSpecKeeperSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()               {}
+func (v *JobPartsSpecOCR2Spec) implementsGraphQLInterfaceJobPartsSpecJobSpec()                 {}
+func (v *JobPartsSpecOCRSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()                  {}
+func (v *JobPartsSpecStandardCapabilitiesSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec() {}
+func (v *JobPartsSpecVRFSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()                  {}
+func (v *JobPartsSpecWebhookSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()              {}
+func (v *JobPartsSpecWorkflowSpec) implementsGraphQLInterfaceJobPartsSpecJobSpec()             {}
 
 func __unmarshalJobPartsSpecJobSpec(b []byte, v *JobPartsSpecJobSpec) error {
 	if string(b) == "null" {
@@ -2419,6 +2443,9 @@ func __unmarshalJobPartsSpecJobSpec(b []byte, v *JobPartsSpecJobSpec) error {
 	}
 
 	switch tn.TypeName {
+	case "BlockHeaderFeederSpec":
+		*v = new(JobPartsSpecBlockHeaderFeederSpec)
+		return json.Unmarshal(b, *v)
 	case "BlockhashStoreSpec":
 		*v = new(JobPartsSpecBlockhashStoreSpec)
 		return json.Unmarshal(b, *v)
@@ -2434,6 +2461,9 @@ func __unmarshalJobPartsSpecJobSpec(b []byte, v *JobPartsSpecJobSpec) error {
 	case "FluxMonitorSpec":
 		*v = new(JobPartsSpecFluxMonitorSpec)
 		return json.Unmarshal(b, *v)
+	case "GatewaySpec":
+		*v = new(JobPartsSpecGatewaySpec)
+		return json.Unmarshal(b, *v)
 	case "KeeperSpec":
 		*v = new(JobPartsSpecKeeperSpec)
 		return json.Unmarshal(b, *v)
@@ -2443,11 +2473,17 @@ func __unmarshalJobPartsSpecJobSpec(b []byte, v *JobPartsSpecJobSpec) error {
 	case "OCRSpec":
 		*v = new(JobPartsSpecOCRSpec)
 		return json.Unmarshal(b, *v)
+	case "StandardCapabilitiesSpec":
+		*v = new(JobPartsSpecStandardCapabilitiesSpec)
+		return json.Unmarshal(b, *v)
 	case "VRFSpec":
 		*v = new(JobPartsSpecVRFSpec)
 		return json.Unmarshal(b, *v)
 	case "WebhookSpec":
 		*v = new(JobPartsSpecWebhookSpec)
+		return json.Unmarshal(b, *v)
+	case "WorkflowSpec":
+		*v = new(JobPartsSpecWorkflowSpec)
 		return json.Unmarshal(b, *v)
 	case "":
 		return fmt.Errorf(
@@ -2462,6 +2498,14 @@ func __marshalJobPartsSpecJobSpec(v *JobPartsSpecJobSpec) ([]byte, error) {
 
 	var typename string
 	switch v := (*v).(type) {
+	case *JobPartsSpecBlockHeaderFeederSpec:
+		typename = "BlockHeaderFeederSpec"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*JobPartsSpecBlockHeaderFeederSpec
+		}{typename, v}
+		return json.Marshal(result)
 	case *JobPartsSpecBlockhashStoreSpec:
 		typename = "BlockhashStoreSpec"
 
@@ -2502,6 +2546,14 @@ func __marshalJobPartsSpecJobSpec(v *JobPartsSpecJobSpec) ([]byte, error) {
 			*JobPartsSpecFluxMonitorSpec
 		}{typename, v}
 		return json.Marshal(result)
+	case *JobPartsSpecGatewaySpec:
+		typename = "GatewaySpec"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*JobPartsSpecGatewaySpec
+		}{typename, v}
+		return json.Marshal(result)
 	case *JobPartsSpecKeeperSpec:
 		typename = "KeeperSpec"
 
@@ -2530,6 +2582,14 @@ func __marshalJobPartsSpecJobSpec(v *JobPartsSpecJobSpec) ([]byte, error) {
 			*JobPartsSpecOCRSpec
 		}{typename, v}
 		return json.Marshal(result)
+	case *JobPartsSpecStandardCapabilitiesSpec:
+		typename = "StandardCapabilitiesSpec"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*JobPartsSpecStandardCapabilitiesSpec
+		}{typename, v}
+		return json.Marshal(result)
 	case *JobPartsSpecVRFSpec:
 		typename = "VRFSpec"
 
@@ -2544,6 +2604,14 @@ func __marshalJobPartsSpecJobSpec(v *JobPartsSpecJobSpec) ([]byte, error) {
 		result := struct {
 			TypeName string `json:"__typename"`
 			*JobPartsSpecWebhookSpec
+		}{typename, v}
+		return json.Marshal(result)
+	case *JobPartsSpecWorkflowSpec:
+		typename = "WorkflowSpec"
+
+		result := struct {
+			TypeName string `json:"__typename"`
+			*JobPartsSpecWorkflowSpec
 		}{typename, v}
 		return json.Marshal(result)
 	case nil:
@@ -2705,6 +2773,14 @@ type JobPartsSpecOCRSpec struct {
 // GetTypename returns JobPartsSpecOCRSpec.Typename, and is useful for accessing the field via an interface.
 func (v *JobPartsSpecOCRSpec) GetTypename() string { return v.Typename }
 
+// JobPartsSpecStandardCapabilitiesSpec includes the requested fields of the GraphQL type StandardCapabilitiesSpec.
+type JobPartsSpecStandardCapabilitiesSpec struct {
+	Typename string `json:"__typename"`
+}
+
+// GetTypename returns JobPartsSpecStandardCapabilitiesSpec.Typename, and is useful for accessing the field via an interface.
+func (v *JobPartsSpecStandardCapabilitiesSpec) GetTypename() string { return v.Typename }
+
 // JobPartsSpecVRFSpec includes the requested fields of the GraphQL type VRFSpec.
 type JobPartsSpecVRFSpec struct {
 	Typename string `json:"__typename"`
@@ -2721,6 +2797,14 @@ type JobPartsSpecWebhookSpec struct {
 // GetTypename returns JobPartsSpecWebhookSpec.Typename, and is useful for accessing the field via an interface.
 func (v *JobPartsSpecWebhookSpec) GetTypename() string { return v.Typename }
 
+// JobPartsSpecWorkflowSpec includes the requested fields of the GraphQL type WorkflowSpec.
+type JobPartsSpecWorkflowSpec struct {
+	Typename string `json:"__typename"`
+}
+
+// GetTypename returns JobPartsSpecWorkflowSpec.Typename, and is useful for accessing the field via an interface.
+func (v *JobPartsSpecWorkflowSpec) GetTypename() string { return v.Typename }
+
 type JobProposalStatus string
 
 const (
@@ -2728,6 +2812,8 @@ const (
 	JobProposalStatusApproved  JobProposalStatus = "APPROVED"
 	JobProposalStatusRejected  JobProposalStatus = "REJECTED"
 	JobProposalStatusCancelled JobProposalStatus = "CANCELLED"
+	JobProposalStatusDeleted   JobProposalStatus = "DELETED"
+	JobProposalStatusRevoked   JobProposalStatus = "REVOKED"
 )
 
 // ListBridgesBridgesBridgesPayload includes the requested fields of the GraphQL type BridgesPayload.
@@ -3431,6 +3517,7 @@ const (
 	SpecStatusApproved  SpecStatus = "APPROVED"
 	SpecStatusRejected  SpecStatus = "REJECTED"
 	SpecStatusCancelled SpecStatus = "CANCELLED"
+	SpecStatusRevoked   SpecStatus = "REVOKED"
 )
 
 type UpdateFeedsManagerInput struct {

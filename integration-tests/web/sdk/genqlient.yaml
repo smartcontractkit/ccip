@@ -12,4 +12,4 @@ bindings:
     type: string
 
 package_bindings:
-- package: github.com/smartcontractkit/chainlink/core/web/gqlscalar
+- package: github.com/smartcontractkit/chainlink/v2/core/web/gqlscalar

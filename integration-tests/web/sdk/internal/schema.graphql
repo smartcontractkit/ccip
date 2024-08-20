@@ -12,7 +12,6 @@ type Query {
     bridges(offset: Int, limit: Int): BridgesPayload!
     chain(id: ID!): ChainPayload!
     chains(offset: Int, limit: Int): ChainsPayload!
-    config: ConfigPayload!
     configv2: ConfigV2Payload!
     csaKeys: CSAKeysPayload!
     ethKeys: EthKeysPayload!
@@ -44,22 +43,18 @@ type Mutation {
     cancelJobProposalSpec(id: ID!): CancelJobProposalSpecPayload!
     createAPIToken(input: CreateAPITokenInput!): CreateAPITokenPayload!
     createBridge(input: CreateBridgeInput!): CreateBridgePayload!
-    createChain(input: CreateChainInput!): CreateChainPayload!
     createCSAKey: CreateCSAKeyPayload!
     createFeedsManager(input: CreateFeedsManagerInput!): CreateFeedsManagerPayload!
     createFeedsManagerChainConfig(input: CreateFeedsManagerChainConfigInput!): CreateFeedsManagerChainConfigPayload!
     createJob(input: CreateJobInput!): CreateJobPayload!
-    createNode(input: CreateNodeInput!): CreateNodePayload!
     createOCRKeyBundle: CreateOCRKeyBundlePayload!
     createOCR2KeyBundle(chainType: OCR2ChainType!): CreateOCR2KeyBundlePayload!
     createP2PKey: CreateP2PKeyPayload!
     deleteAPIToken(input: DeleteAPITokenInput!): DeleteAPITokenPayload!
     deleteBridge(id: ID!): DeleteBridgePayload!
-    deleteChain(id: ID!): DeleteChainPayload!
     deleteCSAKey(id: ID!): DeleteCSAKeyPayload!
     deleteFeedsManagerChainConfig(id: ID!): DeleteFeedsManagerChainConfigPayload!
     deleteJob(id: ID!): DeleteJobPayload!
-    deleteNode(id: ID!): DeleteNodePayload!
     deleteOCRKeyBundle(id: ID!): DeleteOCRKeyBundlePayload!
     deleteOCR2KeyBundle(id: ID!): DeleteOCR2KeyBundlePayload!
     deleteP2PKey(id: ID!): DeleteP2PKeyPayload!
@@ -71,7 +66,6 @@ type Mutation {
     setGlobalLogLevel(level: LogLevel!): SetGlobalLogLevelPayload!
     setSQLLogging(input: SetSQLLoggingInput!): SetSQLLoggingPayload!
     updateBridge(id: ID!, input: UpdateBridgeInput!): UpdateBridgePayload!
-    updateChain(id: ID!, input: UpdateChainInput!): UpdateChainPayload!
     updateFeedsManager(id: ID!, input: UpdateFeedsManagerInput!): UpdateFeedsManagerPayload!
     updateFeedsManagerChainConfig(id: ID!, input: UpdateFeedsManagerChainConfigInput!): UpdateFeedsManagerChainConfigPayload!
     updateJobProposalSpecDefinition(id: ID!, input: UpdateJobProposalSpecDefinitionInput!): UpdateJobProposalSpecDefinitionPayload!
@@ -178,10 +172,7 @@ union DeleteBridgePayload = DeleteBridgeSuccess
 type Chain {
     id: ID!
     enabled: Boolean!
-    config: ChainConfig!
-    nodes: [Node!]!
-    createdAt: Time!
-    updatedAt: Time!
+    config: String!
 }
 
 union ChainPayload = Chain | NotFoundError
@@ -189,178 +180,6 @@ union ChainPayload = Chain | NotFoundError
 type ChainsPayload implements PaginatedPayload {
     results: [Chain!]!
     metadata: PaginationMetadata!
-}
-
-input CreateChainInput {
-    id: ID!
-    config: ChainConfigInput!
-    keySpecificConfigs: [KeySpecificChainConfigInput]!
-}
-
-type CreateChainSuccess {
-    chain: Chain!
-}
-
-union CreateChainPayload = CreateChainSuccess | InputErrors
-
-input UpdateChainInput {
-    enabled: Boolean!
-    config: ChainConfigInput!
-    keySpecificConfigs: [KeySpecificChainConfigInput]!
-}
-
-type UpdateChainSuccess {
-    chain: Chain!
-}
-
-union UpdateChainPayload = UpdateChainSuccess | NotFoundError | InputErrors
-
-type DeleteChainSuccess {
-    chain: Chain!
-}
-
-union DeleteChainPayload = DeleteChainSuccess | NotFoundError
-enum GasEstimatorMode {
-    BLOCK_HISTORY
-    FIXED_PRICE
-    OPTIMISM
-    OPTIMISM2
-}
-
-enum ChainType {
-    ARBITRUM
-    EXCHAIN
-    OPTIMISM
-    XDAI
-}
-
-interface GeneralChainConfig {
-    blockHistoryEstimatorBlockDelay: Int
-    blockHistoryEstimatorBlockHistorySize: Int
-    ethTxReaperThreshold: String
-    ethTxResendAfterThreshold: String
-    evmEIP1559DynamicFees: Boolean
-    evmFinalityDepth: Int
-    evmGasBumpPercent: Int
-    evmGasBumpTxDepth: Int
-    evmGasBumpWei: String
-    evmGasLimitDefault: Int
-    evmGasLimitMultiplier: Float
-    evmGasLimitOCRJobType: Int
-    evmGasLimitDRJobType: Int
-    evmGasLimitVRFJobType: Int
-    evmGasLimitFMJobType: Int
-    evmGasLimitKeeperJobType: Int
-    evmGasPriceDefault: String
-    evmGasTipCapDefault: String
-    evmGasTipCapMinimum: String
-    evmHeadTrackerHistoryDepth: Int
-    evmHeadTrackerMaxBufferSize: Int
-    evmHeadTrackerSamplingInterval: String
-    evmLogBackfillBatchSize: Int
-    evmMaxGasPriceWei: String
-    evmNonceAutoSync: Boolean
-    evmRPCDefaultBatchSize: Int
-    flagsContractAddress: String
-    gasEstimatorMode: GasEstimatorMode
-    chainType: ChainType
-    minIncomingConfirmations: Int
-    minimumContractPayment: String
-    ocrObservationTimeout: String
-    linkContractAddress: String
-}
-
-type ChainConfig implements GeneralChainConfig {
-    blockHistoryEstimatorBlockDelay: Int
-    blockHistoryEstimatorBlockHistorySize: Int
-    ethTxReaperThreshold: String
-    ethTxResendAfterThreshold: String
-    evmEIP1559DynamicFees: Boolean
-    evmFinalityDepth: Int
-    evmGasBumpPercent: Int
-    evmGasBumpTxDepth: Int
-    evmGasBumpWei: String
-    evmGasLimitDefault: Int
-    evmGasLimitMultiplier: Float
-    evmGasLimitOCRJobType: Int
-    evmGasLimitDRJobType: Int
-    evmGasLimitVRFJobType: Int
-    evmGasLimitFMJobType: Int
-    evmGasLimitKeeperJobType: Int
-    evmGasPriceDefault: String
-    evmGasTipCapDefault: String
-    evmGasTipCapMinimum: String
-    evmHeadTrackerHistoryDepth: Int
-    evmHeadTrackerMaxBufferSize: Int
-    evmHeadTrackerSamplingInterval: String
-    evmLogBackfillBatchSize: Int
-    evmMaxGasPriceWei: String
-    evmNonceAutoSync: Boolean
-    evmRPCDefaultBatchSize: Int
-    flagsContractAddress: String
-    gasEstimatorMode: GasEstimatorMode
-    chainType: ChainType
-    minIncomingConfirmations: Int
-    minimumContractPayment: String
-    ocrObservationTimeout: String
-    linkContractAddress: String
-    keySpecificConfigs: [KeySpecificChainConfig]!
-}
-
-type KeySpecificChainConfig {
-    address: String!
-    config: ChainConfig!
-}
-
-input ChainConfigInput {
-    blockHistoryEstimatorBlockDelay: Int
-    blockHistoryEstimatorBlockHistorySize: Int
-    ethTxReaperThreshold: String
-    ethTxResendAfterThreshold: String
-    evmEIP1559DynamicFees: Boolean
-    evmFinalityDepth: Int
-    evmGasBumpPercent: Int
-    evmGasBumpTxDepth: Int
-    evmGasBumpWei: String
-    evmGasLimitDefault: Int
-    evmGasLimitMultiplier: Float
-    evmGasLimitOCRJobType: Int
-    evmGasLimitDRJobType: Int
-    evmGasLimitVRFJobType: Int
-    evmGasLimitFMJobType: Int
-    evmGasLimitKeeperJobType: Int
-    evmGasPriceDefault: String
-    evmGasTipCapDefault: String
-    evmGasTipCapMinimum: String
-    evmHeadTrackerHistoryDepth: Int
-    evmHeadTrackerMaxBufferSize: Int
-    evmHeadTrackerSamplingInterval: String
-    evmLogBackfillBatchSize: Int
-    evmMaxGasPriceWei: String
-    evmNonceAutoSync: Boolean
-    evmRPCDefaultBatchSize: Int
-    flagsContractAddress: String
-    gasEstimatorMode: GasEstimatorMode
-    chainType: ChainType
-    minIncomingConfirmations: Int
-    minimumContractPayment: String
-    ocrObservationTimeout: String
-    linkContractAddress: String
-}
-
-input KeySpecificChainConfigInput {
-    address: String!
-    config: ChainConfigInput!
-}
-scalar ConfigItemValue
-
-type ConfigItem {
-    key: String!
-    value: ConfigItemValue!
-}
-
-type ConfigPayload {
-    items: [ConfigItem!]!
 }
 type ConfigV2Payload {
   user: String!
@@ -478,6 +297,14 @@ enum JobType {
 	OCR2
 }
 
+type Plugins {
+	commit: Boolean!
+	execute: Boolean!
+	median: Boolean!
+	mercury: Boolean!
+	rebalancer: Boolean!
+}
+
 type FeedsManager {
 	id: ID!
 	name: String!
@@ -494,6 +321,7 @@ type FeedsManagerChainConfig {
 	chainID: String!
 	chainType: String!
 	accountAddr: String!
+	accountAddrPubKey: String
 	adminAddr: String!
 	fluxMonitorJobConfig: FluxMonitorJobConfig!
 	ocr1JobConfig: OCR1JobConfig!
@@ -516,8 +344,10 @@ type OCR2JobConfig {
 	enabled: Boolean!
 	isBootstrap: Boolean!
 	multiaddr: String
+	forwarderAddress: String
 	p2pPeerID: String
 	keyBundleID: String
+	plugins: Plugins!
 }
 
 # FeedsManagerPayload defines the response to fetch a single feeds manager by id
@@ -573,6 +403,7 @@ input CreateFeedsManagerChainConfigInput {
 	chainID: String!
 	chainType: String!
 	accountAddr: String!
+	accountAddrPubKey: String
 	adminAddr: String!
 	fluxMonitorEnabled: Boolean!
 	ocr1Enabled: Boolean!
@@ -583,8 +414,10 @@ input CreateFeedsManagerChainConfigInput {
 	ocr2Enabled: Boolean!
 	ocr2IsBootstrap: Boolean
 	ocr2Multiaddr: String
+	ocr2ForwarderAddress: String
 	ocr2P2PPeerID: String
 	ocr2KeyBundleID: String
+	ocr2Plugins: String!
 }
 
 # CreateFeedsManagerChainConfigSuccess defines the success response when
@@ -612,6 +445,7 @@ union DeleteFeedsManagerChainConfigPayload = DeleteFeedsManagerChainConfigSucces
 
 input UpdateFeedsManagerChainConfigInput {
 	accountAddr: String!
+	accountAddrPubKey: String
 	adminAddr: String!
 	fluxMonitorEnabled: Boolean!
 	ocr1Enabled: Boolean!
@@ -622,8 +456,10 @@ input UpdateFeedsManagerChainConfigInput {
 	ocr2Enabled: Boolean!
 	ocr2IsBootstrap: Boolean
 	ocr2Multiaddr: String
+	ocr2ForwarderAddress: String
 	ocr2P2PPeerID: String
 	ocr2KeyBundleID: String
+	ocr2Plugins: String!
 }
 
 # UpdateFeedsManagerChainConfigSuccess defines the success response when
@@ -695,6 +531,8 @@ enum JobProposalStatus {
   APPROVED
   REJECTED
   CANCELLED
+  DELETED
+  REVOKED
 }
 
 type JobProposal {
@@ -718,6 +556,7 @@ enum SpecStatus {
     APPROVED
     REJECTED
     CANCELLED
+    REVOKED
 }
 
 type JobProposalSpec {
@@ -873,10 +712,9 @@ type Node {
     wsURL: String!
     httpURL: String!
     chain: Chain!
-    createdAt: Time!
-    updatedAt: Time!
     state: String!
     sendOnly: Boolean!
+    order: Int
 }
 
 union NodePayload = Node | NotFoundError
@@ -885,26 +723,6 @@ type NodesPayload implements PaginatedPayload {
     results: [Node!]!
     metadata: PaginationMetadata!
 }
-
-input CreateNodeInput {
-    name: String!
-    evmChainID: Int!
-    wsURL: String!
-    httpURL: String!
-    sendOnly: Boolean!
-}
-
-type CreateNodeSuccess {
-    node: Node!
-}
-
-union CreateNodePayload = CreateNodeSuccess
-
-type DeleteNodeSuccess {
-    node: Node!
-}
-
-union DeleteNodePayload = DeleteNodeSuccess | NotFoundError
 type OCRKeyBundle {
     id: ID!
     configPublicKey: String!
@@ -929,10 +747,11 @@ type DeleteOCRKeyBundleSuccess {
 union DeleteOCRKeyBundlePayload = DeleteOCRKeyBundleSuccess | NotFoundError
 enum OCR2ChainType {
     EVM
-    TERRA
-	SOLANA
+    COSMOS
+    SOLANA
+    STARKNET
+    APTOS
 }
-
 
 type OCR2KeyBundle {
 	id: ID!
@@ -1003,10 +822,15 @@ union JobSpec =
     VRFSpec |
     WebhookSpec |
     BlockhashStoreSpec |
-    BootstrapSpec
+    BlockHeaderFeederSpec |
+    BootstrapSpec |
+    GatewaySpec |
+    WorkflowSpec |
+    StandardCapabilitiesSpec
 
 type CronSpec {
     schedule: String!
+    evmChainID: String
     createdAt: Time!
 }
 
@@ -1015,7 +839,6 @@ type DirectRequestSpec {
     createdAt: Time!
     evmChainID: String
     minIncomingConfirmations: Int!
-    minIncomingConfirmationsEnv: Boolean!
     minContractPaymentLinkJuels: String!
     requesters: [String!]
 }
@@ -1045,29 +868,20 @@ type KeeperSpec {
 
 type OCRSpec {
     blockchainTimeout: String
-    blockchainTimeoutEnv: Boolean!
     contractAddress: String!
     contractConfigConfirmations: Int
-    contractConfigConfirmationsEnv: Boolean!
     contractConfigTrackerPollInterval: String
-    contractConfigTrackerPollIntervalEnv: Boolean!
     contractConfigTrackerSubscribeInterval: String
-    contractConfigTrackerSubscribeIntervalEnv: Boolean!
     createdAt: Time!
     evmChainID: String
     isBootstrapPeer: Boolean!
     keyBundleID: String
     observationTimeout: String
-    observationTimeoutEnv: Boolean!
-    p2pBootstrapPeers: [String!]
     p2pv2Bootstrappers: [String!]
     transmitterAddress: String
     databaseTimeout: String!
-    databaseTimeoutEnv: Boolean!
     observationGracePeriod: String!
-    observationGracePeriodEnv: Boolean!
     contractTransmitterTransmitTimeout: String!
-    contractTransmitterTransmitTimeoutEnv: Boolean!
 }
 
 type OCR2Spec {
@@ -1084,6 +898,7 @@ type OCR2Spec {
     transmitterID: String
     pluginType: String!
     pluginConfig: Map!
+    feedID: String
 }
 
 type VRFSpec {
@@ -1092,7 +907,6 @@ type VRFSpec {
     evmChainID: String
     fromAddresses: [String!]
     minIncomingConfirmations: Int!
-    minIncomingConfirmationsEnv: Boolean!
     pollPeriod: String!
     publicKey: String!
     requestedConfsDelay: Int!
@@ -1100,10 +914,12 @@ type VRFSpec {
     batchCoordinatorAddress: String
     batchFulfillmentEnabled: Boolean!
     batchFulfillmentGasMultiplier: Float!
+    customRevertsPipelineEnabled: Boolean
     chunkSize: Int!
     backoffInitialDelay: String!
     backoffMaxDelay: String!
     gasLanePrice: String
+    vrfOwnerAddress: String
 }
 
 type WebhookSpec {
@@ -1113,12 +929,33 @@ type WebhookSpec {
 type BlockhashStoreSpec {
     coordinatorV1Address: String
     coordinatorV2Address: String
+    coordinatorV2PlusAddress: String
     waitBlocks: Int!
     lookbackBlocks: Int!
     blockhashStoreAddress: String!
+    trustedBlockhashStoreAddress: String
+    trustedBlockhashStoreBatchSize: Int!
+    heartbeatPeriod: String!
     pollPeriod: String!
     runTimeout: String!
     evmChainID: String
+    fromAddresses: [String!]
+    createdAt: Time!
+}
+
+type BlockHeaderFeederSpec {
+    coordinatorV1Address: String
+    coordinatorV2Address: String
+    coordinatorV2PlusAddress: String
+    waitBlocks: Int!
+    lookbackBlocks: Int!
+    blockhashStoreAddress: String!
+    batchBlockhashStoreAddress: String!
+    pollPeriod: String!
+    runTimeout: String!
+    evmChainID: String
+    getBlockhashesBatchSize: Int!
+    storeBlockhashesBatchSize: Int!
     fromAddresses: [String!]
     createdAt: Time!
 }
@@ -1133,6 +970,28 @@ type BootstrapSpec {
     contractConfigTrackerPollInterval: String
     contractConfigConfirmations: Int
     createdAt: Time!
+}
+
+type GatewaySpec {
+    id: ID!
+    gatewayConfig: Map!
+    createdAt: Time!
+}
+
+type WorkflowSpec {
+    id: ID!
+    workflowID: String!
+    workflow: String!
+    workflowOwner: String!
+    createdAt: Time!
+    updatedAt: Time!
+}
+
+type StandardCapabilitiesSpec {
+    id: ID!
+    createdAt: Time!
+    command: String!
+    config: String
 }
 type TaskRun {
     id: ID!

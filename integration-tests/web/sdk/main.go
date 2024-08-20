@@ -6,7 +6,7 @@ import (
 
 	"github.com/Khan/genqlient/generate"
 
-	"github.com/smartcontractkit/chainlink/core/web/schema"
+	"github.com/smartcontractkit/chainlink/v2/core/web/schema"
 )
 
 func main() {
