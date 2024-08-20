@@ -242,7 +242,7 @@ contract EVM2EVMMultiOffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
     });
   }
 
-  function _convertToGeneralMessage(Internal.Any2EVMRampMessage memory original)
+  function _convertToGeneralMessage(Internal.Any2EVMRampMessageV1_6 memory original)
     internal
     view
     returns (Client.Any2EVMMessage memory message)
@@ -271,9 +271,9 @@ contract EVM2EVMMultiOffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
   function _generateAny2EVMMessageNoTokens(
     uint64 sourceChainSelector,
     bytes memory onRamp,
-    uint64 sequenceNumber
-  ) internal view returns (Internal.Any2EVMRampMessage memory) {
-    return _generateAny2EVMMessage(sourceChainSelector, onRamp, sequenceNumber, new Client.EVMTokenAmount[](0), false);
+    uint64 messageNumber
+  ) internal view returns (Internal.Any2EVMRampMessageV1_6 memory) {
+    return _generateAny2EVMMessage(sourceChainSelector, onRamp, messageNumber, new Client.EVMTokenAmount[](0), false);
   }
 
   function _generateAny2EVMMessageWithTokens(
@@ -281,7 +281,7 @@ contract EVM2EVMMultiOffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
     bytes memory onRamp,
     uint64 sequenceNumber,
     uint256[] memory amounts
-  ) internal view returns (Internal.Any2EVMRampMessage memory) {
+  ) internal view returns (Internal.Any2EVMRampMessageV1_6 memory) {
     Client.EVMTokenAmount[] memory tokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
       tokenAmounts[i].amount = amounts[i];
@@ -292,10 +292,10 @@ contract EVM2EVMMultiOffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
   function _generateAny2EVMMessage(
     uint64 sourceChainSelector,
     bytes memory onRamp,
-    uint64 sequenceNumber,
+    uint64 messageNumber,
     Client.EVMTokenAmount[] memory tokenAmounts,
     bool allowOutOfOrderExecution
-  ) internal view returns (Internal.Any2EVMRampMessage memory) {
+  ) internal view returns (Internal.Any2EVMRampMessageV1_6 memory) {
     bytes memory data = abi.encode(0);
 
     Internal.RampTokenAmount[] memory rampTokenAmounts = new Internal.RampTokenAmount[](tokenAmounts.length);
@@ -310,13 +310,13 @@ contract EVM2EVMMultiOffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
       });
     }
 
-    Internal.Any2EVMRampMessage memory message = Internal.Any2EVMRampMessage({
-      header: Internal.RampMessageHeader({
+    Internal.Any2EVMRampMessageV1_6 memory message = Internal.Any2EVMRampMessageV1_6({
+      header: Internal.RampMessageHeaderV1_6({
         messageId: "",
         sourceChainSelector: sourceChainSelector,
         destChainSelector: DEST_CHAIN_SELECTOR,
-        sequenceNumber: sequenceNumber,
-        nonce: allowOutOfOrderExecution ? 0 : sequenceNumber
+        messageNumber: messageNumber,
+        nonce: allowOutOfOrderExecution ? 0 : messageNumber
       }),
       sender: abi.encode(OWNER),
       data: data,
@@ -333,8 +333,8 @@ contract EVM2EVMMultiOffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
   function _generateSingleBasicMessage(
     uint64 sourceChainSelector,
     bytes memory onRamp
-  ) internal view returns (Internal.Any2EVMRampMessage[] memory) {
-    Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](1);
+  ) internal view returns (Internal.Any2EVMRampMessageV1_6[] memory) {
+    Internal.Any2EVMRampMessageV1_6[] memory messages = new Internal.Any2EVMRampMessageV1_6[](1);
     messages[0] = _generateAny2EVMMessageNoTokens(sourceChainSelector, onRamp, 1);
     return messages;
   }
@@ -342,8 +342,8 @@ contract EVM2EVMMultiOffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
   function _generateMessagesWithTokens(
     uint64 sourceChainSelector,
     bytes memory onRamp
-  ) internal view returns (Internal.Any2EVMRampMessage[] memory) {
-    Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](2);
+  ) internal view returns (Internal.Any2EVMRampMessageV1_6[] memory) {
+    Internal.Any2EVMRampMessageV1_6[] memory messages = new Internal.Any2EVMRampMessageV1_6[](2);
     Client.EVMTokenAmount[] memory tokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     tokenAmounts[0].amount = 1e18;
     tokenAmounts[1].amount = 5e18;
@@ -355,7 +355,7 @@ contract EVM2EVMMultiOffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
 
   function _generateReportFromMessages(
     uint64 sourceChainSelector,
-    Internal.Any2EVMRampMessage[] memory messages
+    Internal.Any2EVMRampMessageV1_6[] memory messages
   ) internal pure returns (Internal.ExecutionReportSingleChain memory) {
     bytes[][] memory offchainTokenData = new bytes[][](messages.length);
 
@@ -374,14 +374,14 @@ contract EVM2EVMMultiOffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
 
   function _generateBatchReportFromMessages(
     uint64 sourceChainSelector,
-    Internal.Any2EVMRampMessage[] memory messages
+    Internal.Any2EVMRampMessageV1_6[] memory messages
   ) internal pure returns (Internal.ExecutionReportSingleChain[] memory) {
     Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](1);
     reports[0] = _generateReportFromMessages(sourceChainSelector, messages);
     return reports;
   }
 
-  function _getGasLimitsFromMessages(Internal.Any2EVMRampMessage[] memory messages)
+  function _getGasLimitsFromMessages(Internal.Any2EVMRampMessageV1_6[] memory messages)
     internal
     pure
     returns (uint256[] memory)
@@ -410,7 +410,7 @@ contract EVM2EVMMultiOffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
     EVM2EVMMultiOffRamp.SourceChainConfig memory config2
   ) internal pure {
     assertEq(config1.isEnabled, config2.isEnabled);
-    assertEq(config1.minSeqNr, config2.minSeqNr);
+    assertEq(config1.minMsgNr, config2.minMsgNr);
     assertEq(config1.onRamp, config2.onRamp);
     assertEq(address(config1.router), address(config2.router));
   }

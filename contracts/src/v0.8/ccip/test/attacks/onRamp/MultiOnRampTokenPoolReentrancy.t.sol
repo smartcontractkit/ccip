@@ -103,8 +103,10 @@ contract MultiOnRampTokenPoolReentrancy is EVM2EVMMultiOnRampSetup {
     // emit CCIPSendRequested(msgEvent1);
 
     // After issue is fixed, sequence now increments as expected
-    Internal.EVM2AnyRampMessage memory msgEvent1 = _messageToEvent(message1, 1, 1, expectedFee, address(s_facadeClient));
-    Internal.EVM2AnyRampMessage memory msgEvent2 = _messageToEvent(message2, 2, 2, expectedFee, address(s_facadeClient));
+    Internal.EVM2AnyRampMessageV1_6 memory msgEvent1 =
+      _messageToEvent(message1, 1, 1, expectedFee, address(s_facadeClient));
+    Internal.EVM2AnyRampMessageV1_6 memory msgEvent2 =
+      _messageToEvent(message2, 2, 2, expectedFee, address(s_facadeClient));
 
     vm.expectEmit();
     emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, msgEvent2);

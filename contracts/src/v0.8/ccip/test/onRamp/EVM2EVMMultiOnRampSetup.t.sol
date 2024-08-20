@@ -66,16 +66,16 @@ contract EVM2EVMMultiOnRampSetup is PriceRegistryFeeSetup {
 
   function _messageToEvent(
     Client.EVM2AnyMessage memory message,
-    uint64 seqNum,
+    uint64 msgNum,
     uint64 nonce,
     uint256 feeTokenAmount,
     address originalSender
-  ) public view returns (Internal.EVM2AnyRampMessage memory) {
-    return _messageToEvent(
+  ) public view returns (Internal.EVM2AnyRampMessageV1_6 memory) {
+    return _messageToEventV1_6(
       message,
       SOURCE_CHAIN_SELECTOR,
       DEST_CHAIN_SELECTOR,
-      seqNum,
+      msgNum,
       nonce,
       feeTokenAmount,
       originalSender,

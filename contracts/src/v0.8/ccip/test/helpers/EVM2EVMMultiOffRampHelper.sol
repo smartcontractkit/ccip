@@ -49,7 +49,7 @@ contract EVM2EVMMultiOffRampHelper is EVM2EVMMultiOffRamp, IgnoreContractSize {
   }
 
   function trialExecute(
-    Internal.Any2EVMRampMessage memory message,
+    Internal.Any2EVMRampMessageV1_6 memory message,
     bytes[] memory offchainTokenData
   ) external returns (Internal.MessageExecutionState, bytes memory) {
     return _trialExecute(message, offchainTokenData);

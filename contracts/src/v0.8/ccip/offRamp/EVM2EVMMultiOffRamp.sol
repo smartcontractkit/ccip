@@ -36,7 +36,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   error ZeroChainSelectorNotAllowed();
   error ExecutionError(bytes32 messageId, bytes err);
   error SourceChainNotEnabled(uint64 sourceChainSelector);
-  error TokenDataMismatch(uint64 sourceChainSelector, uint64 sequenceNumber);
+  error TokenDataMismatch(uint64 sourceChainSelector, uint64 messageNumber);
   error UnexpectedTokenData();
   error ManualExecutionNotYetEnabled(uint64 sourceChainSelector);
   error ManualExecutionGasLimitMismatch();
@@ -52,7 +52,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
-  error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
+  error InvalidNewState(uint64 sourceChainSelector, uint64 messageNumber, Internal.MessageExecutionState newState);
   error InvalidStaticConfig(uint64 sourceChainSelector);
   error StaleCommitReport();
   error InvalidInterval(uint64 sourceChainSelector, Interval interval);
@@ -65,7 +65,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event ExecutionStateChanged(
     uint64 indexed sourceChainSelector,
-    uint64 indexed sequenceNumber,
+    uint64 indexed messageNumber,
     bytes32 indexed messageId,
     Internal.MessageExecutionState state,
     bytes returnData,
@@ -73,8 +73,8 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   );
   event SourceChainSelectorAdded(uint64 sourceChainSelector);
   event SourceChainConfigSet(uint64 indexed sourceChainSelector, SourceChainConfig sourceConfig);
-  event SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
-  event AlreadyAttempted(uint64 sourceChainSelector, uint64 sequenceNumber);
+  event SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 messageNumber);
+  event AlreadyAttempted(uint64 sourceChainSelector, uint64 messageNumber);
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event CommitReportAccepted(CommitReport report);
   event RootRemoved(bytes32 root);
@@ -92,7 +92,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   struct SourceChainConfig {
     IRouter router; // ──────────╮  Local router to use for messages coming from this source chain
     bool isEnabled; //           |  Flag whether the source chain is enabled or not
-    uint64 minSeqNr; // ─────────╯  The min sequence number expected for future messages
+    uint64 minMsgNr; // ─────────╯  The min message number expected for future messages
     bytes onRamp; // OnRamp address on the source chain
   }
 
@@ -114,11 +114,11 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     address messageValidator; // Optional message validator to validate incoming messages (zero address = no validator)
   }
 
-  /// @notice a sequenceNumber interval
+  /// @notice a messageNumber interval
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct Interval {
-    uint64 min; // ───╮ Minimum sequence number, inclusive
-    uint64 max; // ───╯ Maximum sequence number, inclusive
+    uint64 min; // ───╮ Minimum message number, inclusive
+    uint64 max; // ───╯ Maximum message number, inclusive
   }
 
   /// @dev Struct to hold a merkle root and an interval for a source chain so that an array of these can be passed in the CommitReport.
@@ -160,10 +160,10 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) internal s_sourceChainConfigs;
 
   // STATE
-  /// @dev A mapping of sequence numbers (per source chain) to execution state using a bitmap with each execution
+  /// @dev A mapping of message numbers (per source chain) to execution state using a bitmap with each execution
   /// state only taking up 2 bits of the uint256, packing 128 states into a single slot.
   /// Message state is tracked to ensure message can only be executed successfully once.
-  mapping(uint64 sourceChainSelector => mapping(uint64 seqNum => uint256 executionStateBitmap)) internal
+  mapping(uint64 sourceChainSelector => mapping(uint64 msgNum => uint256 executionStateBitmap)) internal
     s_executionStates;
 
   // sourceChainSelector => merkleRoot => timestamp when received
@@ -210,52 +210,52 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   // │                           Execution                          │
   // ================================================================
 
-  /// @notice Returns the current execution state of a message based on its sequenceNumber.
+  /// @notice Returns the current execution state of a message based on its messageNumber.
   /// @param sourceChainSelector The source chain to get the execution state for
-  /// @param sequenceNumber The sequence number of the message to get the execution state for.
+  /// @param messageNumber The message number of the message to get the execution state for.
   /// @return The current execution state of the message.
   /// @dev we use the literal number 128 because using a constant increased gas usage.
   function getExecutionState(
     uint64 sourceChainSelector,
-    uint64 sequenceNumber
+    uint64 messageNumber
   ) public view returns (Internal.MessageExecutionState) {
     return Internal.MessageExecutionState(
       (
-        _getSequenceNumberBitmap(sourceChainSelector, sequenceNumber)
-          >> ((sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH)
+        _getMessageNumberBitmap(sourceChainSelector, messageNumber)
+          >> ((messageNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH)
       ) & MESSAGE_EXECUTION_STATE_MASK
     );
   }
 
-  /// @notice Sets a new execution state for a given sequence number. It will overwrite any existing state.
+  /// @notice Sets a new execution state for a given message number. It will overwrite any existing state.
   /// @param sourceChainSelector The source chain to set the execution state for
-  /// @param sequenceNumber The sequence number for which the state will be saved.
+  /// @param messageNumber The message number for which the state will be saved.
   /// @param newState The new value the state will be in after this function is called.
   /// @dev we use the literal number 128 because using a constant increased gas usage.
   function _setExecutionState(
     uint64 sourceChainSelector,
-    uint64 sequenceNumber,
+    uint64 messageNumber,
     Internal.MessageExecutionState newState
   ) internal {
-    uint256 offset = (sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH;
-    uint256 bitmap = _getSequenceNumberBitmap(sourceChainSelector, sequenceNumber);
+    uint256 offset = (messageNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH;
+    uint256 bitmap = _getMessageNumberBitmap(sourceChainSelector, messageNumber);
     // to unset any potential existing state we zero the bits of the section the state occupies,
     // then we do an AND operation to blank out any existing state for the section.
     bitmap &= ~(MESSAGE_EXECUTION_STATE_MASK << offset);
     // Set the new state
     bitmap |= uint256(newState) << offset;
 
-    s_executionStates[sourceChainSelector][sequenceNumber / 128] = bitmap;
+    s_executionStates[sourceChainSelector][messageNumber / 128] = bitmap;
   }
 
-  /// @param sourceChainSelector remote source chain selector to get sequence number bitmap for
-  /// @param sequenceNumber sequence number to get bitmap for
-  /// @return bitmap Bitmap of the given sequence number for the provided source chain selector. One bitmap represents 128 sequence numbers
-  function _getSequenceNumberBitmap(
+  /// @param sourceChainSelector remote source chain selector to get message number bitmap for
+  /// @param messageNumber message number to get bitmap for
+  /// @return bitmap Bitmap of the given message number for the provided source chain selector. One bitmap represents 128 message numbers
+  function _getMessageNumberBitmap(
     uint64 sourceChainSelector,
-    uint64 sequenceNumber
+    uint64 messageNumber
   ) internal view returns (uint256 bitmap) {
-    return s_executionStates[sourceChainSelector][sequenceNumber / 128];
+    return s_executionStates[sourceChainSelector][messageNumber / 128];
   }
 
   /// @notice Manually executes a set of reports.
@@ -350,7 +350,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
 
     for (uint256 i = 0; i < numMsgs; ++i) {
-      Internal.Any2EVMRampMessage memory message = report.messages[i];
+      Internal.Any2EVMRampMessageV1_6 memory message = report.messages[i];
 
       // Commits do not verify the destChainSelector in the message, since only the root is committed,
       // so we have to check it explicitly
@@ -374,10 +374,10 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     bool manualExecution = manualExecGasLimits.length != 0;
     for (uint256 i = 0; i < numMsgs; ++i) {
       uint256 gasStart = gasleft();
-      Internal.Any2EVMRampMessage memory message = report.messages[i];
+      Internal.Any2EVMRampMessageV1_6 memory message = report.messages[i];
 
       Internal.MessageExecutionState originalState =
-        getExecutionState(sourceChainSelector, message.header.sequenceNumber);
+        getExecutionState(sourceChainSelector, message.header.messageNumber);
       // Two valid cases here, we either have never touched this message before, or we tried to execute
       // and failed. This check protects against reentry and re-execution because the other state is
       // IN_PROGRESS which should not be allowed to execute.
@@ -390,7 +390,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         // If the message has already been executed, we skip it.  We want to not revert on race conditions between
         // executing parties. This will allow us to open up manual exec while also attempting with the DON, without
         // reverting an entire DON batch when a user manually executes while the tx is inflight.
-        emit SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
+        emit SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.messageNumber);
         continue;
       }
 
@@ -411,7 +411,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         // DON can only execute a message once
         // Acceptable state transitions: UNTOUCHED->SUCCESS, UNTOUCHED->FAILURE
         if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
-          emit AlreadyAttempted(sourceChainSelector, message.header.sequenceNumber);
+          emit AlreadyAttempted(sourceChainSelector, message.header.messageNumber);
           continue;
         }
       }
@@ -437,13 +437,13 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       // when executing as a defense in depth measure.
       bytes[] memory offchainTokenData = report.offchainTokenData[i];
       if (message.tokenAmounts.length != offchainTokenData.length) {
-        revert TokenDataMismatch(sourceChainSelector, message.header.sequenceNumber);
+        revert TokenDataMismatch(sourceChainSelector, message.header.messageNumber);
       }
 
-      _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
+      _setExecutionState(sourceChainSelector, message.header.messageNumber, Internal.MessageExecutionState.IN_PROGRESS);
 
       (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
-      _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
+      _setExecutionState(sourceChainSelector, message.header.messageNumber, newState);
 
       // Since it's hard to estimate whether manual execution will succeed, we
       // revert the entire transaction if it fails. This will show the user if
@@ -462,13 +462,13 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       // The only valid post states are FAILURE and SUCCESS (checked below)
       if (newState != Internal.MessageExecutionState.SUCCESS) {
         if (newState != Internal.MessageExecutionState.FAILURE) {
-          revert InvalidNewState(sourceChainSelector, message.header.sequenceNumber, newState);
+          revert InvalidNewState(sourceChainSelector, message.header.messageNumber, newState);
         }
       }
 
       emit ExecutionStateChanged(
         sourceChainSelector,
-        message.header.sequenceNumber,
+        message.header.messageNumber,
         message.header.messageId,
         newState,
         returnData,
@@ -478,12 +478,12 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   }
 
   /// @notice Try executing a message.
-  /// @param message Internal.Any2EVMRampMessage memory message.
+  /// @param message Internal.Any2EVMRampMessageV1_6 memory message.
   /// @param offchainTokenData Data provided by the DON for token transfers.
   /// @return the new state of the message, being either SUCCESS or FAILURE.
   /// @return revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
-    Internal.Any2EVMRampMessage memory message,
+    Internal.Any2EVMRampMessageV1_6 memory message,
     bytes[] memory offchainTokenData
   ) internal returns (Internal.MessageExecutionState, bytes memory) {
     try this.executeSingleMessage(message, offchainTokenData) {}
@@ -504,7 +504,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts
   /// (for example smart contract wallets) without an associated message.
   function executeSingleMessage(
-    Internal.Any2EVMRampMessage memory message,
+    Internal.Any2EVMRampMessageV1_6 memory message,
     bytes[] calldata offchainTokenData
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
@@ -561,13 +561,13 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @param report serialized commit report
   /// @dev A commitReport can have two distinct parts (batched together to amortize the cost of checking sigs):
   /// 1. Price updates
-  /// 2. A batch of merkle root and sequence number intervals (per-source)
-  /// Both have their own, separate, staleness checks, with price updates using the epoch and round
-  /// number of the latest price update. The merkle root checks for staleness based on the seqNums.
+  /// 2. A batch of merkle root and message number intervals (per-source)
+  /// Both have their own, separate, staleness checks, with price updates using the OCR sequence
+  /// number from the latest price update. The merkle root checks for staleness based on the message numbers.
   /// They need to be separate because a price report for round t+2 might be included before a report
   /// containing a merkle root for round t+1. This merkle root report for round t+1 is still valid
   /// and should not be rejected. When a report with a stale root but valid price updates is submitted,
-  /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
+  /// we are OK to revert to preserve the invariant that we always revert on invalid message number ranges.
   /// If that happens, prices will be updates in later rounds.
   function commit(
     bytes32[3] calldata reportContext,
@@ -605,7 +605,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
       SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
 
       // If we reached this section, the report should contain a valid root
-      if (sourceChainConfig.minSeqNr != root.interval.min || root.interval.min > root.interval.max) {
+      if (sourceChainConfig.minMsgNr != root.interval.min || root.interval.min > root.interval.max) {
         revert InvalidInterval(root.sourceChainSelector, root.interval);
       }
 
@@ -618,7 +618,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         revert RootAlreadyCommitted(root.sourceChainSelector, merkleRoot);
       }
 
-      sourceChainConfig.minSeqNr = root.interval.max + 1;
+      sourceChainConfig.minMsgNr = root.interval.max + 1;
       s_roots[root.sourceChainSelector][merkleRoot] = block.timestamp;
     }
 
@@ -688,8 +688,6 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
     if (ocrPluginType == uint8(Internal.OCRPluginType.Commit)) {
       // When the OCR config changes, we reset the sequence number
       // since it is scoped per config digest.
-      // Note that s_minSeqNr/roots do not need to be reset as the roots persist
-      // across reconfigurations and are de-duplicated separately.
       s_latestPriceSequenceNumber = 0;
     }
   }
@@ -755,7 +753,7 @@ contract EVM2EVMMultiOffRamp is ITypeAndVersion, MultiOCR3Base {
         }
 
         currentConfig.onRamp = newOnRamp;
-        currentConfig.minSeqNr = 1;
+        currentConfig.minMsgNr = 1;
         emit SourceChainSelectorAdded(sourceChainSelector);
       } else if (keccak256(currentOnRamp) != keccak256(newOnRamp)) {
         revert InvalidStaticConfig(sourceChainSelector);

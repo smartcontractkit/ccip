@@ -15,7 +15,7 @@ import "../onRamp/EVM2EVMMultiOnRampSetup.t.sol";
 /// 2. Commit multiple merkle roots (1 for each source chain).
 /// 3. Batch execute all the committed messages.
 contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
-  using Internal for Internal.Any2EVMRampMessage;
+  using Internal for Internal.Any2EVMRampMessageV1_6;
 
   Router internal s_sourceRouter2;
   EVM2EVMMultiOnRampHelper internal s_onRamp2;
@@ -112,10 +112,10 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
     uint256 balance1Pre = token1.balanceOf(OWNER);
 
     // Send messages
-    Internal.Any2EVMRampMessage[] memory messages1 = new Internal.Any2EVMRampMessage[](2);
+    Internal.Any2EVMRampMessageV1_6[] memory messages1 = new Internal.Any2EVMRampMessageV1_6[](2);
     messages1[0] = _sendRequest(1, SOURCE_CHAIN_SELECTOR, 1, s_metadataHash, s_sourceRouter, s_tokenAdminRegistry);
     messages1[1] = _sendRequest(2, SOURCE_CHAIN_SELECTOR, 2, s_metadataHash, s_sourceRouter, s_tokenAdminRegistry);
-    Internal.Any2EVMRampMessage[] memory messages2 = new Internal.Any2EVMRampMessage[](1);
+    Internal.Any2EVMRampMessageV1_6[] memory messages2 = new Internal.Any2EVMRampMessageV1_6[](1);
     messages2[0] =
       _sendRequest(1, SOURCE_CHAIN_SELECTOR + 1, 1, s_metadataHash2, s_sourceRouter2, s_tokenAdminRegistry2);
 
@@ -140,12 +140,12 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
     EVM2EVMMultiOffRamp.MerkleRoot[] memory roots = new EVM2EVMMultiOffRamp.MerkleRoot[](2);
     roots[0] = EVM2EVMMultiOffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: EVM2EVMMultiOffRamp.Interval(messages1[0].header.sequenceNumber, messages1[1].header.sequenceNumber),
+      interval: EVM2EVMMultiOffRamp.Interval(messages1[0].header.messageNumber, messages1[1].header.messageNumber),
       merkleRoot: merkleRoots[0]
     });
     roots[1] = EVM2EVMMultiOffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
-      interval: EVM2EVMMultiOffRamp.Interval(messages2[0].header.sequenceNumber, messages2[0].header.sequenceNumber),
+      interval: EVM2EVMMultiOffRamp.Interval(messages2[0].header.messageNumber, messages2[0].header.messageNumber),
       merkleRoot: merkleRoots[1]
     });
 
@@ -184,7 +184,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
 
     assertExecutionStateChangedEventLogs(
       SOURCE_CHAIN_SELECTOR,
-      messages1[0].header.sequenceNumber,
+      messages1[0].header.messageNumber,
       messages1[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
       ""
@@ -192,7 +192,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
 
     assertExecutionStateChangedEventLogs(
       SOURCE_CHAIN_SELECTOR,
-      messages1[1].header.sequenceNumber,
+      messages1[1].header.messageNumber,
       messages1[1].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
       ""
@@ -200,7 +200,7 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
 
     assertExecutionStateChangedEventLogs(
       SOURCE_CHAIN_SELECTOR + 1,
-      messages2[0].header.sequenceNumber,
+      messages2[0].header.messageNumber,
       messages2[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
       ""
@@ -208,13 +208,13 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
   }
 
   function _sendRequest(
-    uint64 expectedSeqNum,
+    uint64 expectedMsgNum,
     uint64 sourceChainSelector,
     uint64 nonce,
     bytes32 metadataHash,
     Router router,
     TokenAdminRegistry tokenAdminRegistry
-  ) public returns (Internal.Any2EVMRampMessage memory) {
+  ) public returns (Internal.Any2EVMRampMessageV1_6 memory) {
     Client.EVM2AnyMessage memory message = _generateTokenMessage();
     uint256 expectedFee = router.getFee(DEST_CHAIN_SELECTOR, message);
 
@@ -222,11 +222,11 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
     IERC20(s_sourceTokens[1]).approve(address(router), i_tokenAmount1);
 
     message.receiver = abi.encode(address(s_receiver));
-    Internal.EVM2AnyRampMessage memory msgEvent = _messageToEvent(
+    Internal.EVM2AnyRampMessageV1_6 memory msgEvent = _messageToEventV1_6(
       message,
       sourceChainSelector,
       DEST_CHAIN_SELECTOR,
-      expectedSeqNum,
+      expectedMsgNum,
       nonce,
       expectedFee,
       OWNER,
@@ -243,12 +243,12 @@ contract MultiRampsE2E is EVM2EVMMultiOnRampSetup, EVM2EVMMultiOffRampSetup {
 
     uint256 gasLimit = s_priceRegistry.parseEVMExtraArgsFromBytes(msgEvent.extraArgs, DEST_CHAIN_SELECTOR).gasLimit;
 
-    return Internal.Any2EVMRampMessage({
-      header: Internal.RampMessageHeader({
+    return Internal.Any2EVMRampMessageV1_6({
+      header: Internal.RampMessageHeaderV1_6({
         messageId: msgEvent.header.messageId,
         sourceChainSelector: sourceChainSelector,
         destChainSelector: DEST_CHAIN_SELECTOR,
-        sequenceNumber: msgEvent.header.sequenceNumber,
+        messageNumber: msgEvent.header.messageNumber,
         nonce: msgEvent.header.nonce
       }),
       sender: abi.encode(msgEvent.sender),
