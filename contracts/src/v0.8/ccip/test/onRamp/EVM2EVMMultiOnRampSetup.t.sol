@@ -92,7 +92,8 @@ contract EVM2EVMMultiOnRampSetup is PriceRegistryFeeSetup {
     return EVM2EVMMultiOnRamp.DynamicConfig({
       priceRegistry: priceRegistry,
       messageValidator: address(0),
-      feeAggregator: FEE_AGGREGATOR
+      feeAggregator: FEE_AGGREGATOR,
+      allowListAdmin: address(0)
     });
   }
 

@@ -31,9 +31,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     vm.expectEmit();
     emit EVM2EVMMultiOnRamp.ConfigSet(staticConfig, dynamicConfig);
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.DestChainConfigSet(
-      DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, s_sourceRouter)
-    );
+    emit EVM2EVMMultiOnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
 
     _deployOnRamp(SOURCE_CHAIN_SELECTOR, s_sourceRouter, address(s_outboundNonceManager), address(s_tokenAdminRegistry));
 
@@ -607,7 +605,8 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
       priceRegistry: address(23423),
       messageValidator: makeAddr("messageValidator"),
-      feeAggregator: FEE_AGGREGATOR
+      feeAggregator: FEE_AGGREGATOR,
+      allowListAdmin: address(0)
     });
 
     vm.expectEmit();
@@ -625,7 +624,8 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
       priceRegistry: address(0),
       feeAggregator: FEE_AGGREGATOR,
-      messageValidator: makeAddr("messageValidator")
+      messageValidator: makeAddr("messageValidator"),
+      allowListAdmin: address(0)
     });
 
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
@@ -636,7 +636,8 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
       priceRegistry: address(23423),
       messageValidator: address(0),
-      feeAggregator: FEE_AGGREGATOR
+      feeAggregator: FEE_AGGREGATOR,
+      allowListAdmin: address(0)
     });
 
     // Invalid price reg reverts.
@@ -649,7 +650,8 @@ contract EVM2EVMMultiOnRamp_setDynamicConfig is EVM2EVMMultiOnRampSetup {
     EVM2EVMMultiOnRamp.DynamicConfig memory newConfig = EVM2EVMMultiOnRamp.DynamicConfig({
       priceRegistry: address(23423),
       messageValidator: address(0),
-      feeAggregator: address(0)
+      feeAggregator: address(0),
+      allowListAdmin: address(0)
     });
     vm.expectRevert(EVM2EVMMultiOnRamp.InvalidConfig.selector);
     s_onRamp.setDynamicConfig(newConfig);
@@ -751,9 +753,7 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
 
     // supports disabling a lane by setting a router to zero
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.DestChainConfigSet(
-      DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, IRouter(address(0)))
-    );
+    emit EVM2EVMMultiOnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, IRouter(address(0)), false);
     s_onRamp.applyDestChainConfigUpdates(configArgs);
     assertEq(address(0), address(s_onRamp.getRouter(DEST_CHAIN_SELECTOR)));
 
@@ -763,11 +763,9 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
       EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter});
     configArgs[1] = EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999))});
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.DestChainConfigSet(
-      DEST_CHAIN_SELECTOR, EVM2EVMMultiOnRamp.DestChainConfig(0, s_sourceRouter)
-    );
+    emit EVM2EVMMultiOnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
     vm.expectEmit();
-    emit EVM2EVMMultiOnRamp.DestChainConfigSet(9999, EVM2EVMMultiOnRamp.DestChainConfig(0, IRouter(address(9999))));
+    emit EVM2EVMMultiOnRamp.DestChainConfigSet(9999, 0, IRouter(address(9999)), false);
     s_onRamp.applyDestChainConfigUpdates(configArgs);
     assertEq(address(s_sourceRouter), address(s_onRamp.getRouter(DEST_CHAIN_SELECTOR)));
     assertEq(address(9999), address(s_onRamp.getRouter(9999)));

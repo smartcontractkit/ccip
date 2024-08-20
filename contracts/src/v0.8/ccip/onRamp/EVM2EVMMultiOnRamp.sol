@@ -19,12 +19,14 @@ import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The EVM2EVMMultiOnRamp is a contract that handles lane-specific fee logic
 /// @dev The EVM2EVMMultiOnRamp, MultiCommitStore and EVM2EVMMultiOffRamp form an xchain upgradeable unit. Any change to one of them
 /// results an onchain upgrade of all 3.
 contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   using SafeERC20 for IERC20;
+  using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
 
   error CannotSendZeroTokens();
@@ -35,13 +37,23 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   error CursedByRMN(uint64 sourceChainSelector);
   error GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
   error InvalidDestChainConfig(uint64 sourceChainSelector);
+  error OnlyCallableByOwnerOrAllowlistAdmin();
+  error SenderNotAllowed(address sender);
+  error AllowListNotEnabled();
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
-  event DestChainConfigSet(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
+  event DestChainConfigSet(
+    uint64 indexed destChainSelector, uint64 sequenceNumber, IRouter router, bool allowListEnabled
+  );
   event FeePaid(address indexed feeToken, uint256 feeValueJuels);
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPSendRequested(uint64 indexed destChainSelector, Internal.EVM2AnyRampMessage message);
+  event AllowListAdminSet(address indexed allowListAdmin);
+  event AllowListAdd(address sender);
+  event AllowListRemove(address sender);
+  event AllowListDisabled(uint64 destChainSelector);
+  event AllowListEnabled(uint64 destChainSelector);
 
   /// @dev Struct that contains the static configuration
   /// RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -59,6 +71,7 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     address priceRegistry; // Price registry address
     address messageValidator; // Optional message validator to validate outbound messages (zero address = no validator)
     address feeAggregator; // Fee aggregator address
+    address allowListAdmin; // authorized admin to add or remove allowed senders
   }
 
   /// @dev Struct to hold the configs for a destination chain
@@ -69,6 +82,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     // This is the local router address that is allowed to send messages to the destination chain.
     // This is NOT the receiving router address on the destination chain.
     IRouter router;
+    bool allowListEnabled;
+    EnumerableSet.AddressSet allowList;
   }
 
   /// @dev Same as DestChainConfig but with the destChainSelector so that an array of these
@@ -138,6 +153,10 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     address originalSender
   ) external returns (bytes32) {
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+
+    if (destChainConfig.allowListEnabled && destChainConfig.allowList.contains(originalSender)) {
+      revert SenderNotAllowed(originalSender);
+    }
 
     // NOTE: assumes the message has already been validated through the getFee call
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
@@ -324,13 +343,94 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
         revert InvalidDestChainConfig(destChainSelector);
       }
 
-      DestChainConfig memory newDestChainConfig = DestChainConfig({
-        sequenceNumber: s_destChainConfigs[destChainSelector].sequenceNumber,
-        router: destChainConfigArg.router
-      });
-      s_destChainConfigs[destChainSelector] = newDestChainConfig;
+      s_destChainConfigs[destChainSelector].router = destChainConfigArg.router;
 
-      emit DestChainConfigSet(destChainSelector, newDestChainConfig);
+      emit DestChainConfigSet(
+        destChainSelector,
+        s_destChainConfigs[destChainSelector].sequenceNumber,
+        s_destChainConfigs[destChainSelector].router,
+        s_destChainConfigs[destChainSelector].allowListEnabled
+      );
+    }
+  }
+
+  // ================================================================
+  // │                          Allowlist                           │
+  // ================================================================
+
+  /// @notice Gets whether the allowList functionality is enabled.
+  /// @return true is enabled, false if not.
+  function getAllowListEnabled(uint64 destinationChainSelector) external view returns (bool) {
+    return s_destChainConfigs[destinationChainSelector].allowListEnabled;
+  }
+
+  /// @notice Gets the allowed addresses.
+  /// @return The allowed addresses.
+  function getAllowList(uint64 destinationChainSelector) external view returns (address[] memory) {
+    return s_destChainConfigs[destinationChainSelector].allowList.values();
+  }
+
+  modifier onlyOwnerOrAllowListAdmin() {
+    if (msg.sender != owner() && msg.sender != s_dynamicConfig.allowListAdmin) {
+      revert OnlyCallableByOwnerOrAllowlistAdmin();
+    }
+    _;
+  }
+
+  function setAllowListAdmin(address allowListAdmin) external onlyOwner {
+    s_dynamicConfig.allowListAdmin = allowListAdmin;
+    emit AllowListAdminSet(allowListAdmin);
+  }
+
+  /// @notice Apply updates to the allow list.
+  /// @param removes The addresses to be removed.
+  /// @param adds The addresses to be added.
+  function applyAllowListUpdates(
+    uint64 destinationChainSelector,
+    address[] calldata removes,
+    address[] calldata adds
+  ) external onlyOwnerOrAllowListAdmin {
+    _applyAllowListUpdates(destinationChainSelector, removes, adds);
+  }
+
+  /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
+  function _applyAllowListUpdates(
+    uint64 destinationChainSelector,
+    address[] memory removes,
+    address[] memory adds
+  ) internal {
+    DestChainConfig storage destChainConfig = s_destChainConfigs[destinationChainSelector];
+
+    if (!destChainConfig.allowListEnabled) revert AllowListNotEnabled();
+
+    for (uint256 i = 0; i < removes.length; ++i) {
+      address toRemove = removes[i];
+      if (destChainConfig.allowList.remove(toRemove)) {
+        emit AllowListRemove(toRemove);
+      }
+    }
+    for (uint256 i = 0; i < adds.length; ++i) {
+      address toAdd = adds[i];
+      if (toAdd == address(0)) {
+        continue;
+      }
+      if (destChainConfig.allowList.add(toAdd)) {
+        emit AllowListAdd(toAdd);
+      }
+    }
+  }
+
+  function disableAllowList(uint64[] calldata destinationChainSelectors) external onlyOwnerOrAllowListAdmin {
+    for (uint64 i = 0; i < destinationChainSelectors.length; ++i) {
+      s_destChainConfigs[destinationChainSelectors[i]].allowListEnabled = false;
+      emit AllowListDisabled(destinationChainSelectors[i]);
+    }
+  }
+
+  function enableAllowList(uint64[] calldata destinationChainSelectors) external onlyOwnerOrAllowListAdmin {
+    for (uint64 i = 0; i < destinationChainSelectors.length; ++i) {
+      s_destChainConfigs[destinationChainSelectors[i]].allowListEnabled = true;
+      emit AllowListEnabled(destinationChainSelectors[i]);
     }
   }
 
