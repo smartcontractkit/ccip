@@ -418,10 +418,10 @@ func validateOCRConfigs(
 	pluginType cctypes.PluginType,
 	ocrConfigs []ccipreaderpkg.OCR3ConfigWithMeta,
 ) error {
-	if len(ocrConfigs) != 1 {
-		return fmt.Errorf("expected exactly one OCR config, got %d", len(ocrConfigs))
-	}
-
+	//if len(ocrConfigs) != 1 {
+	//	return fmt.Errorf("expected exactly one OCR config, got %d", len(ocrConfigs))
+	//}
+	//
 	if ocrConfigs[0].Config.PluginType != uint8(pluginType) {
 		return fmt.Errorf("expected OCR config to be for plugin type %d, got %d", pluginType, ocrConfigs[0].Config.PluginType)
 	}

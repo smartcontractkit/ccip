@@ -464,6 +464,45 @@ func AddChainConfig(
 	return chainConfig
 }
 
+func getOffchainConfig(
+	t *testing.T,
+	pluginType cctypes.PluginType,
+	uni onchainUniverse,
+	h homeChain,
+) []byte {
+	var encodedOffchainConfig []byte
+	var err2 error
+	if pluginType == cctypes.PluginTypeCCIPCommit {
+		encodedOffchainConfig, err2 = pluginconfig.EncodeCommitOffchainConfig(pluginconfig.CommitOffchainConfig{
+			RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(RemoteGasPriceBatchWriteFrequency),
+			TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(time.Second),
+			PriceSources: map[ocrtypes.Account]pluginconfig.ArbitrumPriceSource{
+				ocrtypes.Account(uni.weth.Address().Hex()): {
+					AggregatorAddress: h.mockAggregatorAddress.Hex(),
+					DeviationPPB:      ccipocr3.BigInt{Int: big.NewInt(1)},
+				},
+			},
+			TokenDecimals: map[ocrtypes.Account]uint8{
+				ocrtypes.Account(uni.weth.Address().Hex()): 18,
+			},
+			TokenPriceChainSelector: getSelector(h.chainID),
+		})
+		require.NoError(t, err2)
+	} else {
+		encodedOffchainConfig, err2 = pluginconfig.EncodeExecuteOffchainConfig(pluginconfig.ExecuteOffchainConfig{
+			BatchGasLimit:             BatchGasLimit,
+			RelativeBoostPerWaitHour:  RelativeBoostPerWaitHour,
+			MessageVisibilityInterval: *commonconfig.MustNewDuration(FirstBlockAge),
+			InflightCacheExpiry:       *commonconfig.MustNewDuration(InflightCacheExpiry),
+			RootSnoozeTime:            *commonconfig.MustNewDuration(RootSnoozeTime),
+			BatchingStrategyID:        BatchingStrategyID,
+		})
+		require.NoError(t, err2)
+	}
+
+	return encodedOffchainConfig
+}
+
 func (h *homeChain) AddDON(
 	t *testing.T,
 	ccipCapabilityID [32]byte,
@@ -486,35 +525,10 @@ func (h *homeChain) AddDON(
 	// Add DON on capability registry contract
 	var ocr3Configs []ocr3_config_encoder.CCIPConfigTypesOCR3Config
 	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
-		var encodedOffchainConfig []byte
-		var err2 error
-		if pluginType == cctypes.PluginTypeCCIPCommit {
-			encodedOffchainConfig, err2 = pluginconfig.EncodeCommitOffchainConfig(pluginconfig.CommitOffchainConfig{
-				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(RemoteGasPriceBatchWriteFrequency),
-				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(time.Second),
-				PriceSources: map[ocrtypes.Account]pluginconfig.ArbitrumPriceSource{
-					ocrtypes.Account(uni.weth.Address().Hex()): {
-						AggregatorAddress: h.mockAggregatorAddress.Hex(),
-						DeviationPPB:      ccipocr3.BigInt{Int: big.NewInt(1)},
-					},
-				},
-				TokenDecimals: map[ocrtypes.Account]uint8{
-					ocrtypes.Account(uni.weth.Address().Hex()): 18,
-				},
-				TokenPriceChainSelector: getSelector(h.chainID),
-			})
-			require.NoError(t, err2)
-		} else {
-			encodedOffchainConfig, err2 = pluginconfig.EncodeExecuteOffchainConfig(pluginconfig.ExecuteOffchainConfig{
-				BatchGasLimit:             BatchGasLimit,
-				RelativeBoostPerWaitHour:  RelativeBoostPerWaitHour,
-				MessageVisibilityInterval: *commonconfig.MustNewDuration(FirstBlockAge),
-				InflightCacheExpiry:       *commonconfig.MustNewDuration(InflightCacheExpiry),
-				RootSnoozeTime:            *commonconfig.MustNewDuration(RootSnoozeTime),
-				BatchingStrategyID:        BatchingStrategyID,
-			})
-			require.NoError(t, err2)
-		}
+		encodedOffchainConfig := getOffchainConfig(t, pluginType, uni, *h)
+		// commit: len:337, cap:352
+		// exec: len:171, cap:176
+
 		signers, transmitters, configF, _, offchainConfigVersion, offchainConfig, err2 := ocr3confighelper.ContractSetConfigArgsForTests(
 			DeltaProgress,
 			DeltaResend,
