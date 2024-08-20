@@ -3,6 +3,7 @@ package ccip
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -70,6 +71,7 @@ func (o *orm) GetTokenPricesByDestChain(ctx context.Context, destChainSelector u
 		FROM ccip.observed_token_prices
 		WHERE chain_selector = $1;
 	`
+	o.withAnalyze(ctx, "GetTokenPricesByDestChain", stmt, destChainSelector)
 	err := o.ds.SelectContext(ctx, &tokenPrices, stmt, destChainSelector)
 	if err != nil {
 		return nil, err
@@ -163,6 +165,7 @@ func (o *orm) pickOnlyRelevantTokensForUpdate(
 			and token_addr = any($2)
 			and updated_at >= statement_timestamp() - $3::interval
 	`
+	o.withAnalyze(ctx, "pickOnlyRelevantTokensForUpdate", stmt, destChainSelector, tokenAddrsToBytes(tokenPricesByAddress))
 
 	pgInterval := fmt.Sprintf("%d milliseconds", interval.Milliseconds())
 	args := []interface{}{destChainSelector, tokenAddrsToBytes(tokenPricesByAddress), pgInterval}
@@ -203,4 +206,17 @@ func tokenAddrsToBytes(tokens map[string]*assets.Wei) [][]byte {
 		addrs = append(addrs, []byte(tkAddr))
 	}
 	return addrs
+}
+
+func (o *orm) withAnalyze(ctx context.Context, queryName string, query string, args ...interface{}) {
+	query = "EXPLAIN (ANALYZE, BUFFERS) " + query
+
+	var response []string
+	err := o.ds.SelectContext(ctx, &response, query, args...)
+	if err != nil {
+		return
+	}
+	if len(response) > 0 {
+		o.lggr.Infow("Analyze query", "query", queryName, "response", strings.Join(response, "\n"))
+	}
 }
