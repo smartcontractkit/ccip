@@ -52,6 +52,8 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
   event AllowListAdminSet(address indexed allowListAdmin);
   event AllowListDisabled(uint64 destChainSelector);
   event AllowListEnabled(uint64 destChainSelector);
+  event AllowListAdded(uint64 indexed destChainSelector, address[] allowList);
+  event AllowListRemoved(uint64 indexed destChainSelector, address[] allowList);
 
   /// @dev Struct that contains the static configuration
   /// RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -77,10 +79,10 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     // The last used sequence number. This is zero in the case where no messages has been sent yet.
     // 0 is not a valid sequence number for any real transaction.
     uint64 sequenceNumber;
+    bool allowListEnabled;
     // This is the local router address that is allowed to send messages to the destination chain.
     // This is NOT the receiving router address on the destination chain.
     IRouter router;
-    bool allowListEnabled;
     EnumerableSet.AddressSet allowList;
   }
 
@@ -404,12 +406,21 @@ contract EVM2EVMMultiOnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCre
     for (uint256 i = 0; i < removes.length; ++i) {
       destChainConfig.allowList.remove(removes[i]);
     }
+
+    if (removes.length > 0) {
+      emit AllowListRemoved(destinationChainSelector, removes);
+    }
+
     for (uint256 i = 0; i < adds.length; ++i) {
       address toAdd = adds[i];
       if (toAdd == address(0)) {
         continue;
       }
       destChainConfig.allowList.add(toAdd);
+    }
+
+    if (adds.length > 0) {
+      emit AllowListAdded(destinationChainSelector, adds);
     }
   }
 
