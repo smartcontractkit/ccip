@@ -46,7 +46,7 @@ contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
     // Initial values
     assertEq("EVM2EVMMultiOnRamp 1.6.0-dev", s_onRamp.typeAndVersion());
     assertEq(OWNER, s_onRamp.owner());
-    assertEq(1, s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR));
+    assertEq(1, s_onRamp.getExpectedNextMessageNumber(DEST_CHAIN_SELECTOR));
     assertEq(address(s_sourceRouter), address(s_onRamp.getRouter(DEST_CHAIN_SELECTOR)));
   }
 
@@ -227,12 +227,12 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 
-  function test_ShouldIncrementSeqNumAndNonce_Success() public {
+  function test_ShouldIncrementMsgNumAndNonce_Success() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     for (uint64 i = 1; i < 4; ++i) {
       uint64 nonceBefore = s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
-      uint64 sequenceNumberBefore = s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR) - 1;
+      uint64 messageNumberBefore = s_onRamp.getExpectedNextMessageNumber(DEST_CHAIN_SELECTOR) - 1;
 
       vm.expectEmit();
       emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, i, i, 0, OWNER));
@@ -240,9 +240,9 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
       uint64 nonceAfter = s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
-      uint64 sequenceNumberAfter = s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR) - 1;
+      uint64 messageNumberAfter = s_onRamp.getExpectedNextMessageNumber(DEST_CHAIN_SELECTOR) - 1;
       assertEq(nonceAfter, nonceBefore + 1);
-      assertEq(sequenceNumberAfter, sequenceNumberBefore + 1);
+      assertEq(messageNumberAfter, messageNumberBefore + 1);
     }
   }
 
@@ -254,7 +254,7 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
 
     for (uint64 i = 1; i < 4; ++i) {
       uint64 nonceBefore = s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
-      uint64 sequenceNumberBefore = s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR) - 1;
+      uint64 messageNumberBefore = s_onRamp.getExpectedNextMessageNumber(DEST_CHAIN_SELECTOR) - 1;
 
       vm.expectEmit();
       emit EVM2EVMMultiOnRamp.CCIPSendRequested(DEST_CHAIN_SELECTOR, _messageToEvent(message, i, i, 0, OWNER));
@@ -262,9 +262,9 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
       uint64 nonceAfter = s_outboundNonceManager.getOutboundNonce(DEST_CHAIN_SELECTOR, OWNER);
-      uint64 sequenceNumberAfter = s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR) - 1;
+      uint64 messageNumberAfter = s_onRamp.getExpectedNextMessageNumber(DEST_CHAIN_SELECTOR) - 1;
       assertEq(nonceAfter, nonceBefore);
-      assertEq(sequenceNumberAfter, sequenceNumberBefore + 1);
+      assertEq(messageNumberAfter, messageNumberBefore + 1);
     }
   }
 
@@ -318,7 +318,8 @@ contract EVM2EVMMultiOnRamp_forwardFromRouter is EVM2EVMMultiOnRampSetup {
     // Make sure the tokens are in the contract
     deal(s_sourceFeeToken, address(s_onRamp), feeTokenAmount);
 
-    Internal.EVM2AnyRampMessage memory expectedEvent = _messageToEvent(message, 1, 1, feeTokenAmount, originalSender);
+    Internal.EVM2AnyRampMessageV1_6 memory expectedEvent =
+      _messageToEvent(message, 1, 1, feeTokenAmount, originalSender);
 
     vm.expectEmit();
     emit EVM2EVMMultiOnRamp.FeePaid(s_sourceFeeToken, feeTokenAmount);

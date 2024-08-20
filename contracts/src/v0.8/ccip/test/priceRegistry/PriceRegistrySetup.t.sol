@@ -390,6 +390,45 @@ contract PriceRegistryFeeSetup is PriceRegistrySetup {
     return messageEvent;
   }
 
+  function _messageToEventV1_6(
+    Client.EVM2AnyMessage memory message,
+    uint64 sourceChainSelector,
+    uint64 destChainSelector,
+    uint64 msgNum,
+    uint64 nonce,
+    uint256 feeTokenAmount,
+    address originalSender,
+    bytes32 metadataHash,
+    TokenAdminRegistry tokenAdminRegistry
+  ) internal view returns (Internal.EVM2AnyRampMessageV1_6 memory) {
+    Client.EVMExtraArgsV2 memory extraArgs =
+      s_priceRegistry.parseEVMExtraArgsFromBytes(message.extraArgs, destChainSelector);
+
+    Internal.EVM2AnyRampMessageV1_6 memory messageEvent = Internal.EVM2AnyRampMessageV1_6({
+      header: Internal.RampMessageHeaderV1_6({
+        messageId: "",
+        sourceChainSelector: sourceChainSelector,
+        destChainSelector: destChainSelector,
+        messageNumber: msgNum,
+        nonce: extraArgs.allowOutOfOrderExecution ? 0 : nonce
+      }),
+      sender: originalSender,
+      data: message.data,
+      receiver: message.receiver,
+      extraArgs: Client._argsToBytes(extraArgs),
+      feeToken: message.feeToken,
+      feeTokenAmount: feeTokenAmount,
+      tokenAmounts: new Internal.RampTokenAmount[](message.tokenAmounts.length)
+    });
+
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+      messageEvent.tokenAmounts[i] = _getSourceTokenData(message.tokenAmounts[i], tokenAdminRegistry);
+    }
+
+    messageEvent.header.messageId = Internal._hash(messageEvent, metadataHash);
+    return messageEvent;
+  }
+
   function _getSourceTokenData(
     Client.EVMTokenAmount memory tokenAmount,
     TokenAdminRegistry tokenAdminRegistry
