@@ -821,11 +821,11 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
       }
 
       _validateDestFamilyAddress(chainFamilySelector, rampTokenAmounts[i].destTokenAddress);
-      PriceRegistry.TokenTransferFeeConfig memory tokenTransferFeeConfig = s_tokenTransferFeeConfig[destChainSelector][sourceToken];
+      PriceRegistry.TokenTransferFeeConfig memory tokenTransferFeeConfig =
+        s_tokenTransferFeeConfig[destChainSelector][sourceToken];
       uint32 defaultGasOverhead = s_destChainConfigs[destChainSelector].defaultTokenDestGasOverhead;
-      uint32 destGasAmount = tokenTransferFeeConfig.isEnabled
-        ? tokenTransferFeeConfig.destGasOverhead
-        : defaultGasOverhead;
+      uint32 destGasAmount =
+        tokenTransferFeeConfig.isEnabled ? tokenTransferFeeConfig.destGasOverhead : defaultGasOverhead;
 
       // The user will be billed either the default or the override, so we send the exact amount that we billed for
       // to the destination chain to be used for the token releaseOrMint and transfer.
