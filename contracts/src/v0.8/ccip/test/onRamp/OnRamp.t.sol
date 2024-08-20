@@ -25,7 +25,7 @@ contract OnRamp_constructor is OnRampSetup {
       nonceManager: address(s_outboundNonceManager),
       tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
-    OnRamp.DynamicConfig memory dynamicConfig = _generateDynamicMultiOnRampConfig(address(s_priceRegistry));
+    OnRamp.DynamicConfig memory dynamicConfig = _generateDynamicOnRampConfig(address(s_priceRegistry));
 
     vm.expectEmit();
     emit OnRamp.ConfigSet(staticConfig, dynamicConfig);
@@ -56,7 +56,7 @@ contract OnRamp_constructor is OnRampSetup {
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      _generateDynamicMultiOnRampConfig(address(s_priceRegistry)),
+      _generateDynamicOnRampConfig(address(s_priceRegistry)),
       _generateDestChainConfigArgs(IRouter(address(0)))
     );
   }
@@ -70,7 +70,7 @@ contract OnRamp_constructor is OnRampSetup {
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      _generateDynamicMultiOnRampConfig(address(s_priceRegistry)),
+      _generateDynamicOnRampConfig(address(s_priceRegistry)),
       _generateDestChainConfigArgs(IRouter(address(0)))
     );
   }
@@ -84,7 +84,7 @@ contract OnRamp_constructor is OnRampSetup {
         nonceManager: address(0),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      _generateDynamicMultiOnRampConfig(address(s_priceRegistry)),
+      _generateDynamicOnRampConfig(address(s_priceRegistry)),
       _generateDestChainConfigArgs(IRouter(address(0)))
     );
   }
@@ -98,7 +98,7 @@ contract OnRamp_constructor is OnRampSetup {
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(0)
       }),
-      _generateDynamicMultiOnRampConfig(address(s_priceRegistry)),
+      _generateDynamicOnRampConfig(address(s_priceRegistry)),
       _generateDestChainConfigArgs(IRouter(address(0)))
     );
   }
@@ -353,7 +353,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     // We pause by disabling the whitelist
     vm.stopPrank();
     vm.startPrank(OWNER);
-    s_onRamp.setDynamicConfig(_generateDynamicMultiOnRampConfig(address(2)));
+    s_onRamp.setDynamicConfig(_generateDynamicOnRampConfig(address(2)));
     vm.expectRevert(OnRamp.MustBeCalledByRouter.selector);
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, OWNER);
   }
@@ -649,10 +649,10 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
   function test_SetConfigOnlyOwner_Revert() public {
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setDynamicConfig(_generateDynamicMultiOnRampConfig(address(2)));
+    s_onRamp.setDynamicConfig(_generateDynamicOnRampConfig(address(2)));
     vm.startPrank(ADMIN);
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setDynamicConfig(_generateDynamicMultiOnRampConfig(address(2)));
+    s_onRamp.setDynamicConfig(_generateDynamicOnRampConfig(address(2)));
   }
 }
 

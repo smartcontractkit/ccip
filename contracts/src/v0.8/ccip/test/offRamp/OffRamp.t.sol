@@ -38,7 +38,7 @@ contract OffRamp_constructor is OffRampSetup {
       tokenAdminRegistry: address(s_tokenAdminRegistry),
       nonceManager: address(s_inboundNonceManager)
     });
-    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicMultiOffRampConfig(address(s_priceRegistry));
+    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(address(s_priceRegistry));
 
     OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](2);
     sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
@@ -159,7 +159,7 @@ contract OffRamp_constructor is OffRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
-      _generateDynamicMultiOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_priceRegistry)),
       sourceChainConfigs
     );
   }
@@ -185,7 +185,7 @@ contract OffRamp_constructor is OffRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
-      _generateDynamicMultiOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_priceRegistry)),
       sourceChainConfigs
     );
   }
@@ -205,7 +205,7 @@ contract OffRamp_constructor is OffRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
-      _generateDynamicMultiOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_priceRegistry)),
       sourceChainConfigs
     );
   }
@@ -225,7 +225,7 @@ contract OffRamp_constructor is OffRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
-      _generateDynamicMultiOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_priceRegistry)),
       sourceChainConfigs
     );
   }
@@ -245,7 +245,7 @@ contract OffRamp_constructor is OffRampSetup {
         tokenAdminRegistry: ZERO_ADDRESS,
         nonceManager: address(s_inboundNonceManager)
       }),
-      _generateDynamicMultiOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_priceRegistry)),
       sourceChainConfigs
     );
   }
@@ -265,7 +265,7 @@ contract OffRamp_constructor is OffRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: ZERO_ADDRESS
       }),
-      _generateDynamicMultiOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_priceRegistry)),
       sourceChainConfigs
     );
   }
@@ -273,7 +273,7 @@ contract OffRamp_constructor is OffRampSetup {
 
 contract OffRamp_setDynamicConfig is OffRampSetup {
   function test_SetDynamicConfig_Success() public {
-    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicMultiOffRampConfig(address(s_priceRegistry));
+    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(address(s_priceRegistry));
 
     vm.expectEmit();
     emit OffRamp.DynamicConfigSet(dynamicConfig);
@@ -285,7 +285,7 @@ contract OffRamp_setDynamicConfig is OffRampSetup {
   }
 
   function test_SetDynamicConfigWithValidator_Success() public {
-    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicMultiOffRampConfig(address(s_priceRegistry));
+    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(address(s_priceRegistry));
     dynamicConfig.messageValidator = address(s_inboundMessageValidator);
 
     vm.expectEmit();
@@ -301,7 +301,7 @@ contract OffRamp_setDynamicConfig is OffRampSetup {
 
   function test_NonOwner_Revert() public {
     vm.startPrank(STRANGER);
-    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicMultiOffRampConfig(address(s_priceRegistry));
+    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(address(s_priceRegistry));
 
     vm.expectRevert("Only callable by owner");
 
@@ -309,7 +309,7 @@ contract OffRamp_setDynamicConfig is OffRampSetup {
   }
 
   function test_PriceRegistryZeroAddress_Revert() public {
-    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicMultiOffRampConfig(ZERO_ADDRESS);
+    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(ZERO_ADDRESS);
 
     vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
 

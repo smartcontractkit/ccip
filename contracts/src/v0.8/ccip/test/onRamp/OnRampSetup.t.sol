@@ -84,7 +84,7 @@ contract OnRampSetup is PriceRegistryFeeSetup {
     );
   }
 
-  function _generateDynamicMultiOnRampConfig(address priceRegistry) internal pure returns (OnRamp.DynamicConfig memory) {
+  function _generateDynamicOnRampConfig(address priceRegistry) internal pure returns (OnRamp.DynamicConfig memory) {
     return
       OnRamp.DynamicConfig({priceRegistry: priceRegistry, messageValidator: address(0), feeAggregator: FEE_AGGREGATOR});
   }
@@ -117,7 +117,7 @@ contract OnRampSetup is PriceRegistryFeeSetup {
         nonceManager: nonceManager,
         tokenAdminRegistry: tokenAdminRegistry
       }),
-      _generateDynamicMultiOnRampConfig(address(s_priceRegistry)),
+      _generateDynamicOnRampConfig(address(s_priceRegistry)),
       _generateDestChainConfigArgs(router)
     );
 

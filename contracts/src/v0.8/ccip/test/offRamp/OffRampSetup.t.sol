@@ -81,7 +81,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(nonceManager)
       }),
-      _generateDynamicMultiOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_priceRegistry)),
       sourceChainConfigs
     );
 
@@ -106,7 +106,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
       transmitters: s_validTransmitters
     });
 
-    s_offRamp.setDynamicConfig(_generateDynamicMultiOffRampConfig(address(s_priceRegistry)));
+    s_offRamp.setDynamicConfig(_generateDynamicOffRampConfig(address(s_priceRegistry)));
     s_offRamp.setOCR3Configs(ocrConfigs);
 
     address[] memory authorizedCallers = new address[](1);
@@ -223,11 +223,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
   uint32 internal constant MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS = 200_000;
   uint32 internal constant MAX_TOKEN_POOL_TRANSFER_GAS = 50_000;
 
-  function _generateDynamicMultiOffRampConfig(address priceRegistry)
-    internal
-    pure
-    returns (OffRamp.DynamicConfig memory)
-  {
+  function _generateDynamicOffRampConfig(address priceRegistry) internal pure returns (OffRamp.DynamicConfig memory) {
     return OffRamp.DynamicConfig({
       permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
       priceRegistry: priceRegistry,
@@ -438,7 +434,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
-      _generateDynamicMultiOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_priceRegistry)),
       new OffRamp.SourceChainConfigArgs[](0)
     );
 
