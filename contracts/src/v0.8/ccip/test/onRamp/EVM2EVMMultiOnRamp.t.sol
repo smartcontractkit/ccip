@@ -17,6 +17,7 @@ import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMint
 import {EVM2EVMMultiOnRampSetup} from "./EVM2EVMMultiOnRampSetup.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import "forge-std/console.sol";
 
 contract EVM2EVMMultiOnRamp_constructor is EVM2EVMMultiOnRampSetup {
   function test_Constructor_Success() public {
@@ -784,5 +785,93 @@ contract EVM2EVMMultiOnRamp_applyDestChainConfigUpdates is EVM2EVMMultiOnRampSet
     configArgs[0].destChainSelector = 0; // invalid
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMMultiOnRamp.InvalidDestChainConfig.selector, 0));
     s_onRamp.applyDestChainConfigUpdates(configArgs);
+  }
+}
+
+
+import "forge-std/console.sol";
+contract EVM2EVMMultiOnRamp_allowListConfigUpdates is EVM2EVMMultiOnRampSetup {
+
+  function test_setAllowListAdmin_Success() public {
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+
+    address allowListAdmin = vm.addr(1);
+    vm.expectEmit();
+    emit EVM2EVMMultiOnRamp.AllowListAdminSet(allowListAdmin);
+    s_onRamp.setAllowListAdmin(allowListAdmin);
+  }
+
+  function test_setAllowListAdmin_ByNonOwner_Revert() public {
+    vm.stopPrank();
+    address allowListAdmin = vm.addr(1);
+    vm.startPrank(STRANGER);
+    vm.expectRevert("Only callable by owner");
+    s_onRamp.setAllowListAdmin(allowListAdmin);
+  }
+
+  function test_applyAllowList_Success() public {
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+
+    EVM2EVMMultiOnRamp.DestChainConfigArgs[] memory configArgs = new EVM2EVMMultiOnRamp.DestChainConfigArgs[](2);
+    configArgs[0] =
+      EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter});
+    configArgs[1] = EVM2EVMMultiOnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999))});
+    vm.expectEmit();
+    emit EVM2EVMMultiOnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
+    vm.expectEmit();
+    emit EVM2EVMMultiOnRamp.DestChainConfigSet(9999, 0, IRouter(address(9999)), false);
+    s_onRamp.applyDestChainConfigUpdates(configArgs);
+
+    uint64[] memory destinationChainSelectors = new uint64[](2);
+    destinationChainSelectors[0] = DEST_CHAIN_SELECTOR;
+    destinationChainSelectors[1] = uint64(99999);
+    s_onRamp.enableAllowList(destinationChainSelectors);
+
+    address[] memory addAllowedList = new address[](4);
+    addAllowedList[0] = vm.addr(1);
+    addAllowedList[1] = vm.addr(2);
+    addAllowedList[2] = vm.addr(3);
+    addAllowedList[3] = vm.addr(4);
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOnRamp.AllowListAdded(DEST_CHAIN_SELECTOR, addAllowedList);
+
+    s_onRamp.applyAllowListUpdates(DEST_CHAIN_SELECTOR, new address[](0), addAllowedList);
+    assertEq(4, s_onRamp.getAllowList(DEST_CHAIN_SELECTOR).length);
+
+  address[] memory actualAllowedList = s_onRamp.getAllowList(DEST_CHAIN_SELECTOR);
+    assertEq(addAllowedList, actualAllowedList);
+
+    address[] memory removeAllowList = new address[](1);
+    removeAllowList[0] = vm.addr(2);
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOnRamp.AllowListRemoved(DEST_CHAIN_SELECTOR, removeAllowList);
+
+    s_onRamp.applyAllowListUpdates(DEST_CHAIN_SELECTOR, removeAllowList, new address[](0));
+    assertEq(3, s_onRamp.getAllowList(DEST_CHAIN_SELECTOR).length);
+
+    addAllowedList = new address[](2);
+    addAllowedList[0] = vm.addr(5);
+    addAllowedList[1] = vm.addr(6);
+
+    removeAllowList = new address[](2);
+    removeAllowList[0] = vm.addr(1);
+    removeAllowList[1] = vm.addr(3);
+
+    vm.expectEmit();
+    emit EVM2EVMMultiOnRamp.AllowListAdded(DEST_CHAIN_SELECTOR, addAllowedList);
+    emit EVM2EVMMultiOnRamp.AllowListRemoved(DEST_CHAIN_SELECTOR, removeAllowList);
+
+    s_onRamp.applyAllowListUpdates(DEST_CHAIN_SELECTOR, removeAllowList, addAllowedList);
+    assertEq(3, s_onRamp.getAllowList(DEST_CHAIN_SELECTOR).length);
+
+    address[] memory expectedAllowList = new address[](3);
+    expectedAllowList[0] = vm.addr(4);
+    expectedAllowList[1] = vm.addr(5);
+    expectedAllowList[2] = vm.addr(6);
+    // TODO compare unordered arrays (expectedAllowList vs allowedAddressList)
   }
 }
