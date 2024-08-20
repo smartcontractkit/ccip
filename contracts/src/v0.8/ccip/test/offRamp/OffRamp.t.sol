@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
@@ -11,8 +10,6 @@ import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
 import {NonceManager} from "../../NonceManager.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
-import {RMN} from "../../RMN.sol";
-import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
@@ -22,9 +19,7 @@ import {MultiOCR3Base} from "../../ocr/MultiOCR3Base.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
-
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
-import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import {OffRampHelper} from "../helpers/OffRampHelper.sol";
 import {ConformingReceiver} from "../helpers/receivers/ConformingReceiver.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
@@ -944,7 +939,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     });
 
     return
-      OffRamp.CommitReport({priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
   }
 }
 
@@ -2488,7 +2483,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
   }
 
   function test_releaseOrMintTokens_Success() public {
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     IERC20 dstToken1 = IERC20(s_destFeeToken);
     uint256 startingBalance = dstToken1.balanceOf(OWNER);
     uint256 amount1 = 100;
@@ -2524,7 +2519,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
   }
 
   function test_releaseOrMintTokens_destDenominatedDecimals_Success() public {
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     uint256 amount = 100;
     uint256 destinationDenominationMultiplier = 1000;
     srcTokenAmounts[1].amount = amount;
@@ -2548,7 +2543,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
   // Revert
 
   function test_TokenHandlingError_Reverts() public {
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
 
     bytes memory unknownError = bytes("unknown error");
     s_maybeRevertingPool.setShouldRevert(unknownError);
@@ -2566,7 +2561,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
 
   function test_releaseOrMintTokens_InvalidDataLengthReturnData_Revert() public {
     uint256 amount = 100;
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     srcTokenAmounts[0].amount = amount;
 
     bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
@@ -2599,7 +2594,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
   }
 
   function test_releaseOrMintTokens_InvalidEVMAddress_Revert() public {
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
 
     bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
     Internal.RampTokenAmount[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
@@ -2631,7 +2626,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
   }
 
   function test_releaseOrMintTokens_PoolDoesNotSupportDest_Reverts() public {
-    Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     uint256 amount1 = 100;
     srcTokenAmounts[0].amount = amount1;
 
@@ -2953,7 +2948,7 @@ contract OffRamp_commit is OffRampSetup {
     });
 
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
 
     vm.expectEmit();
     emit OffRamp.CommitReportAccepted(commitReport);
@@ -2980,7 +2975,7 @@ contract OffRamp_commit is OffRampSetup {
       merkleRoot: "stale report 1"
     });
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
 
     vm.expectEmit();
     emit OffRamp.CommitReportAccepted(commitReport);
@@ -3014,7 +3009,7 @@ contract OffRamp_commit is OffRampSetup {
   function test_OnlyTokenPriceUpdates_Success() public {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](0);
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
 
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
@@ -3030,7 +3025,7 @@ contract OffRamp_commit is OffRampSetup {
   function test_OnlyGasPriceUpdates_Success() public {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](0);
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
 
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
@@ -3045,7 +3040,7 @@ contract OffRamp_commit is OffRampSetup {
   function test_PriceSequenceNumberCleared_Success() public {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](0);
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
 
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
@@ -3094,7 +3089,7 @@ contract OffRamp_commit is OffRampSetup {
     uint224 tokenPrice2 = 5e18;
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](0);
     OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
-      priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice1),
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice1),
       merkleRoots: roots
     });
 
@@ -3113,7 +3108,7 @@ contract OffRamp_commit is OffRampSetup {
       interval: OffRamp.Interval(1, maxSeq),
       merkleRoot: "stale report"
     });
-    commitReport.priceUpdates = getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice2);
+    commitReport.priceUpdates = _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice2);
     commitReport.merkleRoots = roots;
 
     vm.expectEmit();
@@ -3215,7 +3210,7 @@ contract OffRamp_commit is OffRampSetup {
     });
 
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.CursedByRMN.selector, roots[0].sourceChainSelector));
     _commit(commitReport, s_latestSequenceNumber);
@@ -3229,7 +3224,7 @@ contract OffRamp_commit is OffRampSetup {
       merkleRoot: bytes32(0)
     });
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
 
     vm.expectRevert(OffRamp.InvalidRoot.selector);
     _commit(commitReport, s_latestSequenceNumber);
@@ -3241,7 +3236,7 @@ contract OffRamp_commit is OffRampSetup {
     roots[0] =
       OffRamp.MerkleRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR_1, interval: interval, merkleRoot: bytes32(0)});
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidInterval.selector, roots[0].sourceChainSelector, interval));
     _commit(commitReport, s_latestSequenceNumber);
@@ -3254,7 +3249,7 @@ contract OffRamp_commit is OffRampSetup {
     roots[0] =
       OffRamp.MerkleRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR_1, interval: interval, merkleRoot: bytes32(0)});
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidInterval.selector, roots[0].sourceChainSelector, interval));
     _commit(commitReport, s_latestSequenceNumber);
@@ -3263,7 +3258,7 @@ contract OffRamp_commit is OffRampSetup {
   function test_ZeroEpochAndRound_Revert() public {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](0);
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
 
     vm.expectRevert(OffRamp.StaleCommitReport.selector);
     _commit(commitReport, 0);
@@ -3272,7 +3267,7 @@ contract OffRamp_commit is OffRampSetup {
   function test_OnlyPriceUpdateStaleReport_Revert() public {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](0);
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
 
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
@@ -3288,7 +3283,7 @@ contract OffRamp_commit is OffRampSetup {
       OffRamp.MerkleRoot({sourceChainSelector: 0, interval: OffRamp.Interval(1, 2), merkleRoot: "Only a single root"});
 
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.SourceChainNotEnabled.selector, 0));
     _commit(commitReport, s_latestSequenceNumber);
@@ -3302,7 +3297,7 @@ contract OffRamp_commit is OffRampSetup {
       merkleRoot: "Only a single root"
     });
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
 
     _commit(commitReport, s_latestSequenceNumber);
     commitReport.merkleRoots[0].interval = OffRamp.Interval(3, 3);
@@ -3322,7 +3317,7 @@ contract OffRamp_commit is OffRampSetup {
     });
 
     return
-      OffRamp.CommitReport({priceUpdates: getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
   }
 }
 
@@ -3358,7 +3353,7 @@ contract OffRamp_resetUnblessedRoots is OffRampSetup {
     });
 
     OffRamp.CommitReport memory report =
-      OffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
 
     _commit(report, ++s_latestSequenceNumber);
 
@@ -3411,7 +3406,7 @@ contract OffRamp_verify is OffRampSetup {
       merkleRoot: leaves[0]
     });
     OffRamp.CommitReport memory report =
-      OffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
     _commit(report, ++s_latestSequenceNumber);
     bytes32[] memory proofs = new bytes32[](0);
     // We have not blessed this root, should return 0.
@@ -3429,7 +3424,7 @@ contract OffRamp_verify is OffRampSetup {
       merkleRoot: leaves[0]
     });
     OffRamp.CommitReport memory report =
-      OffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
     _commit(report, ++s_latestSequenceNumber);
     // Bless that root.
     IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
@@ -3452,7 +3447,7 @@ contract OffRamp_verify is OffRampSetup {
     });
 
     OffRamp.CommitReport memory report =
-      OffRamp.CommitReport({priceUpdates: getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
     _commit(report, ++s_latestSequenceNumber);
 
     // Bless that root.

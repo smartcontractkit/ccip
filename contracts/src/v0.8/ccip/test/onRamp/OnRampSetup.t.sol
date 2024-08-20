@@ -1,28 +1,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../NonceManager.sol";
-import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
-import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
-import {TokenPool} from "../../pools/TokenPool.sol";
-import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
-import {TokenSetup} from "../TokenSetup.t.sol";
-
 import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import {OnRampHelper} from "../helpers/OnRampHelper.sol";
 import {PriceRegistryFeeSetup} from "../priceRegistry/PriceRegistry.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-contract OnRampSetup is TokenSetup, PriceRegistryFeeSetup {
+contract OnRampSetup is PriceRegistryFeeSetup {
   uint256 internal immutable i_tokenAmount0 = 9;
   uint256 internal immutable i_tokenAmount1 = 7;
 
@@ -33,9 +26,8 @@ contract OnRampSetup is TokenSetup, PriceRegistryFeeSetup {
   address[] internal s_offRamps;
   NonceManager internal s_outboundNonceManager;
 
-  function setUp() public virtual override(TokenSetup, PriceRegistryFeeSetup) {
-    TokenSetup.setUp();
-    PriceRegistryFeeSetup.setUp();
+  function setUp() public virtual override {
+    super.setUp();
 
     s_outboundMessageValidator = new MessageInterceptorHelper();
     s_outboundNonceManager = new NonceManager(new address[](0));
@@ -60,7 +52,7 @@ contract OnRampSetup is TokenSetup, PriceRegistryFeeSetup {
   }
 
   function _generateTokenMessage() public view returns (Client.EVM2AnyMessage memory) {
-    Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory tokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     tokenAmounts[0].amount = i_tokenAmount0;
     tokenAmounts[1].amount = i_tokenAmount1;
     return Client.EVM2AnyMessage({

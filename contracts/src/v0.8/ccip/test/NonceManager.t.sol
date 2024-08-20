@@ -13,7 +13,6 @@ import {OnRamp} from "../onRamp/OnRamp.sol";
 import {BaseTest} from "./BaseTest.t.sol";
 import {EVM2EVMOffRampHelper} from "./helpers/EVM2EVMOffRampHelper.sol";
 import {EVM2EVMOnRampHelper} from "./helpers/EVM2EVMOnRampHelper.sol";
-import {OnRampHelper} from "./helpers/OnRampHelper.sol";
 import {MockCommitStore} from "./mocks/MockCommitStore.sol";
 import {OffRampSetup} from "./offRamp/OffRampSetup.t.sol";
 import {OnRampSetup} from "./onRamp/OnRampSetup.t.sol";
@@ -213,7 +212,7 @@ contract NonceManager_OnRampUpgrade is OnRampSetup {
       minFeeUSDCents: 1_00, // 1 USD
       maxFeeUSDCents: 1000_00, // 1,000 USD
       deciBps: 2_5, // 2.5 bps, or 0.025%
-      destGasOverhead: 40_000,
+      destGasOverhead: 140_000,
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES),
       aggregateRateLimitEnabled: true
     });
