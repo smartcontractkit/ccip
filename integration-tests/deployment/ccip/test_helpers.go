@@ -5,11 +5,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
+	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
 	jobv1 "github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/job/v1"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment/memory"
@@ -63,6 +68,9 @@ func NewEnvironmentWithCR(t *testing.T, lggr logger.Logger, numChains int) Deplo
 	})
 	for _, node := range nodes {
 		require.NoError(t, node.App.Start(ctx))
+		t.Cleanup(func() {
+			require.NoError(t, node.App.Stop())
+		})
 	}
 
 	e := memory.NewMemoryEnvironmentFromChainsNodes(t, lggr, chains, nodes)
@@ -108,4 +116,67 @@ func ReplayAllLogs(nodes map[string]memory.Node, chains map[uint64]deployment.Ch
 		}
 	}
 	return nil
+}
+
+func SendRequest(t *testing.T, e deployment.Environment, state CCIPOnChainState, src, dest uint64) uint64 {
+	msg := router.ClientEVM2AnyMessage{
+		Receiver:     common.LeftPadBytes(state.Chains[dest].Receiver.Address().Bytes(), 32),
+		Data:         []byte("hello"),
+		TokenAmounts: nil, // TODO: no tokens for now
+		// Pay native.
+		FeeToken:  common.HexToAddress("0x0"),
+		ExtraArgs: nil, // TODO: no extra args for now, falls back to default
+	}
+	fee, err := state.Chains[src].Router.GetFee(
+		&bind.CallOpts{Context: context.Background()}, dest, msg)
+	require.NoError(t, err, deployment.MaybeDataErr(err))
+
+	t.Logf("Sending CCIP request from chain selector %d to chain selector %d",
+		src, dest)
+	e.Chains[src].DeployerKey.Value = fee
+	tx, err := state.Chains[src].Router.CcipSend(
+		e.Chains[src].DeployerKey,
+		dest,
+		msg)
+	require.NoError(t, err)
+	blockNum, err := e.Chains[src].Confirm(tx.Hash())
+	require.NoError(t, err)
+	it, err := state.Chains[src].OnRamp.FilterCCIPSendRequested(&bind.FilterOpts{
+		Start:   blockNum,
+		End:     &blockNum,
+		Context: context.Background(),
+	}, []uint64{dest})
+	require.NoError(t, err)
+	return it.Event.Message.Header.SequenceNumber
+}
+
+func ConfirmExecution(t *testing.T,
+	source, dest deployment.Chain,
+	offramp *offramp.OffRamp,
+	expectedSeqNr uint64) {
+	tick := time.NewTicker(5 * time.Second)
+	defer tick.Stop()
+	for range tick.C {
+		// TODO: Clean this up
+		source.Client.(*backends.SimulatedBackend).Commit()
+		dest.Client.(*backends.SimulatedBackend).Commit()
+		scc, err := offramp.GetSourceChainConfig(nil, source.Selector)
+		require.NoError(t, err)
+		t.Logf("Waiting for ExecutionStateChanged on chain  %d from chain %d with expected sequence number %d, current onchain minSeqNr: %d",
+			dest.Selector, source.Selector, expectedSeqNr, scc.MinSeqNr)
+		iter, err := offramp.FilterExecutionStateChanged(nil,
+			[]uint64{source.Selector}, []uint64{expectedSeqNr}, nil)
+		require.NoError(t, err)
+		var count int
+		for iter.Next() {
+			if iter.Event.SequenceNumber == expectedSeqNr && iter.Event.SourceChainSelector == source.Selector {
+				count++
+			}
+		}
+		if count == 1 {
+			t.Logf("Received ExecutionStateChanged on chain %d from chain %d with expected sequence number %d",
+				dest.Selector, source.Selector, expectedSeqNr)
+			return
+		}
+	}
 }

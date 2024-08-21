@@ -8,18 +8,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	ccipdeployment "github.com/smartcontractkit/chainlink/integration-tests/deployment/ccip"
 	jobv1 "github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/job/v1"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
-
-	ccipdeployment "github.com/smartcontractkit/chainlink/integration-tests/deployment/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
@@ -78,40 +75,14 @@ func Test0002_InitialDeploy(t *testing.T) {
 	}
 
 	// Send a message from each chain to every other chain.
-	for src, srcChain := range e.Chains {
+	expectedSeqNum := make(map[uint64]uint64)
+	for src := range e.Chains {
 		for dest := range e.Chains {
 			if src == dest {
 				continue
 			}
-			msg := router.ClientEVM2AnyMessage{
-				Receiver:     common.LeftPadBytes(state.Chains[dest].Receiver.Address().Bytes(), 32),
-				Data:         []byte("hello"),
-				TokenAmounts: nil, // TODO: no tokens for now
-				FeeToken:     state.Chains[src].Weth9.Address(),
-				ExtraArgs:    nil, // TODO: no extra args for now, falls back to default
-			}
-			fee, err := state.Chains[src].Router.GetFee(
-				&bind.CallOpts{Context: context.Background()}, dest, msg)
-			require.NoError(t, err, deployment.MaybeDataErr(err))
-			tx, err := state.Chains[src].Weth9.Deposit(&bind.TransactOpts{
-				From:   e.Chains[src].DeployerKey.From,
-				Signer: e.Chains[src].DeployerKey.Signer,
-				Value:  fee,
-			})
-			require.NoError(t, err)
-			require.NoError(t, srcChain.Confirm(tx.Hash()))
-
-			// TODO: should be able to avoid this by using native?
-			tx, err = state.Chains[src].Weth9.Approve(e.Chains[src].DeployerKey,
-				state.Chains[src].Router.Address(), fee)
-			require.NoError(t, err)
-			require.NoError(t, srcChain.Confirm(tx.Hash()))
-
-			t.Logf("Sending CCIP request from chain selector %d to chain selector %d",
-				src, dest)
-			tx, err = state.Chains[src].Router.CcipSend(e.Chains[src].DeployerKey, dest, msg)
-			require.NoError(t, err)
-			require.NoError(t, srcChain.Confirm(tx.Hash()))
+			seqNum := ccipdeployment.SendRequest(t, e, state, src, dest)
+			expectedSeqNum[dest] = seqNum
 		}
 	}
 
@@ -128,7 +99,8 @@ func Test0002_InitialDeploy(t *testing.T) {
 			wg.Add(1)
 			go func(src, dest uint64) {
 				defer wg.Done()
-				waitForCommitWithInterval(t, srcChain, dstChain, state.Chains[dest].OffRamp, ccipocr3.SeqNumRange{1, 1})
+				waitForCommitWithInterval(t, srcChain, dstChain, state.Chains[dest].OffRamp,
+					ccipocr3.SeqNumRange{ccipocr3.SeqNum(expectedSeqNum[dest]), ccipocr3.SeqNum(expectedSeqNum[dest])})
 			}(src, dest)
 		}
 	}
@@ -146,7 +118,9 @@ func Test0002_InitialDeploy(t *testing.T) {
 			wg.Add(1)
 			go func(src, dest deployment.Chain) {
 				defer wg.Done()
-				waitForExecWithSeqNr(t, src, dest, state.Chains[dest.Selector].OffRamp, 1)
+				ccipdeployment.ConfirmExecution(t,
+					src, dest, state.Chains[dest.Selector].OffRamp,
+					expectedSeqNum[dest.Selector])
 			}(srcChain, dstChain)
 		}
 	}
@@ -196,37 +170,6 @@ func waitForCommitWithInterval(
 					}
 				}
 			}
-		}
-	}
-}
-
-func waitForExecWithSeqNr(t *testing.T,
-	source, dest deployment.Chain,
-	offramp *offramp.OffRamp,
-	expectedSeqNr uint64) {
-	tick := time.NewTicker(5 * time.Second)
-	defer tick.Stop()
-	for range tick.C {
-		// TODO: Clean this up
-		source.Client.(*backends.SimulatedBackend).Commit()
-		dest.Client.(*backends.SimulatedBackend).Commit()
-		scc, err := offramp.GetSourceChainConfig(nil, source.Selector)
-		require.NoError(t, err)
-		t.Logf("Waiting for ExecutionStateChanged on chain  %d from chain %d with expected sequence number %d, current onchain minSeqNr: %d",
-			dest.Selector, source.Selector, expectedSeqNr, scc.MinSeqNr)
-		iter, err := offramp.FilterExecutionStateChanged(nil,
-			[]uint64{source.Selector}, []uint64{expectedSeqNr}, nil)
-		require.NoError(t, err)
-		var count int
-		for iter.Next() {
-			if iter.Event.SequenceNumber == expectedSeqNr && iter.Event.SourceChainSelector == source.Selector {
-				count++
-			}
-		}
-		if count == 1 {
-			t.Logf("Received ExecutionStateChanged on chain %d from chain %d with expected sequence number %d",
-				dest.Selector, source.Selector, expectedSeqNr)
-			return
 		}
 	}
 }

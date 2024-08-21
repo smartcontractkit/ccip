@@ -144,7 +144,8 @@ func AddNodes(
 	if err != nil {
 		return err
 	}
-	return chain.Confirm(tx.Hash())
+	_, err = chain.Confirm(tx.Hash())
+	return err
 }
 
 func SetupConfigInfo(chainSelector uint64, readers [][32]byte, fChain uint8, cfg []byte) ccip_config.CCIPConfigTypesChainConfigInfo {

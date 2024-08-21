@@ -11,7 +11,7 @@ import (
 // TestAddLane covers the workflow of adding a lane
 // between existing supported chains in CCIP.
 func TestAddLane(t *testing.T) {
-	e := NewEnvironmentWithCR(t, logger.TestLogger(t), 3)
+	e := NewEnvironmentWithCRAndJobs(t, logger.TestLogger(t), 3)
 	// Here we have CR + nodes set up, but no CCIP contracts deployed.
 	state, err := LoadOnchainState(e.Env, e.Ab)
 	require.NoError(t, err)
@@ -21,7 +21,7 @@ func TestAddLane(t *testing.T) {
 		CCIPOnChainState: state,
 	})
 	require.NoError(t, err)
-	require.NoError(t, ab.Merge(e.Ab))
+	require.NoError(t, e.Ab.Merge(ab))
 
 	// We expect no lanes available on any chain.
 	state, err = LoadOnchainState(e.Env, e.Ab)
@@ -33,5 +33,18 @@ func TestAddLane(t *testing.T) {
 	}
 
 	// Add one lane and send traffic.
-	//from, to := e.Env.AllChainSelectors()[0], e.Env.AllChainSelectors()[1]
+	from, to := e.Env.AllChainSelectors()[0], e.Env.AllChainSelectors()[1]
+	require.NoError(t, AddLane(e.Env, state, from, to))
+
+	for sel, chain := range state.Chains {
+		offRamps, err := chain.Router.GetOffRamps(nil)
+		require.NoError(t, err)
+		if sel == to {
+			require.Len(t, offRamps, 1)
+		} else {
+			require.Len(t, offRamps, 0)
+		}
+	}
+	seqNum := SendRequest(t, e.Env, state, from, to)
+	ConfirmExecution(t, e.Env.Chains[from], e.Env.Chains[to], state.Chains[to].OffRamp, seqNum)
 }
