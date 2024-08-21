@@ -657,11 +657,15 @@ func (lp *logPoller) backgroundWorkerRun() {
 				blockPruneTick = time.After(utils.WithJitter(lp.pollPeriod * 100))
 			}
 		case <-logPruneTick:
+			lp.lggr.Infof("Pruning LogPoller logs...")
 			logPruneTick = time.After(utils.WithJitter(lp.pollPeriod * 2401)) // = 7^5 avoids common factors with 1000
 			allRemoved, err := lp.PruneExpiredLogs(ctx)
-			if !allRemoved {
+			if allRemoved {
+				lp.lggr.Infof("Finished pruning LogPoller logs. Next pruning in ~ %s", lp.pollPeriod*2401)
+			} else {
 				// Tick faster when cleanup can't keep up with the pace of new logs
 				logPruneTick = time.After(utils.WithJitter(lp.pollPeriod * 241))
+				lp.lggr.Warnf("Partially finished pruning LogPoller logs. Will resume in ~ %s", lp.pollPeriod*241)
 			}
 			if err != nil {
 				lp.lggr.Errorw("Unable to prune expired logs", "err", err)
