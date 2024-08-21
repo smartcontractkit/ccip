@@ -70,7 +70,11 @@ contract PriceRegistryHelper is PriceRegistry {
     _validateDestFamilyAddress(chainFamilySelector, destAddress);
   }
 
-  function calculateRebasedValue(uint8 dataFeedDecimal, uint8 tokenDecimal, uint256 feedValue) external pure returns (uint256) {
+  function calculateRebasedValue(
+    uint8 dataFeedDecimal,
+    uint8 tokenDecimal,
+    uint256 feedValue
+  ) external pure returns (uint256) {
     return _calculateRebasedValue(dataFeedDecimal, tokenDecimal, feedValue);
   }
 }
