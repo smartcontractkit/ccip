@@ -905,16 +905,10 @@ TTL = '8h'
 
 [CCIP.Env.Network]
 selected_networks = [
-  'ARBITRUM_SEPOLIA',
   'AVALANCHE_FUJI',
   'OPTIMISM_SEPOLIA',
   'BASE_SEPOLIA',
-  'BSC_TESTNET',
-  'WEMIX_TESTNET',
   'SEPOLIA',
-  'POLYGON_AMOY',
-  'KROMA_SEPOLIA',
-  'BLAST_SEPOLIA'  
 ]
 
 [CCIP.Groups.load]
@@ -932,13 +926,13 @@ NoOfTokensPerChain = 1
 [CCIP.Groups.load.LoadProfile]
 RequestPerUnitTime = [1]
 TimeUnit = '5s'
-TestDuration = '1h'
+TestDuration = '30m'
 TestRunName = 'v2.12.0-ccip1.4.16-load'
 
 # There is slower exec rounds in Sepolia/Ethereum, therefore reducing the frequency
 [CCIP.Groups.load.LoadProfile.FrequencyByDestination.SEPOLIA]
 RequestPerUnitTime = [1]
-TimeUnit = '10s'
+TimeUnit = '20s'
 
 # to represent 20%, 60%, 15%, 5% of the total messages
 [CCIP.Groups.load.LoadProfile.MsgProfile]
