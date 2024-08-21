@@ -156,7 +156,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
 
     if (destChainConfig.allowListEnabled) {
-      if (destChainConfig.allowList.contains(originalSender)) {
+      if (!destChainConfig.allowList.contains(originalSender)) {
         revert SenderNotAllowed(originalSender);
       }
     }
@@ -395,15 +395,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     address[] calldata removes,
     address[] calldata adds
   ) external onlyOwnerOrAllowListAdmin {
-    _applyAllowListUpdates(destinationChainSelector, removes, adds);
-  }
-
-  /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
-  function _applyAllowListUpdates(
-    uint64 destinationChainSelector,
-    address[] memory removes,
-    address[] memory adds
-  ) internal {
     DestChainConfig storage destChainConfig = s_destChainConfigs[destinationChainSelector];
 
     if (!destChainConfig.allowListEnabled) revert AllowListNotEnabled();
