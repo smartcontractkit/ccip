@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -24,7 +25,6 @@ import (
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 	ccipmocks "github.com/smartcontractkit/chainlink/v2/core/services/ccip/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -369,6 +369,7 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 
 	testCases := []struct {
 		name                string
+		destTokens          []cciptypes.Address
 		tokenDecimals       map[cciptypes.Address]uint8
 		sourceNativeToken   cciptypes.Address
 		filterOutTokens     []cciptypes.Address
@@ -427,13 +428,34 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 			expErr:              true,
 		},
 		{
-			name: "price getter returns more prices than requested",
-			tokenDecimals: map[cciptypes.Address]uint8{ // only destination tokens
+			name:       "price getter returns more prices than destTokens",
+			destTokens: []cciptypes.Address{tokens[1]},
+			tokenDecimals: map[cciptypes.Address]uint8{
+				tokens[1]: 18,
+				tokens[2]: 12,
+				tokens[3]: 18,
+			},
+			sourceNativeToken: sourceNativeToken,
+			priceGetterRespData: map[cciptypes.Address]*big.Int{
+				sourceNativeToken: val1e18(100),
+				tokens[1]:         val1e18(200),
+				tokens[2]:         val1e18(300),
+				tokens[3]:         val1e18(400),
+			},
+			expTokenPricesUSD: map[cciptypes.Address]*big.Int{
+				tokens[1]: val1e18(200),
+				tokens[2]: val1e18(300 * 1e6),
+				tokens[3]: val1e18(400),
+			},
+		},
+		{
+			name: "price getter returns more prices with missing decimals",
+			tokenDecimals: map[cciptypes.Address]uint8{
 				tokens[1]: 18,
 				tokens[2]: 12,
 			},
 			sourceNativeToken: sourceNativeToken,
-			priceGetterRespData: map[cciptypes.Address]*big.Int{ // should return all tokens (including source native token)
+			priceGetterRespData: map[cciptypes.Address]*big.Int{
 				sourceNativeToken: val1e18(100),
 				tokens[1]:         val1e18(200),
 				tokens[2]:         val1e18(300),
@@ -482,22 +504,30 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 			defer priceGetter.AssertExpectations(t)
 
 			var destTokens []cciptypes.Address
-			for tk := range tc.tokenDecimals {
-				destTokens = append(destTokens, tk)
+			if len(tc.destTokens) == 0 {
+				for tk := range tc.tokenDecimals {
+					destTokens = append(destTokens, tk)
+				}
+			} else {
+				destTokens = tc.destTokens
 			}
-			sort.Slice(destTokens, func(i, j int) bool {
-				return destTokens[i] < destTokens[j]
+
+			finalDestTokens := make([]cciptypes.Address, 0, len(destTokens))
+			for addr := range tc.priceGetterRespData {
+				if (tc.sourceNativeToken != addr) || (slices.Contains(destTokens, addr)) {
+					finalDestTokens = append(finalDestTokens, addr)
+				}
+			}
+			sort.Slice(finalDestTokens, func(i, j int) bool {
+				return finalDestTokens[i] < finalDestTokens[j]
 			})
+
 			var destDecimals []uint8
-			for _, token := range destTokens {
+			for _, token := range finalDestTokens {
 				destDecimals = append(destDecimals, tc.tokenDecimals[token])
 			}
 
-			queryTokens := ccipcommon.FlattenUniqueSlice(destTokens)
-
-			if len(queryTokens) > 0 {
-				priceGetter.On("TokenPricesUSD", mock.Anything, []cciptypes.Address{}).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
-			}
+			priceGetter.On("TokenPricesUSD", mock.Anything, []cciptypes.Address{}).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
 
 			offRampReader := ccipdatamocks.NewOffRampReader(t)
 			offRampReader.On("GetTokens", mock.Anything).Return(cciptypes.OffRampTokens{
@@ -506,9 +536,9 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 
 			destPriceReg := ccipdatamocks.NewPriceRegistryReader(t)
 			if tc.expDecimalErr {
-				destPriceReg.On("GetTokensDecimals", mock.Anything, mock.Anything).Return(destDecimals, fmt.Errorf("Token not found")).Maybe()
+				destPriceReg.On("GetTokensDecimals", mock.Anything, finalDestTokens).Return([]uint8{}, fmt.Errorf("Token not found")).Maybe()
 			} else {
-				destPriceReg.On("GetTokensDecimals", mock.Anything, destTokens).Return(destDecimals, nil).Maybe()
+				destPriceReg.On("GetTokensDecimals", mock.Anything, finalDestTokens).Return(destDecimals, nil).Maybe()
 			}
 			destPriceReg.On("GetFeeTokens", mock.Anything).Return([]cciptypes.Address{destTokens[0]}, nil).Maybe()
 
