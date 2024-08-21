@@ -935,6 +935,11 @@ TimeUnit = '5s'
 TestDuration = '1h'
 TestRunName = 'v2.12.0-ccip1.4.16-load'
 
+# There is slower exec rounds in Sepolia/Ethereum, therefore reducing the frequency
+[CCIP.Groups.load.LoadProfile.FrequencyByDestination.SEPOLIA]
+RequestPerUnitTime = [1]
+TimeUnit = '10s'
+
 # to represent 20%, 60%, 15%, 5% of the total messages
 [CCIP.Groups.load.LoadProfile.MsgProfile]
 Frequencies = [4,12,3,1]
