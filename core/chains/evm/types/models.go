@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
@@ -107,6 +108,8 @@ func (h *Head) forEach(do func(h *Head) bool) {
 	cur := h
 	fast := h // use Floyd's Cycle-Finding Algo
 	start := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
 	for cur != nil {
 		if !do(cur) {
 			return
@@ -126,7 +129,7 @@ func (h *Head) forEach(do func(h *Head) bool) {
 		// if there is a circular reference eventually `fast` will catch up with `cur`.
 		// As .Parent can be modified by another goroutine, it's possible that
 		// cycle will be created after `fast` reached end of the list. To prevent infinite loop, we use duration based validation
-		if (cur != nil && cur == fast) || time.Since(start) > 10*time.Second {
+		if (cur != nil && cur == fast) || ctx.Err() != nil {
 			// we should log the issue instead of panicking to avoid killing whole node.
 			// we can switch to panic, after full transition to loops.
 			lggr, _ := logger.New()
