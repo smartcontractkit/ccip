@@ -255,9 +255,9 @@ func (_c *PriceRegistryInterface_ApplyDestChainConfigUpdates_Call) RunAndReturn(
 	return _c
 }
 
-// ApplyFeeTokensUpdates provides a mock function with given fields: opts, feeTokensToAdd, feeTokensToRemove
-func (_m *PriceRegistryInterface) ApplyFeeTokensUpdates(opts *bind.TransactOpts, feeTokensToAdd []common.Address, feeTokensToRemove []common.Address) (*types.Transaction, error) {
-	ret := _m.Called(opts, feeTokensToAdd, feeTokensToRemove)
+// ApplyFeeTokensUpdates provides a mock function with given fields: opts, feeTokensToRemove, feeTokensToAdd
+func (_m *PriceRegistryInterface) ApplyFeeTokensUpdates(opts *bind.TransactOpts, feeTokensToRemove []common.Address, feeTokensToAdd []common.Address) (*types.Transaction, error) {
+	ret := _m.Called(opts, feeTokensToRemove, feeTokensToAdd)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ApplyFeeTokensUpdates")
@@ -266,10 +266,10 @@ func (_m *PriceRegistryInterface) ApplyFeeTokensUpdates(opts *bind.TransactOpts,
 	var r0 *types.Transaction
 	var r1 error
 	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []common.Address, []common.Address) (*types.Transaction, error)); ok {
-		return rf(opts, feeTokensToAdd, feeTokensToRemove)
+		return rf(opts, feeTokensToRemove, feeTokensToAdd)
 	}
 	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []common.Address, []common.Address) *types.Transaction); ok {
-		r0 = rf(opts, feeTokensToAdd, feeTokensToRemove)
+		r0 = rf(opts, feeTokensToRemove, feeTokensToAdd)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Transaction)
@@ -277,7 +277,7 @@ func (_m *PriceRegistryInterface) ApplyFeeTokensUpdates(opts *bind.TransactOpts,
 	}
 
 	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []common.Address, []common.Address) error); ok {
-		r1 = rf(opts, feeTokensToAdd, feeTokensToRemove)
+		r1 = rf(opts, feeTokensToRemove, feeTokensToAdd)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -292,13 +292,13 @@ type PriceRegistryInterface_ApplyFeeTokensUpdates_Call struct {
 
 // ApplyFeeTokensUpdates is a helper method to define mock.On call
 //   - opts *bind.TransactOpts
-//   - feeTokensToAdd []common.Address
 //   - feeTokensToRemove []common.Address
-func (_e *PriceRegistryInterface_Expecter) ApplyFeeTokensUpdates(opts interface{}, feeTokensToAdd interface{}, feeTokensToRemove interface{}) *PriceRegistryInterface_ApplyFeeTokensUpdates_Call {
-	return &PriceRegistryInterface_ApplyFeeTokensUpdates_Call{Call: _e.mock.On("ApplyFeeTokensUpdates", opts, feeTokensToAdd, feeTokensToRemove)}
+//   - feeTokensToAdd []common.Address
+func (_e *PriceRegistryInterface_Expecter) ApplyFeeTokensUpdates(opts interface{}, feeTokensToRemove interface{}, feeTokensToAdd interface{}) *PriceRegistryInterface_ApplyFeeTokensUpdates_Call {
+	return &PriceRegistryInterface_ApplyFeeTokensUpdates_Call{Call: _e.mock.On("ApplyFeeTokensUpdates", opts, feeTokensToRemove, feeTokensToAdd)}
 }
 
-func (_c *PriceRegistryInterface_ApplyFeeTokensUpdates_Call) Run(run func(opts *bind.TransactOpts, feeTokensToAdd []common.Address, feeTokensToRemove []common.Address)) *PriceRegistryInterface_ApplyFeeTokensUpdates_Call {
+func (_c *PriceRegistryInterface_ApplyFeeTokensUpdates_Call) Run(run func(opts *bind.TransactOpts, feeTokensToRemove []common.Address, feeTokensToAdd []common.Address)) *PriceRegistryInterface_ApplyFeeTokensUpdates_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(*bind.TransactOpts), args[1].([]common.Address), args[2].([]common.Address))
 	})
@@ -374,9 +374,9 @@ func (_c *PriceRegistryInterface_ApplyPremiumMultiplierWeiPerEthUpdates_Call) Ru
 	return _c
 }
 
-// ApplyTokenTransferFeeConfigUpdates provides a mock function with given fields: opts, tokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs
-func (_m *PriceRegistryInterface) ApplyTokenTransferFeeConfigUpdates(opts *bind.TransactOpts, tokenTransferFeeConfigArgs []price_registry.PriceRegistryTokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs []price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs) (*types.Transaction, error) {
-	ret := _m.Called(opts, tokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs)
+// ApplyTokenTransferFeeConfigUpdates provides a mock function with given fields: opts, tokensToUseDefaultFeeConfigs, tokenTransferFeeConfigArgs
+func (_m *PriceRegistryInterface) ApplyTokenTransferFeeConfigUpdates(opts *bind.TransactOpts, tokensToUseDefaultFeeConfigs []price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs, tokenTransferFeeConfigArgs []price_registry.PriceRegistryTokenTransferFeeConfigArgs) (*types.Transaction, error) {
+	ret := _m.Called(opts, tokensToUseDefaultFeeConfigs, tokenTransferFeeConfigArgs)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ApplyTokenTransferFeeConfigUpdates")
@@ -384,19 +384,19 @@ func (_m *PriceRegistryInterface) ApplyTokenTransferFeeConfigUpdates(opts *bind.
 
 	var r0 *types.Transaction
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []price_registry.PriceRegistryTokenTransferFeeConfigArgs, []price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs) (*types.Transaction, error)); ok {
-		return rf(opts, tokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs)
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs, []price_registry.PriceRegistryTokenTransferFeeConfigArgs) (*types.Transaction, error)); ok {
+		return rf(opts, tokensToUseDefaultFeeConfigs, tokenTransferFeeConfigArgs)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []price_registry.PriceRegistryTokenTransferFeeConfigArgs, []price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs) *types.Transaction); ok {
-		r0 = rf(opts, tokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs)
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs, []price_registry.PriceRegistryTokenTransferFeeConfigArgs) *types.Transaction); ok {
+		r0 = rf(opts, tokensToUseDefaultFeeConfigs, tokenTransferFeeConfigArgs)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Transaction)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []price_registry.PriceRegistryTokenTransferFeeConfigArgs, []price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs) error); ok {
-		r1 = rf(opts, tokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs)
+	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs, []price_registry.PriceRegistryTokenTransferFeeConfigArgs) error); ok {
+		r1 = rf(opts, tokensToUseDefaultFeeConfigs, tokenTransferFeeConfigArgs)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -411,15 +411,15 @@ type PriceRegistryInterface_ApplyTokenTransferFeeConfigUpdates_Call struct {
 
 // ApplyTokenTransferFeeConfigUpdates is a helper method to define mock.On call
 //   - opts *bind.TransactOpts
-//   - tokenTransferFeeConfigArgs []price_registry.PriceRegistryTokenTransferFeeConfigArgs
 //   - tokensToUseDefaultFeeConfigs []price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs
-func (_e *PriceRegistryInterface_Expecter) ApplyTokenTransferFeeConfigUpdates(opts interface{}, tokenTransferFeeConfigArgs interface{}, tokensToUseDefaultFeeConfigs interface{}) *PriceRegistryInterface_ApplyTokenTransferFeeConfigUpdates_Call {
-	return &PriceRegistryInterface_ApplyTokenTransferFeeConfigUpdates_Call{Call: _e.mock.On("ApplyTokenTransferFeeConfigUpdates", opts, tokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs)}
+//   - tokenTransferFeeConfigArgs []price_registry.PriceRegistryTokenTransferFeeConfigArgs
+func (_e *PriceRegistryInterface_Expecter) ApplyTokenTransferFeeConfigUpdates(opts interface{}, tokensToUseDefaultFeeConfigs interface{}, tokenTransferFeeConfigArgs interface{}) *PriceRegistryInterface_ApplyTokenTransferFeeConfigUpdates_Call {
+	return &PriceRegistryInterface_ApplyTokenTransferFeeConfigUpdates_Call{Call: _e.mock.On("ApplyTokenTransferFeeConfigUpdates", opts, tokensToUseDefaultFeeConfigs, tokenTransferFeeConfigArgs)}
 }
 
-func (_c *PriceRegistryInterface_ApplyTokenTransferFeeConfigUpdates_Call) Run(run func(opts *bind.TransactOpts, tokenTransferFeeConfigArgs []price_registry.PriceRegistryTokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs []price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs)) *PriceRegistryInterface_ApplyTokenTransferFeeConfigUpdates_Call {
+func (_c *PriceRegistryInterface_ApplyTokenTransferFeeConfigUpdates_Call) Run(run func(opts *bind.TransactOpts, tokensToUseDefaultFeeConfigs []price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs, tokenTransferFeeConfigArgs []price_registry.PriceRegistryTokenTransferFeeConfigArgs)) *PriceRegistryInterface_ApplyTokenTransferFeeConfigUpdates_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*bind.TransactOpts), args[1].([]price_registry.PriceRegistryTokenTransferFeeConfigArgs), args[2].([]price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs))
+		run(args[0].(*bind.TransactOpts), args[1].([]price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs), args[2].([]price_registry.PriceRegistryTokenTransferFeeConfigArgs))
 	})
 	return _c
 }
@@ -429,7 +429,7 @@ func (_c *PriceRegistryInterface_ApplyTokenTransferFeeConfigUpdates_Call) Return
 	return _c
 }
 
-func (_c *PriceRegistryInterface_ApplyTokenTransferFeeConfigUpdates_Call) RunAndReturn(run func(*bind.TransactOpts, []price_registry.PriceRegistryTokenTransferFeeConfigArgs, []price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs) (*types.Transaction, error)) *PriceRegistryInterface_ApplyTokenTransferFeeConfigUpdates_Call {
+func (_c *PriceRegistryInterface_ApplyTokenTransferFeeConfigUpdates_Call) RunAndReturn(run func(*bind.TransactOpts, []price_registry.PriceRegistryTokenTransferFeeConfigRemoveArgs, []price_registry.PriceRegistryTokenTransferFeeConfigArgs) (*types.Transaction, error)) *PriceRegistryInterface_ApplyTokenTransferFeeConfigUpdates_Call {
 	_c.Call.Return(run)
 	return _c
 }
