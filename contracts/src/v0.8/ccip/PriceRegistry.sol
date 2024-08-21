@@ -342,27 +342,8 @@ contract PriceRegistry is
     if (dataFeedAnswer < 0) {
       revert DataFeedValueOutOfUint224Range();
     }
-    uint256 rebasedValue = uint256(dataFeedAnswer);
-
-    // Rebase formula for units in smallest token denomination: usdValue * (1e18 * 1e18) / 1eTokenDecimals
-    // feedValue * (10 ** (18 - feedDecimals)) * (10 ** (18 - erc20Decimals))
-    // feedValue * (10 ** ((18 - feedDecimals) + (18 - erc20Decimals)))
-    // feedValue * (10 ** (36 - feedDecimals - erc20Decimals))
-    // feedValue * (10 ** (36 - (feedDecimals + erc20Decimals)))
-    // feedValue * (10 ** (36 - excessDecimals))
-    // If excessDecimals > 36 => flip it to feedValue / (10 ** (excessDecimals - 36))
-
-    uint8 excessDecimals = dataFeedContract.decimals() + priceFeedConfig.tokenDecimals;
-
-    if (excessDecimals > 36) {
-      rebasedValue /= 10 ** (excessDecimals - 36);
-    } else {
-      rebasedValue *= 10 ** (36 - excessDecimals);
-    }
-
-    if (rebasedValue > type(uint224).max) {
-      revert DataFeedValueOutOfUint224Range();
-    }
+    uint256 rebasedValue =
+      _calculateRebasedValue(dataFeedContract.decimals(), priceFeedConfig.tokenDecimals, uint256(dataFeedAnswer));
 
     // Data feed staleness is unchecked to decouple the PriceRegistry from data feed delay issues
     return Internal.TimestampedPackedUint224({value: uint224(rebasedValue), timestamp: uint32(block.timestamp)});
@@ -465,16 +446,11 @@ contract PriceRegistry is
     ReceivedCCIPFeedReport[] memory feeds = abi.decode(report, (ReceivedCCIPFeedReport[]));
 
     for (uint256 i = 0; i < feeds.length; ++i) {
-      uint256 rebasedValue = uint256(feeds[i].price);
       uint8 tokenDecimals = s_usdPriceFeedsPerToken[feeds[i].token].tokenDecimals;
       if (tokenDecimals == 0) {
         revert TokenNotSupported(feeds[i].token);
       }
-      if (tokenDecimals > 18) {
-        rebasedValue /= 10 ** (tokenDecimals - 18);
-      } else {
-        rebasedValue *= 10 ** (18 - tokenDecimals);
-      }
+      uint256 rebasedValue = _calculateRebasedValue(18, tokenDecimals, feeds[i].price);
       s_usdPerToken[feeds[i].token] =
         Internal.TimestampedPackedUint224({value: uint224(rebasedValue), timestamp: feeds[i].timestamp});
       emit UsdPerTokenUpdated(feeds[i].token, uint224(rebasedValue), feeds[i].timestamp);
@@ -656,6 +632,27 @@ contract PriceRegistry is
     }
 
     return (tokenTransferFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead);
+  }
+
+  function _calculateRebasedValue(
+    uint8 dataFeedDecimal,
+    uint8 tokenDecimal,
+    uint256 feedValue
+  ) public view returns (uint256) {
+    uint8 excessDecimals = dataFeedDecimal + tokenDecimal;
+    uint256 rebasedValue;
+
+    if (excessDecimals > 36) {
+      rebasedValue = feedValue / (10 ** (excessDecimals - 36));
+    } else {
+      rebasedValue = feedValue * (10 ** (36 - excessDecimals));
+    }
+
+    if (rebasedValue > type(uint224).max) {
+      revert DataFeedValueOutOfUint224Range();
+    }
+
+    return rebasedValue;
   }
 
   /// @notice Returns the estimated data availability cost of the message.
