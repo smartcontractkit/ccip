@@ -92,7 +92,7 @@ jobs:
             id: core_unit
             os: ubuntu22.04-32cores-128GB
             printResults: true
-          - cmd: go_core_ccip_v2_tests
+          - cmd: go_core_ccip_deployment_tests
             id: core_unit
             os: ubuntu22.04-32cores-128GB
             printResults: true
