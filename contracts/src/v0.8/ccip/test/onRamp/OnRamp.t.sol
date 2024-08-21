@@ -412,6 +412,13 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, address(0));
   }
 
+  function test_UnAllowedOriginalSender_Revert() public {
+    vm.stopPrank();
+    vm.startPrank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.SenderNotAllowed.selector, STRANGER));
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, STRANGER);
+  }
+
   function test_MessageValidationError_Revert() public {
     _enableOutboundMessageValidator();
 
@@ -922,12 +929,6 @@ contract OnRamp_allowListConfigUpdates is OnRampSetup {
 
     s_onRamp.applyAllowListUpdates(applyAllowListRequestItems3);
     assertEq(3, s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).allowList.length);
-
-    address[] memory expectedAllowList = new address[](3);
-    expectedAllowList[0] = vm.addr(4);
-    expectedAllowList[1] = vm.addr(5);
-    expectedAllowList[2] = vm.addr(6);
-    // TODO compare unordered arrays (expectedAllowList vs allowedAddressList)
   }
 
   function test_applyAllowList_Revert() public {
