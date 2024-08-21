@@ -8,29 +8,36 @@ import {IMigratableMultiMechanismTokenPool} from "./IMigratableMultiMechanismTok
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
 import {USDCTokenPool} from "../USDC/USDCTokenPool.sol";
-import {MultiMechanismPoolManager} from "./MultiMechanismPoolManager.sol";
 import {USDCBridgeMigrator} from "./USDCBridgeMigrator.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice A token pool for USDC which uses CCTP for supported chains and Lock/Release for all others
 /// @dev The functionality from LockReleaseTokenPool.sol has been duplicated due to lack of compiler support for shared
 /// constructors between parents
 /// @dev The primary token mechanism in this pool is Burn/Mint with CCTP, with Lock/Release as the
 /// secondary, opt in mechanism for chains not currently supporting CCTP.
-contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, MultiMechanismPoolManager, USDCBridgeMigrator {
+contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   using SafeERC20 for IERC20;
+  using EnumerableSet for EnumerableSet.UintSet;
 
   event LiquidityTransferred(address indexed from, uint64 indexed remoteChainSelector, uint256 amount);
 
+  event AltMechanismEnabled(uint64 indexed remoteChainSelector);
+  event AltMechanismDisabled(uint64 indexed remoteChainSelector);
+
   error LanePausedForCCTPMigration(uint64 remoteChainSelector);
+  error CannotUseMechanismAfterMigration(uint64 remoteChainSelector);
 
   /// @notice The address of the rebalancer.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
   /// and CCIP is facilitating mint/burn on all the other chains, in which case the invariant
   /// balanceOf(pool) on home chain >= sum(totalSupply(mint/burn "wrapped" token) on all remote chains) should always hold
-  address internal s_rebalancer;
+  mapping(uint64 remoteChainSelector => address rebalancer) internal s_liquidityProvider;
+
+  mapping(uint64 => bool) internal s_shouldUseAltMech;
 
   constructor(
     ITokenMessenger tokenMessenger,
@@ -39,6 +46,10 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, MultiMechanismPoolMana
     address rmnProxy,
     address router
   ) USDCTokenPool(tokenMessenger, token, allowlist, rmnProxy, router) USDCBridgeMigrator(address(token), router) {}
+
+  // ================================================================
+  // │                   Incoming/Outgoing Mechanisms               |
+  // ================================================================
 
   /// @notice Locks the token in the pool
   /// @dev The _validateLockOrBurn check is an essential security check
@@ -53,22 +64,18 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, MultiMechanismPoolMana
       return super.lockOrBurn(lockOrBurnIn);
     }
 
+    // Circle requires a supply-lock to prevent outgoing messages once the migration process begins.
+    // This prevents new outgoing messages once the migration has begun to ensure any the procedure runs as expected
     if (s_proposedUSDCMigrationChain != 0 && s_proposedUSDCMigrationChain == lockOrBurnIn.remoteChainSelector) {
       revert LanePausedForCCTPMigration(s_proposedUSDCMigrationChain);
     }
 
-    return _altMechOutgoingMessage(lockOrBurnIn);
+    // Additional safety check to prevent messages from using the alternative mechanisms after a migration has finished
+    if (s_executedCCTPChainMigrations.contains(lockOrBurnIn.remoteChainSelector)) {
+      revert CannotUseMechanismAfterMigration(lockOrBurnIn.remoteChainSelector);
+    }
 
-    // if (shouldUseAltMechForOutgoingMessage(lockOrBurnIn.remoteChainSelector, lockOrBurnIn.offchainTokenData)) {
-    //   if (s_proposedUSDCMigrationChain != 0 && s_proposedUSDCMigrationChain == lockOrBurnIn.remoteChainSelector) {
-    //     revert LanePausedForCCTPMigration(s_proposedUSDCMigrationChain);
-    //   } else {
-    //     return _altMechOutgoingMessage(lockOrBurnIn);
-    //   }
-    // } else {
-    //   // Otherwise, use native CCTP functionality
-    //   return super.lockOrBurn(lockOrBurnIn);
-    // }
+    return _lockReleaseOutgoingMessage(lockOrBurnIn);
   }
 
   /// @notice Release tokens from the pool to the recipient
@@ -80,14 +87,14 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, MultiMechanismPoolMana
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
     if (shouldUseAltMechForIncomingMessage(releaseOrMintIn.remoteChainSelector, releaseOrMintIn.offchainTokenData)) {
-      return _altMechIncomingMessage(releaseOrMintIn);
+      return _lockReleaseIncomingMessage(releaseOrMintIn);
     } else {
       return super.releaseOrMint(releaseOrMintIn);
     }
   }
 
   /// @notice Contains the alternative mechanism for incoming tokens, in this implementation is "Release" incoming tokens
-  function _altMechIncomingMessage(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+  function _lockReleaseIncomingMessage(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
     internal
     virtual
     returns (Pool.ReleaseOrMintOutV1 memory)
@@ -99,7 +106,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, MultiMechanismPoolMana
     s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.amount;
 
     // Release to the offRamp, which forwards it to the recipient
-    getToken().safeTransfer(msg.sender, releaseOrMintIn.amount);
+    getToken().safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
     emit Released(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
@@ -107,7 +114,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, MultiMechanismPoolMana
   }
 
   /// @notice Contains the alternative mechanism, in this implementation is "Lock" on outgoing tokens
-  function _altMechOutgoingMessage(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
+  function _lockReleaseOutgoingMessage(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
     internal
     virtual
     returns (Pool.LockOrBurnOutV1 memory)
@@ -122,16 +129,20 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, MultiMechanismPoolMana
     return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
   }
 
+  // ================================================================
+  // │                   Liquidity Management                       |
+  // ================================================================
+
   /// @notice Gets LiquidityManager, can be address(0) if none is configured.
-  /// @return The current liquidity manager.
-  function getRebalancer() external view returns (address) {
-    return s_rebalancer;
+  /// @return The current liquidity manager for the given chain selector
+  function getLiquidityProvider(uint64 remoteChainSelector) external view returns (address) {
+    return s_liquidityProvider[remoteChainSelector];
   }
 
   /// @notice Sets the LiquidityManager address.
   /// @dev Only callable by the owner.
-  function setRebalancer(address rebalancer) external onlyOwner {
-    s_rebalancer = rebalancer;
+  function setLiquidityProvider(uint64 remoteChainSelector, address rebalancer) external onlyOwner {
+    s_liquidityProvider[remoteChainSelector] = rebalancer;
   }
 
   /// @notice Adds liquidity to the pool for a specific chain. The tokens should be approved first.
@@ -141,7 +152,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, MultiMechanismPoolMana
   /// @param remoteChainSelector The chain for which liquidity is provided to. Necessary to ensure there's accurate
   /// parity between locked USDC in this contract and the circulating supply on the remote chain
   function provideLiquidity(uint64 remoteChainSelector, uint256 amount) external {
-    if (s_rebalancer != msg.sender) revert TokenPool.Unauthorized(msg.sender);
+    if (s_liquidityProvider[remoteChainSelector] != msg.sender) revert TokenPool.Unauthorized(msg.sender);
 
     s_lockedTokensByChainSelector[remoteChainSelector] += amount;
 
@@ -157,7 +168,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, MultiMechanismPoolMana
   /// withdrawn on this chain, otherwise a mismatch may occur between locked token balance and remote circulating supply
   /// which may block a potential future migration of the chain to CCTP.
   function withdrawLiquidity(uint64 remoteChainSelector, uint256 amount) external {
-    if (s_rebalancer != msg.sender) revert TokenPool.Unauthorized(msg.sender);
+    if (s_liquidityProvider[remoteChainSelector] != msg.sender) revert TokenPool.Unauthorized(msg.sender);
 
     s_lockedTokensByChainSelector[remoteChainSelector] -= amount;
 
@@ -182,5 +193,49 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, MultiMechanismPoolMana
     s_lockedTokensByChainSelector[remoteChainSelector] += amount;
 
     emit LiquidityTransferred(from, remoteChainSelector, amount);
+  }
+
+  // ================================================================
+  // │                   Alt Mechanisn Logic                        |
+  // ================================================================
+
+  /// @notice Return whether a lane should use the alternative L/R mechanism in the token pool.
+  /// @param destChainSelector the source chain the message was sent from
+  /// @return bool If the alternative L/R mechanism should be used
+  /// @dev Function has been marked virtual and includes an unused calldata parameter in the event that
+  /// more complex logic becomes necessary in the future, especially if logic changes between incoming
+  /// and outgoing messages.
+  /// @dev It is currently assumed that for a given chain selector, s_shouldUseAltMech is always symmetrical for
+  /// incoming and outgoing messages. This may change if the function is overridden
+  function shouldUseAltMechForOutgoingMessage(uint64 destChainSelector) public view virtual returns (bool) {
+    return s_shouldUseAltMech[destChainSelector];
+  }
+
+  /// @notice Return whether a lane should use the alternative L/R mechanism in the token pool.
+  /// @param sourceChainSelector the source chain the message was sent from
+  /// @return bool If the alternative L/R mechanism should be used
+  /// @dev Function has been marked virtual and includes an unused calldata parameter in the event that
+  /// more complex logic becomes necessary in the future, especially if logic changes between incoming
+  /// and outgoing messages.
+  function shouldUseAltMechForIncomingMessage(
+    uint64 sourceChainSelector,
+    bytes calldata
+  ) public view virtual returns (bool) {
+    return s_shouldUseAltMech[sourceChainSelector];
+  }
+
+  /// @notice Updates Updates designations for chains on whether to use primary or alt mechanism on CCIP messages
+  /// @param removes A list of chain selectors to disable Lock-Release, and enforce BM
+  /// @param adds A list of chain selectors to enable LR instead of BM
+  function updateChainSelectorMechanisms(uint64[] calldata removes, uint64[] calldata adds) external onlyOwner {
+    for (uint256 i = 0; i < removes.length; ++i) {
+      delete s_shouldUseAltMech[removes[i]];
+      emit AltMechanismDisabled(removes[i]);
+    }
+
+    for (uint256 i = 0; i < adds.length; ++i) {
+      s_shouldUseAltMech[adds[i]] = true;
+      emit AltMechanismEnabled(adds[i]);
+    }
   }
 }

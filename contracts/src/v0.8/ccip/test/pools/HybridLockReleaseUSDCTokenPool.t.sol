@@ -13,7 +13,6 @@ import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 
 import {HybridLockReleaseUSDCTokenPool} from "../../pools/MultiMechanismPools/HybridLockReleaseUSDCTokenPool.sol";
-import {MultiMechanismPoolManager} from "../../pools/MultiMechanismPools/MultiMechanismPoolManager.sol";
 import {USDCBridgeMigrator} from "../../pools/MultiMechanismPools/USDCBridgeMigrator.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
@@ -84,16 +83,16 @@ contract USDCTokenPoolSetup is BaseTest {
       remotePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       remoteTokenAddress: abi.encode(address(s_token)),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     chainUpdates[1] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       remotePoolAddress: abi.encode(DEST_CHAIN_USDC_POOL),
       remoteTokenAddress: abi.encode(DEST_CHAIN_USDC_TOKEN),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
 
     s_usdcTokenPool.applyChainUpdates(chainUpdates);
@@ -108,7 +107,7 @@ contract USDCTokenPoolSetup is BaseTest {
 
     s_usdcTokenPool.setDomains(domains);
 
-    s_usdcTokenPool.setRebalancer(OWNER);
+    s_usdcTokenPool.setLiquidityProvider(DEST_CHAIN_SELECTOR, OWNER);
   }
 
   function setUpRamps() internal {
@@ -189,8 +188,11 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
       "Alt mech not configured for incoming message from SOURCE_CHAIN_SELECTOR"
     );
 
+    vm.startPrank(OWNER);
+    s_usdcTokenPool.setLiquidityProvider(SOURCE_CHAIN_SELECTOR, OWNER);
+
     // Add 1e12 liquidity so that there's enough to release
-    vm.startPrank(s_usdcTokenPool.getRebalancer());
+    vm.startPrank(s_usdcTokenPool.getLiquidityProvider(SOURCE_CHAIN_SELECTOR));
 
     s_token.approve(address(s_usdcTokenPool), type(uint256).max);
 
@@ -227,14 +229,14 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     assertEq(poolReturnDataV1.destinationAmount, amount, "destinationAmount and actual amount transferred differ");
 
     // Simulate the off-ramp forwarding tokens to the recipient on destination chain
-    s_token.transfer(recipient, amount);
+    // s_token.transfer(recipient, amount);
 
     assertEq(
       s_token.balanceOf(address(s_usdcTokenPool)),
       liquidityAmount - amount,
       "Incorrect remaining liquidity in TokenPool"
     );
-    assertEq(s_token.balanceOf(recipient), amount, "Tokens not transferred to recipient");
+    assertEq(s_token.balanceOf(recipient), amount, "Tokens not transferred to regipient");
   }
 
   function test_LockOrBurn_PrimaryMechanism_Success() public {
@@ -331,7 +333,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     vm.startPrank(OWNER);
 
     vm.expectEmit();
-    emit MultiMechanismPoolManager.AltMechanismDisabled(DEST_CHAIN_SELECTOR);
+    emit HybridLockReleaseUSDCTokenPool.AltMechanismDisabled(DEST_CHAIN_SELECTOR);
 
     s_usdcTokenPool.updateChainSelectorMechanisms(destChainRemoves, new uint64[](0));
 
@@ -349,9 +351,11 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     vm.startPrank(OWNER);
 
     vm.expectEmit();
-    emit MultiMechanismPoolManager.AltMechanismDisabled(SOURCE_CHAIN_SELECTOR);
+    emit HybridLockReleaseUSDCTokenPool.AltMechanismDisabled(SOURCE_CHAIN_SELECTOR);
 
     s_usdcTokenPool.updateChainSelectorMechanisms(destChainRemoves, new uint64[](0));
+
+    s_usdcTokenPool.setLiquidityProvider(SOURCE_CHAIN_SELECTOR, OWNER);
 
     // Test incoming on the primary mechanism after disable alt, simulating Circle's new support for CCTP on
     // DEST_CHAIN_SELECTOR
@@ -364,8 +368,8 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     vm.startPrank(OWNER);
     s_token.approve(address(s_usdcTokenPool), type(uint256).max);
 
-    s_usdcTokenPool.setRebalancer(OWNER);
-    assertEq(s_usdcTokenPool.getRebalancer(), OWNER, "Owner is not Rebalancer");
+    s_usdcTokenPool.setLiquidityProvider(SOURCE_CHAIN_SELECTOR, OWNER);
+    assertEq(s_usdcTokenPool.getLiquidityProvider(SOURCE_CHAIN_SELECTOR), OWNER, "Owner is not Rebalancer");
 
     s_usdcTokenPool.provideLiquidity(SOURCE_CHAIN_SELECTOR, liquidityAmount);
 
@@ -572,10 +576,6 @@ contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
     // Fail because of invalid chain selector 0
     vm.expectRevert(abi.encodeWithSelector(USDCBridgeMigrator.InvalidChainSelector.selector, 0));
     s_usdcTokenPool.proposeCCTPMigration(0);
-
-    // Fail because the router does not support that chain
-    vm.expectRevert(abi.encodeWithSelector(USDCBridgeMigrator.InvalidChainSelector.selector, 1234));
-    s_usdcTokenPool.proposeCCTPMigration(1234);
   }
 
   function test_burnLockedUSDC_invalidPermissions_Revert() public {
@@ -600,7 +600,7 @@ contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
   function test_transferLiquidity_Success() public {
     // Set as the OWNER so we can provide liquidity
     vm.startPrank(OWNER);
-    s_usdcTokenPoolTransferLiquidity.setRebalancer(OWNER);
+    s_usdcTokenPoolTransferLiquidity.setLiquidityProvider(DEST_CHAIN_SELECTOR, OWNER);
 
     s_token.approve(address(s_usdcTokenPoolTransferLiquidity), type(uint256).max);
 
@@ -610,7 +610,7 @@ contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
     s_usdcTokenPoolTransferLiquidity.provideLiquidity(DEST_CHAIN_SELECTOR, liquidityAmount);
 
     // Set the new token pool as the rebalancer
-    s_usdcTokenPoolTransferLiquidity.setRebalancer(address(s_usdcTokenPool));
+    s_usdcTokenPoolTransferLiquidity.setLiquidityProvider(DEST_CHAIN_SELECTOR, address(s_usdcTokenPool));
 
     vm.expectEmit();
     emit ILiquidityContainer.LiquidityRemoved(address(s_usdcTokenPool), liquidityAmount);

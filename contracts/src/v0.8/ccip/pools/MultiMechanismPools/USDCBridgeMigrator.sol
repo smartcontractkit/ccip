@@ -7,6 +7,10 @@ import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v4.8.3/contra
 
 import {Router} from "../../Router.sol";
 
+/// @notice Allows migration of a lane in a token pool from Lock/Release to CCTP supported Burn/Mint. Contract
+/// functionality is based on hard requirements defined by Circle to allow future CCTP compatibility
+/// @dev Once a migration for a lane has occured, it can never be reversed, and CCTP will be the mechanism forever. This
+/// makes the assumption that Circle will continue to support that lane indefinitely.
 abstract contract USDCBridgeMigrator is OwnerIsCreator {
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -57,10 +61,9 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
 
     // Ensure that the chain is supported by CCIP and non-zero, hasn't already been executed on, and is
     // a valid CCIP-supported chain selector
-    if (
-      remoteChainSelector == 0 || s_executedCCTPChainMigrations.contains(remoteChainSelector)
-        || !i_router.isChainSupported(remoteChainSelector)
-    ) revert InvalidChainSelector(remoteChainSelector);
+    if (remoteChainSelector == 0 || s_executedCCTPChainMigrations.contains(remoteChainSelector)) {
+      revert InvalidChainSelector(remoteChainSelector);
+    }
 
     s_proposedUSDCMigrationChain = remoteChainSelector;
 
