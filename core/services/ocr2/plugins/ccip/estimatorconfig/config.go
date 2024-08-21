@@ -7,6 +7,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 )
 
+// FeeEstimatorConfigProvider implements abstract storage for the DataAvailability settings in onRamp dynamic Config.
+// It's implemented to transfer DA config from different entities offRamp, onRamp, commitStore without injecting the
+// strong dependency between modules. ConfigProvider fetch ccip.OnRampReader object reads and returns only relevant
+// fields for the daGasEstimator from the encapsulated onRampReader.
 type FeeEstimatorConfigProvider interface {
 	SetOnRampReader(reader ccip.OnRampReader)
 	GetDataAvailabilityConfig(ctx context.Context) (destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64, err error)

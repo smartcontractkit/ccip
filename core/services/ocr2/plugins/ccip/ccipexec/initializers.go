@@ -25,7 +25,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -93,9 +92,6 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 	if err != nil {
 		return nil, fmt.Errorf("get source wrapped native token: %w", err)
 	}
-
-	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
-	feeEstimatorConfig.SetOnRampReader(onRampReader)
 
 	srcCommitStore, err := srcProvider.NewCommitStoreReader(ctx, offRampConfig.CommitStore)
 	if err != nil {
