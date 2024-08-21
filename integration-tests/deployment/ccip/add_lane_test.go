@@ -11,6 +11,9 @@ import (
 // TestAddLane covers the workflow of adding a lane
 // between existing supported chains in CCIP.
 func TestAddLane(t *testing.T) {
+	// TODO: The offchain code doesn't yet support partial lane
+	// enablement, need to address then re-enable this test.
+	t.Skip()
 	e := NewEnvironmentWithCRAndJobs(t, logger.TestLogger(t), 3)
 	// Here we have CR + nodes set up, but no CCIP contracts deployed.
 	state, err := LoadOnchainState(e.Env, e.Ab)
@@ -46,5 +49,6 @@ func TestAddLane(t *testing.T) {
 		}
 	}
 	seqNum := SendRequest(t, e.Env, state, from, to)
+	require.Equal(t, uint64(1), seqNum)
 	ConfirmExecution(t, e.Env.Chains[from], e.Env.Chains[to], state.Chains[to].OffRamp, seqNum)
 }

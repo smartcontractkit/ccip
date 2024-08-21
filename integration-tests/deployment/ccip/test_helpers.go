@@ -147,6 +147,7 @@ func SendRequest(t *testing.T, e deployment.Environment, state CCIPOnChainState,
 		Context: context.Background(),
 	}, []uint64{dest})
 	require.NoError(t, err)
+	require.True(t, it.Next())
 	return it.Event.Message.Header.SequenceNumber
 }
 
