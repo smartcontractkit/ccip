@@ -222,13 +222,6 @@ func logsQueryWithConfs(clause string, confs evmtypes.Confirmations) string {
 	return withConfs(logsQuery(clause), confs)
 }
 
-func withLimit(clause string, limit int) string {
-	if limit == 0 {
-		return clause
-	}
-	return fmt.Sprintf("%s LIMIT %d", clause, limit)
-}
-
 func (o *DSORM) SelectBlockByHash(ctx context.Context, hash common.Hash) (*LogPollerBlock, error) {
 	var b LogPollerBlock
 	if err := o.ds.GetContext(ctx, &b,
