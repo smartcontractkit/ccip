@@ -30,7 +30,7 @@ contract OnRamp_constructor is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.ConfigSet(staticConfig, dynamicConfig);
     vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, OnRamp.DestChainConfig(0, s_sourceRouter));
+    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
 
     _deployOnRamp(SOURCE_CHAIN_SELECTOR, s_sourceRouter, address(s_outboundNonceManager), address(s_tokenAdminRegistry));
 
@@ -604,7 +604,8 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       priceRegistry: address(23423),
       messageValidator: makeAddr("messageValidator"),
-      feeAggregator: FEE_AGGREGATOR
+      feeAggregator: FEE_AGGREGATOR,
+      allowListAdmin: address(0)
     });
 
     vm.expectEmit();
@@ -622,7 +623,8 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       priceRegistry: address(0),
       feeAggregator: FEE_AGGREGATOR,
-      messageValidator: makeAddr("messageValidator")
+      messageValidator: makeAddr("messageValidator"),
+      allowListAdmin: address(0)
     });
 
     vm.expectRevert(OnRamp.InvalidConfig.selector);
@@ -630,8 +632,12 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
   }
 
   function test_SetConfigInvalidConfig_Revert() public {
-    OnRamp.DynamicConfig memory newConfig =
-      OnRamp.DynamicConfig({priceRegistry: address(23423), messageValidator: address(0), feeAggregator: FEE_AGGREGATOR});
+    OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
+      priceRegistry: address(23423),
+      messageValidator: address(0),
+      feeAggregator: FEE_AGGREGATOR,
+      allowListAdmin: address(0)
+    });
 
     // Invalid price reg reverts.
     newConfig.priceRegistry = address(0);
@@ -640,8 +646,12 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
   }
 
   function test_SetConfigInvalidConfigFeeAggregatorEqAddressZero_Revert() public {
-    OnRamp.DynamicConfig memory newConfig =
-      OnRamp.DynamicConfig({priceRegistry: address(23423), messageValidator: address(0), feeAggregator: address(0)});
+    OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
+      priceRegistry: address(23423),
+      messageValidator: address(0),
+      feeAggregator: address(0),
+      allowListAdmin: address(0)
+    });
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     s_onRamp.setDynamicConfig(newConfig);
   }
@@ -742,7 +752,7 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
 
     // supports disabling a lane by setting a router to zero
     vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, OnRamp.DestChainConfig(0, IRouter(address(0))));
+    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, IRouter(address(0)), false);
     s_onRamp.applyDestChainConfigUpdates(configArgs);
     assertEq(address(0), address(s_onRamp.getRouter(DEST_CHAIN_SELECTOR)));
 
@@ -751,9 +761,9 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
     configArgs[0] = OnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter});
     configArgs[1] = OnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999))});
     vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, OnRamp.DestChainConfig(0, s_sourceRouter));
+    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
     vm.expectEmit();
-    emit OnRamp.DestChainConfigSet(9999, OnRamp.DestChainConfig(0, IRouter(address(9999))));
+    emit OnRamp.DestChainConfigSet(9999, 0, IRouter(address(9999)), false);
     s_onRamp.applyDestChainConfigUpdates(configArgs);
     assertEq(address(s_sourceRouter), address(s_onRamp.getRouter(DEST_CHAIN_SELECTOR)));
     assertEq(address(9999), address(s_onRamp.getRouter(9999)));
@@ -765,12 +775,124 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
     assertEq(numLogs, vm.getRecordedLogs().length); // indicates no changes made
   }
 
-  function test_ApplyDestChainConfigUpdates_WithInalidChainSelector_Revert() external {
+  function test_ApplyDestChainConfigUpdates_WithInvalidChainSelector_Revert() external {
     vm.stopPrank();
     vm.startPrank(OWNER);
     OnRamp.DestChainConfigArgs[] memory configArgs = new OnRamp.DestChainConfigArgs[](1);
     configArgs[0].destChainSelector = 0; // invalid
     vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidDestChainConfig.selector, 0));
     s_onRamp.applyDestChainConfigUpdates(configArgs);
+  }
+}
+
+contract OnRamp_allowListConfigUpdates is OnRampSetup {
+  function test_setAllowListAdmin_Success() public {
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+
+    address allowListAdmin = vm.addr(1);
+    vm.expectEmit();
+    emit OnRamp.AllowListAdminSet(allowListAdmin);
+    s_onRamp.setAllowListAdmin(allowListAdmin);
+  }
+
+  function test_setAllowListAdmin_ByNonOwner_Revert() public {
+    vm.stopPrank();
+    address allowListAdmin = vm.addr(1);
+    vm.startPrank(STRANGER);
+    vm.expectRevert("Only callable by owner");
+    s_onRamp.setAllowListAdmin(allowListAdmin);
+  }
+
+  function test_applyAllowList_Success() public {
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+
+    OnRamp.DestChainConfigArgs[] memory configArgs = new OnRamp.DestChainConfigArgs[](2);
+    configArgs[0] = OnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter});
+    configArgs[1] = OnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999))});
+    vm.expectEmit();
+    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
+    vm.expectEmit();
+    emit OnRamp.DestChainConfigSet(9999, 0, IRouter(address(9999)), false);
+    s_onRamp.applyDestChainConfigUpdates(configArgs);
+
+    uint64[] memory destinationChainSelectors = new uint64[](2);
+    destinationChainSelectors[0] = DEST_CHAIN_SELECTOR;
+    destinationChainSelectors[1] = uint64(99999);
+
+    address[] memory addAllowedList = new address[](4);
+    addAllowedList[0] = vm.addr(1);
+    addAllowedList[1] = vm.addr(2);
+    addAllowedList[2] = vm.addr(3);
+    addAllowedList[3] = vm.addr(4);
+
+    vm.expectEmit();
+    emit OnRamp.AllowListAdded(DEST_CHAIN_SELECTOR, addAllowedList);
+
+    OnRamp.ApplyAllowListRequest memory applyAllowListRequest = OnRamp.ApplyAllowListRequest({
+      allowListEnabled: true,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      newAllowList: addAllowedList,
+      removeAllowList: new address[](0)
+    });
+
+    OnRamp.ApplyAllowListRequest[] memory applyAllowListRequestItems = new OnRamp.ApplyAllowListRequest[](1);
+    applyAllowListRequestItems[0] = applyAllowListRequest;
+
+    s_onRamp.applyAllowListUpdates(applyAllowListRequestItems);
+    assertEq(4, s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).allowList.length);
+
+    assertEq(addAllowedList, s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).allowList);
+
+    address[] memory removeAllowList = new address[](1);
+    removeAllowList[0] = vm.addr(2);
+
+    vm.expectEmit();
+    emit OnRamp.AllowListRemoved(DEST_CHAIN_SELECTOR, removeAllowList);
+
+    applyAllowListRequest = OnRamp.ApplyAllowListRequest({
+      allowListEnabled: true,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      newAllowList: new address[](0),
+      removeAllowList: removeAllowList
+    });
+
+    OnRamp.ApplyAllowListRequest[] memory applyAllowListRequestItems2 = new OnRamp.ApplyAllowListRequest[](1);
+    applyAllowListRequestItems2[0] = applyAllowListRequest;
+
+    s_onRamp.applyAllowListUpdates(applyAllowListRequestItems2);
+    assertEq(3, s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).allowList.length);
+
+    addAllowedList = new address[](2);
+    addAllowedList[0] = vm.addr(5);
+    addAllowedList[1] = vm.addr(6);
+
+    removeAllowList = new address[](2);
+    removeAllowList[0] = vm.addr(1);
+    removeAllowList[1] = vm.addr(3);
+
+    vm.expectEmit();
+    emit OnRamp.AllowListAdded(DEST_CHAIN_SELECTOR, addAllowedList);
+    emit OnRamp.AllowListRemoved(DEST_CHAIN_SELECTOR, removeAllowList);
+
+    applyAllowListRequest = OnRamp.ApplyAllowListRequest({
+      allowListEnabled: true,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      newAllowList: addAllowedList,
+      removeAllowList: removeAllowList
+    });
+
+    OnRamp.ApplyAllowListRequest[] memory applyAllowListRequestItems3 = new OnRamp.ApplyAllowListRequest[](1);
+    applyAllowListRequestItems3[0] = applyAllowListRequest;
+
+    s_onRamp.applyAllowListUpdates(applyAllowListRequestItems3);
+    assertEq(3, s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).allowList.length);
+
+    address[] memory expectedAllowList = new address[](3);
+    expectedAllowList[0] = vm.addr(4);
+    expectedAllowList[1] = vm.addr(5);
+    expectedAllowList[2] = vm.addr(6);
+    // TODO compare unordered arrays (expectedAllowList vs allowedAddressList)
   }
 }

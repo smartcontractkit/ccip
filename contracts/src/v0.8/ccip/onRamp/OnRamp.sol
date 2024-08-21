@@ -19,12 +19,14 @@ import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice The OnRamp is a contract that handles lane-specific fee logic
 /// @dev The OnRamp, MultiCommitStore and OffRamp form an xchain upgradeable unit. Any change to one of them
 /// results an onchain upgrade of all 3.
 contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   using SafeERC20 for IERC20;
+  using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
 
   error CannotSendZeroTokens();
@@ -35,13 +37,24 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   error CursedByRMN(uint64 sourceChainSelector);
   error GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
   error InvalidDestChainConfig(uint64 sourceChainSelector);
+  error OnlyCallableByOwnerOrAllowlistAdmin();
+  error SenderNotAllowed(address sender);
+  error AllowListNotEnabled();
+  error InvalidAllowListRequest(uint64 destChainSelector);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
-  event DestChainConfigSet(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
+  event DestChainConfigSet(
+    uint64 indexed destChainSelector, uint64 sequenceNumber, IRouter router, bool allowListEnabled
+  );
   event FeePaid(address indexed feeToken, uint256 feeValueJuels);
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
   event CCIPSendRequested(uint64 indexed destChainSelector, Internal.EVM2AnyRampMessage message);
+  event AllowListAdminSet(address indexed allowListAdmin);
+  event AllowListDisabled(uint64 destChainSelector);
+  event AllowListEnabled(uint64 destChainSelector);
+  event AllowListAdded(uint64 indexed destChainSelector, address[] allowList);
+  event AllowListRemoved(uint64 indexed destChainSelector, address[] allowList);
 
   /// @dev Struct that contains the static configuration
   /// RMN depends on this struct, if changing, please notify the RMN maintainers.
@@ -59,6 +72,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     address priceRegistry; // Price registry address
     address messageValidator; // Optional message validator to validate outbound messages (zero address = no validator)
     address feeAggregator; // Fee aggregator address
+    address allowListAdmin; // authorized admin to add or remove allowed senders
   }
 
   /// @dev Struct to hold the configs for a destination chain
@@ -66,9 +80,25 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     // The last used sequence number. This is zero in the case where no messages has been sent yet.
     // 0 is not a valid sequence number for any real transaction.
     uint64 sequenceNumber;
+    bool allowListEnabled;
     // This is the local router address that is allowed to send messages to the destination chain.
     // This is NOT the receiving router address on the destination chain.
     IRouter router;
+    // This is the list of addresses allowed to send messages from onRamp
+    EnumerableSet.AddressSet allowList;
+  }
+
+  /// @dev Struct used as a return type for config query on Destination chain
+  struct DestChainConfigInfo {
+    // The last used sequence number. This is zero in the case where no messages has been sent yet.
+    // 0 is not a valid sequence number for any real transaction.
+    uint64 sequenceNumber;
+    bool allowListEnabled;
+    // This is the local router address that is allowed to send messages to the destination chain.
+    // This is NOT the receiving router address on the destination chain.
+    IRouter router;
+    // This is the list of addresses allowed to send messages from onRamp
+    address[] allowList;
   }
 
   /// @dev Same as DestChainConfig but with the destChainSelector so that an array of these
@@ -77,6 +107,15 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector
     IRouter router; // Source router address
+  }
+
+  /// @dev Struct used to apply AllowList for multiple destChainSelectors
+  //solhint-disable gas-struct-packing
+  struct ApplyAllowListRequest {
+    uint64 destChainSelector;
+    bool allowListEnabled;
+    address[] newAllowList;
+    address[] removeAllowList;
   }
 
   // STATIC CONFIG
@@ -138,6 +177,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     address originalSender
   ) external returns (bytes32) {
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+
+    if (destChainConfig.allowListEnabled) {
+      if (!destChainConfig.allowList.contains(originalSender)) {
+        revert SenderNotAllowed(originalSender);
+      }
+    }
 
     // NOTE: assumes the message has already been validated through the getFee call
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
@@ -324,13 +369,76 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
         revert InvalidDestChainConfig(destChainSelector);
       }
 
-      DestChainConfig memory newDestChainConfig = DestChainConfig({
-        sequenceNumber: s_destChainConfigs[destChainSelector].sequenceNumber,
-        router: destChainConfigArg.router
-      });
-      s_destChainConfigs[destChainSelector] = newDestChainConfig;
+      s_destChainConfigs[destChainSelector].router = destChainConfigArg.router;
 
-      emit DestChainConfigSet(destChainSelector, newDestChainConfig);
+      emit DestChainConfigSet(
+        destChainSelector,
+        s_destChainConfigs[destChainSelector].sequenceNumber,
+        s_destChainConfigs[destChainSelector].router,
+        s_destChainConfigs[destChainSelector].allowListEnabled
+      );
+    }
+  }
+
+  // ================================================================
+  // │                          Allowlist                           │
+  // ================================================================
+
+  function getDestChainConfig(uint64 destinationChainSelector) public view returns (DestChainConfigInfo memory) {
+    DestChainConfig storage config = s_destChainConfigs[destinationChainSelector];
+    return DestChainConfigInfo({
+      sequenceNumber: config.sequenceNumber,
+      allowListEnabled: config.allowListEnabled,
+      router: config.router,
+      allowList: config.allowList.values()
+    });
+  }
+
+  function setAllowListAdmin(address allowListAdmin) external onlyOwner {
+    s_dynamicConfig.allowListAdmin = allowListAdmin;
+    emit AllowListAdminSet(allowListAdmin);
+  }
+
+  function applyAllowListUpdates(ApplyAllowListRequest[] calldata applyAllowListRequestItems) external {
+    if (msg.sender != owner()) {
+      if (msg.sender != s_dynamicConfig.allowListAdmin) {
+        revert OnlyCallableByOwnerOrAllowlistAdmin();
+      }
+    }
+
+    for (uint256 i = 0; i < applyAllowListRequestItems.length; ++i) {
+      ApplyAllowListRequest memory applyAllowListRequestItem = applyAllowListRequestItems[i];
+
+      if (!applyAllowListRequestItem.allowListEnabled) {
+        if (applyAllowListRequestItem.newAllowList.length > 0) {
+          revert InvalidAllowListRequest(applyAllowListRequestItem.destChainSelector);
+        }
+      }
+
+      DestChainConfig storage destChainConfig = s_destChainConfigs[applyAllowListRequestItem.destChainSelector];
+      destChainConfig.allowListEnabled = applyAllowListRequestItem.allowListEnabled;
+
+      if (applyAllowListRequestItem.allowListEnabled) {
+        for (uint256 j = 0; j < applyAllowListRequestItem.newAllowList.length; ++j) {
+          address toAdd = applyAllowListRequestItem.newAllowList[j];
+          if (toAdd == address(0)) {
+            continue;
+          }
+          destChainConfig.allowList.add(toAdd);
+        }
+
+        if (applyAllowListRequestItem.newAllowList.length > 0) {
+          emit AllowListAdded(applyAllowListRequestItem.destChainSelector, applyAllowListRequestItem.newAllowList);
+        }
+      }
+
+      for (uint256 k = 0; k < applyAllowListRequestItem.removeAllowList.length; ++k) {
+        destChainConfig.allowList.remove(applyAllowListRequestItem.removeAllowList[k]);
+      }
+
+      if (applyAllowListRequestItem.removeAllowList.length > 0) {
+        emit AllowListRemoved(applyAllowListRequestItem.destChainSelector, applyAllowListRequestItem.removeAllowList);
+      }
     }
   }
 
