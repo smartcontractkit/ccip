@@ -2161,7 +2161,8 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
     uint224 expectedStoredToken2Price = rebaseTokenPrice(report[1].price, 20);
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(onReportTestToken1, expectedStoredToken1Price, block.timestamp);
-    emit PriceRegistry.UsdPerTokenUpdated(onReportTestToken1, expectedStoredToken2Price, block.timestamp);
+    vm.expectEmit();
+    emit PriceRegistry.UsdPerTokenUpdated(onReportTestToken2, expectedStoredToken2Price, block.timestamp);
 
     changePrank(FORWARDER_1);
     s_priceRegistry.onReport(encodedPermissionsMetadata, encodedReport);
