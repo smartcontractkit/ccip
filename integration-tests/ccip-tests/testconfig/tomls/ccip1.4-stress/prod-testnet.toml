@@ -914,7 +914,6 @@ selected_networks = [
 [CCIP.Groups.load]
 NetworkPairs = [
   'AVALANCHE_FUJI,SEPOLIA',
-  'OPTIMISM_SEPOLIA,BASE_SEPOLIA'
 ]
 
 BiDirectionalLane = true
@@ -924,15 +923,14 @@ ExistingDeployment = true
 NoOfTokensPerChain = 1
 
 [CCIP.Groups.load.LoadProfile]
-RequestPerUnitTime = [1]
-TimeUnit = '5s'
-TestDuration = '30m'
+RequestPerUnitTime = [12]
+TimeUnit = '1m'
+TestDuration = '10m'
 TestRunName = 'v2.12.0-ccip1.4.16-load'
 
 # There is slower exec rounds in Sepolia/Ethereum, therefore reducing the frequency
 [CCIP.Groups.load.LoadProfile.FrequencyByDestination.SEPOLIA]
 RequestPerUnitTime = [1]
-TimeUnit = '20s'
 
 # to represent 20%, 60%, 15%, 5% of the total messages
 [CCIP.Groups.load.LoadProfile.MsgProfile]
