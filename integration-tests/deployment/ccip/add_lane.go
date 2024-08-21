@@ -19,13 +19,13 @@ func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) 
 	tx, err := state.Chains[from].Router.ApplyRampUpdates(e.Chains[from].DeployerKey, []router.RouterOnRamp{
 		{
 			DestChainSelector: to,
-			OnRamp:            state.Chains[from].EvmOnRampV160.Address(),
+			OnRamp:            state.Chains[from].OnRamp.Address(),
 		},
 	}, []router.RouterOffRamp{}, []router.RouterOffRamp{})
 	if err := deployment.ConfirmIfNoError(e.Chains[from], tx, err); err != nil {
 		return err
 	}
-	tx, err = state.Chains[from].EvmOnRampV160.ApplyDestChainConfigUpdates(e.Chains[from].DeployerKey,
+	tx, err = state.Chains[from].OnRamp.ApplyDestChainConfigUpdates(e.Chains[from].DeployerKey,
 		[]onramp.OnRampDestChainConfigArgs{
 			{
 				DestChainSelector: to,
@@ -70,13 +70,13 @@ func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) 
 		return err
 	}
 
-	tx, err = state.Chains[to].EvmOffRampV160.ApplySourceChainConfigUpdates(e.Chains[to].DeployerKey,
+	tx, err = state.Chains[to].OffRamp.ApplySourceChainConfigUpdates(e.Chains[to].DeployerKey,
 		[]offramp.OffRampSourceChainConfigArgs{
 			{
 				Router:              state.Chains[to].Router.Address(),
 				SourceChainSelector: from,
 				IsEnabled:           true,
-				OnRamp:              common.LeftPadBytes(state.Chains[from].EvmOnRampV160.Address().Bytes(), 32),
+				OnRamp:              common.LeftPadBytes(state.Chains[from].OnRamp.Address().Bytes(), 32),
 			},
 		})
 	if err := deployment.ConfirmIfNoError(e.Chains[to], tx, err); err != nil {
@@ -85,7 +85,7 @@ func AddLane(e deployment.Environment, state CCIPOnChainState, from, to uint64) 
 	tx, err = state.Chains[to].Router.ApplyRampUpdates(e.Chains[to].DeployerKey, []router.RouterOnRamp{}, []router.RouterOffRamp{}, []router.RouterOffRamp{
 		{
 			SourceChainSelector: from,
-			OffRamp:             state.Chains[to].EvmOffRampV160.Address(),
+			OffRamp:             state.Chains[to].OffRamp.Address(),
 		},
 	})
 	return deployment.ConfirmIfNoError(e.Chains[to], tx, err)

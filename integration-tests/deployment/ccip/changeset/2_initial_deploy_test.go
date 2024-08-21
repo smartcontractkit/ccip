@@ -20,15 +20,13 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 
 	ccipdeployment "github.com/smartcontractkit/chainlink/integration-tests/deployment/ccip"
-	"github.com/smartcontractkit/chainlink/integration-tests/deployment/memory"
-
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 func Test0002_InitialDeploy(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	ctx := ccipdeployment.Context(t)
-	tenv := ccipdeployment.NewDeployedTestEnvironment(t, lggr)
+	tenv := ccipdeployment.NewEnvironmentWithCR(t, lggr, 3)
 	e := tenv.Env
 	nodes := tenv.Nodes
 	chains := e.Chains
@@ -48,7 +46,7 @@ func Test0002_InitialDeploy(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ensure capreg logs are up to date.
-	require.NoError(t, ReplayAllLogs(nodes, chains))
+	require.NoError(t, ccipdeployment.ReplayAllLogs(nodes, chains))
 
 	// Apply the jobs.
 	for nodeID, jobs := range output.JobSpecs {
@@ -67,7 +65,7 @@ func Test0002_InitialDeploy(t *testing.T) {
 	time.Sleep(30 * time.Second)
 
 	// Ensure job related logs are up to date.
-	require.NoError(t, ReplayAllLogs(nodes, chains))
+	require.NoError(t, ccipdeployment.ReplayAllLogs(nodes, chains))
 
 	// Send a request from every router
 	// Add all lanes
@@ -118,6 +116,7 @@ func Test0002_InitialDeploy(t *testing.T) {
 	}
 
 	// Wait for all commit reports to land.
+	cStart := time.Now()
 	var wg sync.WaitGroup
 	for src, srcChain := range e.Chains {
 		for dest, dstChain := range e.Chains {
@@ -129,11 +128,12 @@ func Test0002_InitialDeploy(t *testing.T) {
 			wg.Add(1)
 			go func(src, dest uint64) {
 				defer wg.Done()
-				waitForCommitWithInterval(t, srcChain, dstChain, state.Chains[dest].EvmOffRampV160, ccipocr3.SeqNumRange{1, 1})
+				waitForCommitWithInterval(t, srcChain, dstChain, state.Chains[dest].OffRamp, ccipocr3.SeqNumRange{1, 1})
 			}(src, dest)
 		}
 	}
 	wg.Wait()
+	cEnd := time.Now()
 
 	// Wait for all exec reports to land
 	for src, srcChain := range e.Chains {
@@ -146,24 +146,15 @@ func Test0002_InitialDeploy(t *testing.T) {
 			wg.Add(1)
 			go func(src, dest deployment.Chain) {
 				defer wg.Done()
-				waitForExecWithSeqNr(t, src, dest, state.Chains[dest.Selector].EvmOffRampV160, 1)
+				waitForExecWithSeqNr(t, src, dest, state.Chains[dest.Selector].OffRamp, 1)
 			}(srcChain, dstChain)
 		}
 	}
 	wg.Wait()
-
+	eEnd := time.Now()
+	t.Log("Commit time:", cEnd.Sub(cStart))
+	t.Log("Exec time:", eEnd.Sub(cEnd))
 	// TODO: Apply the proposal.
-}
-
-func ReplayAllLogs(nodes map[string]memory.Node, chains map[uint64]deployment.Chain) error {
-	for _, node := range nodes {
-		for sel := range chains {
-			if err := node.ReplayLogs(map[uint64]uint64{sel: 1}); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func waitForCommitWithInterval(

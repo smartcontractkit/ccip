@@ -3,10 +3,13 @@ package ccipdeployment
 import (
 	"context"
 	"testing"
+	"time"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
+
+	jobv1 "github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/job/v1"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment/memory"
@@ -40,9 +43,9 @@ type DeployedTestEnvironment struct {
 
 // NewDeployedEnvironment creates a new CCIP environment
 // with capreg and nodes set up.
-func NewDeployedTestEnvironment(t *testing.T, lggr logger.Logger) DeployedTestEnvironment {
+func NewEnvironmentWithCR(t *testing.T, lggr logger.Logger, numChains int) DeployedTestEnvironment {
 	ctx := Context(t)
-	chains := memory.NewMemoryChains(t, 3)
+	chains := memory.NewMemoryChains(t, numChains)
 	homeChainSel := uint64(0)
 	homeChainEVM := uint64(0)
 	// Say first chain is home chain.
@@ -69,4 +72,40 @@ func NewDeployedTestEnvironment(t *testing.T, lggr logger.Logger) DeployedTestEn
 		HomeChainSel: homeChainSel,
 		Nodes:        nodes,
 	}
+}
+
+func NewEnvironmentWithCRAndJobs(t *testing.T, lggr logger.Logger, numChains int) DeployedTestEnvironment {
+	ctx := Context(t)
+	e := NewEnvironmentWithCR(t, lggr, numChains)
+	jbs, err := NewCCIPJobSpecs(e.Env.NodeIDs, e.Env.Offchain)
+	require.NoError(t, err)
+	for nodeID, jobs := range jbs {
+		for _, job := range jobs {
+			// Note these auto-accept
+			_, err := e.Env.Offchain.ProposeJob(ctx,
+				&jobv1.ProposeJobRequest{
+					NodeId: nodeID,
+					Spec:   job,
+				})
+			require.NoError(t, err)
+		}
+	}
+	// Wait for plugins to register filters?
+	// TODO: Investigate how to avoid.
+	time.Sleep(30 * time.Second)
+
+	// Ensure job related logs are up to date.
+	require.NoError(t, ReplayAllLogs(e.Nodes, e.Env.Chains))
+	return e
+}
+
+func ReplayAllLogs(nodes map[string]memory.Node, chains map[uint64]deployment.Chain) error {
+	for _, node := range nodes {
+		for sel := range chains {
+			if err := node.ReplayLogs(map[uint64]uint64{sel: 1}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

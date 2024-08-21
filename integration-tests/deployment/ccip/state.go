@@ -27,8 +27,8 @@ import (
 )
 
 type CCIPChainState struct {
-	EvmOnRampV160      *onramp.OnRamp
-	EvmOffRampV160     *offramp.OffRamp
+	OnRamp             *onramp.OnRamp
+	OffRamp            *offramp.OffRamp
 	PriceRegistry      *price_registry.PriceRegistry
 	ArmProxy           *rmn_proxy_contract.RMNProxyContract
 	NonceManager       *nonce_manager.NonceManager
@@ -201,13 +201,13 @@ func LoadChainState(chain deployment.Chain, addresses map[string]deployment.Type
 			if err != nil {
 				return state, err
 			}
-			state.EvmOnRampV160 = onRampC
+			state.OnRamp = onRampC
 		case deployment.NewTypeAndVersion(OffRamp, deployment.Version1_6_0_dev).String():
 			offRamp, err := offramp.NewOffRamp(common.HexToAddress(address), chain.Client)
 			if err != nil {
 				return state, err
 			}
-			state.EvmOffRampV160 = offRamp
+			state.OffRamp = offRamp
 		case deployment.NewTypeAndVersion(ARMProxy, deployment.Version1_0_0).String():
 			armProxy, err := rmn_proxy_contract.NewRMNProxyContract(common.HexToAddress(address), chain.Client)
 			if err != nil {

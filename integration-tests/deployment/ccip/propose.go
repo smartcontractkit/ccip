@@ -37,7 +37,7 @@ func GenerateAcceptOwnershipProposal(
 			return deployment.Proposal{}, err
 		}
 
-		txData, err := state.Chains[sel].EvmOnRampV160.AcceptOwnership(SimTransactOpts())
+		txData, err := state.Chains[sel].OnRamp.AcceptOwnership(SimTransactOpts())
 		if err != nil {
 			return deployment.Proposal{}, err
 		}
@@ -49,7 +49,7 @@ func GenerateAcceptOwnershipProposal(
 			ChainId:  big.NewInt(int64(evmID)),
 			MultiSig: state.Chains[sel].McmsAddr,
 			Nonce:    opCount,
-			To:       state.Chains[sel].EvmOnRampV160.Address(),
+			To:       state.Chains[sel].OnRamp.Address(),
 			Value:    big.NewInt(0),
 			Data:     txData.Data(),
 		})

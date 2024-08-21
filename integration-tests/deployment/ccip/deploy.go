@@ -156,7 +156,7 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 		// Enable ramps on price registry/nonce manager
 		tx, err := chainState.PriceRegistry.ApplyAuthorizedCallerUpdates(chain.DeployerKey, price_registry.AuthorizedCallersAuthorizedCallerArgs{
 			// TODO: We enable the deployer initially to set prices
-			AddedCallers: []common.Address{chainState.EvmOffRampV160.Address(), chain.DeployerKey.From},
+			AddedCallers: []common.Address{chainState.OffRamp.Address(), chain.DeployerKey.From},
 		})
 		if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
 			e.Logger.Errorw("Failed to confirm price registry authorized caller update", "err", err)
@@ -164,13 +164,14 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 		}
 
 		tx, err = chainState.NonceManager.ApplyAuthorizedCallerUpdates(chain.DeployerKey, nonce_manager.AuthorizedCallersAuthorizedCallerArgs{
-			AddedCallers: []common.Address{chainState.EvmOffRampV160.Address(), chainState.EvmOnRampV160.Address()},
+			AddedCallers: []common.Address{chainState.OffRamp.Address(), chainState.OnRamp.Address()},
 		})
 		if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
 			e.Logger.Errorw("Failed to update nonce manager with ramps", "err", err)
 			return ab, err
 		}
 
+		// TODO: Do we want to extract this?
 		// Add chain config for each chain.
 		_, err = AddChainConfig(e.Logger,
 			e.Chains[c.HomeChainSel],
@@ -187,7 +188,7 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 			cr,
 			c.Chains[c.HomeChainSel].CapabilityRegistry,
 			c.Chains[c.HomeChainSel].CCIPConfig,
-			chainState.EvmOffRampV160,
+			chainState.OffRamp,
 			chain,
 			e.Chains[c.HomeChainSel],
 			uint8(len(nodes)/3),

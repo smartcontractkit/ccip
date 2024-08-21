@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"time"
 
@@ -377,7 +378,7 @@ func AddDON(
 	}
 
 	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
-		_, err = offRamp.LatestConfigDetails(&bind.CallOpts{
+		ocrConfig, err := offRamp.LatestConfigDetails(&bind.CallOpts{
 			Context: context.Background(),
 		}, uint8(pluginType))
 		if err != nil {
@@ -386,14 +387,31 @@ func AddDON(
 		}
 		// TODO: assertions to be done as part of full state
 		// resprentation validation CCIP-3047
-		//require.Equalf(t, offrampOCR3Configs[pluginType].ConfigDigest, ocrConfig.ConfigInfo.ConfigDigest, "%s OCR3 config digest mismatch", pluginType.String())
-		//require.Equalf(t, offrampOCR3Configs[pluginType].F, ocrConfig.ConfigInfo.F, "%s OCR3 config F mismatch", pluginType.String())
-		//require.Equalf(t, offrampOCR3Configs[pluginType].IsSignatureVerificationEnabled, ocrConfig.ConfigInfo.IsSignatureVerificationEnabled, "%s OCR3 config signature verification mismatch", pluginType.String())
-		//if pluginType == cctypes.PluginTypeCCIPCommit {
-		//	// only commit will set signers, exec doesn't need them.
-		//	require.Equalf(t, offrampOCR3Configs[pluginType].Signers, ocrConfig.Signers, "%s OCR3 config signers mismatch", pluginType.String())
-		//}
-		//require.Equalf(t, offrampOCR3Configs[pluginType].TransmittersByEVMChainID, ocrConfig.TransmittersByEVMChainID, "%s OCR3 config transmitters mismatch", pluginType.String())
+		if offrampOCR3Configs[pluginType].ConfigDigest != ocrConfig.ConfigInfo.ConfigDigest {
+			return fmt.Errorf("%s OCR3 config digest mismatch", pluginType.String())
+		}
+		if offrampOCR3Configs[pluginType].F != ocrConfig.ConfigInfo.F {
+			return fmt.Errorf("%s OCR3 config F mismatch", pluginType.String())
+		}
+		if offrampOCR3Configs[pluginType].IsSignatureVerificationEnabled != ocrConfig.ConfigInfo.IsSignatureVerificationEnabled {
+			return fmt.Errorf("%s OCR3 config signature verification mismatch", pluginType.String())
+		}
+		if pluginType == cctypes.PluginTypeCCIPCommit {
+			// only commit will set signers, exec doesn't need them.
+			for i, signer := range offrampOCR3Configs[pluginType].Signers {
+				if !bytes.Equal(signer.Bytes(), ocrConfig.Signers[i].Bytes()) {
+					return fmt.Errorf("%s OCR3 config signer mismatch", pluginType.String())
+				}
+			}
+			//if offrampOCR3Configs[pluginType].Signers != ocrConfig.Signers {
+			//	return fmt.Errorf("%s OCR3 config signers mismatch", pluginType.String())
+			//}
+		}
+		for i, transmitter := range offrampOCR3Configs[pluginType].Transmitters {
+			if !bytes.Equal(transmitter.Bytes(), ocrConfig.Transmitters[i].Bytes()) {
+				return fmt.Errorf("%s OCR3 config transmitter mismatch", pluginType.String())
+			}
+		}
 	}
 
 	lggr.Infof("set ocr3 config on the offramp, signers: %+v, transmitters: %+v", signerAddresses, transmitterAddresses)
