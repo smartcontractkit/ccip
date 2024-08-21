@@ -24,6 +24,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
 )
 
+// Batching strategies
+const (
+	BEST_EFFORT_BATCHING_STRATEGY_ID = uint32(0)
+	ZK_OVERFLOW_BATCHING_STRATEGY_ID = uint32(1)
+)
+
 type BatchContext struct {
 	report                     commitReportWithSendRequests
 	inflight                   []InflightInternalExecutionReport
@@ -62,11 +68,11 @@ type ZKOverflowBatchingStrategy struct {
 func NewBatchingStrategy(batchingStrategyID uint32, statusChecker statuschecker.CCIPTransactionStatusChecker) (BatchingStrategy, error) {
 	var batchingStrategy BatchingStrategy
 	switch batchingStrategyID {
-	case 0:
+	case BEST_EFFORT_BATCHING_STRATEGY_ID:
 		batchingStrategy = &BestEffortBatchingStrategy{
 			BatchingStrategyID: batchingStrategyID,
 		}
-	case 1:
+	case ZK_OVERFLOW_BATCHING_STRATEGY_ID:
 		batchingStrategy = &ZKOverflowBatchingStrategy{
 			BatchingStrategyID: batchingStrategyID,
 			statuschecker:      statusChecker,
