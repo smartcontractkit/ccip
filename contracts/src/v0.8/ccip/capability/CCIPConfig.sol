@@ -99,17 +99,19 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   // │                    Config Getters                            │
   // ================================================================
   /// @notice Returns the capabilities registry address.
-  /// @return The capabilities registry address.
-  function getCapabilityRegistry() external view returns (address) {
+  /// @return capabilitiesRegistry The capabilities registry address.
+  function getCapabilityRegistry() external view returns (address capabilitiesRegistry) {
     return i_capabilitiesRegistry;
   }
 
   /// @notice Returns all the chain configurations.
+  /// @param pageIndex The page index.
+  /// @param pageSize The page size.
   /// @return paginatedChainConfigs chain configurations.
   function getAllChainConfigs(
     uint256 pageIndex,
     uint256 pageSize
-  ) external view returns (CCIPConfigTypes.ChainConfigInfo[] memory) {
+  ) external view returns (CCIPConfigTypes.ChainConfigInfo[] memory paginatedChainConfigs) {
     uint256 totalItems = s_remoteChainSelectors.length(); // Total number of chain selectors
     uint256 startIndex = pageIndex * pageSize;
 
@@ -122,8 +124,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
       endIndex = totalItems;
     }
 
-    CCIPConfigTypes.ChainConfigInfo[] memory paginatedChainConfigs =
-      new CCIPConfigTypes.ChainConfigInfo[](endIndex - startIndex);
+    paginatedChainConfigs = new CCIPConfigTypes.ChainConfigInfo[](endIndex - startIndex);
 
     uint256[] memory chainSelectors = s_remoteChainSelectors.values();
     for (uint256 i = startIndex; i < endIndex; ++i) {
@@ -140,11 +141,11 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @notice Returns the OCR configuration for the given don ID and plugin type.
   /// @param donId The DON ID.
   /// @param pluginType The plugin type.
-  /// @return The OCR3 configurations, up to 2 (blue and green).
+  /// @return configs The OCR3 configurations, up to 2 (blue and green).
   function getOCRConfig(
     uint32 donId,
     Internal.OCRPluginType pluginType
-  ) external view returns (CCIPConfigTypes.OCR3ConfigWithMeta[] memory) {
+  ) external view returns (CCIPConfigTypes.OCR3ConfigWithMeta[] memory configs) {
     return s_ocr3Configs[donId][pluginType];
   }
 
@@ -181,6 +182,10 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     }
   }
 
+  /// @notice Sets a new OCR3 config for a specific plugin type for a DON.
+  /// @param donId The DON ID.
+  /// @param pluginType The plugin type.
+  /// @param newConfig The new configuration.
   function _updatePluginConfig(
     uint32 donId,
     Internal.OCRPluginType pluginType,
@@ -213,19 +218,22 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
 
   /// @notice Determine the config state of the configuration from the length of the config.
   /// @param configLen The length of the configuration.
-  /// @return The config state.
-  function _stateFromConfigLength(uint256 configLen) internal pure returns (CCIPConfigTypes.ConfigState) {
+  /// @return configState The config state.
+  function _stateFromConfigLength(uint256 configLen) internal pure returns (CCIPConfigTypes.ConfigState configState) {
     if (configLen > 2) {
       revert InvalidConfigLength(configLen);
     }
     return CCIPConfigTypes.ConfigState(configLen);
   }
 
-  // the only valid state transitions are the following:
-  // init    -> running (first ever config)
-  // running -> staging (blue/green proposal)
-  // staging -> running (promotion)
-  // everything else is invalid and should revert.
+  /// @notice Validates the state transition between two config states.
+  /// The only valid state transitions are the following:
+  /// Init    -> Running (first ever config)
+  /// Running -> Staging (blue/green proposal)
+  /// Staging -> Running (promotion)
+  /// Everything else is invalid and should revert.
+  /// @param currentState The current state.
+  /// @param newState The new state.
   function _validateConfigStateTransition(
     CCIPConfigTypes.ConfigState currentState,
     CCIPConfigTypes.ConfigState newState
@@ -244,6 +252,9 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     revert InvalidConfigStateTransition(currentState, newState);
   }
 
+  /// @notice Validates the transition between two OCR3 configurations.
+  /// @param currentConfig The current configuration with metadata.
+  /// @param newConfigWithMeta The new configuration with metadata.
   function _validateConfigTransition(
     CCIPConfigTypes.OCR3ConfigWithMeta[] memory currentConfig,
     CCIPConfigTypes.OCR3ConfigWithMeta[] memory newConfigWithMeta
@@ -288,14 +299,14 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @param newConfig The new configuration, without metadata.
   /// @param currentState The current state of the configuration.
   /// @param newState The new state of the configuration.
-  /// @return The new configuration with metadata.
+  /// @return newConfigWithMeta The new configuration with metadata.
   function _computeNewConfigWithMeta(
     uint32 donId,
     CCIPConfigTypes.OCR3ConfigWithMeta[] memory currentConfig,
     CCIPConfigTypes.OCR3Config[] memory newConfig,
     CCIPConfigTypes.ConfigState currentState,
     CCIPConfigTypes.ConfigState newState
-  ) internal view returns (CCIPConfigTypes.OCR3ConfigWithMeta[] memory) {
+  ) internal view returns (CCIPConfigTypes.OCR3ConfigWithMeta[] memory newConfigWithMeta) {
     uint64[] memory configCounts = new uint64[](newConfig.length);
 
     // Set config counts based on the only valid state transitions.
@@ -316,8 +327,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
       revert InvalidConfigStateTransition(currentState, newState);
     }
 
-    CCIPConfigTypes.OCR3ConfigWithMeta[] memory newConfigWithMeta =
-      new CCIPConfigTypes.OCR3ConfigWithMeta[](newConfig.length);
+    newConfigWithMeta = new CCIPConfigTypes.OCR3ConfigWithMeta[](newConfig.length);
     for (uint256 i = 0; i < configCounts.length; ++i) {
       _validateConfig(newConfig[i]);
       newConfigWithMeta[i] = CCIPConfigTypes.OCR3ConfigWithMeta({
@@ -332,6 +342,8 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
 
   /// @notice Group the OCR3 configurations by plugin type for further processing.
   /// @param ocr3Configs The OCR3 configurations to group.
+  /// @return commitConfigs The commit configurations.
+  /// @return execConfigs The execution configurations.
   function _groupByPluginType(CCIPConfigTypes.OCR3Config[] memory ocr3Configs)
     internal
     pure
@@ -368,6 +380,8 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     return (commitConfigs, execConfigs);
   }
 
+  /// @notice Validates an OCR3 configuration.
+  /// @param cfg The OCR3 configuration.
   function _validateConfig(CCIPConfigTypes.OCR3Config memory cfg) internal view {
     if (cfg.chainSelector == 0) revert ChainSelectorNotSet();
     if (cfg.pluginType != Internal.OCRPluginType.Commit && cfg.pluginType != Internal.OCRPluginType.Execution) {
@@ -413,12 +427,12 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @param donId The DON ID.
   /// @param configCount The configuration count.
   /// @param ocr3Config The OCR3 configuration.
-  /// @return The computed digest.
+  /// @return computedDigest The computed digest.
   function _computeConfigDigest(
     uint32 donId,
     uint64 configCount,
     CCIPConfigTypes.OCR3Config memory ocr3Config
-  ) internal pure returns (bytes32) {
+  ) internal pure returns (bytes32 computedDigest) {
     uint256 h = uint256(
       keccak256(
         abi.encode(

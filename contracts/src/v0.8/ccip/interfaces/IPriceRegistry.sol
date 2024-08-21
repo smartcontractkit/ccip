@@ -18,22 +18,28 @@ interface IPriceRegistry {
   /// @notice Get the `tokenPrice` for a given token.
   /// @param token The token to get the price for.
   /// @return tokenPrice The tokenPrice for the given token.
-  function getTokenPrice(address token) external view returns (Internal.TimestampedPackedUint224 memory);
+  function getTokenPrice(address token) external view returns (Internal.TimestampedPackedUint224 memory tokenPrice);
 
   /// @notice Get the `tokenPrice` for a given token, checks if the price is valid.
   /// @param token The token to get the price for.
   /// @return tokenPrice The tokenPrice for the given token if it exists and is valid.
-  function getValidatedTokenPrice(address token) external view returns (uint224);
+  function getValidatedTokenPrice(address token) external view returns (uint224 tokenPrice);
 
   /// @notice Get the `tokenPrice` for an array of tokens.
   /// @param tokens The tokens to get prices for.
   /// @return tokenPrices The tokenPrices for the given tokens.
-  function getTokenPrices(address[] calldata tokens) external view returns (Internal.TimestampedPackedUint224[] memory);
+  function getTokenPrices(address[] calldata tokens)
+    external
+    view
+    returns (Internal.TimestampedPackedUint224[] memory tokenPrices);
 
   /// @notice Returns the token price data feed configuration
   /// @param token The token to retrieve the feed config for
-  /// @return dataFeedAddress The token price data feed config (if feed address is 0, the feed config is disabled)
-  function getTokenPriceFeedConfig(address token) external view returns (TokenPriceFeedConfig memory);
+  /// @return tokenPriceFeedConfig The token price data feed config (if feed address is 0, the feed config is disabled)
+  function getTokenPriceFeedConfig(address token)
+    external
+    view
+    returns (TokenPriceFeedConfig memory tokenPriceFeedConfig);
 
   /// @notice Get an encoded `gasPrice` for a given destination chain ID.
   /// The 224-bit result encodes necessary gas price components.
@@ -46,7 +52,7 @@ interface IPriceRegistry {
   function getDestinationChainGasPrice(uint64 destChainSelector)
     external
     view
-    returns (Internal.TimestampedPackedUint224 memory);
+    returns (Internal.TimestampedPackedUint224 memory gasPrice);
 
   /// @notice Gets the fee token price and the gas price, both denominated in dollars.
   /// @param token The source token to get the price for.
@@ -70,8 +76,8 @@ interface IPriceRegistry {
   ) external view returns (uint256 toTokenAmount);
 
   /// @notice Get the list of fee tokens.
-  /// @return The tokens set as fee tokens.
-  function getFeeTokens() external view returns (address[] memory);
+  /// @return feeTokens The tokens set as fee tokens.
+  function getFeeTokens() external view returns (address[] memory feeTokens);
 
   /// @notice Validates the ccip message & returns the fee
   /// @param destChainSelector The destination chain selector.

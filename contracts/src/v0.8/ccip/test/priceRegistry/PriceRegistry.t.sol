@@ -361,23 +361,23 @@ contract PriceRegistry_applyFeeTokensUpdates is PriceRegistrySetup {
     vm.expectEmit();
     emit PriceRegistry.FeeTokenAdded(feeTokens[0]);
 
-    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
+    s_priceRegistry.applyFeeTokensUpdates(new address[](0), feeTokens);
     assertEq(s_priceRegistry.getFeeTokens().length, 3);
     assertEq(s_priceRegistry.getFeeTokens()[2], feeTokens[0]);
 
     // add same feeToken is no-op
-    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
+    s_priceRegistry.applyFeeTokensUpdates(new address[](0), feeTokens);
     assertEq(s_priceRegistry.getFeeTokens().length, 3);
     assertEq(s_priceRegistry.getFeeTokens()[2], feeTokens[0]);
 
     vm.expectEmit();
     emit PriceRegistry.FeeTokenRemoved(feeTokens[0]);
 
-    s_priceRegistry.applyFeeTokensUpdates(new address[](0), feeTokens);
+    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
     assertEq(s_priceRegistry.getFeeTokens().length, 2);
 
     // removing already removed feeToken is no-op
-    s_priceRegistry.applyFeeTokensUpdates(new address[](0), feeTokens);
+    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
     assertEq(s_priceRegistry.getFeeTokens().length, 2);
   }
 
@@ -386,7 +386,7 @@ contract PriceRegistry_applyFeeTokensUpdates is PriceRegistrySetup {
     feeTokens[0] = STRANGER;
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
-    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
+    s_priceRegistry.applyFeeTokensUpdates(new address[](0), feeTokens);
   }
 }
 
@@ -548,7 +548,7 @@ contract PriceRegistry_convertTokenAmount is PriceRegistrySetup {
     address linkToken = address(2);
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = feeToken;
-    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
+    s_priceRegistry.applyFeeTokensUpdates(new address[](0), feeTokens);
 
     Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](2);
     tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: feeToken, usdPerToken: usdPerFeeToken});
@@ -1104,7 +1104,7 @@ contract PriceRegistry_applyTokenTransferFeeConfigUpdates is PriceRegistrySetup 
     }
 
     s_priceRegistry.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0)
+      new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0), tokenTransferFeeConfigArgs
     );
 
     for (uint256 i = 0; i < tokenTransferFeeConfigs.length; ++i) {
@@ -1158,7 +1158,7 @@ contract PriceRegistry_applyTokenTransferFeeConfigUpdates is PriceRegistrySetup 
 
     PriceRegistry.TokenTransferFeeConfigRemoveArgs[] memory tokensToRemove =
       new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0);
-    s_priceRegistry.applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, tokensToRemove);
+    s_priceRegistry.applyTokenTransferFeeConfigUpdates(tokensToRemove, tokenTransferFeeConfigArgs);
 
     PriceRegistry.TokenTransferFeeConfig memory config0 = s_priceRegistry.getTokenTransferFeeConfig(
       tokenTransferFeeConfigArgs[0].destChainSelector, tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token
@@ -1187,7 +1187,7 @@ contract PriceRegistry_applyTokenTransferFeeConfigUpdates is PriceRegistrySetup 
     );
 
     s_priceRegistry.applyTokenTransferFeeConfigUpdates(
-      new PriceRegistry.TokenTransferFeeConfigArgs[](0), tokensToRemove
+      tokensToRemove, new PriceRegistry.TokenTransferFeeConfigArgs[](0)
     );
 
     config0 = s_priceRegistry.getTokenTransferFeeConfig(
@@ -1208,7 +1208,7 @@ contract PriceRegistry_applyTokenTransferFeeConfigUpdates is PriceRegistrySetup 
   function test_ApplyTokenTransferFeeZeroInput() public {
     vm.recordLogs();
     s_priceRegistry.applyTokenTransferFeeConfigUpdates(
-      new PriceRegistry.TokenTransferFeeConfigArgs[](0), new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0)
+      new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0), new PriceRegistry.TokenTransferFeeConfigArgs[](0)
     );
 
     assertEq(vm.getRecordedLogs().length, 0);
@@ -1223,7 +1223,7 @@ contract PriceRegistry_applyTokenTransferFeeConfigUpdates is PriceRegistrySetup 
     vm.expectRevert("Only callable by owner");
 
     s_priceRegistry.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0)
+      new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0), tokenTransferFeeConfigArgs
     );
   }
 
@@ -1251,7 +1251,7 @@ contract PriceRegistry_applyTokenTransferFeeConfigUpdates is PriceRegistrySetup 
     );
 
     s_priceRegistry.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0)
+      new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0), tokenTransferFeeConfigArgs
     );
   }
 }
@@ -1389,7 +1389,7 @@ contract PriceRegistry_getTokenTransferCost is PriceRegistryFeeSetup {
       isEnabled: true
     });
     s_priceRegistry.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0)
+      new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0), tokenTransferFeeConfigArgs
     );
 
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, 1e36);
@@ -1953,7 +1953,7 @@ contract PriceRegistry_validatePoolReturnData is PriceRegistryFeeSetup {
       isEnabled: true
     });
     s_priceRegistry.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0)
+      new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0), tokenTransferFeeConfigArgs
     );
 
     s_priceRegistry.validatePoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
