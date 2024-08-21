@@ -50,7 +50,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error TokenHandlingError(bytes err);
   error ReleaseOrMintBalanceMismatch(uint256 amountReleased, uint256 balancePre, uint256 balancePost);
   error EmptyReport();
-  error CursedByRMN(uint64 sourceChainSelector);
   error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
@@ -342,8 +341,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     uint256[] memory manualExecGasLimits
   ) internal {
     uint64 sourceChainSelector = report.sourceChainSelector;
-    _whenNotCursed(sourceChainSelector);
-
     SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
 
     uint256 numMsgs = report.messages.length;
@@ -605,8 +602,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     for (uint256 i = 0; i < commitReport.merkleRoots.length; ++i) {
       MerkleRoot memory root = commitReport.merkleRoots[i];
       uint64 sourceChainSelector = root.sourceChainSelector;
-
-      _whenNotCursed(sourceChainSelector);
       SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
 
       if (sourceChainConfig.minSeqNr != root.interval.min || root.interval.min > root.interval.max) {
@@ -957,13 +952,5 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   function ccipReceive(Client.Any2EVMMessage calldata) external pure {
     // solhint-disable-next-line
     revert();
-  }
-
-  /// @notice Validates that the source chain -> this chain lane, and reverts if it is cursed
-  /// @param sourceChainSelector Source chain selector to check for cursing
-  function _whenNotCursed(uint64 sourceChainSelector) internal view {
-    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) {
-      revert CursedByRMN(sourceChainSelector);
-    }
   }
 }
