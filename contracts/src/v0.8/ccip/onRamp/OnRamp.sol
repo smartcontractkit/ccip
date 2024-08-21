@@ -40,6 +40,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   error OnlyCallableByOwnerOrAllowlistAdmin();
   error SenderNotAllowed(address sender);
   error AllowListNotEnabled();
+  error InvalidAllowListRequest(uint64 destChainSelector);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event DestChainConfigSet(
@@ -87,12 +88,34 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     EnumerableSet.AddressSet allowList;
   }
 
+  /// @dev Struct used as a return type for config query on Destination chain
+  struct DestChainConfigInfo {
+    // The last used sequence number. This is zero in the case where no messages has been sent yet.
+    // 0 is not a valid sequence number for any real transaction.
+    uint64 sequenceNumber;
+    bool allowListEnabled;
+    // This is the local router address that is allowed to send messages to the destination chain.
+    // This is NOT the receiving router address on the destination chain.
+    IRouter router;
+    // This is the list of addresses allowed to send messages from onRamp
+    address[] allowList;
+  }
+
   /// @dev Same as DestChainConfig but with the destChainSelector so that an array of these
   /// can be passed in the constructor and the applyDestChainConfigUpdates function
   //solhint-disable gas-struct-packing
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector
     IRouter router; // Source router address
+  }
+
+  /// @dev Struct used to apply AllowList for multiple destChainSelectors
+  //solhint-disable gas-struct-packing
+  struct ApplyAllowListRequest {
+    uint64 destChainSelector;
+    bool allowListEnabled;
+    address[] newAllowList;
+    address[] removeAllowList;
   }
 
   // STATIC CONFIG
@@ -361,25 +384,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   // │                          Allowlist                           │
   // ================================================================
 
-  /// @notice Gets whether the allowList functionality is enabled.
-  /// @return true is enabled, false if not.
-  function isAllowListEnabled(uint64 destinationChainSelector) external view returns (bool) {
-    return s_destChainConfigs[destinationChainSelector].allowListEnabled;
-  }
-
-  /// @notice Gets the allowed addresses.
-  /// @return The allowed addresses.
-  function getAllowList(uint64 destinationChainSelector) external view returns (address[] memory) {
-    return s_destChainConfigs[destinationChainSelector].allowList.values();
-  }
-
-  modifier onlyOwnerOrAllowListAdmin() {
-    if (msg.sender != owner()) {
-      if (msg.sender != s_dynamicConfig.allowListAdmin) {
-        revert OnlyCallableByOwnerOrAllowlistAdmin();
-      }
-    }
-    _;
+  function getDestChainConfig(uint64 destinationChainSelector) public view returns (DestChainConfigInfo memory) {
+    DestChainConfig storage config = s_destChainConfigs[destinationChainSelector];
+    return DestChainConfigInfo({
+      sequenceNumber: config.sequenceNumber,
+      allowListEnabled: config.allowListEnabled,
+      router: config.router,
+      allowList: config.allowList.values()
+    });
   }
 
   function setAllowListAdmin(address allowListAdmin) external onlyOwner {
@@ -387,50 +399,46 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     emit AllowListAdminSet(allowListAdmin);
   }
 
-  /// @notice Apply updates to the allow list.
-  /// @param removes The addresses to be removed.
-  /// @param adds The addresses to be added.
-  function applyAllowListUpdates(
-    uint64 destinationChainSelector,
-    address[] calldata removes,
-    address[] calldata adds
-  ) external onlyOwnerOrAllowListAdmin {
-    DestChainConfig storage destChainConfig = s_destChainConfigs[destinationChainSelector];
-
-    if (!destChainConfig.allowListEnabled) revert AllowListNotEnabled();
-
-    for (uint256 i = 0; i < removes.length; ++i) {
-      destChainConfig.allowList.remove(removes[i]);
-    }
-
-    if (removes.length > 0) {
-      emit AllowListRemoved(destinationChainSelector, removes);
-    }
-
-    for (uint256 i = 0; i < adds.length; ++i) {
-      address toAdd = adds[i];
-      if (toAdd == address(0)) {
-        continue;
+  function applyAllowListUpdates(ApplyAllowListRequest[] calldata applyAllowListRequestItems) external {
+    if (msg.sender != owner()) {
+      if (msg.sender != s_dynamicConfig.allowListAdmin) {
+        revert OnlyCallableByOwnerOrAllowlistAdmin();
       }
-      destChainConfig.allowList.add(toAdd);
     }
 
-    if (adds.length > 0) {
-      emit AllowListAdded(destinationChainSelector, adds);
-    }
-  }
+    for (uint256 i = 0; i < applyAllowListRequestItems.length; ++i) {
+      ApplyAllowListRequest memory applyAllowListRequestItem = applyAllowListRequestItems[i];
 
-  function disableAllowList(uint64[] calldata destinationChainSelectors) external onlyOwnerOrAllowListAdmin {
-    for (uint64 i = 0; i < destinationChainSelectors.length; ++i) {
-      s_destChainConfigs[destinationChainSelectors[i]].allowListEnabled = false;
-      emit AllowListDisabled(destinationChainSelectors[i]);
-    }
-  }
+      if (!applyAllowListRequestItem.allowListEnabled) {
+        if (applyAllowListRequestItem.newAllowList.length > 0) {
+          revert InvalidAllowListRequest(applyAllowListRequestItem.destChainSelector);
+        }
+      }
 
-  function enableAllowList(uint64[] calldata destinationChainSelectors) external onlyOwnerOrAllowListAdmin {
-    for (uint64 i = 0; i < destinationChainSelectors.length; ++i) {
-      s_destChainConfigs[destinationChainSelectors[i]].allowListEnabled = true;
-      emit AllowListEnabled(destinationChainSelectors[i]);
+      DestChainConfig storage destChainConfig = s_destChainConfigs[applyAllowListRequestItem.destChainSelector];
+      destChainConfig.allowListEnabled = applyAllowListRequestItem.allowListEnabled;
+
+      if (applyAllowListRequestItem.allowListEnabled) {
+        for (uint256 j = 0; j < applyAllowListRequestItem.newAllowList.length; ++j) {
+          address toAdd = applyAllowListRequestItem.newAllowList[j];
+          if (toAdd == address(0)) {
+            continue;
+          }
+          destChainConfig.allowList.add(toAdd);
+        }
+
+        if (applyAllowListRequestItem.newAllowList.length > 0) {
+          emit AllowListAdded(applyAllowListRequestItem.destChainSelector, applyAllowListRequestItem.newAllowList);
+        }
+      }
+
+      for (uint256 k = 0; k < applyAllowListRequestItem.removeAllowList.length; ++k) {
+        destChainConfig.allowList.remove(applyAllowListRequestItem.removeAllowList[k]);
+      }
+
+      if (applyAllowListRequestItem.removeAllowList.length > 0) {
+        emit AllowListRemoved(applyAllowListRequestItem.destChainSelector, applyAllowListRequestItem.removeAllowList);
+      }
     }
   }
 

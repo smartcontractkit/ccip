@@ -820,7 +820,6 @@ contract OnRamp_allowListConfigUpdates is OnRampSetup {
     uint64[] memory destinationChainSelectors = new uint64[](2);
     destinationChainSelectors[0] = DEST_CHAIN_SELECTOR;
     destinationChainSelectors[1] = uint64(99999);
-    s_onRamp.enableAllowList(destinationChainSelectors);
 
     address[] memory addAllowedList = new address[](4);
     addAllowedList[0] = vm.addr(1);
@@ -831,11 +830,20 @@ contract OnRamp_allowListConfigUpdates is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.AllowListAdded(DEST_CHAIN_SELECTOR, addAllowedList);
 
-    s_onRamp.applyAllowListUpdates(DEST_CHAIN_SELECTOR, new address[](0), addAllowedList);
-    assertEq(4, s_onRamp.getAllowList(DEST_CHAIN_SELECTOR).length);
+    OnRamp.ApplyAllowListRequest memory applyAllowListRequest = OnRamp.ApplyAllowListRequest({
+      allowListEnabled: true,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      newAllowList: addAllowedList,
+      removeAllowList: new address[](0)
+    });
 
-    address[] memory actualAllowedList = s_onRamp.getAllowList(DEST_CHAIN_SELECTOR);
-    assertEq(addAllowedList, actualAllowedList);
+    OnRamp.ApplyAllowListRequest[] memory applyAllowListRequestItems = new OnRamp.ApplyAllowListRequest[](1);
+    applyAllowListRequestItems[0] = applyAllowListRequest;
+
+    s_onRamp.applyAllowListUpdates(applyAllowListRequestItems);
+    assertEq(4, s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).allowList.length);
+
+    assertEq(addAllowedList, s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).allowList);
 
     address[] memory removeAllowList = new address[](1);
     removeAllowList[0] = vm.addr(2);
@@ -843,8 +851,18 @@ contract OnRamp_allowListConfigUpdates is OnRampSetup {
     vm.expectEmit();
     emit OnRamp.AllowListRemoved(DEST_CHAIN_SELECTOR, removeAllowList);
 
-    s_onRamp.applyAllowListUpdates(DEST_CHAIN_SELECTOR, removeAllowList, new address[](0));
-    assertEq(3, s_onRamp.getAllowList(DEST_CHAIN_SELECTOR).length);
+    applyAllowListRequest = OnRamp.ApplyAllowListRequest({
+      allowListEnabled: true,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      newAllowList: new address[](0),
+      removeAllowList: removeAllowList
+    });
+
+    OnRamp.ApplyAllowListRequest[] memory applyAllowListRequestItems2 = new OnRamp.ApplyAllowListRequest[](1);
+    applyAllowListRequestItems2[0] = applyAllowListRequest;
+
+    s_onRamp.applyAllowListUpdates(applyAllowListRequestItems2);
+    assertEq(3, s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).allowList.length);
 
     addAllowedList = new address[](2);
     addAllowedList[0] = vm.addr(5);
@@ -858,8 +876,18 @@ contract OnRamp_allowListConfigUpdates is OnRampSetup {
     emit OnRamp.AllowListAdded(DEST_CHAIN_SELECTOR, addAllowedList);
     emit OnRamp.AllowListRemoved(DEST_CHAIN_SELECTOR, removeAllowList);
 
-    s_onRamp.applyAllowListUpdates(DEST_CHAIN_SELECTOR, removeAllowList, addAllowedList);
-    assertEq(3, s_onRamp.getAllowList(DEST_CHAIN_SELECTOR).length);
+    applyAllowListRequest = OnRamp.ApplyAllowListRequest({
+      allowListEnabled: true,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      newAllowList: addAllowedList,
+      removeAllowList: removeAllowList
+    });
+
+    OnRamp.ApplyAllowListRequest[] memory applyAllowListRequestItems3 = new OnRamp.ApplyAllowListRequest[](1);
+    applyAllowListRequestItems3[0] = applyAllowListRequest;
+
+    s_onRamp.applyAllowListUpdates(applyAllowListRequestItems3);
+    assertEq(3, s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).allowList.length);
 
     address[] memory expectedAllowList = new address[](3);
     expectedAllowList[0] = vm.addr(4);
