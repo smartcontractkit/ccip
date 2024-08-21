@@ -29,7 +29,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   event AltMechanismDisabled(uint64 indexed remoteChainSelector);
 
   error LanePausedForCCTPMigration(uint64 remoteChainSelector);
-  error CannotUseMechanismAfterMigration(uint64 remoteChainSelector);
+  error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
 
   /// @notice The address of the rebalancer.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
@@ -72,7 +72,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     // Additional safety check to prevent messages from using the alternative mechanisms after a migration has finished
     if (s_executedCCTPChainMigrations.contains(lockOrBurnIn.remoteChainSelector)) {
-      revert CannotUseMechanismAfterMigration(lockOrBurnIn.remoteChainSelector);
+      revert TokenLockingNotAllowedAfterMigration(lockOrBurnIn.remoteChainSelector);
     }
 
     return _lockReleaseOutgoingMessage(lockOrBurnIn);

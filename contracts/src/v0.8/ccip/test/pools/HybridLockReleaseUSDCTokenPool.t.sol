@@ -531,7 +531,7 @@ contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
     s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
   }
 
-  function cancelExistingCCTPMigrationProposal() public {
+  function test_cancelExistingCCTPMigrationProposal() public {
     vm.startPrank(OWNER);
 
     vm.expectEmit();
@@ -639,5 +639,54 @@ contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
       liquidityAmount,
       "Liquidity amount of tokens should be new in new pool, but aren't"
     );
+  }
+
+  function test_cannotLockTokensOnMigratedChain_Revert() public {
+    bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
+    uint256 amount = 1e6;
+
+    // Perform a lock-burn, then migrate
+    test_lockOrBurn_then_BurnInCCTPMigration_Success();
+
+    vm.startPrank(s_routerAllowedOnRamp);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        HybridLockReleaseUSDCTokenPool.TokenLockingNotAllowedAfterMigration.selector, DEST_CHAIN_SELECTOR
+      )
+    );
+
+    s_usdcTokenPool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: OWNER,
+        receiver: abi.encodePacked(receiver),
+        amount: amount,
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_token)
+      })
+    );
+  }
+
+  function test_cannotModifyLiquidityWithoutPermissions_Revert() public {
+    address randomAddr = makeAddr("RANDOM");
+
+    vm.startPrank(randomAddr);
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.Unauthorized.selector, randomAddr));
+
+    // Revert because there's insufficient permissions for the DEST_CHAIN_SELECTOR to provide liquidity
+    s_usdcTokenPool.provideLiquidity(DEST_CHAIN_SELECTOR, 1e6);
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.Unauthorized.selector, randomAddr));
+
+    // Revert because there's insufficient permissions for the DEST_CHAIN_SELECTOR to withdraw liquidity
+    s_usdcTokenPool.withdrawLiquidity(DEST_CHAIN_SELECTOR, 1e6);
+  }
+
+  function test_cannotCancelANonExistentMigrationProposal() public {
+    vm.expectRevert(USDCBridgeMigrator.NoExistingMigrationProposal.selector);
+
+    // Proposal to migrate doesn't exist, and so the chain selector is zero, and therefore should revert
+    s_usdcTokenPool.cancelExistingCCTPMigrationProposal();
   }
 }
