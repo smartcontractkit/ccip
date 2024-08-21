@@ -2125,24 +2125,6 @@ contract PriceRegistry_KeystoneSetup is PriceRegistrySetup {
     s_priceRegistry.setReportPermissions(permissions);
     s_priceRegistry.updateTokenPriceFeeds(tokenPriceFeeds);
   }
-
-  function rebaseTokenPrice(uint256 reportedPrice, uint8 tokenDecimals) internal returns (uint224) {
-    // Rebase formula for units in smallest token denomination: usdValue * (1e18 * 1e18) / 1eTokenDecimals
-    // feedValue * (10 ** (18 - feedDecimals)) * (10 ** (18 - erc20Decimals))
-    // feedValue * (10 ** ((18 - feedDecimals) + (18 - erc20Decimals)))
-    // feedValue * (10 ** (36 - feedDecimals - erc20Decimals))
-    // feedValue * (10 ** (36 - (feedDecimals + erc20Decimals)))
-    // feedValue * (10 ** (36 - excessDecimals))
-    // If excessDecimals > 36 => flip it to feedValue / (10 ** (excessDecimals - 36))
-    uint8 excessDecimals = 18 + tokenDecimals;
-
-    if (excessDecimals > 36) {
-      reportedPrice /= 10 ** (excessDecimals - 36);
-    } else {
-      reportedPrice *= 10 ** (36 - excessDecimals);
-    }
-    return uint224(reportedPrice);
-  }
 }
 
 contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
@@ -2157,8 +2139,8 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
       PriceRegistry.ReceivedCCIPFeedReport({token: onReportTestToken2, price: 4e18, timestamp: uint32(block.timestamp)});
 
     bytes memory encodedReport = abi.encode(report);
-    uint224 expectedStoredToken1Price = rebaseTokenPrice(report[0].price, 18);
-    uint224 expectedStoredToken2Price = rebaseTokenPrice(report[1].price, 20);
+    uint224 expectedStoredToken1Price = uint224(s_priceRegistry.calculateRebasedValue(18, 18, report[0].price));
+    uint224 expectedStoredToken2Price = uint224(s_priceRegistry.calculateRebasedValue(18, 20, report[1].price));
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(onReportTestToken1, expectedStoredToken1Price, block.timestamp);
     vm.expectEmit();

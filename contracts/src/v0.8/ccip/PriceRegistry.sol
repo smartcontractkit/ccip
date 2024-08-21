@@ -638,7 +638,7 @@ contract PriceRegistry is
     uint8 dataFeedDecimal,
     uint8 tokenDecimal,
     uint256 feedValue
-  ) public view returns (uint256) {
+  ) internal pure returns (uint256) {
     uint8 excessDecimals = dataFeedDecimal + tokenDecimal;
     uint256 rebasedValue;
 
