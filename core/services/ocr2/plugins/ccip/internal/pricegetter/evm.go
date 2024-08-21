@@ -103,8 +103,13 @@ func (d *DynamicPriceGetter) FilterConfiguredTokens(ctx context.Context, tokens 
 	return configured, unconfigured, nil
 }
 
+// It returns the prices of all tokens defined in the price getter.
+func (d *DynamicPriceGetter) GetJobSpecTokenPricesUSD(ctx context.Context) (map[cciptypes.Address]*big.Int, error) {
+	return d.TokenPricesUSD(ctx, d.getAllTokensDefined())
+}
+
 // TokenPricesUSD implements the PriceGetter interface.
-// It retrieves token prices in USD for all configured tokens in the job spec.
+// It returns static prices stored in the price getter, and batch calls aggregators (one per chain) to retrieve aggregator-based prices.
 func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
 	prices, batchCallsPerChain, err := d.preparePricesAndBatchCallsPerChain(tokens)
 	if err != nil {
@@ -114,6 +119,18 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []ccipty
 		return nil, err
 	}
 	return prices, nil
+}
+
+func (d *DynamicPriceGetter) getAllTokensDefined() []cciptypes.Address {
+	tokens := make([]cciptypes.Address, 0)
+
+	for addr := range d.cfg.AggregatorPrices {
+		tokens = append(tokens, ccipcalc.EvmAddrToGeneric(addr))
+	}
+	for addr := range d.cfg.StaticPrices {
+		tokens = append(tokens, ccipcalc.EvmAddrToGeneric(addr))
+	}
+	return tokens
 }
 
 // performBatchCalls performs batch calls on all chains to retrieve token prices.
@@ -191,27 +208,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, map[uint64]*batchCallsForChain, error) {
 	prices := make(map[cciptypes.Address]*big.Int, len(tokens))
 	batchCallsPerChain := make(map[uint64]*batchCallsForChain)
-
-	var evmAddrs []common.Address
-	var err error
-
-	if len(tokens) == 0 {
-		for addr := range d.cfg.AggregatorPrices {
-			// Fills evmAddrs with all aggregator-based token addresses.
-			evmAddrs = append(evmAddrs, addr)
-		}
-		for tokenAddress, staticCfg := range d.cfg.StaticPrices {
-			// Fill static prices.
-			prices[ccipcalc.EvmAddrToGeneric(tokenAddress)] = staticCfg.Price
-		}
-	} else {
-		// Convert tokens to EVM addresses
-		evmAddrs, err = ccipcalc.GenericAddrsToEvm(tokens...)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
+	evmAddrs, err := ccipcalc.GenericAddrsToEvm(tokens...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -244,7 +241,6 @@ func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []cciptyp
 			return nil, nil, fmt.Errorf("no price resolution rule for token %s", tk.Hex())
 		}
 	}
-
 	return prices, batchCallsPerChain, nil
 }
 

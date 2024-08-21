@@ -314,7 +314,7 @@ func TestPriceService_observeGasPriceUpdates(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			priceGetter := pricegetter.NewMockPriceGetter(t)
+			priceGetter := pricegetter.NewMockAllTokensPriceGetter(t)
 			defer priceGetter.AssertExpectations(t)
 
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
@@ -500,7 +500,7 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			priceGetter := pricegetter.NewMockPriceGetter(t)
+			priceGetter := pricegetter.NewMockAllTokensPriceGetter(t)
 			defer priceGetter.AssertExpectations(t)
 
 			var destTokens []cciptypes.Address
@@ -527,7 +527,7 @@ func TestPriceService_observeTokenPriceUpdates(t *testing.T) {
 				destDecimals = append(destDecimals, tc.tokenDecimals[token])
 			}
 
-			priceGetter.On("TokenPricesUSD", mock.Anything, []cciptypes.Address{}).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
+			priceGetter.On("GetJobSpecTokenPricesUSD", mock.Anything).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
 
 			offRampReader := ccipdatamocks.NewOffRampReader(t)
 			offRampReader.On("GetTokens", mock.Anything).Return(cciptypes.OffRampTokens{
@@ -852,7 +852,7 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 
 	orm := setupORM(t)
 
-	priceGetter := pricegetter.NewMockPriceGetter(t)
+	priceGetter := pricegetter.NewMockAllTokensPriceGetter(t)
 	defer priceGetter.AssertExpectations(t)
 
 	gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
@@ -862,7 +862,7 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 		tokens[0]: val1e18(tokenPrices[0]),
 	}, nil)
 
-	priceGetter.On("TokenPricesUSD", mock.Anything, []cciptypes.Address{}).Return(map[cciptypes.Address]*big.Int{
+	priceGetter.On("GetJobSpecTokenPricesUSD", mock.Anything).Return(map[cciptypes.Address]*big.Int{
 		tokens[0]: val1e18(tokenPrices[0]),
 		tokens[1]: val1e18(tokenPrices[1]),
 		tokens[2]: val1e18(tokenPrices[2]),

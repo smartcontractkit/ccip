@@ -74,7 +74,7 @@ type priceService struct {
 
 	sourceChainSelector     uint64
 	sourceNative            cciptypes.Address
-	priceGetter             pricegetter.PriceGetter
+	priceGetter             pricegetter.AllTokensPriceGetter
 	offRampReader           ccipdata.OffRampReader
 	gasPriceEstimator       prices.GasPriceEstimatorCommit
 	destPriceRegistryReader ccipdata.PriceRegistryReader
@@ -94,7 +94,7 @@ func NewPriceService(
 	sourceChainSelector uint64,
 
 	sourceNative cciptypes.Address,
-	priceGetter pricegetter.PriceGetter,
+	priceGetter pricegetter.AllTokensPriceGetter,
 	offRampReader ccipdata.OffRampReader,
 ) PriceService {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -322,7 +322,6 @@ func (p *priceService) observeGasPriceUpdates(
 		return nil, fmt.Errorf("gasPriceEstimator is not set yet")
 	}
 
-	// Price getter should only return the source native token pricen as the tokens param is not empty
 	// Include wrapped native to identify the source native USD price, notice USD is in 1e18 scale, i.e. $1 = 1e18
 	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, []cciptypes.Address{p.sourceNative})
 
@@ -359,7 +358,7 @@ func (p *priceService) observeGasPriceUpdates(
 }
 
 // All prices are USD ($1=1e18) denominated. All prices must be not nil.
-// Jobspec should have the list of destTokens (ARL, bps, etc) and the sourceNative token.
+// Jobspec should have the destination tokens (Aggregate Rate Limit, Bps) and 1 source token (source native).
 // Not respecting this will error out as we need to fetch the token decimals for all tokens expect sourceNative.
 // destTokens is only used to check if sourceNative has the same address as one of the dest tokens.
 // Return token prices should contain the exact same tokens as in tokenDecimals.
@@ -370,8 +369,7 @@ func (p *priceService) observeTokenPriceUpdates(
 	if p.destPriceRegistryReader == nil {
 		return nil, fmt.Errorf("destPriceRegistry is not set yet")
 	}
-	// Price getter should return all token prices in USD, including source native token (as the tokens param is empty)
-	rawTokenPricesUSD, err := p.priceGetter.TokenPricesUSD(ctx, []cciptypes.Address{})
+	rawTokenPricesUSD, err := p.priceGetter.GetJobSpecTokenPricesUSD(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch token prices: %w", err)
 	}
