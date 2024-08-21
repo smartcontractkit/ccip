@@ -151,7 +151,7 @@ func TestParsingDifferentFormats(t *testing.T) {
 			`, token.URL, strings.ToLower(address.String()))
 
 			prices, err := newTestPipelineGetter(t, source).
-				TokenPricesUSD(context.Background(), []cciptypes.Address{})
+				TokenPricesUSD(context.Background(), []cciptypes.Address{ccipcalc.EvmAddrToGeneric(address)})
 
 			if tt.expectedError {
 				require.Error(t, err)
