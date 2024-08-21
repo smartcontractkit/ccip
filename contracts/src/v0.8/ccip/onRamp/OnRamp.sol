@@ -178,15 +178,16 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   ) external returns (bytes32) {
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
 
+    // NOTE: assumes the message has already been validated through the getFee call
+    // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
+    if (originalSender == address(0)) revert RouterMustSetOriginalSender();
+
     if (destChainConfig.allowListEnabled) {
       if (!destChainConfig.allowList.contains(originalSender)) {
         revert SenderNotAllowed(originalSender);
       }
     }
 
-    // NOTE: assumes the message has already been validated through the getFee call
-    // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
-    if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause.
     if (msg.sender != address(destChainConfig.router)) revert MustBeCalledByRouter();
 

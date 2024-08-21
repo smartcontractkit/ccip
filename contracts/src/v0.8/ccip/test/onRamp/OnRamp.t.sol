@@ -117,6 +117,20 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     feeTokens[0] = s_sourceTokens[1];
     s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
 
+    uint64[] memory destinationChainSelectors = new uint64[](1);
+    destinationChainSelectors[0] = DEST_CHAIN_SELECTOR;
+    address[] memory addAllowedList = new address[](1);
+    addAllowedList[0] = OWNER;
+    OnRamp.ApplyAllowListRequest memory applyAllowListRequest = OnRamp.ApplyAllowListRequest({
+      allowListEnabled: true,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      newAllowList: addAllowedList,
+      removeAllowList: new address[](0)
+    });
+    OnRamp.ApplyAllowListRequest[] memory applyAllowListRequestItems = new OnRamp.ApplyAllowListRequest[](1);
+    applyAllowListRequestItems[0] = applyAllowListRequest;
+    s_onRamp.applyAllowListUpdates(applyAllowListRequestItems);
+
     // Since we'll mostly be testing for valid calls from the router we'll
     // mock all calls to be originating from the router and re-mock in
     // tests that require failure.
@@ -308,6 +322,25 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     vm.assume(originalSender != address(0));
     vm.assume(uint160(receiver) >= Internal.PRECOMPILE_SPACE);
     feeTokenAmount = uint96(bound(feeTokenAmount, 0, MAX_MSG_FEES_JUELS));
+    vm.stopPrank();
+
+    vm.startPrank(OWNER);
+    uint64[] memory destinationChainSelectors = new uint64[](1);
+    destinationChainSelectors[0] = uint64(DEST_CHAIN_SELECTOR);
+    address[] memory addAllowedList = new address[](1);
+    addAllowedList[0] = originalSender;
+    OnRamp.ApplyAllowListRequest memory applyAllowListRequest = OnRamp.ApplyAllowListRequest({
+      allowListEnabled: true,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      newAllowList: addAllowedList,
+      removeAllowList: new address[](0)
+    });
+    OnRamp.ApplyAllowListRequest[] memory applyAllowListRequestItems = new OnRamp.ApplyAllowListRequest[](1);
+    applyAllowListRequestItems[0] = applyAllowListRequest;
+    s_onRamp.applyAllowListUpdates(applyAllowListRequestItems);
+    vm.stopPrank();
+
+    vm.startPrank(address(s_sourceRouter));
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.receiver = abi.encode(receiver);
@@ -398,13 +431,13 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
 
-  function test_CannotSendZeroTokens_Revert() public {
+  function test_MultiCannotSendZeroTokens_Revert() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokenAmounts = new Client.EVMTokenAmount[](1);
     message.tokenAmounts[0].amount = 0;
     message.tokenAmounts[0].token = s_sourceTokens[0];
     vm.expectRevert(OnRamp.CannotSendZeroTokens.selector);
-    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, STRANGER);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
 
   function test_UnsupportedToken_Revert() public {
