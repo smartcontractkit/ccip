@@ -864,9 +864,10 @@ contract OnRamp_allowListConfigUpdates is OnRampSetup {
     s_onRamp.applyAllowListUpdates(applyAllowListRequestItems2);
     assertEq(3, s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).allowList.length);
 
-    addAllowedList = new address[](2);
+    addAllowedList = new address[](3);
     addAllowedList[0] = vm.addr(5);
     addAllowedList[1] = vm.addr(6);
+    addAllowedList[2] = address(0);
 
     removeAllowList = new address[](2);
     removeAllowList[0] = vm.addr(1);
@@ -894,5 +895,48 @@ contract OnRamp_allowListConfigUpdates is OnRampSetup {
     expectedAllowList[1] = vm.addr(5);
     expectedAllowList[2] = vm.addr(6);
     // TODO compare unordered arrays (expectedAllowList vs allowedAddressList)
+  }
+
+  function test_applyAllowList_Revert() public {
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+
+    OnRamp.DestChainConfigArgs[] memory configArgs = new OnRamp.DestChainConfigArgs[](2);
+    configArgs[0] = OnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter});
+    configArgs[1] = OnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999))});
+    vm.expectEmit();
+    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
+    vm.expectEmit();
+    emit OnRamp.DestChainConfigSet(9999, 0, IRouter(address(9999)), false);
+    s_onRamp.applyDestChainConfigUpdates(configArgs);
+
+    uint64[] memory destinationChainSelectors = new uint64[](2);
+    destinationChainSelectors[0] = DEST_CHAIN_SELECTOR;
+    destinationChainSelectors[1] = uint64(99999);
+
+    address[] memory addAllowedList = new address[](4);
+    addAllowedList[0] = vm.addr(1);
+    addAllowedList[1] = vm.addr(2);
+    addAllowedList[2] = vm.addr(3);
+    addAllowedList[3] = vm.addr(4);
+
+    OnRamp.ApplyAllowListRequest memory applyAllowListRequest = OnRamp.ApplyAllowListRequest({
+      allowListEnabled: false,
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      newAllowList: addAllowedList,
+      removeAllowList: new address[](0)
+    });
+
+    OnRamp.ApplyAllowListRequest[] memory applyAllowListRequestItems = new OnRamp.ApplyAllowListRequest[](1);
+    applyAllowListRequestItems[0] = applyAllowListRequest;
+
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.InvalidAllowListRequest.selector, DEST_CHAIN_SELECTOR));
+    s_onRamp.applyAllowListUpdates(applyAllowListRequestItems);
+    vm.stopPrank();
+
+    vm.startPrank(STRANGER);
+    vm.expectRevert(OnRamp.OnlyCallableByOwnerOrAllowlistAdmin.selector);
+    s_onRamp.applyAllowListUpdates(applyAllowListRequestItems);
+    vm.stopPrank();
   }
 }
