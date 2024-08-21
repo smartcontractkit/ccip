@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {KeystoneFeedsPermissionHandler} from "../../../keystone/KeystoneFeedsPermissionHandler.sol";
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {MockV3Aggregator} from "../../../tests/MockV3Aggregator.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
+import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "../../libraries/USDPriceWith18Decimals.sol";
 import {PriceRegistryHelper} from "../helpers/PriceRegistryHelper.sol";
 import {PriceRegistryFeeSetup, PriceRegistrySetup} from "./PriceRegistrySetup.t.sol";
-import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
-import {KeystoneFeedsPermissionHandler} from "../../../keystone/KeystoneFeedsPermissionHandler.sol";
+
 import {Vm} from "forge-std/Vm.sol";
 
 contract PriceRegistry_constructor is PriceRegistrySetup {
