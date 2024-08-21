@@ -9,8 +9,7 @@ import {Router} from "../../Router.sol";
 
 /// @notice Allows migration of a lane in a token pool from Lock/Release to CCTP supported Burn/Mint. Contract
 /// functionality is based on hard requirements defined by Circle to allow future CCTP compatibility
-/// @dev Once a migration for a lane has occured, it can never be reversed, and CCTP will be the mechanism forever. This
-/// makes the assumption that Circle will continue to support that lane indefinitely.
+/// @dev Once a migration for a lane has occured, it can never be reversed, and CCTP will be the mechanism forever. This makes the assumption that Circle will continue to support that lane indefinitely.
 abstract contract USDCBridgeMigrator is OwnerIsCreator {
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -37,6 +36,10 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
     i_router = Router(router);
   }
 
+  /// @notice Burn USDC locked for a specific lane so that destination USDC can be converted from 
+  /// non-canonical to canonical USDC.
+  /// @dev This function can only be called by an address specified by the owner to be controlled by circle
+  /// @dev proposeCCTPMigration must be called first on an approved lane to execute properly.
   function burnLockedUSDC() public {
     if (msg.sender != s_circleUSDCMigrator) revert onlyCircle();
     if (s_proposedUSDCMigrationChain == 0) revert ExistingMigrationProposal();
@@ -55,6 +58,12 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
     emit CCTPMigrationExecuted(burnChainSelector, tokensToBurn);
   }
 
+  /// @notice Propose a destination chain to migrate from lock/release mechanism to CCTP enabled burn/mint
+  /// through a Circle controlled burn.
+  /// @param remoteChainSelector the CCIP specific selector for the remote chain currently using a 
+  /// non-canonical form of USDC which they wish to update to canonical. Function will revert if the chain
+  /// selector is zero, or if a migration has already occured for the specified selector.
+  /// @dev This function can only be called by the owner
   function proposeCCTPMigration(uint64 remoteChainSelector) external onlyOwner {
     // Prevent overwriting existing migration proposals until the current one is finished
     if (s_proposedUSDCMigrationChain != 0) revert ExistingMigrationProposal();
@@ -80,16 +89,25 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
     emit CCTPMigrationCancelled(currentProposalChainSelector);
   }
 
+  /// @notice retrieve the chain selector for an ongoing CCTP migration in progress. 
+  /// @return uint64 the chain selector of the lane to be migrated. Will be zero if no proposal currently
+  /// exists
   function getCurrentProposedCCTPChainMigration() public view returns (uint64) {
     return s_proposedUSDCMigrationChain;
   }
 
+  /// @notice Set the address of the circle-controlled wallet which will execute a CCTP lane migration
   /// @dev The function should only be invoked once the address has been confirmed by Circle prior to
   /// chain expansion.
   function setCircleMigratorAddress(address migrator) external onlyOwner {
     s_circleUSDCMigrator = migrator;
   }
 
+  /// @notice Retrieve the amount of canonical USDC locked into this lane and minted on the destination
+  /// @param remoteChainSelector the CCIP specific destination chain implementing a mintable and
+  /// non-canonical form of USDC at present.
+  /// @return uint256 the amount of USDC locked into the specified lane. If non-zero, the number 
+  /// should match the current circulating supply of USDC on the destination chain
   function getLockedTokensForChain(uint64 remoteChainSelector) public view returns (uint256) {
     return s_lockedTokensByChainSelector[remoteChainSelector];
   }
