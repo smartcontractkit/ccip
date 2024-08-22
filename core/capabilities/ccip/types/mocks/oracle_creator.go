@@ -78,9 +78,9 @@ func (_c *OracleCreator_CreateBootstrapOracle_Call) RunAndReturn(run func(types.
 	return _c
 }
 
-// CreatePluginOracle provides a mock function with given fields: pluginType, config
-func (_m *OracleCreator) CreatePluginOracle(pluginType types.PluginType, config types.OCR3ConfigWithMeta) (types.CCIPOracle, error) {
-	ret := _m.Called(pluginType, config)
+// CreatePluginOracle provides a mock function with given fields: config
+func (_m *OracleCreator) CreatePluginOracle(config types.OCR3ConfigWithMeta) (types.CCIPOracle, error) {
+	ret := _m.Called(config)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreatePluginOracle")
@@ -88,19 +88,19 @@ func (_m *OracleCreator) CreatePluginOracle(pluginType types.PluginType, config 
 
 	var r0 types.CCIPOracle
 	var r1 error
-	if rf, ok := ret.Get(0).(func(types.PluginType, types.OCR3ConfigWithMeta) (types.CCIPOracle, error)); ok {
-		return rf(pluginType, config)
+	if rf, ok := ret.Get(0).(func(types.OCR3ConfigWithMeta) (types.CCIPOracle, error)); ok {
+		return rf(config)
 	}
-	if rf, ok := ret.Get(0).(func(types.PluginType, types.OCR3ConfigWithMeta) types.CCIPOracle); ok {
-		r0 = rf(pluginType, config)
+	if rf, ok := ret.Get(0).(func(types.OCR3ConfigWithMeta) types.CCIPOracle); ok {
+		r0 = rf(config)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(types.CCIPOracle)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(types.PluginType, types.OCR3ConfigWithMeta) error); ok {
-		r1 = rf(pluginType, config)
+	if rf, ok := ret.Get(1).(func(types.OCR3ConfigWithMeta) error); ok {
+		r1 = rf(config)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -114,15 +114,14 @@ type OracleCreator_CreatePluginOracle_Call struct {
 }
 
 // CreatePluginOracle is a helper method to define mock.On call
-//   - pluginType types.PluginType
 //   - config types.OCR3ConfigWithMeta
-func (_e *OracleCreator_Expecter) CreatePluginOracle(pluginType interface{}, config interface{}) *OracleCreator_CreatePluginOracle_Call {
-	return &OracleCreator_CreatePluginOracle_Call{Call: _e.mock.On("CreatePluginOracle", pluginType, config)}
+func (_e *OracleCreator_Expecter) CreatePluginOracle(config interface{}) *OracleCreator_CreatePluginOracle_Call {
+	return &OracleCreator_CreatePluginOracle_Call{Call: _e.mock.On("CreatePluginOracle", config)}
 }
 
-func (_c *OracleCreator_CreatePluginOracle_Call) Run(run func(pluginType types.PluginType, config types.OCR3ConfigWithMeta)) *OracleCreator_CreatePluginOracle_Call {
+func (_c *OracleCreator_CreatePluginOracle_Call) Run(run func(config types.OCR3ConfigWithMeta)) *OracleCreator_CreatePluginOracle_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(types.PluginType), args[1].(types.OCR3ConfigWithMeta))
+		run(args[0].(types.OCR3ConfigWithMeta))
 	})
 	return _c
 }
@@ -132,7 +131,7 @@ func (_c *OracleCreator_CreatePluginOracle_Call) Return(_a0 types.CCIPOracle, _a
 	return _c
 }
 
-func (_c *OracleCreator_CreatePluginOracle_Call) RunAndReturn(run func(types.PluginType, types.OCR3ConfigWithMeta) (types.CCIPOracle, error)) *OracleCreator_CreatePluginOracle_Call {
+func (_c *OracleCreator_CreatePluginOracle_Call) RunAndReturn(run func(types.OCR3ConfigWithMeta) (types.CCIPOracle, error)) *OracleCreator_CreatePluginOracle_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
@@ -157,9 +156,9 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 	// must be aware of available bootstrappers.
 	var createOracleFunc launcher.CreateOracleFunc
 	if len(spec.CCIPSpec.P2PV2Bootstrappers) > 0 {
-		createOracleFunc = createPluginOracleFunc(oracleCreator)
+		createOracleFunc = oracleCreator.CreatePluginOracle
 	} else {
-		createOracleFunc = createBootstrapOracleFunc(oracleCreator)
+		createOracleFunc = oracleCreator.CreateBootstrapOracle
 	}
 
 	capLauncher := launcher.New(
@@ -305,16 +304,4 @@ func bindReader(ctx context.Context,
 	}
 
 	return reader, ccipConfigBinding, nil
-}
-
-func createBootstrapOracleFunc(oracleCreator cctypes.OracleCreator) launcher.CreateOracleFunc {
-	return func(pt cctypes.PluginType, ocwm ccipreaderpkg.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
-		return oracleCreator.CreateBootstrapOracle(cctypes.OCR3ConfigWithMeta(ocwm))
-	}
-}
-
-func createPluginOracleFunc(oracleCreator cctypes.OracleCreator) launcher.CreateOracleFunc {
-	return func(pt cctypes.PluginType, ocwm ccipreaderpkg.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
-		return oracleCreator.CreatePluginOracle(cctypes.PluginType(pt), cctypes.OCR3ConfigWithMeta(ocwm))
-	}
 }

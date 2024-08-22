@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	it "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccip_integration_tests/integrationhelpers"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 
@@ -43,9 +42,7 @@ func TestIntegration_Launcher(t *testing.T) {
 		logger.TestLogger(t),
 		uni.HomeChainReader,
 		1*time.Second,
-		func(pt cctypes.PluginType, ocwm reader.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
-			return oracleCreator.CreatePluginOracle(pt, cctypes.OCR3ConfigWithMeta(ocwm))
-		},
+		oracleCreator.CreatePluginOracle,
 	)
 	regSyncer.AddLauncher(launcher)
 
@@ -102,7 +99,8 @@ type oracleCreatorPrints struct {
 	t *testing.T
 }
 
-func (o *oracleCreatorPrints) CreatePluginOracle(pluginType cctypes.PluginType, config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+func (o *oracleCreatorPrints) CreatePluginOracle(config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+	pluginType := cctypes.PluginType(config.Config.PluginType)
 	o.t.Logf("Creating plugin oracle (pluginType: %s) with config %+v\n", pluginType, config)
 	return &oraclePrints{pluginType: pluginType, config: config, t: o.t}, nil
 }

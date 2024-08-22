@@ -102,7 +102,9 @@ func New(
 }
 
 // CreatePluginOracle implements types.OracleCreator.
-func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginType, config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+func (i *inprocessOracleCreator) CreatePluginOracle(config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+	pluginType := cctypes.PluginType(config.Config.PluginType)
+
 	// Assuming that the chain selector is referring to an evm chain for now.
 	// TODO: add an api that returns chain family.
 	destChainID, err := chainsel.ChainIdFromSelector(uint64(config.Config.ChainSelector))

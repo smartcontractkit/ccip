@@ -3,6 +3,7 @@ package launcher
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -26,7 +27,7 @@ var (
 	_ registrysyncer.Launcher = (*launcher)(nil)
 )
 
-type CreateOracleFunc func(cctypes.PluginType, ccipreader.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error)
+type CreateOracleFunc func(cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error)
 
 func New(
 	capabilityVersion,
@@ -338,7 +339,7 @@ func createFutureBlueGreenDeployment(
 	var deployment blueGreenDeployment
 	if isNewGreenInstance(pluginType, ocrConfigs, prevDeployment) {
 		// this is a new green instance.
-		greenOracle, err := createOracleFunc(pluginType, ocrConfigs[1])
+		greenOracle, err := createOracleFunc(cctypes.OCR3ConfigWithMeta(ocrConfigs[1]))
 		if err != nil {
 			return blueGreenDeployment{}, fmt.Errorf("failed to create CCIP commit oracle: %w", err)
 		}
@@ -364,11 +365,6 @@ func createDON(
 	don kcr.CapabilitiesRegistryDONInfo,
 	createOracleFunc CreateOracleFunc,
 ) (*ccipDeployment, error) {
-	if !isMemberOfDON(don, p2pID) {
-		lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", p2pID.String())
-		return nil, nil
-	}
-
 	// this should be a retryable error.
 	commitOCRConfigs, err := homeChainReader.GetOCRConfigs(context.Background(), don.Id, uint8(cctypes.PluginTypeCCIPCommit))
 	if err != nil {
@@ -391,12 +387,27 @@ func createDON(
 		return nil, fmt.Errorf("expected exactly one OCR config for CCIP exec plugin (don id: %d), got %d", don.Id, len(execOCRConfigs))
 	}
 
-	commitOracle, err := createOracleFunc(cctypes.PluginTypeCCIPCommit, commitOCRConfigs[0])
+	// The assumption is that all CCIP dons will have the same set of bootstrappers,
+	// so we check against that assumption here.
+	commitBootstrappers := commitOCRConfigs[0].Config.BootstrapP2PIds
+	execBootstrappers := execOCRConfigs[0].Config.BootstrapP2PIds
+	if !slices.Equal(commitBootstrappers, execBootstrappers) {
+		return nil, fmt.Errorf("commit and exec plugin bootstrappers do not match for CCIP DON %d", don.Id)
+	}
+
+	if !isMemberOfDON(don, p2pID) && !isMemberOfBootstrapSubcommittee(commitBootstrappers, p2pID) {
+		lggr.Infow("Not a member of this DON and not a bootstrap node either, skipping", "donId", don.Id, "p2pId", p2pID.String())
+		return nil, nil
+	}
+
+	// at this point we know we are either a member of the DON or a bootstrap node.
+	// the injected createOracleFunc will create the appropriate oracle.
+	commitOracle, err := createOracleFunc(cctypes.OCR3ConfigWithMeta(commitOCRConfigs[0]))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CCIP commit oracle: %w", err)
 	}
 
-	execOracle, err := createOracleFunc(cctypes.PluginTypeCCIPExec, execOCRConfigs[0])
+	execOracle, err := createOracleFunc(cctypes.OCR3ConfigWithMeta(execOCRConfigs[0]))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CCIP exec oracle: %w", err)
 	}
