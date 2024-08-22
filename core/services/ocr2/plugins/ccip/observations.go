@@ -19,6 +19,9 @@ import (
 // Note if a breaking change is introduced to this struct nodes running different versions
 // will not be able to unmarshal each other's observations. Do not modify unless you
 // know what you are doing.
+//
+// IMPORTANT: Both CommitObservation and ExecutionObservation are streamed and processed by Atlas.
+// Any change to that struct must be tested with Atlas before releasing.
 type CommitObservation struct {
 	Interval                  cciptypes.CommitStoreInterval  `json:"interval"`
 	TokenPricesUSD            map[cciptypes.Address]*big.Int `json:"tokensPerFeeCoin"`
@@ -47,6 +50,9 @@ func (o CommitObservation) Marshal() ([]byte, error) {
 // Note if a breaking change is introduced to this struct nodes running different versions
 // will not be able to unmarshal each other's observations. Do not modify unless you
 // know what you are doing.
+//
+// IMPORTANT: Both CommitObservation and ExecutionObservation are streamed and processed by Atlas.
+// Any change to that struct must be tested with Atlas before releasing.
 type ExecutionObservation struct {
 	Messages map[uint64]MsgData `json:"messages"`
 }
