@@ -16,19 +16,28 @@ import (
 func TestDeployCCIPContracts(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
-		Chains: 1,
-		Nodes:  1,
+		Bootstraps: 1,
+		Chains:     1,
+		Nodes:      4,
 	})
 	// Deploy all the CCIP contracts.
-	ab, err := DeployCCIPContracts(e, DeployCCIPContractConfig{})
+	homeChain := e.AllChainSelectors()[0]
+	capRegAddresses, _, err := DeployCapReg(lggr, e.Chains, homeChain)
 	require.NoError(t, err)
-	state, err := GenerateOnchainState(e, ab)
+	s, err := LoadOnchainState(e, capRegAddresses)
+	require.NoError(t, err)
+	ab, err := DeployCCIPContracts(e, DeployCCIPContractConfig{
+		HomeChainSel:     homeChain,
+		CCIPOnChainState: s,
+	})
+	require.NoError(t, err)
+	state, err := LoadOnchainState(e, ab)
 	require.NoError(t, err)
 	snap, err := state.Snapshot(e.AllChainSelectors())
 	require.NoError(t, err)
 
 	// Assert expect every deployed address to be in the address book.
-	// TODO: Add the rest of CCIPv2 representation
+	// TODO (CCIP-3047): Add the rest of CCIPv2 representation
 	b, err := json.MarshalIndent(snap, "", "	")
 	require.NoError(t, err)
 	fmt.Println(string(b))
