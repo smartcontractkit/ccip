@@ -67,8 +67,8 @@ jobs:
           # Match semver git tags with a "contracts-ccip/" prefix.
           RELEASE_REGEX: '^contracts-ccip/v[0-9]+\.[0-9]+\.[0-9]+$'
           PRE_RELEASE_REGEX: '^contracts-ccip/v[0-9]+\.[0-9]+\.[0-9]+-(.+)$'
-          # Get the version by stripping the "contracts-v" prefix.
-          VERSION_PREFIX: 'contracts-v'
+          # Get the version by stripping the "contracts-ccip/v" prefix.
+          VERSION_PREFIX: 'contracts-ccip/v'
 
 #  prepublish-test:
 #    needs: [changes, tag-check]
@@ -141,8 +141,8 @@ jobs:
     defaults:
       run:
         working-directory: contracts
-    needs: [changes]
-    if: needs.changes.outputs.changes == 'true'
+    needs: [changes, tag-check]
+    if: needs.changes.outputs.changes == 'true' || needs.tag-check.outputs.is-release == 'true' || needs.tag-check.outputs.is-pre-release == 'true'
     name: Solidity Lint
     runs-on: ubuntu-latest
     steps:
@@ -169,8 +169,8 @@ jobs:
     defaults:
       run:
         working-directory: contracts
-    needs: [changes]
-    if: needs.changes.outputs.changes == 'true'
+    needs: [changes, tag-check]
+    if: needs.changes.outputs.changes == 'true' || needs.tag-check.outputs.is-release == 'true' || needs.tag-check.outputs.is-pre-release == 'true'
     name: Prettier Formatting
     runs-on: ubuntu-latest
     steps:
