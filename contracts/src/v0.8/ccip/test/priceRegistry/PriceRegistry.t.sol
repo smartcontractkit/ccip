@@ -2167,7 +2167,11 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        KeystoneFeedsPermissionHandler.ReportForwarderUnauthorized.selector, STRANGER, WORKFLOW_OWNER_1, WORKFLOW_NAME_1, REPORT_NAME_1
+        KeystoneFeedsPermissionHandler.ReportForwarderUnauthorized.selector,
+        STRANGER,
+        WORKFLOW_OWNER_1,
+        WORKFLOW_NAME_1,
+        REPORT_NAME_1
       )
     );
     changePrank(STRANGER);
