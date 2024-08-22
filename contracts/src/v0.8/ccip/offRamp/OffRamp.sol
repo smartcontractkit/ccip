@@ -3,10 +3,11 @@ pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
+
+import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
-import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
@@ -588,7 +589,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         // If prices are not stale, update the latest epoch and round
         s_latestPriceSequenceNumber = sequenceNumber;
         // And update the prices in the price registry
-        IPriceRegistry(s_dynamicConfig.priceRegistry).updatePrices(commitReport.priceUpdates);
+        IFeeQuoter(s_dynamicConfig.priceRegistry).updatePrices(commitReport.priceUpdates);
       } else {
         // If prices are stale and the report doesn't contain a root, this report
         // does not have any valid information and we revert.

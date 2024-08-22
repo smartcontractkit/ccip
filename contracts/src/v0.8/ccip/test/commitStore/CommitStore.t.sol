@@ -10,15 +10,15 @@ import {FeeQuoter} from "../../FeeQuoter.sol";
 import {RMN} from "../../RMN.sol";
 import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
 import {OCR2Abstract} from "../../ocr/OCR2Abstract.sol";
-import {PriceRegistrySetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
+import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {CommitStoreHelper} from "../helpers/CommitStoreHelper.sol";
 import {OCR2BaseSetup} from "../ocr/OCR2Base.t.sol";
 
-contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
+contract CommitStoreSetup is FeeQuoterSetup, OCR2BaseSetup {
   CommitStoreHelper internal s_commitStore;
 
-  function setUp() public virtual override(PriceRegistrySetup, OCR2BaseSetup) {
-    PriceRegistrySetup.setUp();
+  function setUp() public virtual override(FeeQuoterSetup, OCR2BaseSetup) {
+    FeeQuoterSetup.setUp();
     OCR2BaseSetup.setUp();
 
     s_commitStore = new CommitStoreHelper(
@@ -42,15 +42,15 @@ contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
   }
 }
 
-contract CommitStoreRealRMNSetup is PriceRegistrySetup, OCR2BaseSetup {
+contract CommitStoreRealRMNSetup is FeeQuoterSetup, OCR2BaseSetup {
   CommitStoreHelper internal s_commitStore;
 
   RMN internal s_rmn;
 
   address internal constant BLESS_VOTE_ADDR = address(8888);
 
-  function setUp() public virtual override(PriceRegistrySetup, OCR2BaseSetup) {
-    PriceRegistrySetup.setUp();
+  function setUp() public virtual override(FeeQuoterSetup, OCR2BaseSetup) {
+    FeeQuoterSetup.setUp();
     OCR2BaseSetup.setUp();
 
     RMN.Voter[] memory voters = new RMN.Voter[](1);
@@ -73,9 +73,9 @@ contract CommitStoreRealRMNSetup is PriceRegistrySetup, OCR2BaseSetup {
   }
 }
 
-contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
-  function setUp() public virtual override(PriceRegistrySetup, OCR2BaseSetup) {
-    PriceRegistrySetup.setUp();
+contract CommitStore_constructor is FeeQuoterSetup, OCR2BaseSetup {
+  function setUp() public virtual override(FeeQuoterSetup, OCR2BaseSetup) {
+    FeeQuoterSetup.setUp();
     OCR2BaseSetup.setUp();
   }
 

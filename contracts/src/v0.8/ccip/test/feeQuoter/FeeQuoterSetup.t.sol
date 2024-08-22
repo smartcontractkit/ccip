@@ -11,7 +11,7 @@ import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.so
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {FeeQuoterHelper} from "../helpers/FeeQuoterHelper.sol";
 
-contract PriceRegistrySetup is TokenSetup {
+contract FeeQuoterSetup is TokenSetup {
   uint112 internal constant USD_PER_GAS = 1e6; // 0.001 gwei
   uint112 internal constant USD_PER_DATA_AVAILABILITY_GAS = 1e9; // 1 gwei
 
@@ -297,7 +297,7 @@ contract PriceRegistrySetup is TokenSetup {
   }
 }
 
-contract PriceRegistryFeeSetup is PriceRegistrySetup {
+contract PriceRegistryFeeSetup is FeeQuoterSetup {
   uint224 internal s_feeTokenPrice;
   uint224 internal s_wrappedTokenPrice;
   uint224 internal s_customTokenPrice;

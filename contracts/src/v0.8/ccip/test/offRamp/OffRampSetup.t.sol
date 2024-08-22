@@ -16,7 +16,7 @@ import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 
-import {PriceRegistrySetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
+import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
@@ -25,7 +25,7 @@ import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessag
 import {MultiOCR3BaseSetup} from "../ocr/MultiOCR3BaseSetup.t.sol";
 import {Vm} from "forge-std/Test.sol";
 
-contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
+contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
   uint64 internal constant SOURCE_CHAIN_SELECTOR_1 = SOURCE_CHAIN_SELECTOR;
   uint64 internal constant SOURCE_CHAIN_SELECTOR_2 = 6433500567565415381;
   uint64 internal constant SOURCE_CHAIN_SELECTOR_3 = 4051577828743386545;
@@ -57,8 +57,8 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
 
   uint64 internal s_latestSequenceNumber;
 
-  function setUp() public virtual override(PriceRegistrySetup, MultiOCR3BaseSetup) {
-    PriceRegistrySetup.setUp();
+  function setUp() public virtual override(FeeQuoterSetup, MultiOCR3BaseSetup) {
+    FeeQuoterSetup.setUp();
     MultiOCR3BaseSetup.setUp();
 
     s_inboundMessageValidator = new MessageInterceptorHelper();

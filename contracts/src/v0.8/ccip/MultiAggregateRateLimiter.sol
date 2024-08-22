@@ -2,8 +2,8 @@
 pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
+import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "./interfaces/IMessageInterceptor.sol";
-import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {AuthorizedCallers} from "../shared/access/AuthorizedCallers.sol";
 import {EnumerableMapAddresses} from "./../shared/enumerable/EnumerableMapAddresses.sol";
@@ -132,7 +132,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers, IT
   function _getTokenValue(Client.EVMTokenAmount memory tokenAmount) internal view returns (uint256) {
     // not fetching validated price, as price staleness is not important for value-based rate limiting
     // we only need to verify the price is not 0
-    uint224 pricePerToken = IPriceRegistry(s_priceRegistry).getTokenPrice(tokenAmount.token).value;
+    uint224 pricePerToken = IFeeQuoter(s_priceRegistry).getTokenPrice(tokenAmount.token).value;
     if (pricePerToken == 0) revert PriceNotFoundForToken(tokenAmount.token);
     return pricePerToken._calcUSDValueFromTokenAmount(tokenAmount.amount);
   }

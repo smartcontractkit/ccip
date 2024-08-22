@@ -8,12 +8,12 @@ import {Internal} from "../../libraries/Internal.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 
-import {PriceRegistrySetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
+import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {MultiAggregateRateLimiterHelper} from "../helpers/MultiAggregateRateLimiterHelper.sol";
 import {stdError} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
+contract MultiAggregateRateLimiterSetup is BaseTest, FeeQuoterSetup {
   MultiAggregateRateLimiterHelper internal s_rateLimiter;
 
   address internal immutable TOKEN = 0x21118E64E1fB0c487F25Dd6d3601FF6af8D32E4e;
@@ -30,9 +30,9 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
 
   address[] internal s_authorizedCallers;
 
-  function setUp() public virtual override(BaseTest, PriceRegistrySetup) {
+  function setUp() public virtual override(BaseTest, FeeQuoterSetup) {
     BaseTest.setUp();
-    PriceRegistrySetup.setUp();
+    FeeQuoterSetup.setUp();
 
     Internal.PriceUpdates memory priceUpdates = _getSingleTokenPriceUpdateStruct(TOKEN, TOKEN_PRICE);
     s_feeQuoter.updatePrices(priceUpdates);

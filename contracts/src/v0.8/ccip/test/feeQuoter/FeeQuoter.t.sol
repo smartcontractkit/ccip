@@ -9,11 +9,11 @@ import {Internal} from "../../libraries/Internal.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "../../libraries/USDPriceWith18Decimals.sol";
 import {FeeQuoterHelper} from "../helpers/FeeQuoterHelper.sol";
-import {PriceRegistryFeeSetup, PriceRegistrySetup} from "./FeeQuoterSetup.t.sol";
+import {FeeQuoterSetup, PriceRegistryFeeSetup} from "./FeeQuoterSetup.t.sol";
 
 import {Vm} from "forge-std/Vm.sol";
 
-contract FeeQuoter_constructor is PriceRegistrySetup {
+contract FeeQuoter_constructor is FeeQuoterSetup {
   function test_Setup_Success() public virtual {
     address[] memory priceUpdaters = new address[](2);
     priceUpdaters[0] = STRANGER;
@@ -147,7 +147,7 @@ contract FeeQuoter_constructor is PriceRegistrySetup {
   }
 }
 
-contract FeeQuoter_getTokenPrices is PriceRegistrySetup {
+contract FeeQuoter_getTokenPrices is FeeQuoterSetup {
   function test_GetTokenPrices_Success() public view {
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
 
@@ -165,7 +165,7 @@ contract FeeQuoter_getTokenPrices is PriceRegistrySetup {
   }
 }
 
-contract FeeQuoter_getTokenPrice is PriceRegistrySetup {
+contract FeeQuoter_getTokenPrice is FeeQuoterSetup {
   function test_GetTokenPriceFromFeed_Success() public {
     uint256 originalTimestampValue = block.timestamp;
 
@@ -181,7 +181,7 @@ contract FeeQuoter_getTokenPrice is PriceRegistrySetup {
   }
 }
 
-contract FeeQuoter_getValidatedTokenPrice is PriceRegistrySetup {
+contract FeeQuoter_getValidatedTokenPrice is FeeQuoterSetup {
   function test_GetValidatedTokenPrice_Success() public view {
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
     address token = priceUpdates.tokenPriceUpdates[0].sourceToken;
@@ -352,7 +352,7 @@ contract FeeQuoter_getValidatedTokenPrice is PriceRegistrySetup {
   }
 }
 
-contract FeeQuoter_applyFeeTokensUpdates is PriceRegistrySetup {
+contract FeeQuoter_applyFeeTokensUpdates is FeeQuoterSetup {
   function test_ApplyFeeTokensUpdates_Success() public {
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
@@ -389,7 +389,7 @@ contract FeeQuoter_applyFeeTokensUpdates is PriceRegistrySetup {
   }
 }
 
-contract FeeQuoter_updatePrices is PriceRegistrySetup {
+contract FeeQuoter_updatePrices is FeeQuoterSetup {
   function test_OnlyTokenPrice_Success() public {
     Internal.PriceUpdates memory update = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](1),
@@ -522,7 +522,7 @@ contract FeeQuoter_updatePrices is PriceRegistrySetup {
   }
 }
 
-contract FeeQuoter_convertTokenAmount is PriceRegistrySetup {
+contract FeeQuoter_convertTokenAmount is FeeQuoterSetup {
   function test_ConvertTokenAmount_Success() public view {
     Internal.PriceUpdates memory initialPriceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
     uint256 amount = 3e16;
@@ -576,7 +576,7 @@ contract FeeQuoter_convertTokenAmount is PriceRegistrySetup {
   }
 }
 
-contract FeeQuoter_getTokenAndGasPrices is PriceRegistrySetup {
+contract FeeQuoter_getTokenAndGasPrices is FeeQuoterSetup {
   function test_GetFeeTokenAndGasPrices_Success() public view {
     (uint224 feeTokenPrice, uint224 gasPrice) = s_feeQuoter.getTokenAndGasPrices(s_sourceFeeToken, DEST_CHAIN_SELECTOR);
 
@@ -613,7 +613,7 @@ contract FeeQuoter_getTokenAndGasPrices is PriceRegistrySetup {
   }
 }
 
-contract FeeQuoter_updateTokenPriceFeeds is PriceRegistrySetup {
+contract FeeQuoter_updateTokenPriceFeeds is FeeQuoterSetup {
   function test_ZeroFeeds_Success() public {
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
 
@@ -721,7 +721,7 @@ contract FeeQuoter_updateTokenPriceFeeds is PriceRegistrySetup {
   }
 }
 
-contract FeeQuoter_applyDestChainConfigUpdates is PriceRegistrySetup {
+contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
   function test_Fuzz_applyDestChainConfigUpdates_Success(FeeQuoter.DestChainConfigArgs memory destChainConfigArgs)
     public
   {
@@ -857,7 +857,7 @@ contract FeeQuoter_applyDestChainConfigUpdates is PriceRegistrySetup {
   }
 }
 
-contract FeeQuoter_getDataAvailabilityCost is PriceRegistrySetup {
+contract FeeQuoter_getDataAvailabilityCost is FeeQuoterSetup {
   function test_EmptyMessageCalculatesDataAvailabilityCost_Success() public {
     uint256 dataAvailabilityCostUSD =
       s_feeQuoter.getDataAvailabilityCost(DEST_CHAIN_SELECTOR, USD_PER_DATA_AVAILABILITY_GAS, 0, 0, 0);
@@ -973,7 +973,7 @@ contract FeeQuoter_getDataAvailabilityCost is PriceRegistrySetup {
   }
 }
 
-contract FeeQuoter_applyPremiumMultiplierWeiPerEthUpdates is PriceRegistrySetup {
+contract FeeQuoter_applyPremiumMultiplierWeiPerEthUpdates is FeeQuoterSetup {
   function test_Fuzz_applyPremiumMultiplierWeiPerEthUpdates_Success(
     FeeQuoter.PremiumMultiplierWeiPerEthArgs memory premiumMultiplierWeiPerEthArg
   ) public {
@@ -1060,7 +1060,7 @@ contract FeeQuoter_applyPremiumMultiplierWeiPerEthUpdates is PriceRegistrySetup 
   }
 }
 
-contract FeeQuoter_applyTokenTransferFeeConfigUpdates is PriceRegistrySetup {
+contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
   function test_Fuzz_ApplyTokenTransferFeeConfig_Success(
     FeeQuoter.TokenTransferFeeConfig[2] memory tokenTransferFeeConfigs
   ) public {
@@ -1941,7 +1941,7 @@ contract FeeQuoter_validatePoolReturnData is PriceRegistryFeeSetup {
   }
 }
 
-contract FeeQuoter_validateDestFamilyAddress is PriceRegistrySetup {
+contract FeeQuoter_validateDestFamilyAddress is FeeQuoterSetup {
   function test_ValidEVMAddress_Success() public view {
     bytes memory encodedAddress = abi.encode(address(10000));
     s_feeQuoter.validateDestFamilyAddress(Internal.CHAIN_FAMILY_SELECTOR_EVM, encodedAddress);
@@ -1978,7 +1978,7 @@ contract FeeQuoter_validateDestFamilyAddress is PriceRegistrySetup {
   }
 }
 
-contract FeeQuoter_parseEVMExtraArgsFromBytes is PriceRegistrySetup {
+contract FeeQuoter_parseEVMExtraArgsFromBytes is FeeQuoterSetup {
   FeeQuoter.DestChainConfig private s_destChainConfig;
 
   function setUp() public virtual override {

@@ -6,12 +6,12 @@ import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 
-import {PriceRegistrySetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
+import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {AggregateRateLimiterHelper} from "../helpers/AggregateRateLimiterHelper.sol";
 
 import {stdError} from "forge-std/Test.sol";
 
-contract AggregateTokenLimiterSetup is PriceRegistrySetup {
+contract AggregateTokenLimiterSetup is FeeQuoterSetup {
   AggregateRateLimiterHelper internal s_rateLimiter;
   RateLimiter.Config internal s_config;
 
@@ -19,7 +19,7 @@ contract AggregateTokenLimiterSetup is PriceRegistrySetup {
   uint224 internal constant TOKEN_PRICE = 4e18;
 
   function setUp() public virtual override {
-    PriceRegistrySetup.setUp();
+    FeeQuoterSetup.setUp();
 
     Internal.PriceUpdates memory priceUpdates = _getSingleTokenPriceUpdateStruct(TOKEN, TOKEN_PRICE);
     s_feeQuoter.updatePrices(priceUpdates);

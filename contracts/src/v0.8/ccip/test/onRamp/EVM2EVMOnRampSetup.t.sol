@@ -8,12 +8,12 @@ import {Pool} from "../../libraries/Pool.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 
-import {PriceRegistrySetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
+import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {EVM2EVMOnRampHelper} from "../helpers/EVM2EVMOnRampHelper.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
+contract EVM2EVMOnRampSetup is TokenSetup, FeeQuoterSetup {
   uint256 internal immutable i_tokenAmount0 = 9;
   uint256 internal immutable i_tokenAmount1 = 7;
 
@@ -28,9 +28,9 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   EVM2EVMOnRamp.FeeTokenConfigArgs[] internal s_feeTokenConfigArgs;
   EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] internal s_tokenTransferFeeConfigArgs;
 
-  function setUp() public virtual override(TokenSetup, PriceRegistrySetup) {
+  function setUp() public virtual override(TokenSetup, FeeQuoterSetup) {
     TokenSetup.setUp();
-    PriceRegistrySetup.setUp();
+    FeeQuoterSetup.setUp();
 
     s_feeQuoter.updatePrices(_getSingleTokenPriceUpdateStruct(CUSTOM_TOKEN, CUSTOM_TOKEN_PRICE));
 

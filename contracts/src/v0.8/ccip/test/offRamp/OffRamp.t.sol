@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {IFeeQuoter} from "../../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
-import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
-
 import {FeeQuoter} from "../../FeeQuoter.sol";
 import {NonceManager} from "../../NonceManager.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -2967,7 +2966,7 @@ contract OffRamp_commit is OffRampSetup {
   function test_StaleReportWithRoot_Success() public {
     uint64 maxSeq = 12;
     uint224 tokenStartPrice =
-      IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value;
+      IFeeQuoter(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value;
 
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
@@ -3003,7 +3002,7 @@ contract OffRamp_commit is OffRampSetup {
     assertEq(maxSeq * 2 + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
     assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
     assertEq(
-      tokenStartPrice, IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
+      tokenStartPrice, IFeeQuoter(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
     );
   }
 
@@ -3121,9 +3120,7 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
 
     assertEq(maxSeq + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
-    assertEq(
-      tokenPrice1, IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
-    );
+    assertEq(tokenPrice1, IFeeQuoter(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value);
     assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
   }
 
