@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -29,14 +30,14 @@ const (
 	// be able to bring back processing without replaying any logs from chain. You can read that param as
 	// "how long CCIP can be down and still be able to process all the messages after getting back to life".
 	// Breaching this threshold would require replaying chain using LogPoller from the beginning of the outage.
-	CommitExecLogsRetention = 30 * 24 * time.Hour // 30 days
+	CommitExecLogsRetention = 2 * time.Hour // 30 days
 	// CacheEvictionLogsRetention defines the duration for which logs used for caching on-chain data are kept.
 	// Restarting node clears the cache entirely and rebuilds it from scratch by fetching data from chain,
 	// so we don't need to keep these logs for very long. All events relying on cache.NewLogpollerEventsBased should use this retention.
-	CacheEvictionLogsRetention = 7 * 24 * time.Hour // 7 days
+	CacheEvictionLogsRetention = 1 * time.Hour // 7 days
 	// PriceUpdatesLogsRetention defines the duration for which logs with price updates are kept.
 	// These logs are emitted whenever the token price or gas price is updated and Commit scans very small time windows (e.g. 2 hours)
-	PriceUpdatesLogsRetention = 1 * 24 * time.Hour // 1 day
+	PriceUpdatesLogsRetention = 1 * time.Hour // 1 day
 )
 
 type Event[T any] struct {
