@@ -27,7 +27,7 @@ func (pt PluginType) String() string {
 	}
 }
 
-// CCIPOracle represents either a CCIP commit or exec oracle or a bootstrap node.
+// CCIPOracle represents either a CCIP commit or exec oracle.
 type CCIPOracle interface {
 	Close() error
 	Start() error
@@ -39,8 +39,4 @@ type OracleCreator interface {
 	// CreatePlugin creates a new oracle that will run either the commit or exec ccip plugin.
 	// The oracle must be returned unstarted.
 	CreatePluginOracle(pluginType PluginType, config OCR3ConfigWithMeta) (CCIPOracle, error)
-
-	// CreateBootstrapOracle creates a new bootstrap node with the given OCR config.
-	// The oracle must be returned unstarted.
-	CreateBootstrapOracle(config OCR3ConfigWithMeta) (CCIPOracle, error)
 }

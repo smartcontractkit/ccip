@@ -6,16 +6,13 @@ import (
 	"sync"
 	"time"
 
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
-
 	"go.uber.org/multierr"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-common/pkg/services"
-
 	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -331,7 +328,7 @@ func updateDON(
 // All other cases are invalid. This is enforced in the ccip config contract.
 func createFutureBlueGreenDeployment(
 	prevDeployment ccipDeployment,
-	ocrConfigs []ccipreaderpkg.OCR3ConfigWithMeta,
+	ocrConfigs []ccipreader.OCR3ConfigWithMeta,
 	oracleCreator cctypes.OracleCreator,
 	pluginType cctypes.PluginType,
 ) (blueGreenDeployment, error) {
@@ -391,45 +388,35 @@ func createDON(
 		return nil, fmt.Errorf("expected exactly one OCR config for CCIP exec plugin (don id: %d), got %d", don.Id, len(execOCRConfigs))
 	}
 
-	commitOracle, commitBootstrap, err := createOracle(p2pID, oracleCreator, cctypes.PluginTypeCCIPCommit, commitOCRConfigs)
+	commitOracle, err := createOracle(oracleCreator, cctypes.PluginTypeCCIPCommit, commitOCRConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CCIP commit oracle: %w", err)
 	}
 
-	execOracle, execBootstrap, err := createOracle(p2pID, oracleCreator, cctypes.PluginTypeCCIPExec, execOCRConfigs)
+	execOracle, err := createOracle(oracleCreator, cctypes.PluginTypeCCIPExec, execOCRConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CCIP exec oracle: %w", err)
 	}
 
 	return &ccipDeployment{
 		commit: blueGreenDeployment{
-			blue:          commitOracle,
-			bootstrapBlue: commitBootstrap,
+			blue: commitOracle,
 		},
 		exec: blueGreenDeployment{
-			blue:          execOracle,
-			bootstrapBlue: execBootstrap,
+			blue: execOracle,
 		},
 	}, nil
 }
 
 func createOracle(
-	p2pID ragep2ptypes.PeerID,
 	oracleCreator cctypes.OracleCreator,
 	pluginType cctypes.PluginType,
-	ocrConfigs []ccipreaderpkg.OCR3ConfigWithMeta,
-) (pluginOracle, bootstrapOracle cctypes.CCIPOracle, err error) {
+	ocrConfigs []ccipreader.OCR3ConfigWithMeta,
+) (pluginOracle cctypes.CCIPOracle, err error) {
 	pluginOracle, err = oracleCreator.CreatePluginOracle(pluginType, cctypes.OCR3ConfigWithMeta(ocrConfigs[0]))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create CCIP plugin oracle (plugintype: %d): %w", pluginType, err)
+		return nil, fmt.Errorf("failed to create CCIP plugin oracle (plugintype: %d): %w", pluginType, err)
 	}
 
-	if isMemberOfBootstrapSubcommittee(ocrConfigs[0].Config.BootstrapP2PIds, p2pID) {
-		bootstrapOracle, err = oracleCreator.CreateBootstrapOracle(cctypes.OCR3ConfigWithMeta(ocrConfigs[0]))
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create CCIP bootstrap oracle (plugintype: %d): %w", pluginType, err)
-		}
-	}
-
-	return pluginOracle, bootstrapOracle, nil
+	return pluginOracle, nil
 }

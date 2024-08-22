@@ -41,7 +41,7 @@ func Test_createOracle(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			"success, no bootstrap",
+			"success",
 			args{
 				myP2PKey,
 				mocks.NewOracleCreator(t),
@@ -57,32 +57,6 @@ func Test_createOracle(t *testing.T) {
 			func(t *testing.T, args args, oracleCreator *mocks.OracleCreator) {
 				oracleCreator.
 					On("CreatePluginOracle", cctypes.PluginTypeCCIPCommit, cctypes.OCR3ConfigWithMeta(args.ocrConfigs[0])).
-					Return(mocks.NewCCIPOracle(t), nil)
-			},
-			false,
-		},
-		{
-			"success, with bootstrap",
-			args{
-				myP2PKey,
-				mocks.NewOracleCreator(t),
-				cctypes.PluginTypeCCIPCommit,
-				[]ccipreaderpkg.OCR3ConfigWithMeta{
-					{
-						Config: ccipreaderpkg.OCR3Config{
-							BootstrapP2PIds: [][32]byte{myP2PKey},
-						},
-						ConfigCount:  1,
-						ConfigDigest: testutils.Random32Byte(),
-					},
-				},
-			},
-			func(t *testing.T, args args, oracleCreator *mocks.OracleCreator) {
-				oracleCreator.
-					On("CreatePluginOracle", cctypes.PluginTypeCCIPCommit, cctypes.OCR3ConfigWithMeta(args.ocrConfigs[0])).
-					Return(mocks.NewCCIPOracle(t), nil)
-				oracleCreator.
-					On("CreateBootstrapOracle", cctypes.OCR3ConfigWithMeta(args.ocrConfigs[0])).
 					Return(mocks.NewCCIPOracle(t), nil)
 			},
 			false,
@@ -108,37 +82,11 @@ func Test_createOracle(t *testing.T) {
 			},
 			true,
 		},
-		{
-			"error creating bootstrap oracle",
-			args{
-				myP2PKey,
-				mocks.NewOracleCreator(t),
-				cctypes.PluginTypeCCIPCommit,
-				[]ccipreaderpkg.OCR3ConfigWithMeta{
-					{
-						Config: ccipreaderpkg.OCR3Config{
-							BootstrapP2PIds: [][32]byte{myP2PKey},
-						},
-						ConfigCount:  1,
-						ConfigDigest: testutils.Random32Byte(),
-					},
-				},
-			},
-			func(t *testing.T, args args, oracleCreator *mocks.OracleCreator) {
-				oracleCreator.
-					On("CreatePluginOracle", cctypes.PluginTypeCCIPCommit, cctypes.OCR3ConfigWithMeta(args.ocrConfigs[0])).
-					Return(mocks.NewCCIPOracle(t), nil)
-				oracleCreator.
-					On("CreateBootstrapOracle", cctypes.OCR3ConfigWithMeta(args.ocrConfigs[0])).
-					Return(nil, errors.New("error creating oracle"))
-			},
-			true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.expect(t, tt.args, tt.args.oracleCreator)
-			_, _, err := createOracle(tt.args.p2pID, tt.args.oracleCreator, tt.args.pluginType, tt.args.ocrConfigs)
+			_, err := createOracle(tt.args.oracleCreator, tt.args.pluginType, tt.args.ocrConfigs)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -181,7 +129,7 @@ func Test_createDON(t *testing.T) {
 			false,
 		},
 		{
-			"success, no bootstrap",
+			"success",
 			args{
 				logger.TestLogger(t),
 				ragep2ptypes.PeerID(p2pkey.MustNewV2XXXTestingOnly(big.NewInt(1)).PeerID()),
