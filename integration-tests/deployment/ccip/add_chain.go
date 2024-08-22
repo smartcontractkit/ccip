@@ -38,7 +38,8 @@ func AddChain(
 	}
 
 	// 2. Generate proposal per source chain to enable new destination (from test router).
-	var sourceProposals []managed.MCMSWithTimelockProposal
+	var batches []managed.DetailedBatchChainOperation
+	metaDataPerChain := make(map[string]managed.MCMSWithTimelockChainMetadata)
 	for _, source := range sources {
 		chain, _ := chainsel.ChainBySelector(source)
 		enableOnRampDest, err := state.Chains[source].OnRamp.ApplyDestChainConfigUpdates(SimTransactOpts(), []onramp.OnRampDestChainConfigArgs{
@@ -75,52 +76,50 @@ func AddChain(
 		if err != nil {
 			return nil, ab, err
 		}
-		sourceProposal := managed.MCMSWithTimelockProposal{
-			Operation: managed.Schedule,
-			MinDelay:  "1h",
-			ChainMetadata: map[string]managed.MCMSWithTimelockChainMetadata{
-				chain.Name: {
-					ExecutableMCMSChainMetadata: executable.ExecutableMCMSChainMetadata{
-						NonceOffset: 0,
-						MCMAddress:  state.Chains[source].McmAddr,
-					},
-					TimelockAddress: state.Chains[source].McmAddr,
-				},
-			},
-			Transactions: []managed.DetailedBatchChainOperation{
+		batches = append(batches, managed.DetailedBatchChainOperation{
+			ChainIdentifier: chain.Name,
+			Batch: []managed.DetailedOperation{
 				{
-					ChainIdentifier: chain.Name,
-					Batch: []managed.DetailedOperation{
-						{
-							// Enable the source in on ramp
-							Operation: executable.Operation{
-								To:    state.Chains[source].OnRamp.Address(),
-								Data:  hexutil.Encode(enableOnRampDest.Data()),
-								Value: 0,
-							},
-						},
-						{
-							// Set initial dest prices to unblock testing.
-							Operation: executable.Operation{
-								To:    state.Chains[source].PriceRegistry.Address(),
-								Data:  hexutil.Encode(initialPrices.Data()),
-								Value: 0,
-							},
-						},
-						{
-							// Set initial dest prices to unblock testing.
-							Operation: executable.Operation{
-								To:    state.Chains[source].PriceRegistry.Address(),
-								Data:  hexutil.Encode(enablePriceRegDest.Data()),
-								Value: 0,
-							},
-						},
+					// Enable the source in on ramp
+					Operation: executable.Operation{
+						To:    state.Chains[source].OnRamp.Address(),
+						Data:  hexutil.Encode(enableOnRampDest.Data()),
+						Value: 0,
+					},
+				},
+				{
+					// Set initial dest prices to unblock testing.
+					Operation: executable.Operation{
+						To:    state.Chains[source].PriceRegistry.Address(),
+						Data:  hexutil.Encode(initialPrices.Data()),
+						Value: 0,
+					},
+				},
+				{
+					// Set initial dest prices to unblock testing.
+					Operation: executable.Operation{
+						To:    state.Chains[source].PriceRegistry.Address(),
+						Data:  hexutil.Encode(enablePriceRegDest.Data()),
+						Value: 0,
 					},
 				},
 			},
+		})
+		metaDataPerChain[chain.Name] = managed.MCMSWithTimelockChainMetadata{
+			ExecutableMCMSChainMetadata: executable.ExecutableMCMSChainMetadata{
+				NonceOffset: 0,
+				MCMAddress:  state.Chains[source].McmAddr,
+			},
+			TimelockAddress: state.Chains[source].TimelockAddr,
 		}
-		sourceProposals = append(sourceProposals, sourceProposal)
 	}
+	proposal1 := managed.MCMSWithTimelockProposal{
+		Operation:     managed.Schedule,
+		MinDelay:      "1h",
+		ChainMetadata: metaDataPerChain,
+		Transactions:  batches,
+	}
+
 	// Home chain proposal
 	// - Add new DONs for destination to home chain
 	//AddDON(
@@ -149,7 +148,7 @@ func AddChain(
 	}
 
 	// TODO: Outbound
-	return sourceProposals, ab, nil
+	return []managed.MCMSWithTimelockProposal{proposal1}, ab, nil
 }
 
 // 1. Deploy contracts
