@@ -24,8 +24,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
   event LiquidityTransferred(address indexed from, uint64 indexed remoteChainSelector, uint256 amount);
 
-  event AltMechanismEnabled(uint64 indexed remoteChainSelector);
-  event AltMechanismDisabled(uint64 indexed remoteChainSelector);
+  event LockReleaseEnabled(uint64 indexed remoteChainSelector);
+  event LockReleaseDisabled(uint64 indexed remoteChainSelector);
 
   error LanePausedForCCTPMigration(uint64 remoteChainSelector);
   error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
@@ -57,7 +57,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     returns (Pool.LockOrBurnOutV1 memory)
   {
     // // If the alternative mechanism (L/R) for chains which have it enabled
-    if (!shouldUseAltMechForMessage(lockOrBurnIn.remoteChainSelector)) {
+    if (!shouldUseLockRelease(lockOrBurnIn.remoteChainSelector)) {
       return super.lockOrBurn(lockOrBurnIn);
     }
 
@@ -78,7 +78,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     override
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
-    if (!shouldUseAltMechForMessage(releaseOrMintIn.remoteChainSelector)) {
+    if (!shouldUseLockRelease(releaseOrMintIn.remoteChainSelector)) {
       return super.releaseOrMint(releaseOrMintIn);
     } else {
       return _lockReleaseIncomingMessage(releaseOrMintIn);
@@ -188,19 +188,14 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   }
 
   // ================================================================
-  // │                   Alt Mechanisn Logic                        |
+  // │                   Alt Mechanism Logic                        |
   // ================================================================
 
   /// @notice Return whether a lane should use the alternative L/R mechanism in the token pool.
-  /// @param remoteChainSelector the source chain the message was sent from
-  /// @return bool If the alternative L/R mechanism should be used
-  /// @dev Function has been marked virtual and includes an unused calldata parameter in the event that
-  /// more complex logic becomes necessary in the future, especially if logic changes between incoming
-  /// and outgoing messages.
-  /// @dev It is currently assumed that for a given chain selector, s_shouldUseAltMech is always symmetrical for
-  /// incoming and outgoing messages. This may change if the function is overridden
-  function shouldUseAltMechForMessage(uint64 remoteChainSelector) public view virtual returns (bool) {
-    return s_shouldUseAltMech[remoteChainSelector];
+  /// @param remoteChainSelector the remote chain the lane is interacting with
+  /// @return bool Return true if the alternative L/R mechanism should be used
+  function shouldUseLockRelease(uint64 remoteChainSelector) public view virtual returns (bool) {
+    return s_shouldUseLockRelease[remoteChainSelector];
   }
 
   /// @notice Updates Updates designations for chains on whether to use primary or alt mechanism on CCIP messages
@@ -208,13 +203,13 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   /// @param adds A list of chain selectors to enable LR instead of BM
   function updateChainSelectorMechanisms(uint64[] calldata removes, uint64[] calldata adds) external onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
-      delete s_shouldUseAltMech[removes[i]];
-      emit AltMechanismDisabled(removes[i]);
+      delete s_shouldUseLockRelease[removes[i]];
+      emit LockReleaseDisabled(removes[i]);
     }
 
     for (uint256 i = 0; i < adds.length; ++i) {
-      s_shouldUseAltMech[adds[i]] = true;
-      emit AltMechanismEnabled(adds[i]);
+      s_shouldUseLockRelease[adds[i]] = true;
+      emit LockReleaseEnabled(adds[i]);
     }
   }
 }

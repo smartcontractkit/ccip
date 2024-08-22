@@ -12,8 +12,8 @@ import {Internal} from "../../libraries/Internal.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 
-import {HybridLockReleaseUSDCTokenPool} from "../../pools/MultiMechanismPools/HybridLockReleaseUSDCTokenPool.sol";
-import {USDCBridgeMigrator} from "../../pools/MultiMechanismPools/USDCBridgeMigrator.sol";
+import {HybridLockReleaseUSDCTokenPool} from "../../pools/Hybrid/HybridLockReleaseUSDCTokenPool.sol";
+import {USDCBridgeMigrator} from "../../pools/Hybrid/USDCBridgeMigrator.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
 import {BaseTest} from "../BaseTest.t.sol";
@@ -148,7 +148,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     s_usdcTokenPool.updateChainSelectorMechanisms(new uint64[](0), destChainAdds);
 
     assertTrue(
-      s_usdcTokenPool.shouldUseAltMechForMessage(DEST_CHAIN_SELECTOR),
+      s_usdcTokenPool.shouldUseLockRelease(DEST_CHAIN_SELECTOR),
       "Alt mech not configured for outgoing message to DEST_CHAIN_SELECTOR"
     );
 
@@ -184,7 +184,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     s_usdcTokenPool.updateChainSelectorMechanisms(new uint64[](0), destChainAdds);
 
     assertTrue(
-      s_usdcTokenPool.shouldUseAltMechForMessage(SOURCE_CHAIN_SELECTOR),
+      s_usdcTokenPool.shouldUseLockRelease(SOURCE_CHAIN_SELECTOR),
       "Alt mech not configured for incoming message from SOURCE_CHAIN_SELECTOR"
     );
 
@@ -333,7 +333,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     vm.startPrank(OWNER);
 
     vm.expectEmit();
-    emit HybridLockReleaseUSDCTokenPool.AltMechanismDisabled(DEST_CHAIN_SELECTOR);
+    emit HybridLockReleaseUSDCTokenPool.LockReleaseDisabled(DEST_CHAIN_SELECTOR);
 
     s_usdcTokenPool.updateChainSelectorMechanisms(destChainRemoves, new uint64[](0));
 
@@ -351,7 +351,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     vm.startPrank(OWNER);
 
     vm.expectEmit();
-    emit HybridLockReleaseUSDCTokenPool.AltMechanismDisabled(SOURCE_CHAIN_SELECTOR);
+    emit HybridLockReleaseUSDCTokenPool.LockReleaseDisabled(SOURCE_CHAIN_SELECTOR);
 
     s_usdcTokenPool.updateChainSelectorMechanisms(destChainRemoves, new uint64[](0));
 
@@ -415,7 +415,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     s_usdcTokenPool.updateChainSelectorMechanisms(new uint64[](0), destChainAdds);
 
     assertTrue(
-      s_usdcTokenPool.shouldUseAltMechForMessage(DEST_CHAIN_SELECTOR),
+      s_usdcTokenPool.shouldUseLockRelease(DEST_CHAIN_SELECTOR),
       "Alt mech not configured for outgoing message to DEST_CHAIN_SELECTOR"
     );
 
@@ -454,7 +454,7 @@ contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
     s_usdcTokenPool.updateChainSelectorMechanisms(new uint64[](0), destChainAdds);
 
     assertTrue(
-      s_usdcTokenPool.shouldUseAltMechForMessage(DEST_CHAIN_SELECTOR),
+      s_usdcTokenPool.shouldUseLockRelease(DEST_CHAIN_SELECTOR),
       "Alt mech not configured for outgoing message to DEST_CHAIN_SELECTOR"
     );
 
@@ -524,9 +524,7 @@ contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
       "No tokens should be locked for DEST_CHAIN_SELECTOR after CCTP-approved burn"
     );
 
-    assertFalse(
-      s_usdcTokenPool.shouldUseAltMechForMessage(DEST_CHAIN_SELECTOR), "Alt mech should be disabled after a burn"
-    );
+    assertFalse(s_usdcTokenPool.shouldUseLockRelease(DEST_CHAIN_SELECTOR), "Alt mech should be disabled after a burn");
   }
 
   function test_cancelExistingCCTPMigrationProposal() public {

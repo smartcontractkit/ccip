@@ -32,7 +32,7 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   uint64 internal s_proposedUSDCMigrationChain;
 
   mapping(uint64 chainSelector => uint256 lockedBalance) internal s_lockedTokensByChainSelector;
-  mapping(uint64 => bool) internal s_shouldUseAltMech;
+  mapping(uint64 => bool) internal s_shouldUseLockRelease;
 
   constructor(address token, address router) {
     i_USDC = IBurnMintERC20(token);
@@ -61,7 +61,7 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
     i_USDC.burn(tokensToBurn);
 
     // Disable L/R automatically on burned chain and enable CCTP
-    delete s_shouldUseAltMech[burnChainSelector];
+    delete s_shouldUseLockRelease[burnChainSelector];
 
     emit CCTPMigrationExecuted(burnChainSelector, tokensToBurn);
   }
