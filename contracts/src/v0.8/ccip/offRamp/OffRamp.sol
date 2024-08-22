@@ -125,8 +125,9 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @dev Struct to hold a merkle root and an interval for a source chain so that an array of these can be passed in the CommitReport.
   struct MerkleRoot {
-    uint64 sourceChainSelector; // Remote source chain selector that the Merkle Root is scoped to
-    Interval interval; // Report interval of the merkle root
+    uint64 sourceChainSelector; // ───╮ Remote source chain selector that the Merkle Root is scoped to
+    uint64 minSeqNr; //               │ Minimum sequence number, inclusive
+    uint64 maxSeqNr; // ──────────────╯ Maximum sequence number, inclusive
     bytes32 merkleRoot; // Merkle root covering the interval & source chain messages
   }
 
@@ -604,8 +605,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       uint64 sourceChainSelector = root.sourceChainSelector;
       SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
 
-      if (sourceChainConfig.minSeqNr != root.interval.min || root.interval.min > root.interval.max) {
-        revert InvalidInterval(root.sourceChainSelector, root.interval);
+      if (sourceChainConfig.minSeqNr != root.minSeqNr || root.minSeqNr > root.maxSeqNr) {
+        revert InvalidInterval(root.sourceChainSelector, Interval({min: root.minSeqNr, max: root.maxSeqNr}));
       }
 
       // TODO: confirm how RMN offchain blessing impacts commit report
@@ -618,7 +619,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         revert RootAlreadyCommitted(root.sourceChainSelector, merkleRoot);
       }
 
-      sourceChainConfig.minSeqNr = root.interval.max + 1;
+      sourceChainConfig.minSeqNr = root.maxSeqNr + 1;
       s_roots[root.sourceChainSelector][merkleRoot] = block.timestamp;
     }
 
@@ -651,20 +652,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     return IRMN(i_rmnProxy).isBlessed(IRMN.TaggedRoot({commitStore: address(this), root: root}));
   }
 
-  /// @notice Used by the owner in case an invalid sequence of roots has been
-  /// posted and needs to be removed. The interval in the report is trusted.
-  /// @param rootToReset The roots that will be reset. This function will only
-  /// reset roots that are not blessed.
-  function resetUnblessedRoots(UnblessedRoot[] calldata rootToReset) external onlyOwner {
-    for (uint256 i = 0; i < rootToReset.length; ++i) {
-      UnblessedRoot memory root = rootToReset[i];
-      if (!isBlessed(root.merkleRoot)) {
-        delete s_roots[root.sourceChainSelector][root.merkleRoot];
-        emit RootRemoved(root.merkleRoot);
-      }
-    }
-  }
-
   /// @notice Returns timestamp of when root was accepted or 0 if verification fails.
   /// @dev This method uses a merkle tree within a merkle tree, with the hashedLeaves,
   /// proofs and proofFlagBits being used to get the root of the inner tree.
@@ -677,10 +664,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     uint256 proofFlagBits
   ) internal view virtual returns (uint256 timestamp) {
     bytes32 root = MerkleMultiProof.merkleRoot(hashedLeaves, proofs, proofFlagBits);
-    // Only return non-zero if present and blessed.
-    if (!isBlessed(root)) {
-      return 0;
-    }
     return s_roots[sourceChainSelector][root];
   }
 

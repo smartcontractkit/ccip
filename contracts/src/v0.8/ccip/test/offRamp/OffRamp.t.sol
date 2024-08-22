@@ -912,7 +912,8 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, 2),
+      minSeqNr: 1,
+      maxSeqNr: 2,
       merkleRoot: merkleRoot
     });
 
@@ -2918,11 +2919,8 @@ contract OffRamp_commit is OffRampSetup {
     bytes32 root = "Only a single root";
 
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, max1),
-      merkleRoot: root
-    });
+    roots[0] =
+      OffRamp.MerkleRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR_1, minSeqNr: 1, maxSeqNr: max1, merkleRoot: root});
 
     OffRamp.CommitReport memory commitReport =
       OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
@@ -2947,7 +2945,8 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, maxSeq),
+      minSeqNr: 1,
+      maxSeqNr: maxSeq,
       merkleRoot: "stale report 1"
     });
     OffRamp.CommitReport memory commitReport =
@@ -2964,7 +2963,8 @@ contract OffRamp_commit is OffRampSetup {
     assertEq(maxSeq + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
     assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
 
-    commitReport.merkleRoots[0].interval = OffRamp.Interval(maxSeq + 1, maxSeq * 2);
+    commitReport.merkleRoots[0].minSeqNr = maxSeq + 1;
+    commitReport.merkleRoots[0].maxSeqNr = maxSeq * 2;
     commitReport.merkleRoots[0].merkleRoot = "stale report 2";
 
     vm.expectEmit();
@@ -3079,7 +3079,8 @@ contract OffRamp_commit is OffRampSetup {
     roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, maxSeq),
+      minSeqNr: 1,
+      maxSeqNr: maxSeq,
       merkleRoot: "stale report"
     });
     commitReport.priceUpdates = _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice2);
@@ -3176,7 +3177,8 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, 4),
+      minSeqNr: 1,
+      maxSeqNr: 4,
       merkleRoot: bytes32(0)
     });
     OffRamp.CommitReport memory commitReport =
@@ -3189,8 +3191,12 @@ contract OffRamp_commit is OffRampSetup {
   function test_InvalidInterval_Revert() public {
     OffRamp.Interval memory interval = OffRamp.Interval(2, 2);
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] =
-      OffRamp.MerkleRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR_1, interval: interval, merkleRoot: bytes32(0)});
+    roots[0] = OffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      minSeqNr: interval.min,
+      maxSeqNr: interval.max,
+      merkleRoot: bytes32(0)
+    });
     OffRamp.CommitReport memory commitReport =
       OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
 
@@ -3202,8 +3208,12 @@ contract OffRamp_commit is OffRampSetup {
     s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
     OffRamp.Interval memory interval = OffRamp.Interval(1, 0);
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] =
-      OffRamp.MerkleRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR_1, interval: interval, merkleRoot: bytes32(0)});
+    roots[0] = OffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      minSeqNr: interval.min,
+      maxSeqNr: interval.max,
+      merkleRoot: bytes32(0)
+    });
     OffRamp.CommitReport memory commitReport =
       OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
 
@@ -3235,8 +3245,7 @@ contract OffRamp_commit is OffRampSetup {
 
   function test_SourceChainNotEnabled_Revert() public {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] =
-      OffRamp.MerkleRoot({sourceChainSelector: 0, interval: OffRamp.Interval(1, 2), merkleRoot: "Only a single root"});
+    roots[0] = OffRamp.MerkleRoot({sourceChainSelector: 0, minSeqNr: 1, maxSeqNr: 2, merkleRoot: "Only a single root"});
 
     OffRamp.CommitReport memory commitReport =
       OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
@@ -3249,14 +3258,16 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, 2),
+      minSeqNr: 1,
+      maxSeqNr: 2,
       merkleRoot: "Only a single root"
     });
     OffRamp.CommitReport memory commitReport =
       OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
 
     _commit(commitReport, s_latestSequenceNumber);
-    commitReport.merkleRoots[0].interval = OffRamp.Interval(3, 3);
+    commitReport.merkleRoots[0].minSeqNr = 3;
+    commitReport.merkleRoots[0].maxSeqNr = 3;
 
     vm.expectRevert(
       abi.encodeWithSelector(OffRamp.RootAlreadyCommitted.selector, roots[0].sourceChainSelector, roots[0].merkleRoot)
@@ -3268,78 +3279,13 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, s_maxInterval),
+      minSeqNr: 1,
+      maxSeqNr: s_maxInterval,
       merkleRoot: "test #2"
     });
 
     return
       OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
-  }
-}
-
-contract OffRamp_resetUnblessedRoots is OffRampSetup {
-  function setUp() public virtual override {
-    super.setUp();
-    _setupRealRMN();
-    _deployOffRamp(s_realRMN, s_inboundNonceManager);
-    _setupMultipleOffRamps();
-  }
-
-  function test_ResetUnblessedRoots_Success() public {
-    OffRamp.UnblessedRoot[] memory rootsToReset = new OffRamp.UnblessedRoot[](3);
-    rootsToReset[0] = OffRamp.UnblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "1"});
-    rootsToReset[1] = OffRamp.UnblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "2"});
-    rootsToReset[2] = OffRamp.UnblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "3"});
-
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](3);
-    roots[0] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: OffRamp.Interval(1, 2),
-      merkleRoot: rootsToReset[0].merkleRoot
-    });
-    roots[1] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: OffRamp.Interval(3, 4),
-      merkleRoot: rootsToReset[1].merkleRoot
-    });
-    roots[2] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: OffRamp.Interval(5, 5),
-      merkleRoot: rootsToReset[2].merkleRoot
-    });
-
-    OffRamp.CommitReport memory report =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
-
-    _commit(report, ++s_latestSequenceNumber);
-
-    IRMN.TaggedRoot[] memory blessedTaggedRoots = new IRMN.TaggedRoot[](1);
-    blessedTaggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_offRamp), root: rootsToReset[1].merkleRoot});
-
-    vm.startPrank(BLESS_VOTE_ADDR);
-    s_realRMN.voteToBless(blessedTaggedRoots);
-
-    vm.expectEmit(false, false, false, true);
-    emit OffRamp.RootRemoved(rootsToReset[0].merkleRoot);
-
-    vm.expectEmit(false, false, false, true);
-    emit OffRamp.RootRemoved(rootsToReset[2].merkleRoot);
-
-    vm.startPrank(OWNER);
-    s_offRamp.resetUnblessedRoots(rootsToReset);
-
-    assertEq(0, s_offRamp.getMerkleRoot(SOURCE_CHAIN_SELECTOR, rootsToReset[0].merkleRoot));
-    assertEq(BLOCK_TIME, s_offRamp.getMerkleRoot(SOURCE_CHAIN_SELECTOR, rootsToReset[1].merkleRoot));
-    assertEq(0, s_offRamp.getMerkleRoot(SOURCE_CHAIN_SELECTOR, rootsToReset[2].merkleRoot));
-  }
-
-  // Reverts
-
-  function test_OnlyOwner_Revert() public {
-    vm.stopPrank();
-    vm.expectRevert("Only callable by owner");
-    OffRamp.UnblessedRoot[] memory rootsToReset = new OffRamp.UnblessedRoot[](0);
-    s_offRamp.resetUnblessedRoots(rootsToReset);
   }
 }
 
@@ -3351,56 +3297,46 @@ contract OffRamp_verify is OffRampSetup {
     _setupMultipleOffRamps();
   }
 
-  function test_NotBlessed_Success() public {
-    bytes32[] memory leaves = new bytes32[](1);
-    leaves[0] = "root";
+  // function test_NotBlessed_Success() public {
+  //   bytes32[] memory leaves = new bytes32[](1);
+  //   leaves[0] = "root";
+  //   OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
+  //   roots[0] =
+  //     OffRamp.MerkleRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, minSeqNr: 1, maxSeqNr: 2, merkleRoot: leaves[0]});
+  //   OffRamp.CommitReport memory report =
+  //     OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
+  //   _commit(report, ++s_latestSequenceNumber);
+  //   bytes32[] memory proofs = new bytes32[](0);
+  //   // We have not blessed this root, should return 0.
+  //   uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
+  //   assertEq(uint256(0), timestamp);
+  // }
 
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: OffRamp.Interval(1, 2),
-      merkleRoot: leaves[0]
-    });
-    OffRamp.CommitReport memory report =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
-    _commit(report, ++s_latestSequenceNumber);
-    bytes32[] memory proofs = new bytes32[](0);
-    // We have not blessed this root, should return 0.
-    uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
-    assertEq(uint256(0), timestamp);
-  }
-
-  function test_Blessed_Success() public {
-    bytes32[] memory leaves = new bytes32[](1);
-    leaves[0] = "root";
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: OffRamp.Interval(1, 2),
-      merkleRoot: leaves[0]
-    });
-    OffRamp.CommitReport memory report =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
-    _commit(report, ++s_latestSequenceNumber);
-    // Bless that root.
-    IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
-    taggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_offRamp), root: leaves[0]});
-    vm.startPrank(BLESS_VOTE_ADDR);
-    s_realRMN.voteToBless(taggedRoots);
-    bytes32[] memory proofs = new bytes32[](0);
-    uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
-    assertEq(BLOCK_TIME, timestamp);
-  }
+  // function test_Blessed_Success() public {
+  //   bytes32[] memory leaves = new bytes32[](1);
+  //   leaves[0] = "root";
+  //   OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
+  //   roots[0] =
+  //     OffRamp.MerkleRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, minSeqNr: 1, maxSeqNr: 2, merkleRoot: leaves[0]});
+  //   OffRamp.CommitReport memory report =
+  //     OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
+  //   _commit(report, ++s_latestSequenceNumber);
+  //   // Bless that root.
+  //   IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
+  //   taggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_offRamp), root: leaves[0]});
+  //   vm.startPrank(BLESS_VOTE_ADDR);
+  //   s_realRMN.voteToBless(taggedRoots);
+  //   bytes32[] memory proofs = new bytes32[](0);
+  //   uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
+  //   assertEq(BLOCK_TIME, timestamp);
+  // }
 
   function test_NotBlessedWrongChainSelector_Success() public {
     bytes32[] memory leaves = new bytes32[](1);
     leaves[0] = "root";
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: OffRamp.Interval(1, 2),
-      merkleRoot: leaves[0]
-    });
+    roots[0] =
+      OffRamp.MerkleRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, minSeqNr: 1, maxSeqNr: 2, merkleRoot: leaves[0]});
 
     OffRamp.CommitReport memory report =
       OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});

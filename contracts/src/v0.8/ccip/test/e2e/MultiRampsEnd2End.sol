@@ -149,12 +149,14 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
       OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](2);
       roots[0] = OffRamp.MerkleRoot({
         sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-        interval: OffRamp.Interval(messages1[0].header.sequenceNumber, messages1[1].header.sequenceNumber),
+        minSeqNr: messages1[0].header.sequenceNumber,
+        maxSeqNr: messages1[1].header.sequenceNumber,
         merkleRoot: merkleRoots[0]
       });
       roots[1] = OffRamp.MerkleRoot({
         sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
-        interval: OffRamp.Interval(messages2[0].header.sequenceNumber, messages2[0].header.sequenceNumber),
+        minSeqNr: messages2[0].header.sequenceNumber,
+        maxSeqNr: messages2[0].header.sequenceNumber,
         merkleRoot: merkleRoots[1]
       });
 
