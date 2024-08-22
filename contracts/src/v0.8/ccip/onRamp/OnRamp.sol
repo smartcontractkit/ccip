@@ -3,10 +3,10 @@ pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
+import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
-import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../interfaces/IRMN.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
@@ -154,7 +154,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     }
 
     // Convert message fee to juels and retrieve converted args
-    (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) = IPriceRegistry(
+    (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) = IFeeQuoter(
       s_dynamicConfig.priceRegistry
     ).processMessageArgs(destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs);
 
@@ -192,7 +192,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     }
 
     // Validate pool return data after it is populated (view function - no state changes)
-    IPriceRegistry(s_dynamicConfig.priceRegistry).validatePoolReturnData(
+    IFeeQuoter(s_dynamicConfig.priceRegistry).validatePoolReturnData(
       destChainSelector, newMessage.tokenAmounts, message.tokenAmounts
     );
 
@@ -363,13 +363,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   ) external view returns (uint256 feeTokenAmount) {
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN(destChainSelector);
 
-    return IPriceRegistry(s_dynamicConfig.priceRegistry).getValidatedFee(destChainSelector, message);
+    return IFeeQuoter(s_dynamicConfig.priceRegistry).getValidatedFee(destChainSelector, message);
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
   /// @dev This function can be permissionless as it only transfers accepted fee tokens to the fee aggregator which is a trusted address.
   function withdrawFeeTokens() external {
-    address[] memory feeTokens = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokens();
+    address[] memory feeTokens = IFeeQuoter(s_dynamicConfig.priceRegistry).getFeeTokens();
     address feeAggregator = s_dynamicConfig.feeAggregator;
 
     for (uint256 i = 0; i < feeTokens.length; ++i) {

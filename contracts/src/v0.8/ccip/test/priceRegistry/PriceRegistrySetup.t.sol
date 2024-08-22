@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
+import {IFeeQuoter} from "../../interfaces/IFeeQuoter.sol";
 
 import {MockV3Aggregator} from "../../../tests/MockV3Aggregator.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
@@ -191,7 +191,7 @@ contract PriceRegistrySetup is TokenSetup {
   ) internal pure returns (PriceRegistry.TokenPriceFeedUpdate memory) {
     return PriceRegistry.TokenPriceFeedUpdate({
       sourceToken: sourceToken,
-      feedConfig: IPriceRegistry.TokenPriceFeedConfig({dataFeedAddress: dataFeedAddress, tokenDecimals: tokenDecimals})
+      feedConfig: IFeeQuoter.TokenPriceFeedConfig({dataFeedAddress: dataFeedAddress, tokenDecimals: tokenDecimals})
     });
   }
 
@@ -248,20 +248,16 @@ contract PriceRegistrySetup is TokenSetup {
   }
 
   function _assertTokenPriceFeedConfigEquality(
-    IPriceRegistry.TokenPriceFeedConfig memory config1,
-    IPriceRegistry.TokenPriceFeedConfig memory config2
+    IFeeQuoter.TokenPriceFeedConfig memory config1,
+    IFeeQuoter.TokenPriceFeedConfig memory config2
   ) internal pure virtual {
     assertEq(config1.dataFeedAddress, config2.dataFeedAddress);
     assertEq(config1.tokenDecimals, config2.tokenDecimals);
   }
 
-  function _assertTokenPriceFeedConfigUnconfigured(IPriceRegistry.TokenPriceFeedConfig memory config)
-    internal
-    pure
-    virtual
-  {
+  function _assertTokenPriceFeedConfigUnconfigured(IFeeQuoter.TokenPriceFeedConfig memory config) internal pure virtual {
     _assertTokenPriceFeedConfigEquality(
-      config, IPriceRegistry.TokenPriceFeedConfig({dataFeedAddress: address(0), tokenDecimals: 0})
+      config, IFeeQuoter.TokenPriceFeedConfig({dataFeedAddress: address(0), tokenDecimals: 0})
     );
   }
 

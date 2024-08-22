@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
+import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {AuthorizedCallers} from "../shared/access/AuthorizedCallers.sol";
@@ -16,14 +17,14 @@ import {EnumerableSet} from "../vendor/openzeppelin-solidity/v5.0.2/contracts/ut
 /// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
 /// and the price of a token in USD allowing the owner or priceUpdater to update this value.
 /// The authorized callers in the contract represent the fee price updaters.
-contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
+contract PriceRegistry is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
 
   /// @notice Token price data feed update
   struct TokenPriceFeedUpdate {
     address sourceToken; // Source token to update feed for
-    IPriceRegistry.TokenPriceFeedConfig feedConfig; // Feed config update data
+    IFeeQuoter.TokenPriceFeedConfig feedConfig; // Feed config update data
   }
 
   /// @dev Struct that contains the static configuration
@@ -55,7 +56,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   event FeeTokenRemoved(address indexed feeToken);
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
   event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
-  event PriceFeedPerTokenUpdated(address indexed token, IPriceRegistry.TokenPriceFeedConfig priceFeedConfig);
+  event PriceFeedPerTokenUpdated(address indexed token, IFeeQuoter.TokenPriceFeedConfig priceFeedConfig);
   event TokenTransferFeeConfigUpdated(
     uint64 indexed destChainSelector, address indexed token, TokenTransferFeeConfig tokenTransferFeeConfig
   );
@@ -157,7 +158,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   mapping(address token => Internal.TimestampedPackedUint224 price) private s_usdPerToken;
 
   /// @dev Stores the price data feed configurations per token.
-  mapping(address token => IPriceRegistry.TokenPriceFeedConfig dataFeedAddress) private s_usdPriceFeedsPerToken;
+  mapping(address token => IFeeQuoter.TokenPriceFeedConfig dataFeedAddress) private s_usdPriceFeedsPerToken;
 
   /// @dev The multiplier for destination chain specific premiums that can be set by the owner or fee admin
   /// This should never be 0 once set, so it can be used as an isEnabled flag
@@ -213,7 +214,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
   /// @inheritdoc IPriceRegistry
   function getTokenPrice(address token) public view override returns (Internal.TimestampedPackedUint224 memory) {
-    IPriceRegistry.TokenPriceFeedConfig memory priceFeedConfig = s_usdPriceFeedsPerToken[token];
+    IFeeQuoter.TokenPriceFeedConfig memory priceFeedConfig = s_usdPriceFeedsPerToken[token];
     if (priceFeedConfig.dataFeedAddress == address(0)) {
       return s_usdPerToken[token];
     }
@@ -241,12 +242,12 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     return tokenPrices;
   }
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function getTokenPriceFeedConfig(address token)
     external
     view
     override
-    returns (IPriceRegistry.TokenPriceFeedConfig memory)
+    returns (IFeeQuoter.TokenPriceFeedConfig memory)
   {
     return s_usdPriceFeedsPerToken[token];
   }
@@ -305,7 +306,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   /// @notice Gets the token price from a data feed address, rebased to the same units as s_usdPerToken
   /// @param priceFeedConfig token data feed configuration with valid data feed address (used to retrieve price & timestamp)
   /// @return tokenPrice data feed price answer rebased to s_usdPerToken units, with latest block timestamp
-  function _getTokenPriceFromDataFeed(IPriceRegistry.TokenPriceFeedConfig memory priceFeedConfig)
+  function _getTokenPriceFromDataFeed(IFeeQuoter.TokenPriceFeedConfig memory priceFeedConfig)
     internal
     view
     returns (Internal.TimestampedPackedUint224 memory tokenPrice)
@@ -428,7 +429,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     for (uint256 i; i < tokenPriceFeedUpdates.length; ++i) {
       TokenPriceFeedUpdate memory update = tokenPriceFeedUpdates[i];
       address sourceToken = update.sourceToken;
-      IPriceRegistry.TokenPriceFeedConfig memory tokenPriceFeedConfig = update.feedConfig;
+      IFeeQuoter.TokenPriceFeedConfig memory tokenPriceFeedConfig = update.feedConfig;
 
       s_usdPriceFeedsPerToken[sourceToken] = tokenPriceFeedConfig;
       emit PriceFeedPerTokenUpdated(sourceToken, tokenPriceFeedConfig);
@@ -439,7 +440,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   // │                       Fee quoting                            │
   // ================================================================
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   /// @dev The function should always validate message.extraArgs, message.receiver and family-specific configs
   function getValidatedFee(
     uint64 destChainSelector,
@@ -774,7 +775,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     _validateDestFamilyAddress(destChainConfig.chainFamilySelector, receiver);
   }
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function processMessageArgs(
     uint64 destChainSelector,
     address feeToken,
@@ -799,7 +800,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     return (msgFeeJuels, isOutOfOrderExecution, Client._argsToBytes(parsedExtraArgs));
   }
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   /// @dev precondition - rampTokenAmounts and sourceTokenAmounts lengths must be equal
   function validatePoolReturnData(
     uint64 destChainSelector,
