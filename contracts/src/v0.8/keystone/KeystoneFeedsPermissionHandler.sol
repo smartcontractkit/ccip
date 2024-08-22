@@ -67,13 +67,13 @@ abstract contract KeystoneFeedsPermissionHandler is OwnerIsCreator {
     }
   }
 
-  //@notice Generates a unique report ID based on the provided parameters.
-  //@dev The report ID is computed using the Keccak-256 hash function over the encoded parameters.
-  //@param forwarder The address of the forwarder associated with the report.
-  //@param workflowOwner The address of the owner of the workflow.
-  //@param workflowName The name of the workflow, represented as a 10-byte value.
-  //@param reportName The name of the report, represented as a 2-byte value.
-  //@return reportId The computed unique report ID as a bytes32 value.
+  /// @notice Generates a unique report ID based on the provided parameters.
+  /// @dev The report ID is computed using the Keccak-256 hash function over the encoded parameters.
+  /// @param forwarder The address of the forwarder associated with the report.
+  /// @param workflowOwner The address of the owner of the workflow.
+  /// @param workflowName The name of the workflow, represented as a 10-byte value.
+  /// @param reportName The name of the report, represented as a 2-byte value.
+  /// @return reportId The computed unique report ID as a bytes32 value.
   function _createReportId(
     address forwarder,
     address workflowOwner,

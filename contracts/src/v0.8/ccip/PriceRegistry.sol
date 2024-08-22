@@ -642,11 +642,11 @@ contract PriceRegistry is
     return (tokenTransferFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead);
   }
 
-  //@notice calculates the rebased value for 1e18 smallest token denomination
-  //@param dataFeedDecimal decimal of the data feed
-  //@param tokenDecimal decimal of the token
-  //@param feedValue value of the data feed
-  //@return rebasedVal rebased value
+  /// @notice calculates the rebased value for 1e18 smallest token denomination
+  /// @param dataFeedDecimal decimal of the data feed
+  /// @param tokenDecimal decimal of the token
+  /// @param feedValue value of the data feed
+  /// @return rebasedVal rebased value
   function _calculateRebasedValue(
     uint8 dataFeedDecimal,
     uint8 tokenDecimal,
