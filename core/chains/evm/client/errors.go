@@ -161,6 +161,12 @@ var arbitrum = ClientErrors{
 	ServiceUnavailable:    regexp.MustCompile(`(: |^)502 Bad Gateway: [\s\S]*$`),
 }
 
+// Treasure
+var treasureFatal = regexp.MustCompile(`(: |^)invalid chain id for signer(:|$)`)
+var treasure = ClientErrors{
+	Fatal: treasureFatal,
+}
+
 var celo = ClientErrors{
 	TxFeeExceedsCap:       regexp.MustCompile(`(: |^)tx fee \([0-9\.]+ of currency celo\) exceeds the configured cap \([0-9\.]+ [a-zA-Z]+\)$`),
 	TerminallyUnderpriced: regexp.MustCompile(`(: |^)gasprice is less than gas price minimum floor`),
@@ -257,7 +263,7 @@ var internal = ClientErrors{
 	TerminallyStuck: regexp.MustCompile(TerminallyStuckMsg),
 }
 
-var clients = []ClientErrors{parity, geth, arbitrum, metis, substrate, avalanche, nethermind, harmony, besu, erigon, klaytn, celo, zkSync, zkEvm, internal}
+var clients = []ClientErrors{parity, geth, arbitrum, metis, substrate, avalanche, nethermind, harmony, besu, erigon, klaytn, celo, zkSync, zkEvm, treasure, internal}
 
 // ClientErrorRegexes returns a map of compiled regexes for each error type
 func ClientErrorRegexes(errsRegex config.ClientErrors) *ClientErrors {
