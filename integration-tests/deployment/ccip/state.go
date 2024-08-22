@@ -249,7 +249,7 @@ func LoadChainState(chain deployment.Chain, addresses map[string]deployment.Type
 			if err != nil {
 				return state, err
 			}
-			state.Router = r
+			state.TestRouter = r
 		case deployment.NewTypeAndVersion(PriceRegistry, deployment.Version1_6_0_dev).String():
 			pr, err := price_registry.NewPriceRegistry(common.HexToAddress(address), chain.Client)
 			if err != nil {
