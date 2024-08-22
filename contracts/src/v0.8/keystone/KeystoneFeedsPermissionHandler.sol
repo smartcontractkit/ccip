@@ -10,18 +10,18 @@ abstract contract KeystoneFeedsPermissionHandler is OwnerIsCreator {
   /// @notice Holds the details for permissions of a report
   /// @dev Workflow names and report names are stored as bytes to optimize for gas efficiency.
   struct Permission {
-    address forwarder;
-    bytes10 workflowName;
-    bytes2 reportName;
-    address workflowOwner;
-    bool isAllowed;
+    address forwarder;//───────────────╮ The address of the forwarder (20 bytes)
+    bytes10 workflowName;//            │ The name of the workflow in bytes10
+    bytes2 reportName;//───────────────╯ The name of the report in bytes2
+    address workflowOwner; // The address of the workflow owner
+    bool isAllowed; // Whether the report is allowed or not
   }
 
   /// @notice Event emitted when report permissions are set
   event ReportPermissionSet(bytes32 indexed reportId, Permission permission);
 
   /// @notice Error to be thrown when an unauthorized access attempt is made
-  error Unauthorized(address forwarder, address workflowOwner, bytes10 workflowName, bytes2 reportName);
+  error ReportForwarderUnauthorized(address forwarder, address workflowOwner, bytes10 workflowName, bytes2 reportName);
 
   /// @dev Mapping from a report ID to a boolean indicating whether the report is allowed or not
   mapping(bytes32 => bool) internal s_allowedReports;
@@ -30,7 +30,7 @@ abstract contract KeystoneFeedsPermissionHandler is OwnerIsCreator {
   /// @param permissions An array of Permission structs for which to set permissions
   /// @dev Emits a ReportPermissionSet event for each permission set
   function setReportPermissions(Permission[] memory permissions) external onlyOwner {
-    for (uint256 i; i < permissions.length; i++) {
+    for (uint256 i; i < permissions.length; ++i) {
       _setReportPermission(permissions[i]);
     }
   }
@@ -63,7 +63,7 @@ abstract contract KeystoneFeedsPermissionHandler is OwnerIsCreator {
   ) internal view {
     bytes32 reportId = _createReportId(forwarder, workflowOwner, workflowName, reportName);
     if (!s_allowedReports[reportId]) {
-      revert Unauthorized(forwarder, workflowOwner, workflowName, reportName);
+      revert ReportForwarderUnauthorized(forwarder, workflowOwner, workflowName, reportName);
     }
   }
 
