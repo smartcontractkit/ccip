@@ -33,7 +33,8 @@ func Test0002_InitialDeploy(t *testing.T) {
 
 	// Apply migration
 	output, err := Apply0002(tenv.Env, ccipdeployment.DeployCCIPContractConfig{
-		HomeChainSel: tenv.HomeChainSel,
+		HomeChainSel:   tenv.HomeChainSel,
+		ChainsToDeploy: tenv.Env.AllChainSelectors(),
 		// Capreg/config already exist.
 		CCIPOnChainState: state,
 	})
@@ -64,7 +65,6 @@ func Test0002_InitialDeploy(t *testing.T) {
 	// Ensure job related logs are up to date.
 	require.NoError(t, ccipdeployment.ReplayAllLogs(nodes, chains))
 
-	// Send a request from every router
 	// Add all lanes
 	for source := range e.Chains {
 		for dest := range e.Chains {

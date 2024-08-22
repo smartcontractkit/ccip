@@ -14,7 +14,7 @@ func Apply0002(env deployment.Environment, c ccipdeployment.DeployCCIPContractCo
 	ab, err := ccipdeployment.DeployCCIPContracts(env, c)
 	if err != nil {
 		env.Logger.Errorw("Failed to deploy CCIP contracts", "err", err, "addresses", ab)
-		return deployment.ChangesetOutput{}, err
+		return deployment.ChangesetOutput{}, deployment.MaybeDataErr(err)
 	}
 	js, err := ccipdeployment.NewCCIPJobSpecs(env.NodeIDs, env.Offchain)
 	if err != nil {

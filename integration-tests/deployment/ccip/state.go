@@ -42,12 +42,12 @@ type CCIPChainState struct {
 	CapabilityRegistry *capabilities_registry.CapabilitiesRegistry
 	CCIPConfig         *ccip_config.CCIPConfig
 	Mcm                *owner_wrappers.ManyChainMultiSig
-	// TODO: remove once we have Address() on wrappers
-	McmsAddr common.Address
-	Timelock *owner_wrappers.RBACTimelock
+	McmAddr            common.Address
+	Timelock           *owner_wrappers.RBACTimelock
 
 	// Test contracts
-	Receiver *maybe_revert_message_receiver.MaybeRevertMessageReceiver
+	Receiver   *maybe_revert_message_receiver.MaybeRevertMessageReceiver
+	TestRouter *router.Router
 }
 
 // Onchain state always derivable from an address book.
@@ -189,7 +189,7 @@ func LoadChainState(chain deployment.Chain, addresses map[string]deployment.Type
 				return state, err
 			}
 			state.Mcm = mcms
-			state.McmsAddr = common.HexToAddress(address)
+			state.McmAddr = common.HexToAddress(address)
 		case deployment.NewTypeAndVersion(CapabilitiesRegistry, deployment.Version1_0_0).String():
 			cr, err := capabilities_registry.NewCapabilitiesRegistry(common.HexToAddress(address), chain.Client)
 			if err != nil {
@@ -239,6 +239,12 @@ func LoadChainState(chain deployment.Chain, addresses map[string]deployment.Type
 			}
 			state.TokenAdminRegistry = tm
 		case deployment.NewTypeAndVersion(Router, deployment.Version1_2_0).String():
+			r, err := router.NewRouter(common.HexToAddress(address), chain.Client)
+			if err != nil {
+				return state, err
+			}
+			state.Router = r
+		case deployment.NewTypeAndVersion(TestRouter, deployment.Version1_2_0).String():
 			r, err := router.NewRouter(common.HexToAddress(address), chain.Client)
 			if err != nil {
 				return state, err

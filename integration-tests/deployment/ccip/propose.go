@@ -17,7 +17,7 @@ import (
 func SimTransactOpts() *bind.TransactOpts {
 	return &bind.TransactOpts{Signer: func(address common.Address, transaction *types.Transaction) (*types.Transaction, error) {
 		return transaction, nil
-	}, From: common.HexToAddress("0x0"), NoSend: true, GasLimit: 200_000}
+	}, From: common.HexToAddress("0x0"), NoSend: true, GasLimit: 1_000_000}
 }
 
 func GenerateAcceptOwnershipProposal(
@@ -47,7 +47,7 @@ func GenerateAcceptOwnershipProposal(
 		}
 		ops = append(ops, owner_helpers.ManyChainMultiSigOp{
 			ChainId:  big.NewInt(int64(evmID)),
-			MultiSig: state.Chains[sel].McmsAddr,
+			MultiSig: state.Chains[sel].McmAddr,
 			Nonce:    opCount,
 			To:       state.Chains[sel].OnRamp.Address(),
 			Value:    big.NewInt(0),

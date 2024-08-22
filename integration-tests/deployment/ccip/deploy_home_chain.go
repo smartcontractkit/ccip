@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 
@@ -18,7 +19,6 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
@@ -53,6 +53,21 @@ const (
 	MaxDurationShouldTransmitAcceptedReport = 10 * time.Second
 )
 
+var (
+	// TODO: sort out why the mismatch here
+	//CCIPCapabilityId [32]byte = utils.MustHash(hexutil.Encode(MustABIEncode(`[{"type": "string"}, {"type": "string"}]`, CapabilityLabelledName, CapabilityVersion)))
+	CCIPCapabilityId [32]byte = MustHashFromBytes(hexutil.MustDecode("0xe0da3c2b9005178f4731c9f40164f1933ad00bac9d6c13ad4ca1a8a763416380"))
+)
+
+func MustHashFromBytes(b []byte) [32]byte {
+	if len(b) != 32 {
+		panic("invalid length")
+	}
+	var res [32]byte
+	copy(res[:], b)
+	return res
+}
+
 func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainSel uint64) (deployment.AddressBook, common.Address, error) {
 	ab := deployment.NewMemoryAddressBook()
 	chain := chains[chainSel]
@@ -70,6 +85,7 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 		lggr.Errorw("Failed to deploy capreg", "err", err)
 		return ab, common.Address{}, err
 	}
+
 	lggr.Infow("deployed capreg", "addr", capReg.Address)
 	ccipConfig, err := deployContract(
 		lggr, chain, ab,
@@ -126,7 +142,6 @@ func AddNodes(
 	capReg *capabilities_registry.CapabilitiesRegistry,
 	chain deployment.Chain,
 	p2pIDs [][32]byte,
-	capabilityIDs [][32]byte,
 ) error {
 	// Need to sort, otherwise _checkIsValidUniqueSubset onChain will fail
 	sortP2PIDS(p2pIDs)
@@ -136,7 +151,7 @@ func AddNodes(
 			NodeOperatorId:      NodeOperatorID,
 			Signer:              p2pID, // Not used in tests
 			P2pId:               p2pID,
-			HashedCapabilityIds: capabilityIDs,
+			HashedCapabilityIds: [][32]byte{CCIPCapabilityId},
 		}
 		nodeParams = append(nodeParams, nodeParam)
 	}
@@ -165,8 +180,8 @@ func AddChainConfig(
 	ccipConfig *ccip_config.CCIPConfig,
 	chainSelector uint64,
 	p2pIDs [][32]byte,
-	f uint8,
 ) (ccip_config.CCIPConfigTypesChainConfigInfo, error) {
+	f := uint8(len(p2pIDs) / 3)
 	// Need to sort, otherwise _checkIsValidUniqueSubset onChain will fail
 	sortP2PIDS(p2pIDs)
 	// First Add ChainConfig that includes all p2pIDs as readers
@@ -193,17 +208,16 @@ func AddChainConfig(
 
 func AddDON(
 	lggr logger.Logger,
-	ccipCapabilityID [32]byte,
 	capReg *capabilities_registry.CapabilitiesRegistry,
 	ccipConfig *ccip_config.CCIPConfig,
 	offRamp *offramp.OffRamp,
 	dest deployment.Chain,
 	home deployment.Chain,
-	f uint8,
-	bootstrapP2PID [32]byte,
-	p2pIDs [][32]byte,
-	nodes []deployment.Node,
+	nodes deployment.Nodes,
 ) error {
+	f := uint8(len(nodes) / 3)
+	bootstrapP2PID := nodes.BootstrapPeerIDs(dest.Selector)[0]
+	p2pIDs := nodes.PeerIDs(dest.Selector)
 	sortP2PIDS(p2pIDs)
 	// Get OCR3 Config from helper
 	var schedule []int
@@ -311,7 +325,7 @@ func AddDON(
 
 	tx, err := capReg.AddDON(home.DeployerKey, p2pIDs, []capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
 		{
-			CapabilityId: ccipCapabilityID,
+			CapabilityId: CCIPCapabilityId,
 			Config:       encodedConfigs,
 		},
 	}, false, false, f)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	owner_helpers "github.com/smartcontractkit/ccip-owner-contracts/gethwrappers"
 
@@ -42,8 +43,10 @@ var (
 	RBACTimelock         deployment.ContractType = "RBACTimelock"
 	OnRamp               deployment.ContractType = "OnRamp"
 	OffRamp              deployment.ContractType = "OffRamp"
-	CCIPReceiver         deployment.ContractType = "CCIPReceiver"
 	CapabilitiesRegistry deployment.ContractType = "CapabilitiesRegistry"
+	// Note test router maps to a regular router contract.
+	TestRouter   deployment.ContractType = "TestRouter"
+	CCIPReceiver deployment.ContractType = "CCIPReceiver"
 )
 
 type Contracts interface {
@@ -101,7 +104,8 @@ func deployContract[C Contracts](
 }
 
 type DeployCCIPContractConfig struct {
-	HomeChainSel uint64
+	HomeChainSel   uint64
+	ChainsToDeploy []uint64
 	// Existing contracts which we want to skip deployment
 	// Leave empty if we want to deploy everything
 	// TODO: Add skips to deploy function.
@@ -128,17 +132,23 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 		e.Logger.Errorw("Failed to get hashed capability id", "err", err)
 		return ab, err
 	}
+	if cr != CCIPCapabilityId {
+		return ab, fmt.Errorf("Capability registry does not support CCIP %s %s", hexutil.Encode(cr[:]), hexutil.Encode(CCIPCapabilityId[:]))
+	}
 	// Signal to CR that our nodes support CCIP capability.
 	if err := AddNodes(
 		c.Chains[c.HomeChainSel].CapabilityRegistry,
 		e.Chains[c.HomeChainSel],
 		nodes.PeerIDs(c.HomeChainSel), // Doesn't actually matter which sel here
-		[][32]byte{cr},
 	); err != nil {
 		return ab, err
 	}
 
-	for _, chain := range e.Chains {
+	for _, chainSel := range c.ChainsToDeploy {
+		chain, ok := e.Chains[chainSel]
+		if !ok {
+			return ab, fmt.Errorf("Chain %d not found", chainSel)
+		}
 		ab, err = DeployChainContracts(e, chain, ab)
 		if err != nil {
 			return ab, err
@@ -153,47 +163,27 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 			e.Logger.Errorw("Failed to load chain state", "err", err)
 			return ab, err
 		}
-		// Enable ramps on price registry/nonce manager
-		tx, err := chainState.PriceRegistry.ApplyAuthorizedCallerUpdates(chain.DeployerKey, price_registry.AuthorizedCallersAuthorizedCallerArgs{
-			// TODO: We enable the deployer initially to set prices
-			AddedCallers: []common.Address{chainState.OffRamp.Address(), chain.DeployerKey.From},
-		})
-		if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
-			e.Logger.Errorw("Failed to confirm price registry authorized caller update", "err", err)
-			return ab, err
-		}
-
-		tx, err = chainState.NonceManager.ApplyAuthorizedCallerUpdates(chain.DeployerKey, nonce_manager.AuthorizedCallersAuthorizedCallerArgs{
-			AddedCallers: []common.Address{chainState.OffRamp.Address(), chainState.OnRamp.Address()},
-		})
-		if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
-			e.Logger.Errorw("Failed to update nonce manager with ramps", "err", err)
-			return ab, err
-		}
 
 		// TODO: Do we want to extract this?
 		// Add chain config for each chain.
-		_, err = AddChainConfig(e.Logger,
+		_, err = AddChainConfig(
+			e.Logger,
 			e.Chains[c.HomeChainSel],
 			c.Chains[c.HomeChainSel].CCIPConfig,
 			chain.Selector,
-			nodes.PeerIDs(chain.Selector),
-			uint8(len(nodes)/3))
+			nodes.PeerIDs(chain.Selector))
 		if err != nil {
 			return ab, err
 		}
 
-		// For each chain, we create a DON on the home chain.
-		if err := AddDON(e.Logger,
-			cr,
+		// For each chain, we create a DON on the home chain (2 OCR instances)
+		if err := AddDON(
+			e.Logger,
 			c.Chains[c.HomeChainSel].CapabilityRegistry,
 			c.Chains[c.HomeChainSel].CCIPConfig,
 			chainState.OffRamp,
 			chain,
 			e.Chains[c.HomeChainSel],
-			uint8(len(nodes)/3),
-			nodes.BootstrapPeerIDs(chain.Selector)[0],
-			nodes.PeerIDs(chain.Selector),
 			nodes,
 		); err != nil {
 			e.Logger.Errorw("Failed to add DON", "err", err)
@@ -204,7 +194,11 @@ func DeployCCIPContracts(e deployment.Environment, c DeployCCIPContractConfig) (
 	return ab, nil
 }
 
-func DeployChainContracts(e deployment.Environment, chain deployment.Chain, ab deployment.AddressBook) (deployment.AddressBook, error) {
+func DeployChainContracts(
+	e deployment.Environment,
+	chain deployment.Chain,
+	ab deployment.AddressBook,
+) (deployment.AddressBook, error) {
 	ccipReceiver, err := deployContract(e.Logger, chain, ab,
 		func(chain deployment.Chain) ContractDeploy[*maybe_revert_message_receiver.MaybeRevertMessageReceiver] {
 			receiverAddr, tx, receiver, err2 := maybe_revert_message_receiver.DeployMaybeRevertMessageReceiver(
@@ -295,6 +289,8 @@ func DeployChainContracts(e deployment.Environment, chain deployment.Chain, ab d
 	}
 	e.Logger.Infow("deployed rmnProxy", "addr", rmnProxy.Address)
 
+	// TODO: Need general configuration for using pre-existing weth9
+	// link tokens.
 	weth9, err := deployContract(e.Logger, chain, ab,
 		func(chain deployment.Chain) ContractDeploy[*weth9.WETH9] {
 			weth9Addr, tx, weth9c, err2 := weth9.DeployWETH9(
@@ -346,6 +342,24 @@ func DeployChainContracts(e deployment.Environment, chain deployment.Chain, ab d
 		return ab, err
 	}
 	e.Logger.Infow("deployed router", "addr", routerContract)
+
+	testRouterContract, err := deployContract(e.Logger, chain, ab,
+		func(chain deployment.Chain) ContractDeploy[*router.Router] {
+			routerAddr, tx, routerC, err2 := router.DeployRouter(
+				chain.DeployerKey,
+				chain.Client,
+				weth9.Address,
+				rmnProxy.Address,
+			)
+			return ContractDeploy[*router.Router]{
+				routerAddr, routerC, tx, deployment.NewTypeAndVersion(TestRouter, deployment.Version1_2_0), err2,
+			}
+		})
+	if err != nil {
+		e.Logger.Errorw("Failed to deploy test router", "err", err)
+		return ab, err
+	}
+	e.Logger.Infow("deployed test router", "addr", testRouterContract.Address)
 
 	tokenAdminRegistry, err := deployContract(e.Logger, chain, ab,
 		func(chain deployment.Chain) ContractDeploy[*token_admin_registry.TokenAdminRegistry] {
@@ -468,5 +482,24 @@ func DeployChainContracts(e deployment.Environment, chain deployment.Chain, ab d
 		return ab, err
 	}
 	e.Logger.Infow("deployed offramp", "addr", offRamp)
+
+	// Basic wiring is always needed.
+	tx, err := priceRegistry.Contract.ApplyAuthorizedCallerUpdates(chain.DeployerKey, price_registry.AuthorizedCallersAuthorizedCallerArgs{
+		// TODO: We enable the deployer initially to set prices
+		// Should be removed after.
+		AddedCallers: []common.Address{offRamp.Contract.Address(), chain.DeployerKey.From},
+	})
+	if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
+		e.Logger.Errorw("Failed to confirm price registry authorized caller update", "err", err)
+		return ab, err
+	}
+
+	tx, err = nonceManager.Contract.ApplyAuthorizedCallerUpdates(chain.DeployerKey, nonce_manager.AuthorizedCallersAuthorizedCallerArgs{
+		AddedCallers: []common.Address{offRamp.Contract.Address(), onRamp.Contract.Address()},
+	})
+	if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
+		e.Logger.Errorw("Failed to update nonce manager with ramps", "err", err)
+		return ab, err
+	}
 	return ab, nil
 }
