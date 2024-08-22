@@ -27,7 +27,7 @@ func (pt PluginType) String() string {
 	}
 }
 
-// CCIPOracle represents either a CCIP commit or exec oracle.
+// CCIPOracle represents either a CCIP commit or exec oracle or a bootstrap node.
 type CCIPOracle interface {
 	Close() error
 	Start() error
