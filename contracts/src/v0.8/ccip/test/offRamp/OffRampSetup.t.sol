@@ -15,13 +15,14 @@ import {MultiOCR3Base} from "../../ocr/MultiOCR3Base.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
+
+import {PriceRegistrySetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import {OffRampHelper} from "../helpers/OffRampHelper.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MultiOCR3BaseSetup} from "../ocr/MultiOCR3BaseSetup.t.sol";
-import {PriceRegistrySetup} from "../priceRegistry/PriceRegistrySetup.t.sol";
 import {Vm} from "forge-std/Test.sol";
 
 contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
@@ -81,7 +82,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(nonceManager)
       }),
-      _generateDynamicOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_feeQuoter)),
       sourceChainConfigs
     );
 
@@ -106,7 +107,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
       transmitters: s_validTransmitters
     });
 
-    s_offRamp.setDynamicConfig(_generateDynamicOffRampConfig(address(s_priceRegistry)));
+    s_offRamp.setDynamicConfig(_generateDynamicOffRampConfig(address(s_feeQuoter)));
     s_offRamp.setOCR3Configs(ocrConfigs);
 
     address[] memory authorizedCallers = new address[](1);
@@ -117,7 +118,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
 
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = address(s_offRamp);
-    s_priceRegistry.applyAuthorizedCallerUpdates(
+    s_feeQuoter.applyAuthorizedCallerUpdates(
       AuthorizedCallers.AuthorizedCallerArgs({addedCallers: priceUpdaters, removedCallers: new address[](0)})
     );
   }
@@ -146,7 +147,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
       s_validSigners,
       s_validTransmitters,
       s_F,
-      abi.encode(_generateDynamicOffRampConfig(address(router), address(s_priceRegistry))),
+      abi.encode(_generateDynamicOffRampConfig(address(router), address(s_feeQuoter))),
       s_offchainConfigVersion,
       abi.encode("")
     );
@@ -434,7 +435,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
-      _generateDynamicOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_feeQuoter)),
       new OffRamp.SourceChainConfigArgs[](0)
     );
 
@@ -447,7 +448,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
 
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = address(s_offRamp);
-    s_priceRegistry.applyAuthorizedCallerUpdates(
+    s_feeQuoter.applyAuthorizedCallerUpdates(
       AuthorizedCallers.AuthorizedCallerArgs({addedCallers: priceUpdaters, removedCallers: new address[](0)})
     );
   }

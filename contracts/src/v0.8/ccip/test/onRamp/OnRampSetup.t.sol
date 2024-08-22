@@ -9,9 +9,9 @@ import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
+import {PriceRegistryFeeSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import {OnRampHelper} from "../helpers/OnRampHelper.sol";
-import {PriceRegistryFeeSetup} from "../priceRegistry/PriceRegistry.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
@@ -117,7 +117,7 @@ contract OnRampSetup is PriceRegistryFeeSetup {
         nonceManager: nonceManager,
         tokenAdminRegistry: tokenAdminRegistry
       }),
-      _generateDynamicOnRampConfig(address(s_priceRegistry)),
+      _generateDynamicOnRampConfig(address(s_feeQuoter)),
       _generateDestChainConfigArgs(router)
     );
 

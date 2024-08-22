@@ -14,10 +14,10 @@ import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 
 import {EnumerableSet} from "../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
-/// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
+/// @notice The FeeQuoter contract responsibility is to store the current gas price in USD for a given destination chain,
 /// and the price of a token in USD allowing the owner or priceUpdater to update this value.
 /// The authorized callers in the contract represent the fee price updaters.
-contract PriceRegistry is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
+contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
 
@@ -137,7 +137,7 @@ contract PriceRegistry is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
     uint64 premiumMultiplierWeiPerEth; // ──╯ Multiplier for destination chain specific premiums. Should never be 0 so can be used as an isEnabled flag
   }
 
-  string public constant override typeAndVersion = "PriceRegistry 1.6.0-dev";
+  string public constant override typeAndVersion = "FeeQuoter 1.6.0-dev";
 
   /// @dev The gas price per unit of gas for a given destination chain, in USD with 18 decimals.
   /// Multiple gas prices can be encoded into the same value. Each price takes {Internal.GAS_PRICE_BITS} bits.
@@ -348,7 +348,7 @@ contract PriceRegistry is AuthorizedCallers, IFeeQuoter, ITypeAndVersion {
       revert DataFeedValueOutOfUint224Range();
     }
 
-    // Data feed staleness is unchecked to decouple the PriceRegistry from data feed delay issues
+    // Data feed staleness is unchecked to decouple the FeeQuoter from data feed delay issues
     return Internal.TimestampedPackedUint224({value: uint224(rebasedValue), timestamp: uint32(block.timestamp)});
   }
 

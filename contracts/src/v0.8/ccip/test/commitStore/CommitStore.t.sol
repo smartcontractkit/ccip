@@ -6,13 +6,13 @@ import {IRMN} from "../../interfaces/IRMN.sol";
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {CommitStore} from "../../CommitStore.sol";
-import {PriceRegistry} from "../../PriceRegistry.sol";
+import {FeeQuoter} from "../../FeeQuoter.sol";
 import {RMN} from "../../RMN.sol";
 import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
 import {OCR2Abstract} from "../../ocr/OCR2Abstract.sol";
+import {PriceRegistrySetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {CommitStoreHelper} from "../helpers/CommitStoreHelper.sol";
 import {OCR2BaseSetup} from "../ocr/OCR2Base.t.sol";
-import {PriceRegistrySetup} from "../priceRegistry/PriceRegistrySetup.t.sol";
 
 contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
   CommitStoreHelper internal s_commitStore;
@@ -29,15 +29,14 @@ contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
         rmnProxy: address(s_mockRMN)
       })
     );
-    CommitStore.DynamicConfig memory dynamicConfig =
-      CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)});
+    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({priceRegistry: address(s_feeQuoter)});
     s_commitStore.setOCR2Config(
       s_valid_signers, s_valid_transmitters, s_f, abi.encode(dynamicConfig), s_offchainConfigVersion, abi.encode("")
     );
 
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = address(s_commitStore);
-    s_priceRegistry.applyAuthorizedCallerUpdates(
+    s_feeQuoter.applyAuthorizedCallerUpdates(
       AuthorizedCallers.AuthorizedCallerArgs({addedCallers: priceUpdaters, removedCallers: new address[](0)})
     );
   }
@@ -67,8 +66,7 @@ contract CommitStoreRealRMNSetup is PriceRegistrySetup, OCR2BaseSetup {
         rmnProxy: address(s_rmn)
       })
     );
-    CommitStore.DynamicConfig memory dynamicConfig =
-      CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)});
+    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({priceRegistry: address(s_feeQuoter)});
     s_commitStore.setOCR2Config(
       s_valid_signers, s_valid_transmitters, s_f, abi.encode(dynamicConfig), s_offchainConfigVersion, abi.encode("")
     );
@@ -88,8 +86,7 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
       onRamp: 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc,
       rmnProxy: address(s_mockRMN)
     });
-    CommitStore.DynamicConfig memory dynamicConfig =
-      CommitStore.DynamicConfig({priceRegistry: address(s_priceRegistry)});
+    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({priceRegistry: address(s_feeQuoter)});
 
     vm.expectEmit();
     emit CommitStore.ConfigSet(staticConfig, dynamicConfig);
@@ -354,7 +351,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    emit FeeQuoter.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
 
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
     assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
@@ -368,7 +365,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    emit FeeQuoter.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
 
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
     assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
@@ -386,7 +383,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, tokenPrice1, block.timestamp);
+    emit FeeQuoter.UsdPerTokenUpdated(s_sourceFeeToken, tokenPrice1, block.timestamp);
 
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
     assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
@@ -476,7 +473,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    emit FeeQuoter.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
 
     vm.expectRevert(CommitStore.StaleReport.selector);

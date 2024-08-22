@@ -10,12 +10,13 @@ import {Internal} from "../../libraries/Internal.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
+
+import {PriceRegistrySetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {OCR2BaseSetup} from "../ocr/OCR2Base.t.sol";
-import {PriceRegistrySetup} from "../priceRegistry/PriceRegistrySetup.t.sol";
 
 contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
   MockCommitStore internal s_mockCommitStore;
@@ -60,7 +61,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       s_valid_signers,
       s_valid_transmitters,
       s_f,
-      abi.encode(generateDynamicOffRampConfig(address(router), address(s_priceRegistry))),
+      abi.encode(generateDynamicOffRampConfig(address(router), address(s_feeQuoter))),
       s_offchainConfigVersion,
       abi.encode("")
     );

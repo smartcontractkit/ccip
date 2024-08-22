@@ -7,8 +7,9 @@ import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {BaseTest} from "../BaseTest.t.sol";
+
+import {PriceRegistrySetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {MultiAggregateRateLimiterHelper} from "../helpers/MultiAggregateRateLimiterHelper.sol";
-import {PriceRegistrySetup} from "../priceRegistry/PriceRegistrySetup.t.sol";
 import {stdError} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
@@ -34,7 +35,7 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
     PriceRegistrySetup.setUp();
 
     Internal.PriceUpdates memory priceUpdates = _getSingleTokenPriceUpdateStruct(TOKEN, TOKEN_PRICE);
-    s_priceRegistry.updatePrices(priceUpdates);
+    s_feeQuoter.updatePrices(priceUpdates);
 
     MultiAggregateRateLimiter.RateLimiterConfigArgs[] memory configUpdates =
       new MultiAggregateRateLimiter.RateLimiterConfigArgs[](4);
@@ -63,7 +64,7 @@ contract MultiAggregateRateLimiterSetup is BaseTest, PriceRegistrySetup {
     s_authorizedCallers[0] = MOCK_OFFRAMP;
     s_authorizedCallers[1] = MOCK_ONRAMP;
 
-    s_rateLimiter = new MultiAggregateRateLimiterHelper(address(s_priceRegistry), s_authorizedCallers);
+    s_rateLimiter = new MultiAggregateRateLimiterHelper(address(s_feeQuoter), s_authorizedCallers);
     s_rateLimiter.applyRateLimiterConfigUpdates(configUpdates);
   }
 
@@ -114,14 +115,14 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     address[] memory authorizedCallers = new address[](0);
 
     vm.recordLogs();
-    s_rateLimiter = new MultiAggregateRateLimiterHelper(address(s_priceRegistry), authorizedCallers);
+    s_rateLimiter = new MultiAggregateRateLimiterHelper(address(s_feeQuoter), authorizedCallers);
 
     // PriceRegistrySet
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
     assertEq(logEntries.length, 1);
 
     assertEq(OWNER, s_rateLimiter.owner());
-    assertEq(address(s_priceRegistry), s_rateLimiter.getPriceRegistry());
+    assertEq(address(s_feeQuoter), s_rateLimiter.getPriceRegistry());
   }
 
   function test_Constructor_Success() public {
@@ -130,12 +131,12 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     authorizedCallers[1] = MOCK_ONRAMP;
 
     vm.expectEmit();
-    emit MultiAggregateRateLimiter.PriceRegistrySet(address(s_priceRegistry));
+    emit MultiAggregateRateLimiter.PriceRegistrySet(address(s_feeQuoter));
 
-    s_rateLimiter = new MultiAggregateRateLimiterHelper(address(s_priceRegistry), authorizedCallers);
+    s_rateLimiter = new MultiAggregateRateLimiterHelper(address(s_feeQuoter), authorizedCallers);
 
     assertEq(OWNER, s_rateLimiter.owner());
-    assertEq(address(s_priceRegistry), s_rateLimiter.getPriceRegistry());
+    assertEq(address(s_feeQuoter), s_rateLimiter.getPriceRegistry());
     assertEq(s_rateLimiter.typeAndVersion(), "MultiAggregateRateLimiter 1.6.0-dev");
   }
 }
@@ -684,7 +685,7 @@ contract MultiAggregateRateLimiter_onInboundMessage is MultiAggregateRateLimiter
 
       Internal.PriceUpdates memory priceUpdates =
         _getSingleTokenPriceUpdateStruct(s_destTokens[i], TOKEN_PRICE * (i + 1));
-      s_priceRegistry.updatePrices(priceUpdates);
+      s_feeQuoter.updatePrices(priceUpdates);
     }
     s_rateLimiter.updateRateLimitTokens(new MultiAggregateRateLimiter.LocalRateLimitToken[](0), tokensToAdd);
   }
@@ -920,7 +921,7 @@ contract MultiAggregateRateLimiter_onOutboundMessage is MultiAggregateRateLimite
 
       Internal.PriceUpdates memory priceUpdates =
         _getSingleTokenPriceUpdateStruct(s_sourceTokens[i], TOKEN_PRICE * (i + 1));
-      s_priceRegistry.updatePrices(priceUpdates);
+      s_feeQuoter.updatePrices(priceUpdates);
     }
     s_rateLimiter.updateRateLimitTokens(new MultiAggregateRateLimiter.LocalRateLimitToken[](0), tokensToAdd);
   }
