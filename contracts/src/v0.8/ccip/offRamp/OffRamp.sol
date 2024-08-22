@@ -167,7 +167,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   mapping(uint64 sourceChainSelector => mapping(uint64 seqNum => uint256 executionStateBitmap)) internal
     s_executionStates;
 
-  /// @notice Commit timestamp of merfkle roots per source chain
+  /// @notice Commit timestamp of merkle roots per source chain
   mapping(uint64 sourceChainSelector => mapping(bytes32 merkleRoot => uint256 timestamp)) internal s_roots;
   /// @dev The sequence number of the last price update
   uint64 private s_latestPriceSequenceNumber;
