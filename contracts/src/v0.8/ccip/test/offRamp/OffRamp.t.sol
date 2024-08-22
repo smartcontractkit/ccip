@@ -912,6 +912,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: 1,
       maxSeqNr: 2,
       merkleRoot: merkleRoot
@@ -2919,8 +2920,13 @@ contract OffRamp_commit is OffRampSetup {
     bytes32 root = "Only a single root";
 
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] =
-      OffRamp.MerkleRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR_1, minSeqNr: 1, maxSeqNr: max1, merkleRoot: root});
+    roots[0] = OffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      minSeqNr: 1,
+      maxSeqNr: max1,
+      merkleRoot: root
+    });
 
     OffRamp.CommitReport memory commitReport =
       OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
@@ -2945,6 +2951,7 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: 1,
       maxSeqNr: maxSeq,
       merkleRoot: "stale report 1"
@@ -3079,6 +3086,7 @@ contract OffRamp_commit is OffRampSetup {
     roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: 1,
       maxSeqNr: maxSeq,
       merkleRoot: "stale report"
@@ -3177,6 +3185,7 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: 1,
       maxSeqNr: 4,
       merkleRoot: bytes32(0)
@@ -3193,6 +3202,7 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: interval.min,
       maxSeqNr: interval.max,
       merkleRoot: bytes32(0)
@@ -3210,6 +3220,7 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: interval.min,
       maxSeqNr: interval.max,
       merkleRoot: bytes32(0)
@@ -3245,7 +3256,13 @@ contract OffRamp_commit is OffRampSetup {
 
   function test_SourceChainNotEnabled_Revert() public {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({sourceChainSelector: 0, minSeqNr: 1, maxSeqNr: 2, merkleRoot: "Only a single root"});
+    roots[0] = OffRamp.MerkleRoot({
+      sourceChainSelector: 0,
+      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      minSeqNr: 1,
+      maxSeqNr: 2,
+      merkleRoot: "Only a single root"
+    });
 
     OffRamp.CommitReport memory commitReport =
       OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
@@ -3258,6 +3275,7 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: 1,
       maxSeqNr: 2,
       merkleRoot: "Only a single root"
@@ -3279,6 +3297,7 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: 1,
       maxSeqNr: s_maxInterval,
       merkleRoot: "test #2"
@@ -3335,8 +3354,13 @@ contract OffRamp_verify is OffRampSetup {
     bytes32[] memory leaves = new bytes32[](1);
     leaves[0] = "root";
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] =
-      OffRamp.MerkleRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, minSeqNr: 1, maxSeqNr: 2, merkleRoot: leaves[0]});
+    roots[0] = OffRamp.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      minSeqNr: 1,
+      maxSeqNr: 2,
+      merkleRoot: leaves[0]
+    });
 
     OffRamp.CommitReport memory report =
       OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
