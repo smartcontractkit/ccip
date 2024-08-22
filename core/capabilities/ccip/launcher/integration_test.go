@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	it "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ccip_integration_tests/integrationhelpers"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 
@@ -32,17 +33,19 @@ func TestIntegration_Launcher(t *testing.T) {
 	regSyncer, err := registrysyncer.New(lggr, uni, uni.CapReg.Address().String())
 	require.NoError(t, err)
 
-	hcr := uni.HomeChainReader
+	oracleCreator := &oracleCreatorPrints{
+		t: t,
+	}
 	launcher := New(
 		it.CcipCapabilityVersion,
 		it.CcipCapabilityLabelledName,
 		p2pIDs[0],
 		logger.TestLogger(t),
-		hcr,
-		&oracleCreatorPrints{
-			t: t,
-		},
+		uni.HomeChainReader,
 		1*time.Second,
+		func(pt cctypes.PluginType, ocwm reader.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+			return oracleCreator.CreatePluginOracle(pt, cctypes.OCR3ConfigWithMeta(ocwm))
+		},
 	)
 	regSyncer.AddLauncher(launcher)
 

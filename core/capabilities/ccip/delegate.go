@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
@@ -150,14 +151,25 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, spec job.Job) (services 
 		hcr,
 	)
 
+	// if bootstrappers are provided we assume that the node is a plugin oracle.
+	// the reason for this is that bootstrap oracles do not need to be aware
+	// of other bootstrap oracles. however, plugin oracles, at least initially,
+	// must be aware of available bootstrappers.
+	var createOracleFunc launcher.CreateOracleFunc
+	if len(spec.CCIPSpec.P2PV2Bootstrappers) > 0 {
+		createOracleFunc = createPluginOracleFunc(oracleCreator)
+	} else {
+		createOracleFunc = createBootstrapOracleFunc(oracleCreator)
+	}
+
 	capLauncher := launcher.New(
 		spec.CCIPSpec.CapabilityVersion,
 		spec.CCIPSpec.CapabilityLabelledName,
 		ragep2ptypes.PeerID(p2pID.PeerID()),
 		d.lggr,
 		hcr,
-		oracleCreator,
 		12*time.Second,
+		createOracleFunc,
 	)
 
 	// register the capability launcher with the registry syncer
@@ -293,4 +305,16 @@ func bindReader(ctx context.Context,
 	}
 
 	return reader, ccipConfigBinding, nil
+}
+
+func createBootstrapOracleFunc(oracleCreator cctypes.OracleCreator) launcher.CreateOracleFunc {
+	return func(pt cctypes.PluginType, ocwm ccipreaderpkg.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+		return oracleCreator.CreateBootstrapOracle(cctypes.OCR3ConfigWithMeta(ocwm))
+	}
+}
+
+func createPluginOracleFunc(oracleCreator cctypes.OracleCreator) launcher.CreateOracleFunc {
+	return func(pt cctypes.PluginType, ocwm ccipreaderpkg.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+		return oracleCreator.CreatePluginOracle(cctypes.PluginType(pt), cctypes.OCR3ConfigWithMeta(ocwm))
+	}
 }
