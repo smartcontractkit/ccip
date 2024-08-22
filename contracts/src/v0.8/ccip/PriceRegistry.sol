@@ -722,8 +722,9 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   function _parseEVMExtraArgsFromBytes(
     bytes calldata extraArgs,
     DestChainConfig memory destChainConfig
-  ) internal pure returns (Client.EVMExtraArgsV2 memory evmExtraArgs) {
-    evmExtraArgs = _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, destChainConfig.defaultTxGasLimit);
+  ) internal pure returns (Client.EVMExtraArgsV2 memory) {
+    Client.EVMExtraArgsV2 memory evmExtraArgs =
+      _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, destChainConfig.defaultTxGasLimit);
 
     if (evmExtraArgs.gasLimit > uint256(destChainConfig.maxPerMsgGasLimit)) revert MessageGasLimitTooHigh();
     if (destChainConfig.enforceOutOfOrder && !evmExtraArgs.allowOutOfOrderExecution) {

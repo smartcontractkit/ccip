@@ -60,9 +60,8 @@ contract NonceManager is INonceManager, AuthorizedCallers, ITypeAndVersion {
     return _getOutboundNonce(destChainSelector, sender);
   }
 
-  /// @notice Interal version of getOutboundNonce.
-  function _getOutboundNonce(uint64 destChainSelector, address sender) private view returns (uint64 outboundNonce) {
-    outboundNonce = s_outboundNonces[destChainSelector][sender];
+  function _getOutboundNonce(uint64 destChainSelector, address sender) private view returns (uint64) {
+    uint64 outboundNonce = s_outboundNonces[destChainSelector][sender];
 
     // When introducing the NonceManager with existing lanes, we still want to have sequential nonces.
     // Referencing the old onRamp preserves sequencing between updates.
@@ -104,12 +103,8 @@ contract NonceManager is INonceManager, AuthorizedCallers, ITypeAndVersion {
     return _getInboundNonce(sourceChainSelector, sender);
   }
 
-  /// @notice Interal version of getInboundNonce.
-  function _getInboundNonce(
-    uint64 sourceChainSelector,
-    bytes calldata sender
-  ) private view returns (uint64 inboundNonce) {
-    inboundNonce = s_inboundNonces[sourceChainSelector][sender];
+  function _getInboundNonce(uint64 sourceChainSelector, bytes calldata sender) private view returns (uint64) {
+    uint64 inboundNonce = s_inboundNonces[sourceChainSelector][sender];
 
     // When introducing the NonceManager with existing lanes, we still want to have sequential nonces.
     // Referencing the old offRamp to check the expected nonce if none is set for a

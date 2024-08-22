@@ -1296,7 +1296,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       messages[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
       "",
-      30937
+      30899
     );
 
     uint256[][] memory gasLimitOverrides = new uint256[][](1);
@@ -1320,7 +1320,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       messages[0].header.messageId,
       Internal.MessageExecutionState.SUCCESS,
       "",
-      31011
+      30973
     );
 
     uint256[][] memory gasLimitOverrides = new uint256[][](1);
@@ -1391,9 +1391,9 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     gasLimitOverrides[1] = _getGasLimitsFromMessages(messages2);
 
     uint256[] memory expectedGasUsed = new uint256[](3);
-    expectedGasUsed[0] = 31022;
-    expectedGasUsed[1] = 22453;
-    expectedGasUsed[2] = 22453;
+    expectedGasUsed[0] = 30984;
+    expectedGasUsed[1] = 22411;
+    expectedGasUsed[2] = 22411;
 
     for (uint256 i = 0; i < 3; ++i) {
       vm.expectEmit(true, true, true, true);
@@ -1410,8 +1410,8 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     }
 
     expectedGasUsed = new uint256[](2);
-    expectedGasUsed[0] = 24527;
-    expectedGasUsed[1] = 22454;
+    expectedGasUsed[0] = 24489;
+    expectedGasUsed[1] = 22411;
 
     for (uint256 i = 0; i < 2; ++i) {
       vm.expectEmit(true, true, true, false);

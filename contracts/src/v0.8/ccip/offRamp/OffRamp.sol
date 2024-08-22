@@ -483,11 +483,11 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @param message Internal.Any2EVMRampMessage memory message.
   /// @param offchainTokenData Data provided by the DON for token transfers.
   /// @return executionState The new state of the message, being either SUCCESS or FAILURE.
-  /// @return data Revert data in bytes if CCIP receiver reverted during execution.
+  /// @return errData Revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
     Internal.Any2EVMRampMessage memory message,
     bytes[] memory offchainTokenData
-  ) internal returns (Internal.MessageExecutionState executionState, bytes memory data) {
+  ) internal returns (Internal.MessageExecutionState executionState, bytes memory errData) {
     try this.executeSingleMessage(message, offchainTokenData) {}
     catch (bytes memory err) {
       // return the message execution state as FAILURE and the revert data
@@ -495,7 +495,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       return (Internal.MessageExecutionState.FAILURE, err);
     }
     // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
-    return (Internal.MessageExecutionState.SUCCESS, "");
+    return (Internal.MessageExecutionState.SUCCESS, errData);
   }
 
   /// @notice Executes a single message.
@@ -796,12 +796,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @notice Returns a source chain config with a check that the config is enabled
   /// @param sourceChainSelector Source chain selector to check for cursing
   /// @return sourceChainConfig The source chain config storage pointer
-  function _getEnabledSourceChainConfig(uint64 sourceChainSelector)
-    internal
-    view
-    returns (SourceChainConfig storage sourceChainConfig)
-  {
-    sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
+  function _getEnabledSourceChainConfig(uint64 sourceChainSelector) internal view returns (SourceChainConfig storage) {
+    SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
     if (!sourceChainConfig.isEnabled) {
       revert SourceChainNotEnabled(sourceChainSelector);
     }
@@ -943,8 +939,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     address receiver,
     uint64 sourceChainSelector,
     bytes[] calldata offchainTokenData
-  ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
-    destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
+  ) internal returns (Client.EVMTokenAmount[] memory) {
+    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       destTokenAmounts[i] = _releaseOrMintSingleToken(
         sourceTokenAmounts[i], originalSender, receiver, sourceChainSelector, offchainTokenData[i]
