@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 
 // The interface for the 1.2 price registry contract.
