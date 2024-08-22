@@ -13,8 +13,8 @@ abstract contract KeystoneFeedsPermissionHandler is OwnerIsCreator {
     address forwarder; //───────────────╮ The address of the forwarder (20 bytes)
     bytes10 workflowName; //            │ The name of the workflow in bytes10
     bytes2 reportName; //───────────────╯ The name of the report in bytes2
-    address workflowOwner; // The address of the workflow owner
-    bool isAllowed; // Whether the report is allowed or not
+    address workflowOwner;//───────────────╮ // The address of the workflow owner (20 bytes)
+    bool isAllowed; //─────────────────────╯// Whether the report is allowed or not (1 byte)
   }
 
   /// @notice Event emitted when report permissions are set
@@ -24,7 +24,7 @@ abstract contract KeystoneFeedsPermissionHandler is OwnerIsCreator {
   error ReportForwarderUnauthorized(address forwarder, address workflowOwner, bytes10 workflowName, bytes2 reportName);
 
   /// @dev Mapping from a report ID to a boolean indicating whether the report is allowed or not
-  mapping(bytes32 => bool) internal s_allowedReports;
+  mapping(bytes32 reportId => bool isAllowed) internal s_allowedReports;
 
   /// @notice Sets permissions for multiple reports
   /// @param permissions An array of Permission structs for which to set permissions
@@ -67,12 +67,20 @@ abstract contract KeystoneFeedsPermissionHandler is OwnerIsCreator {
     }
   }
 
+
+  //@notice Generates a unique report ID based on the provided parameters.
+  //@dev The report ID is computed using the Keccak-256 hash function over the encoded parameters.
+  //@param forwarder The address of the forwarder associated with the report.
+  //@param workflowOwner The address of the owner of the workflow.
+  //@param workflowName The name of the workflow, represented as a 10-byte value.
+  //@param reportName The name of the report, represented as a 2-byte value.
+  //@return reportId The computed unique report ID as a bytes32 value.
   function _createReportId(
     address forwarder,
     address workflowOwner,
     bytes10 workflowName,
     bytes2 reportName
-  ) internal pure returns (bytes32) {
+  ) internal pure returns (bytes32 reportId) {
     return keccak256(abi.encode(forwarder, workflowOwner, workflowName, reportName));
   }
 }

@@ -55,6 +55,7 @@ contract PriceRegistry is
   error TokenNotSupported(address token);
   error ChainNotSupported(uint64 chain);
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
+  error StaleKeystoneUpdate(address token, uint256 feedTimestamp, uint256 storedTimeStamp);
   error DataFeedValueOutOfUint224Range();
   error InvalidDestBytesOverhead(address token, uint32 destBytesOverhead);
   error MessageGasLimitTooHigh();
@@ -342,11 +343,11 @@ contract PriceRegistry is
     if (dataFeedAnswer < 0) {
       revert DataFeedValueOutOfUint224Range();
     }
-    uint256 rebasedValue =
+    uint224 rebasedValue =
       _calculateRebasedValue(dataFeedContract.decimals(), priceFeedConfig.tokenDecimals, uint256(dataFeedAnswer));
 
     // Data feed staleness is unchecked to decouple the PriceRegistry from data feed delay issues
-    return Internal.TimestampedPackedUint224({value: uint224(rebasedValue), timestamp: uint32(block.timestamp)});
+    return Internal.TimestampedPackedUint224({value: rebasedValue, timestamp: uint32(block.timestamp)});
   }
 
   // ================================================================
@@ -450,10 +451,17 @@ contract PriceRegistry is
       if (tokenDecimals == 0) {
         revert TokenNotSupported(feeds[i].token);
       }
-      uint256 rebasedValue = _calculateRebasedValue(18, tokenDecimals, feeds[i].price);
+      // Keystone reports prices in USD with 18 decimals, so we passing it as 18 in the _calculateRebasedValue function
+      uint224 rebasedValue = _calculateRebasedValue(18, tokenDecimals, feeds[i].price);
+
+      //if stale update then revert
+      if (feeds[i].timestamp < s_usdPerToken[feeds[i].token].timestamp) {
+        revert StaleKeystoneUpdate(feeds[i].token, feeds[i].timestamp, s_usdPerToken[feeds[i].token].timestamp);
+      }
+
       s_usdPerToken[feeds[i].token] =
-        Internal.TimestampedPackedUint224({value: uint224(rebasedValue), timestamp: feeds[i].timestamp});
-      emit UsdPerTokenUpdated(feeds[i].token, uint224(rebasedValue), feeds[i].timestamp);
+        Internal.TimestampedPackedUint224({value: rebasedValue, timestamp: feeds[i].timestamp});
+      emit UsdPerTokenUpdated(feeds[i].token, rebasedValue, feeds[i].timestamp);
     }
   }
 
@@ -634,25 +642,37 @@ contract PriceRegistry is
     return (tokenTransferFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead);
   }
 
+  //@notice calculates the rebased value for 1e18 smallest token denomination
+  //@param dataFeedDecimal decimal of the data feed
+  //@param tokenDecimal decimal of the token
+  //@param feedValue value of the data feed
+  //@return rebasedVal rebased value
   function _calculateRebasedValue(
     uint8 dataFeedDecimal,
     uint8 tokenDecimal,
     uint256 feedValue
-  ) internal pure returns (uint256) {
+  ) internal pure returns (uint224 rebasedValue) {
+    // Rebase formula for units in smallest token denomination: usdValue * (1e18 * 1e18) / 1eTokenDecimals
+    // feedValue * (10 ** (18 - feedDecimals)) * (10 ** (18 - erc20Decimals))
+    // feedValue * (10 ** ((18 - feedDecimals) + (18 - erc20Decimals)))
+    // feedValue * (10 ** (36 - feedDecimals - erc20Decimals))
+    // feedValue * (10 ** (36 - (feedDecimals + erc20Decimals)))
+    // feedValue * (10 ** (36 - excessDecimals))
+    // If excessDecimals > 36 => flip it to feedValue / (10 ** (excessDecimals - 36))
     uint8 excessDecimals = dataFeedDecimal + tokenDecimal;
-    uint256 rebasedValue;
+    uint256 rebasedVal;
 
     if (excessDecimals > 36) {
-      rebasedValue = feedValue / (10 ** (excessDecimals - 36));
+      rebasedVal = feedValue / (10 ** (excessDecimals - 36));
     } else {
-      rebasedValue = feedValue * (10 ** (36 - excessDecimals));
+      rebasedVal = feedValue * (10 ** (36 - excessDecimals));
     }
 
-    if (rebasedValue > type(uint224).max) {
+    if (rebasedVal > type(uint224).max) {
       revert DataFeedValueOutOfUint224Range();
     }
 
-    return rebasedValue;
+    return uint224(rebasedVal);
   }
 
   /// @notice Returns the estimated data availability cost of the message.

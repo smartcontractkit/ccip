@@ -2139,8 +2139,8 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
       PriceRegistry.ReceivedCCIPFeedReport({token: onReportTestToken2, price: 4e18, timestamp: uint32(block.timestamp)});
 
     bytes memory encodedReport = abi.encode(report);
-    uint224 expectedStoredToken1Price = uint224(s_priceRegistry.calculateRebasedValue(18, 18, report[0].price));
-    uint224 expectedStoredToken2Price = uint224(s_priceRegistry.calculateRebasedValue(18, 20, report[1].price));
+    uint224 expectedStoredToken1Price = s_priceRegistry.calculateRebasedValue(18, 18, report[0].price);
+    uint224 expectedStoredToken2Price = s_priceRegistry.calculateRebasedValue(18, 20, report[1].price);
     vm.expectEmit();
     emit PriceRegistry.UsdPerTokenUpdated(onReportTestToken1, expectedStoredToken1Price, block.timestamp);
     vm.expectEmit();
@@ -2189,6 +2189,41 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
 
     vm.expectRevert(abi.encodeWithSelector(PriceRegistry.TokenNotSupported.selector, s_sourceTokens[1]));
     changePrank(FORWARDER_1);
+    s_priceRegistry.onReport(encodedPermissionsMetadata, encodedReport);
+  }
+
+  function test_OnReport_StaleUpdate_Revert() public {
+    //Creating a correct report
+    bytes memory encodedPermissionsMetadata =
+      abi.encodePacked(keccak256(abi.encode("workflowCID")), WORKFLOW_NAME_1, WORKFLOW_OWNER_1, REPORT_NAME_1);
+
+    PriceRegistry.ReceivedCCIPFeedReport[] memory report = new PriceRegistry.ReceivedCCIPFeedReport[](1);
+    report[0] =
+      PriceRegistry.ReceivedCCIPFeedReport({token: onReportTestToken1, price: 4e18, timestamp: uint32(block.timestamp)});
+
+    bytes memory encodedReport = abi.encode(report);
+    uint224 expectedStoredTokenPrice = s_priceRegistry.calculateRebasedValue(18, 18, report[0].price);
+
+    vm.expectEmit();
+    emit PriceRegistry.UsdPerTokenUpdated(onReportTestToken1, expectedStoredTokenPrice, block.timestamp);
+
+    changePrank(FORWARDER_1);
+    //setting the correct price and time with the correct report
+    s_priceRegistry.onReport(encodedPermissionsMetadata, encodedReport);
+
+    //create a stale report
+    report[0] = PriceRegistry.ReceivedCCIPFeedReport({
+      token: onReportTestToken1,
+      price: 4e18,
+      timestamp: uint32(block.timestamp - 1)
+    });
+    encodedReport = abi.encode(report);
+    //expecting a revert
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        PriceRegistry.StaleKeystoneUpdate.selector, onReportTestToken1, block.timestamp - 1, block.timestamp
+      )
+    );
     s_priceRegistry.onReport(encodedPermissionsMetadata, encodedReport);
   }
 }

@@ -74,7 +74,7 @@ contract PriceRegistryHelper is PriceRegistry {
     uint8 dataFeedDecimal,
     uint8 tokenDecimal,
     uint256 feedValue
-  ) external pure returns (uint256) {
+  ) external pure returns (uint224) {
     return _calculateRebasedValue(dataFeedDecimal, tokenDecimal, feedValue);
   }
 }
