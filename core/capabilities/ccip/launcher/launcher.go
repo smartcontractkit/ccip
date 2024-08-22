@@ -8,8 +8,9 @@ import (
 
 	"go.uber.org/multierr"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
