@@ -148,7 +148,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     s_usdcTokenPool.updateChainSelectorMechanisms(new uint64[](0), destChainAdds);
 
     assertTrue(
-      s_usdcTokenPool.shouldUseAltMechForOutgoingMessage(DEST_CHAIN_SELECTOR),
+      s_usdcTokenPool.shouldUseAltMechForMessage(DEST_CHAIN_SELECTOR),
       "Alt mech not configured for outgoing message to DEST_CHAIN_SELECTOR"
     );
 
@@ -184,7 +184,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     s_usdcTokenPool.updateChainSelectorMechanisms(new uint64[](0), destChainAdds);
 
     assertTrue(
-      s_usdcTokenPool.shouldUseAltMechForIncomingMessage(SOURCE_CHAIN_SELECTOR, ""),
+      s_usdcTokenPool.shouldUseAltMechForMessage(SOURCE_CHAIN_SELECTOR),
       "Alt mech not configured for incoming message from SOURCE_CHAIN_SELECTOR"
     );
 
@@ -415,7 +415,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     s_usdcTokenPool.updateChainSelectorMechanisms(new uint64[](0), destChainAdds);
 
     assertTrue(
-      s_usdcTokenPool.shouldUseAltMechForOutgoingMessage(DEST_CHAIN_SELECTOR),
+      s_usdcTokenPool.shouldUseAltMechForMessage(DEST_CHAIN_SELECTOR),
       "Alt mech not configured for outgoing message to DEST_CHAIN_SELECTOR"
     );
 
@@ -454,7 +454,7 @@ contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
     s_usdcTokenPool.updateChainSelectorMechanisms(new uint64[](0), destChainAdds);
 
     assertTrue(
-      s_usdcTokenPool.shouldUseAltMechForOutgoingMessage(DEST_CHAIN_SELECTOR),
+      s_usdcTokenPool.shouldUseAltMechForMessage(DEST_CHAIN_SELECTOR),
       "Alt mech not configured for outgoing message to DEST_CHAIN_SELECTOR"
     );
 
@@ -524,11 +524,9 @@ contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
       "No tokens should be locked for DEST_CHAIN_SELECTOR after CCTP-approved burn"
     );
 
-    vm.startPrank(OWNER);
-
-    // Fail because that chain has already been burned
-    vm.expectRevert(abi.encodeWithSelector(USDCBridgeMigrator.InvalidChainSelector.selector, DEST_CHAIN_SELECTOR));
-    s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
+    assertFalse(
+      s_usdcTokenPool.shouldUseAltMechForMessage(DEST_CHAIN_SELECTOR), "Alt mech should be disabled after a burn"
+    );
   }
 
   function test_cancelExistingCCTPMigrationProposal() public {
@@ -558,24 +556,6 @@ contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
 
     vm.expectRevert(USDCBridgeMigrator.NoExistingMigrationProposal.selector);
     s_usdcTokenPool.cancelExistingCCTPMigrationProposal();
-  }
-
-  function test_proposeCCTPMigration_withInvalidSelector_Revert() public {
-    vm.startPrank(OWNER);
-
-    // Create a proposal
-    s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
-
-    // Revert because there's already a pending migration proposal
-    vm.expectRevert(abi.encodeWithSelector(USDCBridgeMigrator.ExistingMigrationProposal.selector));
-    s_usdcTokenPool.proposeCCTPMigration(0);
-
-    // Cancel the proposal so we can test other invalid proposals
-    s_usdcTokenPool.cancelExistingCCTPMigrationProposal();
-
-    // Fail because of invalid chain selector 0
-    vm.expectRevert(abi.encodeWithSelector(USDCBridgeMigrator.InvalidChainSelector.selector, 0));
-    s_usdcTokenPool.proposeCCTPMigration(0);
   }
 
   function test_burnLockedUSDC_invalidPermissions_Revert() public {
@@ -638,32 +618,6 @@ contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
       s_token.balanceOf(address(s_usdcTokenPool)),
       liquidityAmount,
       "Liquidity amount of tokens should be new in new pool, but aren't"
-    );
-  }
-
-  function test_cannotLockTokensOnMigratedChain_Revert() public {
-    bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
-    uint256 amount = 1e6;
-
-    // Perform a lock-burn, then migrate
-    test_lockOrBurn_then_BurnInCCTPMigration_Success();
-
-    vm.startPrank(s_routerAllowedOnRamp);
-
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        HybridLockReleaseUSDCTokenPool.TokenLockingNotAllowedAfterMigration.selector, DEST_CHAIN_SELECTOR
-      )
-    );
-
-    s_usdcTokenPool.lockOrBurn(
-      Pool.LockOrBurnInV1({
-        originalSender: OWNER,
-        receiver: abi.encodePacked(receiver),
-        amount: amount,
-        remoteChainSelector: DEST_CHAIN_SELECTOR,
-        localToken: address(s_token)
-      })
     );
   }
 

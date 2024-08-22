@@ -16,6 +16,7 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   event CCTPMigrationProposed(uint64 remoteChainSelector);
   event CCTPMigrationExecuted(uint64 remoteChainSelector, uint256 USDCBurned);
   event CCTPMigrationCancelled(uint64 existingProposalSelector);
+  event CircleMigratorAddressSet(address migratorAddress);
 
   error onlyCircle();
   error ExistingMigrationProposal();
@@ -29,17 +30,21 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
 
   address internal s_circleUSDCMigrator;
   uint64 internal s_proposedUSDCMigrationChain;
+
   mapping(uint64 chainSelector => uint256 lockedBalance) internal s_lockedTokensByChainSelector;
+  mapping(uint64 => bool) internal s_shouldUseAltMech;
 
   constructor(address token, address router) {
     i_USDC = IBurnMintERC20(token);
     i_router = Router(router);
   }
 
-  /// @notice Burn USDC locked for a specific lane so that destination USDC can be converted from 
+  /// @notice Burn USDC locked for a specific lane so that destination USDC can be converted from
   /// non-canonical to canonical USDC.
   /// @dev This function can only be called by an address specified by the owner to be controlled by circle
   /// @dev proposeCCTPMigration must be called first on an approved lane to execute properly.
+  /// @dev This function signature should NEVER be overwritten, otherwise it will be unable to be called by
+  /// circle to properly migrate USDC over to CCTP.
   function burnLockedUSDC() public {
     if (msg.sender != s_circleUSDCMigrator) revert onlyCircle();
     if (s_proposedUSDCMigrationChain == 0) revert ExistingMigrationProposal();
@@ -55,24 +60,21 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
 
     i_USDC.burn(tokensToBurn);
 
+    // Disable L/R automatically on burned chain and enable CCTP
+    delete s_shouldUseAltMech[burnChainSelector];
+
     emit CCTPMigrationExecuted(burnChainSelector, tokensToBurn);
   }
 
   /// @notice Propose a destination chain to migrate from lock/release mechanism to CCTP enabled burn/mint
   /// through a Circle controlled burn.
-  /// @param remoteChainSelector the CCIP specific selector for the remote chain currently using a 
+  /// @param remoteChainSelector the CCIP specific selector for the remote chain currently using a
   /// non-canonical form of USDC which they wish to update to canonical. Function will revert if the chain
   /// selector is zero, or if a migration has already occured for the specified selector.
   /// @dev This function can only be called by the owner
   function proposeCCTPMigration(uint64 remoteChainSelector) external onlyOwner {
     // Prevent overwriting existing migration proposals until the current one is finished
     if (s_proposedUSDCMigrationChain != 0) revert ExistingMigrationProposal();
-
-    // Ensure that the chain is supported by CCIP and non-zero, hasn't already been executed on, and is
-    // a valid CCIP-supported chain selector
-    if (remoteChainSelector == 0 || s_executedCCTPChainMigrations.contains(remoteChainSelector)) {
-      revert InvalidChainSelector(remoteChainSelector);
-    }
 
     s_proposedUSDCMigrationChain = remoteChainSelector;
 
@@ -89,7 +91,7 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
     emit CCTPMigrationCancelled(currentProposalChainSelector);
   }
 
-  /// @notice retrieve the chain selector for an ongoing CCTP migration in progress. 
+  /// @notice retrieve the chain selector for an ongoing CCTP migration in progress.
   /// @return uint64 the chain selector of the lane to be migrated. Will be zero if no proposal currently
   /// exists
   function getCurrentProposedCCTPChainMigration() public view returns (uint64) {
@@ -101,12 +103,14 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   /// chain expansion.
   function setCircleMigratorAddress(address migrator) external onlyOwner {
     s_circleUSDCMigrator = migrator;
+
+    emit CircleMigratorAddressSet(migrator);
   }
 
   /// @notice Retrieve the amount of canonical USDC locked into this lane and minted on the destination
   /// @param remoteChainSelector the CCIP specific destination chain implementing a mintable and
   /// non-canonical form of USDC at present.
-  /// @return uint256 the amount of USDC locked into the specified lane. If non-zero, the number 
+  /// @return uint256 the amount of USDC locked into the specified lane. If non-zero, the number
   /// should match the current circulating supply of USDC on the destination chain
   function getLockedTokensForChain(uint64 remoteChainSelector) public view returns (uint256) {
     return s_lockedTokensByChainSelector[remoteChainSelector];
