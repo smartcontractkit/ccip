@@ -17,9 +17,6 @@ importers:
       '@arbitrum/token-bridge-contracts':
         specifier: 1.1.2
         version: 1.1.2
-      '@chainlink/contracts-ccip':
-        specifier: ^1.4.0
-        version: 1.4.0(ethers@5.7.2)
       '@changesets/changelog-github':
         specifier: ^0.5.0
         version: 0.5.0
@@ -202,9 +199,6 @@ packages:
 
   '@balena/dockerignore@1.0.2':
     resolution: {integrity: sha512-wMue2Sy4GAVTk6Ic4tJVcnfdau+gx2EnG7S+uAEe+TWJFqE4YoWN4/H8MSLj4eYJKxGg26lZwboEniNiNwZQ6Q==}
-
-  '@chainlink/contracts-ccip@1.4.0':
-    resolution: {integrity: sha512-8F0OpmXy73vSbOvnKPL0DcYLA6FTiwQSKw1+DQzKyBYVbFk4vtijzs+5Ts/Beu6EIPqXlmLq7WVFZFHiDOBjCg==}
 
   '@chainlink/solhint-plugin-chainlink-solidity@https://codeload.github.com/smartcontractkit/chainlink-solhint-rules/tar.gz/1b4c0c2663fcd983589d4f33a2e73908624ed43c':
     resolution: {tarball: https://codeload.github.com/smartcontractkit/chainlink-solhint-rules/tar.gz/1b4c0c2663fcd983589d4f33a2e73908624ed43c}
@@ -3850,20 +3844,6 @@ snapshots:
       regenerator-runtime: 0.14.1
 
   '@balena/dockerignore@1.0.2': {}
-
-  '@chainlink/contracts-ccip@1.4.0(ethers@5.7.2)':
-    dependencies:
-      '@arbitrum/nitro-contracts': 1.1.1
-      '@arbitrum/token-bridge-contracts': 1.1.2
-      '@eth-optimism/contracts': 0.6.0(ethers@5.7.2)
-      '@openzeppelin/contracts': 4.9.3
-      '@openzeppelin/contracts-upgradeable': 4.9.3
-      '@scroll-tech/contracts': 0.1.0
-    transitivePeerDependencies:
-      - bufferutil
-      - ethers
-      - supports-color
-      - utf-8-validate
 
   '@chainlink/solhint-plugin-chainlink-solidity@https://codeload.github.com/smartcontractkit/chainlink-solhint-rules/tar.gz/1b4c0c2663fcd983589d4f33a2e73908624ed43c': {}
 
