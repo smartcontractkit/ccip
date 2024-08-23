@@ -312,3 +312,22 @@ func mustGetJobSpec(t *testing.T, bootstrapP2PID p2pkey.PeerID, bootstrapPort in
 	require.NoError(t, err)
 	return jb
 }
+
+// mustGetCCIPBootstrapJobSpec creates a CCIP spec without P2PV2Bootstrappers specified
+// so that it can launch the launcher in bootstrap mode.
+func mustGetCCIPBootstrapJobSpec(t *testing.T, p2pKeyID, ocrKeyBundleID string) job.Job {
+	specArgs := validate.SpecArgs{
+		CapabilityVersion:      CapabilityVersion,
+		CapabilityLabelledName: CapabilityLabelledName,
+		OCRKeyBundleIDs: map[string]string{
+			relay.NetworkEVM: ocrKeyBundleID,
+		},
+		P2PKeyID:     p2pKeyID,
+		PluginConfig: map[string]any{},
+	}
+	specToml, err := validate.NewCCIPSpecToml(specArgs)
+	require.NoError(t, err)
+	jb, err := validate.ValidatedCCIPSpec(specToml)
+	require.NoError(t, err)
+	return jb
+}

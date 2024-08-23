@@ -53,19 +53,19 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		apps    []chainlink.Application
 		nodes   []*ocr3Node
 		p2pIDs  [][32]byte
-
-		// The bootstrap node will be: nodes[0]
-		bootstrapPort  int
-		bootstrapP2PID p2pkey.PeerID
 	)
 
-	ports := freeport.GetN(t, numNodes)
+	// grab numNodes + 1 ports, the extra one is for the separate bootstrap
+	// node.
+	ports := freeport.GetN(t, numNodes+1)
 	ctx := testutils.Context(t)
 	callCtx := &bind.CallOpts{Context: ctx}
 
+	bootstrapNode := setupNodeOCR3(t, ports[0], universes, homeChainUni, oracleLogLevel)
+
 	for i := 0; i < numNodes; i++ {
 		t.Logf("Setting up ocr3 node:%d at port:%d", i, ports[i])
-		node := setupNodeOCR3(t, ports[i], universes, homeChainUni, oracleLogLevel)
+		node := setupNodeOCR3(t, ports[i+1], universes, homeChainUni, oracleLogLevel)
 
 		for chainID, transmitter := range node.transmitters {
 			identity := confighelper2.OracleIdentityExtra{
@@ -88,10 +88,11 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 		p2pIDs = append(p2pIDs, peerID)
 	}
 
-	bootstrapPort = ports[0]
-	bootstrapP2PID = p2pIDs[0]
+	bootstrapPort := ports[0]
+	bootstrapP2PID, err := p2pkey.MakePeerID(bootstrapNode.peerID)
+	require.NoError(t, err)
 	bootstrapAddr := fmt.Sprintf("127.0.0.1:%d", bootstrapPort)
-	t.Logf("[bootstrap node] peerID:%s p2pID:%d address:%s", nodes[0].peerID, bootstrapP2PID, bootstrapAddr)
+	t.Logf("[bootstrap node] p2pID:%s address:%s", bootstrapP2PID.String(), bootstrapAddr)
 
 	// Start committing periodically in the background for all the chains
 	tick := time.NewTicker(simulatedBackendBlockTime)
@@ -131,6 +132,14 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 			oracles[uni.chainID],
 		)
 	}
+
+	// create the bootstrap job
+	t.Log("Creating bootstrap job")
+	err = bootstrapNode.app.Start(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, bootstrapNode.app.Stop()) })
+	bootstrapJb := mustGetCCIPBootstrapJobSpec(t, bootstrapNode.peerID, bootstrapNode.keybundle.ID())
+	require.NoError(t, bootstrapNode.app.AddJobV2(ctx, &bootstrapJb))
 
 	t.Log("Creating ocr3 jobs, starting oracles")
 	for i := 0; i < len(nodes); i++ {

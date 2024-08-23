@@ -38,7 +38,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   error TooManyOCR3Configs();
   error TooManySigners();
   error TooManyTransmitters();
-  error TooManyBootstrapP2PIds();
+  error NotEnoughBootstrapP2PIds();
   error P2PIdsLengthNotMatching(uint256 p2pIdsLength, uint256 signersLength, uint256 transmittersLength);
   error NotEnoughTransmitters(uint256 got, uint256 minimum);
   error FMustBePositive();
@@ -393,11 +393,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     if (cfg.p2pIds.length != cfg.signers.length || cfg.p2pIds.length != cfg.transmitters.length) {
       revert P2PIdsLengthNotMatching(cfg.p2pIds.length, cfg.signers.length, cfg.transmitters.length);
     }
-    if (cfg.bootstrapP2PIds.length > cfg.p2pIds.length) revert TooManyBootstrapP2PIds();
-
-    // check for duplicate p2p ids and bootstrapP2PIds.
-    // check that p2p ids in cfg.bootstrapP2PIds are included in cfg.p2pIds.
-    SortedSetValidationUtil._checkIsValidUniqueSubset(cfg.bootstrapP2PIds, cfg.p2pIds);
+    if (cfg.bootstrapP2PIds.length == 0) revert NotEnoughBootstrapP2PIds();
 
     // Check that the readers are in the capabilities registry.
     for (uint256 i = 0; i < cfg.signers.length; ++i) {
