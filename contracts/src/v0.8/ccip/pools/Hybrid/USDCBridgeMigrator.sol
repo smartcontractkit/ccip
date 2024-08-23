@@ -26,7 +26,6 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
 
   IBurnMintERC20 internal immutable i_USDC;
   Router internal immutable i_router;
-  EnumerableSet.UintSet internal s_executedCCTPChainMigrations;
 
   address internal s_circleUSDCMigrator;
   uint64 internal s_proposedUSDCMigrationChain;
@@ -55,8 +54,6 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
     // Even though USDC is a trusted call, ensure CEI by updating state first
     delete s_lockedTokensByChainSelector[burnChainSelector];
     delete s_proposedUSDCMigrationChain;
-
-    s_executedCCTPChainMigrations.add(burnChainSelector);
 
     i_USDC.burn(tokensToBurn);
 

@@ -331,7 +331,7 @@ HybridUSDCTokenPoolMigrationTests:test_burnLockedUSDC_invalidPermissions_Revert(
 HybridUSDCTokenPoolMigrationTests:test_cancelExistingCCTPMigrationProposal() (gas: 31105)
 HybridUSDCTokenPoolMigrationTests:test_cannotCancelANonExistentMigrationProposal() (gas: 12672)
 HybridUSDCTokenPoolMigrationTests:test_cannotModifyLiquidityWithoutPermissions_Revert() (gas: 17143)
-HybridUSDCTokenPoolMigrationTests:test_lockOrBurn_then_BurnInCCTPMigration_Success() (gas: 223828)
+HybridUSDCTokenPoolMigrationTests:test_lockOrBurn_then_BurnInCCTPMigration_Success() (gas: 169204)
 HybridUSDCTokenPoolMigrationTests:test_transferLiquidity_Success() (gas: 153158)
 HybridUSDCTokenPoolTests:test_LockOrBurn_PrimaryMechanism_Success() (gas: 135100)
 HybridUSDCTokenPoolTests:test_LockOrBurn_WhileMigrationPause_Revert() (gas: 106785)
