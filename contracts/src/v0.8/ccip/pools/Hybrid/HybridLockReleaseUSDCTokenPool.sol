@@ -30,11 +30,11 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   error LanePausedForCCTPMigration(uint64 remoteChainSelector);
   error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
 
-  /// @notice The address of the rebalancer.
+  /// @notice The address of the liquidity provider for a specific chain.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
   /// and CCIP is facilitating mint/burn on all the other chains, in which case the invariant
   /// balanceOf(pool) on home chain >= sum(totalSupply(mint/burn "wrapped" token) on all remote chains) should always hold
-  mapping(uint64 remoteChainSelector => address rebalancer) internal s_liquidityProvider;
+  mapping(uint64 remoteChainSelector => address liquidityProvider) internal s_liquidityProvider;
 
   constructor(
     ITokenMessenger tokenMessenger,
@@ -133,8 +133,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
   /// @notice Sets the LiquidityManager address.
   /// @dev Only callable by the owner.
-  function setLiquidityProvider(uint64 remoteChainSelector, address rebalancer) external onlyOwner {
-    s_liquidityProvider[remoteChainSelector] = rebalancer;
+  function setLiquidityProvider(uint64 remoteChainSelector, address liquidityProvider) external onlyOwner {
+    s_liquidityProvider[remoteChainSelector] = liquidityProvider;
   }
 
   /// @notice Adds liquidity to the pool for a specific chain. The tokens should be approved first.
@@ -169,7 +169,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   }
 
   /// @notice This function can be used to transfer liquidity from an older version of the pool to this pool. To do so
-  /// this pool will have to be set as the rebalancer in the older version of the pool. This allows it to transfer the
+  /// this pool will have to be set as the liquidity provider in the older version of the pool. This allows it to transfer the
   /// funds in the old pool to the new pool.
   /// @dev When upgrading a LockRelease pool, this function can be called at the same time as the pool is changed in the
   /// TokenAdminRegistry. This allows for a smooth transition of both liquidity and transactions to the new pool.
