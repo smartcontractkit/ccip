@@ -782,17 +782,14 @@ func TestBatchingStrategies(t *testing.T) {
 	}
 
 	t.Run("BestEffortBatchingStrategy", func(t *testing.T) {
-		strategy := &BestEffortBatchingStrategy{
-			BatchingStrategyID: 0,
-		}
+		strategy := &BestEffortBatchingStrategy{}
 		runBatchingStrategyTests(t, strategy, 1_000_000, append(testCases, bestEffortTestCases...))
 	})
 
 	t.Run("ZKOverflowBatchingStrategy", func(t *testing.T) {
 		mockedStatusChecker := mockstatuschecker.NewCCIPTransactionStatusChecker(t)
 		strategy := &ZKOverflowBatchingStrategy{
-			BatchingStrategyID: 1,
-			statuschecker:      mockedStatusChecker,
+			statuschecker: mockedStatusChecker,
 		}
 		runBatchingStrategyTests(t, strategy, 1_000_000, append(testCases, specificZkOverflowTestCases...))
 	})

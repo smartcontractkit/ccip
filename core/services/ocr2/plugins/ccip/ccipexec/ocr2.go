@@ -471,7 +471,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 func (r *ExecutionReportingPlugin) getF() int {
 	// Default consensus threshold is F+1
 	f := r.F
-	if r.batchingStrategy.GetBatchingStrategyID() == ZK_OVERFLOW_BATCHING_STRATEGY_ID {
+	if r.batchingStrategy.GetBatchingStrategyID() == ZKOverflowBatchingStrategyID {
 		// For batching strategy 1, consensus threshold is 2F+1
 		// This is because chains that can overflow need to reach consensus during the inflight cache period
 		// to avoid 2 transmissions round of an overflown message.

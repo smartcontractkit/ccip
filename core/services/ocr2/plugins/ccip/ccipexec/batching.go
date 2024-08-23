@@ -26,8 +26,8 @@ import (
 
 // Batching strategies
 const (
-	BEST_EFFORT_BATCHING_STRATEGY_ID = uint32(0)
-	ZK_OVERFLOW_BATCHING_STRATEGY_ID = uint32(1)
+	BestEffortBatchingStrategyID = uint32(0)
+	ZKOverflowBatchingStrategyID = uint32(1)
 )
 
 type BatchContext struct {
@@ -56,26 +56,20 @@ type BatchingStrategy interface {
 	GetBatchingStrategyID() uint32
 }
 
-type BestEffortBatchingStrategy struct {
-	BatchingStrategyID uint32
-}
+type BestEffortBatchingStrategy struct{}
 
 type ZKOverflowBatchingStrategy struct {
-	BatchingStrategyID uint32
-	statuschecker      statuschecker.CCIPTransactionStatusChecker
+	statuschecker statuschecker.CCIPTransactionStatusChecker
 }
 
 func NewBatchingStrategy(batchingStrategyID uint32, statusChecker statuschecker.CCIPTransactionStatusChecker) (BatchingStrategy, error) {
 	var batchingStrategy BatchingStrategy
 	switch batchingStrategyID {
-	case BEST_EFFORT_BATCHING_STRATEGY_ID:
-		batchingStrategy = &BestEffortBatchingStrategy{
-			BatchingStrategyID: batchingStrategyID,
-		}
-	case ZK_OVERFLOW_BATCHING_STRATEGY_ID:
+	case BestEffortBatchingStrategyID:
+		batchingStrategy = &BestEffortBatchingStrategy{}
+	case ZKOverflowBatchingStrategyID:
 		batchingStrategy = &ZKOverflowBatchingStrategy{
-			BatchingStrategyID: batchingStrategyID,
-			statuschecker:      statusChecker,
+			statuschecker: statusChecker,
 		}
 	default:
 		return nil, errors.Errorf("unknown batching strategy ID %d", batchingStrategyID)
@@ -84,7 +78,7 @@ func NewBatchingStrategy(batchingStrategyID uint32, statusChecker statuschecker.
 }
 
 func (s *BestEffortBatchingStrategy) GetBatchingStrategyID() uint32 {
-	return s.BatchingStrategyID
+	return BestEffortBatchingStrategyID
 }
 
 // BestEffortBatchingStrategy is a batching strategy that tries to batch as many messages as possible (up to certain limits).
@@ -113,7 +107,7 @@ func (s *BestEffortBatchingStrategy) BuildBatch(
 }
 
 func (bs *ZKOverflowBatchingStrategy) GetBatchingStrategyID() uint32 {
-	return bs.BatchingStrategyID
+	return ZKOverflowBatchingStrategyID
 }
 
 // ZKOverflowBatchingStrategy is a batching strategy for ZK chains overflowing under certain conditions.
