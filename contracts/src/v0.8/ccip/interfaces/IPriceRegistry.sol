@@ -18,20 +18,17 @@ interface IPriceRegistry {
   /// @notice Get the `tokenPrice` for a given token.
   /// @param token The token to get the price for.
   /// @return tokenPrice The tokenPrice for the given token.
-  function getTokenPrice(address token) external view returns (Internal.TimestampedPackedUint224 memory tokenPrice);
+  function getTokenPrice(address token) external view returns (Internal.TimestampedPackedUint224 memory);
 
   /// @notice Get the `tokenPrice` for a given token, checks if the price is valid.
   /// @param token The token to get the price for.
   /// @return tokenPrice The tokenPrice for the given token if it exists and is valid.
-  function getValidatedTokenPrice(address token) external view returns (uint224 tokenPrice);
+  function getValidatedTokenPrice(address token) external view returns (uint224);
 
   /// @notice Get the `tokenPrice` for an array of tokens.
   /// @param tokens The tokens to get prices for.
   /// @return tokenPrices The tokenPrices for the given tokens.
-  function getTokenPrices(address[] calldata tokens)
-    external
-    view
-    returns (Internal.TimestampedPackedUint224[] memory tokenPrices);
+  function getTokenPrices(address[] calldata tokens) external view returns (Internal.TimestampedPackedUint224[] memory);
 
   /// @notice Returns the token price data feed configuration
   /// @param token The token to retrieve the feed config for
@@ -52,7 +49,7 @@ interface IPriceRegistry {
   function getDestinationChainGasPrice(uint64 destChainSelector)
     external
     view
-    returns (Internal.TimestampedPackedUint224 memory gasPrice);
+    returns (Internal.TimestampedPackedUint224 memory);
 
   /// @notice Gets the fee token price and the gas price, both denominated in dollars.
   /// @param token The source token to get the price for.
@@ -77,7 +74,7 @@ interface IPriceRegistry {
 
   /// @notice Get the list of fee tokens.
   /// @return feeTokens The tokens set as fee tokens.
-  function getFeeTokens() external view returns (address[] memory feeTokens);
+  function getFeeTokens() external view returns (address[] memory);
 
   /// @notice Validates the ccip message & returns the fee
   /// @param destChainSelector The destination chain selector.
