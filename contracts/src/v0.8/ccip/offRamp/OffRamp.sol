@@ -219,7 +219,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   function getExecutionState(
     uint64 sourceChainSelector,
     uint64 sequenceNumber
-  ) public view returns (Internal.MessageExecutionState executionState) {
+  ) public view returns (Internal.MessageExecutionState) {
     return Internal.MessageExecutionState(
       (
         _getSequenceNumberBitmap(sourceChainSelector, sequenceNumber)
@@ -631,7 +631,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice Returns the sequence number of the last price update.
   /// @return sequenceNumber The latest price update sequence number.
-  function getLatestPriceSequenceNumber() external view returns (uint64 sequenceNumber) {
+  function getLatestPriceSequenceNumber() external view returns (uint64) {
     return s_latestPriceSequenceNumber;
   }
 
@@ -641,14 +641,14 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @param root The merkle root to check the commit status for.
   /// @return timestamp The timestamp of the committed root or zero in the case that it was never
   /// committed.
-  function getMerkleRoot(uint64 sourceChainSelector, bytes32 root) external view returns (uint256 timestamp) {
+  function getMerkleRoot(uint64 sourceChainSelector, bytes32 root) external view returns (uint256) {
     return s_roots[sourceChainSelector][root];
   }
 
   /// @notice Returns if a root is blessed or not.
   /// @param root The merkle root to check the blessing status for.
   /// @return blessed Whether the root is blessed or not.
-  function isBlessed(bytes32 root) public view returns (bool blessed) {
+  function isBlessed(bytes32 root) public view returns (bool) {
     // TODO: update RMN to also consider the source chain selector for blessing
     return IRMN(i_rmnProxy).isBlessed(IRMN.TaggedRoot({commitStore: address(this), root: root}));
   }
@@ -705,7 +705,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev This function will always return the same struct as the contents is static and can never change.
   /// RMN depends on this function, if changing, please notify the RMN maintainers.
   /// @return staticConfig The static config.
-  function getStaticConfig() external view returns (StaticConfig memory staticConfig) {
+  function getStaticConfig() external view returns (StaticConfig memory) {
     return StaticConfig({
       chainSelector: i_chainSelector,
       rmnProxy: i_rmnProxy,
@@ -716,18 +716,14 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice Returns the current dynamic config.
   /// @return dynamicConfig The current dynamic config.
-  function getDynamicConfig() external view returns (DynamicConfig memory dynamicConfig) {
+  function getDynamicConfig() external view returns (DynamicConfig memory) {
     return s_dynamicConfig;
   }
 
   /// @notice Returns the source chain config for the provided source chain selector
   /// @param sourceChainSelector chain to retrieve configuration for
   /// @return sourceChainConfig The config for the source chain
-  function getSourceChainConfig(uint64 sourceChainSelector)
-    external
-    view
-    returns (SourceChainConfig memory sourceChainConfig)
-  {
+  function getSourceChainConfig(uint64 sourceChainSelector) external view returns (SourceChainConfig memory) {
     return s_sourceChainConfigs[sourceChainSelector];
   }
 
