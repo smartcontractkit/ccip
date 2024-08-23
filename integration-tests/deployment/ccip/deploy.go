@@ -376,7 +376,7 @@ func DeployChainContracts(e deployment.Environment, chain deployment.Chain, ab d
 		return ab, err
 	}
 
-	priceRegistry, err := deployContract(e.Logger, chain, ab,
+	feeQuoter, err := deployContract(e.Logger, chain, ab,
 		func(chain deployment.Chain) ContractDeploy[*fee_quoter.FeeQuoter] {
 			prAddr, tx, pr, err2 := fee_quoter.DeployFeeQuoter(
 				chain.DeployerKey,
@@ -423,7 +423,7 @@ func DeployChainContracts(e deployment.Environment, chain deployment.Chain, ab d
 					TokenAdminRegistry: tokenAdminRegistry.Address,
 				},
 				onramp.OnRampDynamicConfig{
-					PriceRegistry: priceRegistry.Address,
+					FeeQuoter:     feeQuoter.Address,
 					FeeAggregator: common.HexToAddress("0x1"), // TODO real fee aggregator
 				},
 				[]onramp.OnRampDestChainConfigArgs{},
@@ -450,7 +450,7 @@ func DeployChainContracts(e deployment.Environment, chain deployment.Chain, ab d
 					TokenAdminRegistry: tokenAdminRegistry.Address,
 				},
 				offramp.OffRampDynamicConfig{
-					PriceRegistry:                           priceRegistry.Address,
+					FeeQuoter:                               feeQuoter.Address,
 					PermissionLessExecutionThresholdSeconds: uint32(86400),
 					MaxTokenTransferGas:                     uint32(200_000),
 					MaxPoolReleaseOrMintGas:                 uint32(200_000),
