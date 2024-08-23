@@ -242,7 +242,11 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
   function test_LockOrBurn_PrimaryMechanism_Success() public {
     bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
     uint256 amount = 1;
+
+    vm.startPrank(OWNER);
+
     s_token.transfer(address(s_usdcTokenPool), amount);
+
     vm.startPrank(s_routerAllowedOnRamp);
 
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_SELECTOR);
@@ -442,7 +446,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
   }
 }
 
-contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
+contract HybridUSDCTokenPoolMigrationTests is HybridUSDCTokenPoolTests {
   function test_lockOrBurn_then_BurnInCCTPMigration_Success() public {
     bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
     address CIRCLE = makeAddr("CIRCLE CCTP Migrator");
@@ -488,6 +492,9 @@ contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
 
     vm.startPrank(OWNER);
 
+    vm.expectEmit();
+    emit USDCBridgeMigrator.CircleMigratorAddressSet(CIRCLE);
+
     s_usdcTokenPool.setCircleMigratorAddress(CIRCLE);
 
     vm.expectEmit();
@@ -525,6 +532,8 @@ contract HybridUSDCTokenPoolMigrationTests is USDCTokenPoolSetup {
     );
 
     assertFalse(s_usdcTokenPool.shouldUseLockRelease(DEST_CHAIN_SELECTOR), "Alt mech should be disabled after a burn");
+
+    test_LockOrBurn_PrimaryMechanism_Success();
   }
 
   function test_cancelExistingCCTPMigrationProposal() public {
