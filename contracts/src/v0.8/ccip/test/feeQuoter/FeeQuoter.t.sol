@@ -12,7 +12,7 @@ import {Internal} from "../../libraries/Internal.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "../../libraries/USDPriceWith18Decimals.sol";
 import {FeeQuoterHelper} from "../helpers/FeeQuoterHelper.sol";
-import {FeeQuoterSetup, PriceRegistryFeeSetup} from "./FeeQuoterSetup.t.sol";
+import {FeeQuoterFeeSetup, FeeQuoterSetup} from "./FeeQuoterSetup.t.sol";
 
 import {Vm} from "forge-std/Vm.sol";
 
@@ -30,7 +30,7 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
     tokenPriceFeedUpdates[1] =
       _getSingleTokenPriceFeedUpdateStruct(s_sourceTokens[1], s_dataFeedByToken[s_sourceTokens[1]], 6);
 
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
 
     FeeQuoter.StaticConfig memory staticConfig = FeeQuoter.StaticConfig({
       linkToken: s_sourceTokens[0],
@@ -42,12 +42,12 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
       priceUpdaters,
       feeTokens,
       tokenPriceFeedUpdates,
-      s_priceRegistryTokenTransferFeeConfigArgs,
-      s_priceRegistryPremiumMultiplierWeiPerEthArgs,
+      s_feeQuoterTokenTransferFeeConfigArgs,
+      s_feeQuoterPremiumMultiplierWeiPerEthArgs,
       destChainConfigArgs
     );
 
-    _assertPriceRegistryStaticConfigsEqual(s_feeQuoter.getStaticConfig(), staticConfig);
+    _assertFeeQuoterStaticConfigsEqual(s_feeQuoter.getStaticConfig(), staticConfig);
     assertEq(feeTokens, s_feeQuoter.getFeeTokens());
     assertEq(priceUpdaters, s_feeQuoter.getAllAuthorizedCallers());
     assertEq(s_feeQuoter.typeAndVersion(), "FeeQuoter 1.6.0-dev");
@@ -61,19 +61,19 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
     );
 
     assertEq(
-      s_priceRegistryPremiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth,
-      s_feeQuoter.getPremiumMultiplierWeiPerEth(s_priceRegistryPremiumMultiplierWeiPerEthArgs[0].token)
+      s_feeQuoterPremiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth,
+      s_feeQuoter.getPremiumMultiplierWeiPerEth(s_feeQuoterPremiumMultiplierWeiPerEthArgs[0].token)
     );
 
     assertEq(
-      s_priceRegistryPremiumMultiplierWeiPerEthArgs[1].premiumMultiplierWeiPerEth,
-      s_feeQuoter.getPremiumMultiplierWeiPerEth(s_priceRegistryPremiumMultiplierWeiPerEthArgs[1].token)
+      s_feeQuoterPremiumMultiplierWeiPerEthArgs[1].premiumMultiplierWeiPerEth,
+      s_feeQuoter.getPremiumMultiplierWeiPerEth(s_feeQuoterPremiumMultiplierWeiPerEthArgs[1].token)
     );
 
-    FeeQuoter.TokenTransferFeeConfigArgs memory tokenTransferFeeConfigArg = s_priceRegistryTokenTransferFeeConfigArgs[0];
+    FeeQuoter.TokenTransferFeeConfigArgs memory tokenTransferFeeConfigArg = s_feeQuoterTokenTransferFeeConfigArgs[0];
     for (uint256 i = 0; i < tokenTransferFeeConfigArg.tokenTransferFeeConfigs.length; ++i) {
       FeeQuoter.TokenTransferFeeConfigSingleTokenArgs memory tokenFeeArgs =
-        s_priceRegistryTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[i];
+        s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[i];
 
       _assertTokenTransferFeeConfigEqual(
         tokenFeeArgs.tokenTransferFeeConfig,
@@ -85,7 +85,7 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
       FeeQuoter.DestChainConfig memory expectedConfig = destChainConfigArgs[i].destChainConfig;
       uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
 
-      _assertPriceRegistryDestChainConfigsEqual(expectedConfig, s_feeQuoter.getDestChainConfig(destChainSelector));
+      _assertFeeQuoterDestChainConfigsEqual(expectedConfig, s_feeQuoter.getDestChainConfig(destChainSelector));
     }
   }
 
@@ -103,8 +103,8 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
       new address[](0),
       new address[](0),
       new FeeQuoter.TokenPriceFeedUpdate[](0),
-      s_priceRegistryTokenTransferFeeConfigArgs,
-      s_priceRegistryPremiumMultiplierWeiPerEthArgs,
+      s_feeQuoterTokenTransferFeeConfigArgs,
+      s_feeQuoterPremiumMultiplierWeiPerEthArgs,
       new FeeQuoter.DestChainConfigArgs[](0)
     );
   }
@@ -123,8 +123,8 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
       new address[](0),
       new address[](0),
       new FeeQuoter.TokenPriceFeedUpdate[](0),
-      s_priceRegistryTokenTransferFeeConfigArgs,
-      s_priceRegistryPremiumMultiplierWeiPerEthArgs,
+      s_feeQuoterTokenTransferFeeConfigArgs,
+      s_feeQuoterPremiumMultiplierWeiPerEthArgs,
       new FeeQuoter.DestChainConfigArgs[](0)
     );
   }
@@ -143,8 +143,8 @@ contract FeeQuoter_constructor is FeeQuoterSetup {
       new address[](0),
       new address[](0),
       new FeeQuoter.TokenPriceFeedUpdate[](0),
-      s_priceRegistryTokenTransferFeeConfigArgs,
-      s_priceRegistryPremiumMultiplierWeiPerEthArgs,
+      s_feeQuoterTokenTransferFeeConfigArgs,
+      s_feeQuoterPremiumMultiplierWeiPerEthArgs,
       new FeeQuoter.DestChainConfigArgs[](0)
     );
   }
@@ -759,16 +759,16 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
 
     s_feeQuoter.applyDestChainConfigUpdates(newDestChainConfigArgs);
 
-    _assertPriceRegistryDestChainConfigsEqual(
+    _assertFeeQuoterDestChainConfigsEqual(
       destChainConfigArgs.destChainConfig, s_feeQuoter.getDestChainConfig(destChainConfigArgs.destChainSelector)
     );
   }
 
   function test_applyDestChainConfigUpdates_Success() public {
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = new FeeQuoter.DestChainConfigArgs[](2);
-    destChainConfigArgs[0] = _generatePriceRegistryDestChainConfigArgs()[0];
+    destChainConfigArgs[0] = _generateFeeQuoterDestChainConfigArgs()[0];
     destChainConfigArgs[0].destChainConfig.isEnabled = false;
-    destChainConfigArgs[1] = _generatePriceRegistryDestChainConfigArgs()[0];
+    destChainConfigArgs[1] = _generateFeeQuoterDestChainConfigArgs()[0];
     destChainConfigArgs[1].destChainSelector = DEST_CHAIN_SELECTOR + 1;
 
     vm.expectEmit();
@@ -783,8 +783,8 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
     FeeQuoter.DestChainConfig memory gotDestChainConfig1 = s_feeQuoter.getDestChainConfig(DEST_CHAIN_SELECTOR + 1);
 
     assertEq(vm.getRecordedLogs().length, 2);
-    _assertPriceRegistryDestChainConfigsEqual(destChainConfigArgs[0].destChainConfig, gotDestChainConfig0);
-    _assertPriceRegistryDestChainConfigsEqual(destChainConfigArgs[1].destChainConfig, gotDestChainConfig1);
+    _assertFeeQuoterDestChainConfigsEqual(destChainConfigArgs[0].destChainConfig, gotDestChainConfig0);
+    _assertFeeQuoterDestChainConfigsEqual(destChainConfigArgs[1].destChainConfig, gotDestChainConfig1);
   }
 
   function test_applyDestChainConfigUpdatesZeroIntput_Success() public {
@@ -799,7 +799,7 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
   // Reverts
 
   function test_applyDestChainConfigUpdatesDefaultTxGasLimitEqZero_Revert() public {
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     FeeQuoter.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     destChainConfigArg.destChainConfig.defaultTxGasLimit = 0;
@@ -810,7 +810,7 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
   }
 
   function test_applyDestChainConfigUpdatesDefaultTxGasLimitGtMaxPerMessageGasLimit_Revert() public {
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     FeeQuoter.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     // Allow setting to the max value
@@ -826,7 +826,7 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
   }
 
   function test_InvalidDestChainConfigDestChainSelectorEqZero_Revert() public {
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     FeeQuoter.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     destChainConfigArg.destChainSelector = 0;
@@ -837,7 +837,7 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
   }
 
   function test_InvalidDestBytesOverhead_Revert() public {
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     FeeQuoter.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     destChainConfigArg.destChainConfig.defaultTokenDestBytesOverhead = uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES - 1);
@@ -848,7 +848,7 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
   }
 
   function test_InvalidChainFamilySelector_Revert() public {
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     FeeQuoter.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
 
     destChainConfigArg.destChainConfig.chainFamilySelector = bytes4(uint32(1));
@@ -875,7 +875,7 @@ contract FeeQuoter_getDataAvailabilityCost is FeeQuoterSetup {
     assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD);
 
     // Test that the cost is destnation chain specific
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR + 1;
     destChainConfigArgs[0].destChainConfig.destDataAvailabilityOverheadGas =
       destChainConfig.destDataAvailabilityOverheadGas * 2;
@@ -1000,7 +1000,7 @@ contract FeeQuoter_applyPremiumMultiplierWeiPerEthUpdates is FeeQuoterSetup {
   function test_applyPremiumMultiplierWeiPerEthUpdatesSingleToken_Success() public {
     FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs =
       new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](1);
-    premiumMultiplierWeiPerEthArgs[0] = s_priceRegistryPremiumMultiplierWeiPerEthArgs[0];
+    premiumMultiplierWeiPerEthArgs[0] = s_feeQuoterPremiumMultiplierWeiPerEthArgs[0];
     premiumMultiplierWeiPerEthArgs[0].token = vm.addr(1);
 
     vm.expectEmit();
@@ -1011,7 +1011,7 @@ contract FeeQuoter_applyPremiumMultiplierWeiPerEthUpdates is FeeQuoterSetup {
     s_feeQuoter.applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
 
     assertEq(
-      s_priceRegistryPremiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth,
+      s_feeQuoterPremiumMultiplierWeiPerEthArgs[0].premiumMultiplierWeiPerEth,
       s_feeQuoter.getPremiumMultiplierWeiPerEth(vm.addr(1))
     );
   }
@@ -1019,7 +1019,7 @@ contract FeeQuoter_applyPremiumMultiplierWeiPerEthUpdates is FeeQuoterSetup {
   function test_applyPremiumMultiplierWeiPerEthUpdatesMultipleTokens_Success() public {
     FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs =
       new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](2);
-    premiumMultiplierWeiPerEthArgs[0] = s_priceRegistryPremiumMultiplierWeiPerEthArgs[0];
+    premiumMultiplierWeiPerEthArgs[0] = s_feeQuoterPremiumMultiplierWeiPerEthArgs[0];
     premiumMultiplierWeiPerEthArgs[0].token = vm.addr(1);
     premiumMultiplierWeiPerEthArgs[1].token = vm.addr(2);
 
@@ -1233,7 +1233,7 @@ contract FeeQuoter_applyTokenTransferFeeConfigUpdates is FeeQuoterSetup {
   }
 }
 
-contract FeeQuoter_getTokenTransferCost is PriceRegistryFeeSetup {
+contract FeeQuoter_getTokenTransferCost is FeeQuoterFeeSetup {
   using USDPriceWith18Decimals for uint224;
 
   function test_NoTokenTransferChargesZeroFee_Success() public view {
@@ -1315,7 +1315,7 @@ contract FeeQuoter_getTokenTransferCost is PriceRegistryFeeSetup {
 
     uint256 usdWei = _calcUSDValueFromTokenAmount(s_feeTokenPrice, tokenAmount);
     uint256 bpsUSDWei = _applyBpsRatio(
-      usdWei, s_priceRegistryTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.deciBps
+      usdWei, s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.deciBps
     );
 
     assertEq(bpsUSDWei, feeUSDWei);
@@ -1343,7 +1343,7 @@ contract FeeQuoter_getTokenTransferCost is PriceRegistryFeeSetup {
 
     uint256 usdWei = _calcUSDValueFromTokenAmount(s_customTokenPrice, tokenAmount);
     uint256 bpsUSDWei = _applyBpsRatio(
-      usdWei, s_priceRegistryTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig.deciBps
+      usdWei, s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[1].tokenTransferFeeConfig.deciBps
     );
 
     assertEq(bpsUSDWei, feeUSDWei);
@@ -1486,7 +1486,7 @@ contract FeeQuoter_getTokenTransferCost is PriceRegistryFeeSetup {
   }
 }
 
-contract FeeQuoter_getValidatedFee is PriceRegistryFeeSetup {
+contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
   using USDPriceWith18Decimals for uint224;
 
   function test_EmptyMessage_Success() public view {
@@ -1654,7 +1654,7 @@ contract FeeQuoter_getValidatedFee is PriceRegistryFeeSetup {
     vm.stopPrank();
     vm.startPrank(OWNER);
 
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainConfig.enforceOutOfOrder = enforce;
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
 
@@ -1683,7 +1683,7 @@ contract FeeQuoter_getValidatedFee is PriceRegistryFeeSetup {
     vm.stopPrank();
     vm.startPrank(OWNER);
 
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainConfig.enforceOutOfOrder = true;
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
     vm.stopPrank();
@@ -1740,7 +1740,7 @@ contract FeeQuoter_getValidatedFee is PriceRegistryFeeSetup {
   }
 }
 
-contract FeeQuoter_processMessageArgs is PriceRegistryFeeSetup {
+contract FeeQuoter_processMessageArgs is FeeQuoterFeeSetup {
   using USDPriceWith18Decimals for uint224;
 
   function setUp() public virtual override {
@@ -1852,7 +1852,7 @@ contract FeeQuoter_processMessageArgs is PriceRegistryFeeSetup {
   }
 }
 
-contract FeeQuoter_validatePoolReturnData is PriceRegistryFeeSetup {
+contract FeeQuoter_validatePoolReturnData is FeeQuoterFeeSetup {
   function test_WithSingleToken_Success() public view {
     Client.EVMTokenAmount[] memory sourceTokenAmounts = new Client.EVMTokenAmount[](1);
     sourceTokenAmounts[0].amount = 1e18;
@@ -1986,7 +1986,7 @@ contract FeeQuoter_parseEVMExtraArgsFromBytes is FeeQuoterSetup {
 
   function setUp() public virtual override {
     super.setUp();
-    s_destChainConfig = _generatePriceRegistryDestChainConfigArgs()[0].destChainConfig;
+    s_destChainConfig = _generateFeeQuoterDestChainConfigArgs()[0].destChainConfig;
   }
 
   function test_EVMExtraArgsV1_Success() public view {
@@ -2053,13 +2053,13 @@ contract FeeQuoter_parseEVMExtraArgsFromBytes is FeeQuoterSetup {
   }
 }
 
-contract PriceRegistry_KeystoneSetup is FeeQuoterSetup {
-  address constant FORWARDER_1 = address(0x1);
-  address constant WORKFLOW_OWNER_1 = address(0x3);
-  bytes10 constant WORKFLOW_NAME_1 = "workflow1";
-  bytes2 constant REPORT_NAME_1 = "01";
-  address onReportTestToken1;
-  address onReportTestToken2;
+contract FeeQuoter_KeystoneSetup is FeeQuoterSetup {
+  address internal constant FORWARDER_1 = address(0x1);
+  address internal constant WORKFLOW_OWNER_1 = address(0x3);
+  bytes10 internal constant WORKFLOW_NAME_1 = "workflow1";
+  bytes2 internal constant REPORT_NAME_1 = "01";
+  address internal onReportTestToken1;
+  address internal onReportTestToken2;
 
   function setUp() public virtual override {
     super.setUp();
@@ -2088,7 +2088,7 @@ contract PriceRegistry_KeystoneSetup is FeeQuoterSetup {
   }
 }
 
-contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
+contract FeeQuoter_onReport is FeeQuoter_KeystoneSetup {
   function test_onReport_Success() public {
     bytes memory encodedPermissionsMetadata =
       abi.encodePacked(keccak256(abi.encode("workflowCID")), WORKFLOW_NAME_1, WORKFLOW_OWNER_1, REPORT_NAME_1);
@@ -2099,7 +2099,6 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
     report[1] =
       FeeQuoter.ReceivedCCIPFeedReport({token: onReportTestToken2, price: 4e18, timestamp: uint32(block.timestamp)});
 
-    bytes memory encodedReport = abi.encode(report);
     uint224 expectedStoredToken1Price = s_feeQuoter.calculateRebasedValue(18, 18, report[0].price);
     uint224 expectedStoredToken2Price = s_feeQuoter.calculateRebasedValue(18, 20, report[1].price);
     vm.expectEmit();
@@ -2108,7 +2107,7 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
     emit FeeQuoter.UsdPerTokenUpdated(onReportTestToken2, expectedStoredToken2Price, block.timestamp);
 
     changePrank(FORWARDER_1);
-    s_feeQuoter.onReport(encodedPermissionsMetadata, encodedReport);
+    s_feeQuoter.onReport(encodedPermissionsMetadata, abi.encode(report));
 
     vm.assertEq(s_feeQuoter.getTokenPrice(report[0].token).value, expectedStoredToken1Price);
     vm.assertEq(s_feeQuoter.getTokenPrice(report[0].token).timestamp, report[0].timestamp);
@@ -2124,8 +2123,6 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
     report[0] =
       FeeQuoter.ReceivedCCIPFeedReport({token: s_sourceTokens[0], price: 4e18, timestamp: uint32(block.timestamp)});
 
-    bytes memory encodedReport = abi.encode(report);
-
     vm.expectRevert(
       abi.encodeWithSelector(
         KeystoneFeedsPermissionHandler.ReportForwarderUnauthorized.selector,
@@ -2136,7 +2133,7 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
       )
     );
     changePrank(STRANGER);
-    s_feeQuoter.onReport(encodedPermissionsMetadata, encodedReport);
+    s_feeQuoter.onReport(encodedPermissionsMetadata, abi.encode(report));
   }
 
   function test_onReport_UnsupportedToken_Reverts() public {
@@ -2146,11 +2143,9 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
     report[0] =
       FeeQuoter.ReceivedCCIPFeedReport({token: s_sourceTokens[1], price: 4e18, timestamp: uint32(block.timestamp)});
 
-    bytes memory encodedReport = abi.encode(report);
-
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.TokenNotSupported.selector, s_sourceTokens[1]));
     changePrank(FORWARDER_1);
-    s_feeQuoter.onReport(encodedPermissionsMetadata, encodedReport);
+    s_feeQuoter.onReport(encodedPermissionsMetadata, abi.encode(report));
   }
 
   function test_OnReport_StaleUpdate_Revert() public {
@@ -2162,7 +2157,6 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
     report[0] =
       FeeQuoter.ReceivedCCIPFeedReport({token: onReportTestToken1, price: 4e18, timestamp: uint32(block.timestamp)});
 
-    bytes memory encodedReport = abi.encode(report);
     uint224 expectedStoredTokenPrice = s_feeQuoter.calculateRebasedValue(18, 18, report[0].price);
 
     vm.expectEmit();
@@ -2170,18 +2164,17 @@ contract PriceRegistry_onReport is PriceRegistry_KeystoneSetup {
 
     changePrank(FORWARDER_1);
     //setting the correct price and time with the correct report
-    s_feeQuoter.onReport(encodedPermissionsMetadata, encodedReport);
+    s_feeQuoter.onReport(encodedPermissionsMetadata, abi.encode(report));
 
     //create a stale report
     report[0] =
       FeeQuoter.ReceivedCCIPFeedReport({token: onReportTestToken1, price: 4e18, timestamp: uint32(block.timestamp - 1)});
-    encodedReport = abi.encode(report);
     //expecting a revert
     vm.expectRevert(
       abi.encodeWithSelector(
         FeeQuoter.StaleKeystoneUpdate.selector, onReportTestToken1, block.timestamp - 1, block.timestamp
       )
     );
-    s_feeQuoter.onReport(encodedPermissionsMetadata, encodedReport);
+    s_feeQuoter.onReport(encodedPermissionsMetadata, abi.encode(report));
   }
 }

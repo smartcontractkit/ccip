@@ -600,7 +600,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
 
       uint256 bpsFeeUSDWei = 0;
       // Only calculate bps fee if ratio is greater than 0. Ratio of 0 means no bps fee for a token.
-      // Useful for when the PriceRegistry cannot return a valid price for the token.
+      // Useful for when the FeeQuoter cannot return a valid price for the token.
       if (transferFeeConfig.deciBps > 0) {
         uint224 tokenPrice = 0;
         if (tokenAmount.token != feeToken) {
@@ -928,7 +928,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     }
   }
 
-  /// @notice Returns the static PriceRegistry config.
+  /// @notice Returns the static FeeQuoter config.
   /// @dev RMN depends on this function, if changing, please notify the RMN maintainers.
   /// @return the configuration.
   function getStaticConfig() external view returns (StaticConfig memory) {

@@ -308,7 +308,7 @@ contract OffRamp_setDynamicConfig is OffRampSetup {
     s_offRamp.setDynamicConfig(dynamicConfig);
   }
 
-  function test_PriceRegistryZeroAddress_Revert() public {
+  function test_FeeQuoterZeroAddress_Revert() public {
     OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(ZERO_ADDRESS);
 
     vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
@@ -2965,8 +2965,7 @@ contract OffRamp_commit is OffRampSetup {
 
   function test_StaleReportWithRoot_Success() public {
     uint64 maxSeq = 12;
-    uint224 tokenStartPrice =
-      IFeeQuoter(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value;
+    uint224 tokenStartPrice = IFeeQuoter(s_offRamp.getDynamicConfig().feeQuoter).getTokenPrice(s_sourceFeeToken).value;
 
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
@@ -3001,9 +3000,7 @@ contract OffRamp_commit is OffRampSetup {
 
     assertEq(maxSeq * 2 + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
     assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
-    assertEq(
-      tokenStartPrice, IFeeQuoter(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
-    );
+    assertEq(tokenStartPrice, IFeeQuoter(s_offRamp.getDynamicConfig().feeQuoter).getTokenPrice(s_sourceFeeToken).value);
   }
 
   function test_OnlyTokenPriceUpdates_Success() public {
@@ -3120,7 +3117,7 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
 
     assertEq(maxSeq + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
-    assertEq(tokenPrice1, IFeeQuoter(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value);
+    assertEq(tokenPrice1, IFeeQuoter(s_offRamp.getDynamicConfig().feeQuoter).getTokenPrice(s_sourceFeeToken).value);
     assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
   }
 

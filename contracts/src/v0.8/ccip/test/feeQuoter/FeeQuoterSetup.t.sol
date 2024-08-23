@@ -33,8 +33,8 @@ contract FeeQuoterSetup is TokenSetup {
   address[] internal s_destFeeTokens;
   uint224[] internal s_destTokenPrices;
 
-  FeeQuoter.PremiumMultiplierWeiPerEthArgs[] internal s_priceRegistryPremiumMultiplierWeiPerEthArgs;
-  FeeQuoter.TokenTransferFeeConfigArgs[] internal s_priceRegistryTokenTransferFeeConfigArgs;
+  FeeQuoter.PremiumMultiplierWeiPerEthArgs[] internal s_feeQuoterPremiumMultiplierWeiPerEthArgs;
+  FeeQuoter.TokenTransferFeeConfigArgs[] internal s_feeQuoterTokenTransferFeeConfigArgs;
 
   mapping(address token => address dataFeedAddress) internal s_dataFeedByToken;
 
@@ -97,22 +97,22 @@ contract FeeQuoterSetup is TokenSetup {
     feeTokens[1] = s_weth;
     FeeQuoter.TokenPriceFeedUpdate[] memory tokenPriceFeedUpdates = new FeeQuoter.TokenPriceFeedUpdate[](0);
 
-    s_priceRegistryPremiumMultiplierWeiPerEthArgs.push(
+    s_feeQuoterPremiumMultiplierWeiPerEthArgs.push(
       FeeQuoter.PremiumMultiplierWeiPerEthArgs({
         token: s_sourceFeeToken,
         premiumMultiplierWeiPerEth: 5e17 // 0.5x
       })
     );
-    s_priceRegistryPremiumMultiplierWeiPerEthArgs.push(
+    s_feeQuoterPremiumMultiplierWeiPerEthArgs.push(
       FeeQuoter.PremiumMultiplierWeiPerEthArgs({
         token: s_sourceRouter.getWrappedNative(),
         premiumMultiplierWeiPerEth: 2e18 // 2x
       })
     );
 
-    s_priceRegistryTokenTransferFeeConfigArgs.push();
-    s_priceRegistryTokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
-    s_priceRegistryTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
+    s_feeQuoterTokenTransferFeeConfigArgs.push();
+    s_feeQuoterTokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
+    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
       FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
         token: s_sourceFeeToken,
         tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
@@ -125,7 +125,7 @@ contract FeeQuoterSetup is TokenSetup {
         })
       })
     );
-    s_priceRegistryTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
+    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
       FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
         token: CUSTOM_TOKEN,
         tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
@@ -148,9 +148,9 @@ contract FeeQuoterSetup is TokenSetup {
       priceUpdaters,
       feeTokens,
       tokenPriceFeedUpdates,
-      s_priceRegistryTokenTransferFeeConfigArgs,
-      s_priceRegistryPremiumMultiplierWeiPerEthArgs,
-      _generatePriceRegistryDestChainConfigArgs()
+      s_feeQuoterTokenTransferFeeConfigArgs,
+      s_feeQuoterPremiumMultiplierWeiPerEthArgs,
+      _generateFeeQuoterDestChainConfigArgs()
     );
     s_feeQuoter.updatePrices(priceUpdates);
   }
@@ -216,7 +216,7 @@ contract FeeQuoterSetup is TokenSetup {
     return tokenTransferFeeConfigArgs;
   }
 
-  function _generatePriceRegistryDestChainConfigArgs() internal pure returns (FeeQuoter.DestChainConfigArgs[] memory) {
+  function _generateFeeQuoterDestChainConfigArgs() internal pure returns (FeeQuoter.DestChainConfigArgs[] memory) {
     FeeQuoter.DestChainConfigArgs[] memory destChainConfigs = new FeeQuoter.DestChainConfigArgs[](1);
     destChainConfigs[0] = FeeQuoter.DestChainConfigArgs({
       destChainSelector: DEST_CHAIN_SELECTOR,
@@ -269,7 +269,7 @@ contract FeeQuoterSetup is TokenSetup {
     assertEq(a.isEnabled, b.isEnabled);
   }
 
-  function _assertPriceRegistryStaticConfigsEqual(
+  function _assertFeeQuoterStaticConfigsEqual(
     FeeQuoter.StaticConfig memory a,
     FeeQuoter.StaticConfig memory b
   ) internal pure {
@@ -277,7 +277,7 @@ contract FeeQuoterSetup is TokenSetup {
     assertEq(a.maxFeeJuelsPerMsg, b.maxFeeJuelsPerMsg);
   }
 
-  function _assertPriceRegistryDestChainConfigsEqual(
+  function _assertFeeQuoterDestChainConfigsEqual(
     FeeQuoter.DestChainConfig memory a,
     FeeQuoter.DestChainConfig memory b
   ) internal pure {
@@ -297,7 +297,7 @@ contract FeeQuoterSetup is TokenSetup {
   }
 }
 
-contract PriceRegistryFeeSetup is FeeQuoterSetup {
+contract FeeQuoterFeeSetup is FeeQuoterSetup {
   uint224 internal s_feeTokenPrice;
   uint224 internal s_wrappedTokenPrice;
   uint224 internal s_customTokenPrice;

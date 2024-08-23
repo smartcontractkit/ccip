@@ -117,12 +117,12 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     vm.recordLogs();
     s_rateLimiter = new MultiAggregateRateLimiterHelper(address(s_feeQuoter), authorizedCallers);
 
-    // PriceRegistrySet
+    // FeeQuoterSet
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
     assertEq(logEntries.length, 1);
 
     assertEq(OWNER, s_rateLimiter.owner());
-    assertEq(address(s_feeQuoter), s_rateLimiter.getPriceRegistry());
+    assertEq(address(s_feeQuoter), s_rateLimiter.getFeeQuoter());
   }
 
   function test_Constructor_Success() public {
@@ -131,25 +131,25 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
     authorizedCallers[1] = MOCK_ONRAMP;
 
     vm.expectEmit();
-    emit MultiAggregateRateLimiter.PriceRegistrySet(address(s_feeQuoter));
+    emit MultiAggregateRateLimiter.FeeQuoterSet(address(s_feeQuoter));
 
     s_rateLimiter = new MultiAggregateRateLimiterHelper(address(s_feeQuoter), authorizedCallers);
 
     assertEq(OWNER, s_rateLimiter.owner());
-    assertEq(address(s_feeQuoter), s_rateLimiter.getPriceRegistry());
+    assertEq(address(s_feeQuoter), s_rateLimiter.getFeeQuoter());
     assertEq(s_rateLimiter.typeAndVersion(), "MultiAggregateRateLimiter 1.6.0-dev");
   }
 }
 
-contract MultiAggregateRateLimiter_setPriceRegistry is MultiAggregateRateLimiterSetup {
+contract MultiAggregateRateLimiter_setFeeQuoter is MultiAggregateRateLimiterSetup {
   function test_Owner_Success() public {
     address newAddress = address(42);
 
     vm.expectEmit();
-    emit MultiAggregateRateLimiter.PriceRegistrySet(newAddress);
+    emit MultiAggregateRateLimiter.FeeQuoterSet(newAddress);
 
-    s_rateLimiter.setPriceRegistry(newAddress);
-    assertEq(newAddress, s_rateLimiter.getPriceRegistry());
+    s_rateLimiter.setFeeQuoter(newAddress);
+    assertEq(newAddress, s_rateLimiter.getFeeQuoter());
   }
 
   // Reverts
@@ -158,12 +158,12 @@ contract MultiAggregateRateLimiter_setPriceRegistry is MultiAggregateRateLimiter
     vm.startPrank(STRANGER);
     vm.expectRevert(bytes("Only callable by owner"));
 
-    s_rateLimiter.setPriceRegistry(STRANGER);
+    s_rateLimiter.setFeeQuoter(STRANGER);
   }
 
   function test_ZeroAddress_Revert() public {
     vm.expectRevert(AuthorizedCallers.ZeroAddressNotAllowed.selector);
-    s_rateLimiter.setPriceRegistry(address(0));
+    s_rateLimiter.setFeeQuoter(address(0));
   }
 }
 

@@ -108,7 +108,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @notice Dynamic offRamp config
   /// @dev since OffRampConfig is part of OffRampConfigChanged event, if changing it, we should update the ABI on Atlas
   struct DynamicConfig {
-    address priceRegistry; // ──────────────────────────╮ Price registry address on the local chain
+    address feeQuoter; // ──────────────────────────────╮ FeeQuoter address on the local chain
     uint32 permissionLessExecutionThresholdSeconds; //  │ Waiting time before manual execution is enabled
     uint32 maxTokenTransferGas; //                      │ Maximum amount of gas passed on to token `transfer` call
     uint32 maxPoolReleaseOrMintGas; // ─────────────────╯ Maximum amount of gas passed on to token pool when calling releaseOrMint
@@ -588,8 +588,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       if (s_latestPriceSequenceNumber < sequenceNumber) {
         // If prices are not stale, update the latest epoch and round
         s_latestPriceSequenceNumber = sequenceNumber;
-        // And update the prices in the price registry
-        IFeeQuoter(s_dynamicConfig.priceRegistry).updatePrices(commitReport.priceUpdates);
+        // And update the prices in the fee quoter
+        IFeeQuoter(s_dynamicConfig.feeQuoter).updatePrices(commitReport.priceUpdates);
       } else {
         // If prices are stale and the report doesn't contain a root, this report
         // does not have any valid information and we revert.
@@ -777,7 +777,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @notice Sets the dynamic config.
   /// @param dynamicConfig The dynamic config.
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
-    if (dynamicConfig.priceRegistry == address(0)) {
+    if (dynamicConfig.feeQuoter == address(0)) {
       revert ZeroAddressNotAllowed();
     }
 
