@@ -582,7 +582,7 @@ contract OnRamp_getFee is OnRampSetup {
     vm.stopPrank();
     vm.startPrank(OWNER);
 
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainConfig.enforceOutOfOrder = true;
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
     vm.stopPrank();
@@ -600,7 +600,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
   function test_SetDynamicConfig_Success() public {
     OnRamp.StaticConfig memory staticConfig = s_onRamp.getStaticConfig();
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
-      priceRegistry: address(23423),
+      feeQuoter: address(23423),
       messageValidator: makeAddr("messageValidator"),
       feeAggregator: FEE_AGGREGATOR
     });
@@ -611,14 +611,14 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     s_onRamp.setDynamicConfig(newConfig);
 
     OnRamp.DynamicConfig memory gotDynamicConfig = s_onRamp.getDynamicConfig();
-    assertEq(newConfig.priceRegistry, gotDynamicConfig.priceRegistry);
+    assertEq(newConfig.feeQuoter, gotDynamicConfig.feeQuoter);
   }
 
   // Reverts
 
-  function test_SetConfigInvalidConfigPriceRegistryEqAddressZero_Revert() public {
+  function test_SetConfigInvalidConfigFeeQuoterEqAddressZero_Revert() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
-      priceRegistry: address(0),
+      feeQuoter: address(0),
       feeAggregator: FEE_AGGREGATOR,
       messageValidator: makeAddr("messageValidator")
     });
@@ -629,17 +629,17 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
 
   function test_SetConfigInvalidConfig_Revert() public {
     OnRamp.DynamicConfig memory newConfig =
-      OnRamp.DynamicConfig({priceRegistry: address(23423), messageValidator: address(0), feeAggregator: FEE_AGGREGATOR});
+      OnRamp.DynamicConfig({feeQuoter: address(23423), messageValidator: address(0), feeAggregator: FEE_AGGREGATOR});
 
     // Invalid price reg reverts.
-    newConfig.priceRegistry = address(0);
+    newConfig.feeQuoter = address(0);
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     s_onRamp.setDynamicConfig(newConfig);
   }
 
   function test_SetConfigInvalidConfigFeeAggregatorEqAddressZero_Revert() public {
     OnRamp.DynamicConfig memory newConfig =
-      OnRamp.DynamicConfig({priceRegistry: address(23423), messageValidator: address(0), feeAggregator: address(0)});
+      OnRamp.DynamicConfig({feeQuoter: address(23423), messageValidator: address(0), feeAggregator: address(0)});
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     s_onRamp.setDynamicConfig(newConfig);
   }

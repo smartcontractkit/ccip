@@ -56,7 +56,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   /// @dev Struct to contains the dynamic configuration
   // solhint-disable-next-line gas-struct-packing
   struct DynamicConfig {
-    address priceRegistry; // Price registry address
+    address feeQuoter; // FeeQuoter address
     address messageValidator; // Optional message validator to validate outbound messages (zero address = no validator)
     address feeAggregator; // Fee aggregator address
   }
@@ -155,7 +155,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
 
     // Convert message fee to juels and retrieve converted args
     (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) = IFeeQuoter(
-      s_dynamicConfig.priceRegistry
+      s_dynamicConfig.feeQuoter
     ).processMessageArgs(destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs);
 
     emit FeePaid(message.feeToken, msgFeeJuels);
@@ -192,7 +192,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     }
 
     // Validate pool return data after it is populated (view function - no state changes)
-    IFeeQuoter(s_dynamicConfig.priceRegistry).validatePoolReturnData(
+    IFeeQuoter(s_dynamicConfig.feeQuoter).validatePoolReturnData(
       destChainSelector, newMessage.tokenAmounts, message.tokenAmounts
     );
 
@@ -246,8 +246,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
       })
     );
 
-    // NOTE: pool data validations are outsourced to the PriceRegistry to handle family-specific logic handling
-
+    // NOTE: pool data validations are outsourced to the FeeQuoter to handle family-specific logic handling
     return Internal.RampTokenAmount({
       sourcePoolAddress: abi.encode(sourcePool),
       destTokenAddress: poolReturnData.destTokenAddress,
@@ -293,7 +292,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
 
   /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
-    if (dynamicConfig.priceRegistry == address(0) || dynamicConfig.feeAggregator == address(0)) revert InvalidConfig();
+    if (dynamicConfig.feeQuoter == address(0) || dynamicConfig.feeAggregator == address(0)) revert InvalidConfig();
 
     s_dynamicConfig = dynamicConfig;
 
@@ -363,13 +362,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   ) external view returns (uint256 feeTokenAmount) {
     if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN(destChainSelector);
 
-    return IFeeQuoter(s_dynamicConfig.priceRegistry).getValidatedFee(destChainSelector, message);
+    return IFeeQuoter(s_dynamicConfig.feeQuoter).getValidatedFee(destChainSelector, message);
   }
 
   /// @notice Withdraws the outstanding fee token balances to the fee aggregator.
   /// @dev This function can be permissionless as it only transfers accepted fee tokens to the fee aggregator which is a trusted address.
   function withdrawFeeTokens() external {
-    address[] memory feeTokens = IFeeQuoter(s_dynamicConfig.priceRegistry).getFeeTokens();
+    address[] memory feeTokens = IFeeQuoter(s_dynamicConfig.feeQuoter).getFeeTokens();
     address feeAggregator = s_dynamicConfig.feeAggregator;
 
     for (uint256 i = 0; i < feeTokens.length; ++i) {

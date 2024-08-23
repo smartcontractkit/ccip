@@ -200,7 +200,7 @@ func createUniverses(
 				TokenAdminRegistry: tokenAdminRegistry.Address(),
 			},
 			onramp.OnRampDynamicConfig{
-				PriceRegistry: priceRegistry.Address(),
+				FeeQuoter: priceRegistry.Address(),
 				// `withdrawFeeTokens` onRamp function is not part of the message flow
 				// so we can set this to any address
 				FeeAggregator: testutils.NewAddress(),
@@ -226,7 +226,7 @@ func createUniverses(
 				NonceManager:       nonceManager.Address(),
 			},
 			offramp.OffRampDynamicConfig{
-				PriceRegistry: priceRegistry.Address(),
+				FeeQuoter: priceRegistry.Address(),
 			},
 			// Source chain configs will be set up later once we have all chains
 			[]offramp.OffRampSourceChainConfigArgs{},

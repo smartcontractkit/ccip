@@ -224,10 +224,10 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
   uint32 internal constant MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS = 200_000;
   uint32 internal constant MAX_TOKEN_POOL_TRANSFER_GAS = 50_000;
 
-  function _generateDynamicOffRampConfig(address priceRegistry) internal pure returns (OffRamp.DynamicConfig memory) {
+  function _generateDynamicOffRampConfig(address feeQuoter) internal pure returns (OffRamp.DynamicConfig memory) {
     return OffRamp.DynamicConfig({
       permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
-      priceRegistry: priceRegistry,
+      feeQuoter: feeQuoter,
       messageValidator: address(0),
       maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
       maxTokenTransferGas: MAX_TOKEN_POOL_TRANSFER_GAS
@@ -391,7 +391,7 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);
     assertEq(a.maxTokenTransferGas, b.maxTokenTransferGas);
     assertEq(a.messageValidator, b.messageValidator);
-    assertEq(a.priceRegistry, b.priceRegistry);
+    assertEq(a.feeQuoter, b.feeQuoter);
   }
 
   function _assertSourceChainConfigEquality(
