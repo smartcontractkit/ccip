@@ -85,7 +85,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct StaticConfig {
     uint64 chainSelector; // ───╮  Destination chainSelector
-    address rmnProxy; // ───────╯  RMN proxy address
+    IRMNRemote rmnRemote; // ───╯  RMN Verification Contract
     address tokenAdminRegistry; // Token admin registry address
     address nonceManager; // Nonce manager address
   }
@@ -140,8 +140,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   string public constant override typeAndVersion = "OffRamp 1.6.0-dev";
   /// @dev ChainSelector of this chain
   uint64 internal immutable i_chainSelector;
-  /// @dev The address of the RMN proxy
-  address internal immutable i_rmnProxy;
+  /// @dev The RMN verification contract
+  IRMNRemote internal immutable i_rmnRemote;
   /// @dev The address of the token admin registry
   address internal immutable i_tokenAdminRegistry;
   /// @dev The address of the nonce manager
@@ -172,7 +172,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     SourceChainConfigArgs[] memory sourceChainConfigs
   ) MultiOCR3Base() {
     if (
-      staticConfig.rmnProxy == address(0) || staticConfig.tokenAdminRegistry == address(0)
+      address(staticConfig.rmnRemote) == address(0) || staticConfig.tokenAdminRegistry == address(0)
         || staticConfig.nonceManager == address(0)
     ) {
       revert ZeroAddressNotAllowed();
@@ -183,7 +183,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     }
 
     i_chainSelector = staticConfig.chainSelector;
-    i_rmnProxy = staticConfig.rmnProxy;
+    i_rmnRemote = staticConfig.rmnRemote;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
     i_nonceManager = staticConfig.nonceManager;
     emit StaticConfigSet(staticConfig);
@@ -673,7 +673,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   function getStaticConfig() external view returns (StaticConfig memory) {
     return StaticConfig({
       chainSelector: i_chainSelector,
-      rmnProxy: i_rmnProxy,
+      rmnRemote: i_rmnRemote,
       tokenAdminRegistry: i_tokenAdminRegistry,
       nonceManager: i_nonceManager
     });

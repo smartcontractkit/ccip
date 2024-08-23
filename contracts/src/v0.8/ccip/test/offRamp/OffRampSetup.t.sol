@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
+import {IRMNRemote} from "../../interfaces/IRMNRemote.sol";
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../NonceManager.sol";
@@ -69,16 +70,16 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     s_maybeRevertingPool = MaybeRevertingBurnMintTokenPool(s_destPoolByToken[s_destTokens[1]]);
     s_inboundNonceManager = new NonceManager(new address[](0));
 
-    _deployOffRamp(s_mockRMN, s_inboundNonceManager);
+    _deployOffRamp(s_mockRMNRemote, s_inboundNonceManager);
   }
 
-  function _deployOffRamp(IRMN rmnProxy, NonceManager nonceManager) internal {
+  function _deployOffRamp(IRMNRemote rmnRemote, NonceManager nonceManager) internal {
     OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](0);
 
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(rmnProxy),
+        rmnRemote: rmnRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(nonceManager)
       }),
@@ -427,7 +428,7 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN),
+        rmnRemote: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),

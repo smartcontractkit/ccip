@@ -84,7 +84,7 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
     s_sourceRouter2.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
     // Deploy offramp
-    _deployOffRamp(s_mockRMN, s_inboundNonceManager);
+    _deployOffRamp(s_mockRMNRemote, s_inboundNonceManager);
 
     // Enable source chains on offramp
     OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](2);

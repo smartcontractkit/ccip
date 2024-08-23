@@ -5,7 +5,7 @@ import {IFeeQuoter} from "../../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
 import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../../interfaces/IRMN.sol"; // TODO - remove
-import {MerkleRoot} from "../../interfaces/IRMNRemote.sol";
+import {IRMNRemote, MerkleRoot} from "../../interfaces/IRMNRemote.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
@@ -36,7 +36,7 @@ contract OffRamp_constructor is OffRampSetup {
   function test_Constructor_Success() public {
     OffRamp.StaticConfig memory staticConfig = OffRamp.StaticConfig({
       chainSelector: DEST_CHAIN_SELECTOR,
-      rmnProxy: address(s_mockRMN),
+      rmnRemote: s_mockRMNRemote,
       tokenAdminRegistry: address(s_tokenAdminRegistry),
       nonceManager: address(s_inboundNonceManager)
     });
@@ -105,7 +105,7 @@ contract OffRamp_constructor is OffRampSetup {
     // Static config
     OffRamp.StaticConfig memory gotStaticConfig = s_offRamp.getStaticConfig();
     assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
-    assertEq(staticConfig.rmnProxy, gotStaticConfig.rmnProxy);
+    assertEq(address(staticConfig.rmnRemote), address(gotStaticConfig.rmnRemote));
     assertEq(staticConfig.tokenAdminRegistry, gotStaticConfig.tokenAdminRegistry);
 
     // Dynamic config
@@ -157,7 +157,7 @@ contract OffRamp_constructor is OffRampSetup {
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN),
+        rmnRemote: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
@@ -183,7 +183,7 @@ contract OffRamp_constructor is OffRampSetup {
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN),
+        rmnRemote: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
@@ -192,7 +192,7 @@ contract OffRamp_constructor is OffRampSetup {
     );
   }
 
-  function test_ZeroRMNProxy_Revert() public {
+  function test_ZeroRMNRemote_Revert() public {
     uint64[] memory sourceChainSelectors = new uint64[](1);
     sourceChainSelectors[0] = SOURCE_CHAIN_SELECTOR_1;
 
@@ -203,7 +203,7 @@ contract OffRamp_constructor is OffRampSetup {
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: ZERO_ADDRESS,
+        rmnRemote: IRMNRemote(ZERO_ADDRESS),
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
@@ -223,7 +223,7 @@ contract OffRamp_constructor is OffRampSetup {
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: 0,
-        rmnProxy: address(s_mockRMN),
+        rmnRemote: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
@@ -243,7 +243,7 @@ contract OffRamp_constructor is OffRampSetup {
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN),
+        rmnRemote: s_mockRMNRemote,
         tokenAdminRegistry: ZERO_ADDRESS,
         nonceManager: address(s_inboundNonceManager)
       }),
@@ -263,7 +263,7 @@ contract OffRamp_constructor is OffRampSetup {
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN),
+        rmnRemote: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: ZERO_ADDRESS
       }),
@@ -3307,84 +3307,5 @@ contract OffRamp_commit is OffRampSetup {
 
     return
       OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
-  }
-}
-
-contract OffRamp_verify is OffRampSetup {
-  function setUp() public virtual override {
-    super.setUp();
-    _setupRealRMN();
-    _deployOffRamp(s_realRMN, s_inboundNonceManager);
-    _setupMultipleOffRamps();
-  }
-
-  // function test_NotBlessed_Success() public {
-  //   bytes32[] memory leaves = new bytes32[](1);
-  //   leaves[0] = "root";
-  //   MerkleRoot[] memory roots = new MerkleRoot[](1);
-  //   roots[0] =
-  //     MerkleRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, minSeqNr: 1, maxSeqNr: 2, merkleRoot: leaves[0]});
-  //   OffRamp.CommitReport memory report =
-  //     OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
-  //   _commit(report, ++s_latestSequenceNumber);
-  //   bytes32[] memory proofs = new bytes32[](0);
-  //   // We have not blessed this root, should return 0.
-  //   uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
-  //   assertEq(uint256(0), timestamp);
-  // }
-
-  // function test_Blessed_Success() public {
-  //   bytes32[] memory leaves = new bytes32[](1);
-  //   leaves[0] = "root";
-  //   MerkleRoot[] memory roots = new MerkleRoot[](1);
-  //   roots[0] =
-  //     MerkleRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, minSeqNr: 1, maxSeqNr: 2, merkleRoot: leaves[0]});
-  //   OffRamp.CommitReport memory report =
-  //     OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
-  //   _commit(report, ++s_latestSequenceNumber);
-  //   // Bless that root.
-  //   IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
-  //   taggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_offRamp), root: leaves[0]});
-  //   vm.startPrank(BLESS_VOTE_ADDR);
-  //   s_realRMN.voteToBless(taggedRoots);
-  //   bytes32[] memory proofs = new bytes32[](0);
-  //   uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
-  //   assertEq(BLOCK_TIME, timestamp);
-  // }
-
-  function test_NotBlessedWrongChainSelector_Success() public {
-    bytes32[] memory leaves = new bytes32[](1);
-    leaves[0] = "root";
-    MerkleRoot[] memory roots = new MerkleRoot[](1);
-    roots[0] = MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
-      minSeqNr: 1,
-      maxSeqNr: 2,
-      merkleRoot: leaves[0]
-    });
-
-    OffRamp.CommitReport memory report =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
-    _commit(report, ++s_latestSequenceNumber);
-
-    // Bless that root.
-    IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
-    taggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_offRamp), root: leaves[0]});
-    vm.startPrank(BLESS_VOTE_ADDR);
-    s_realRMN.voteToBless(taggedRoots);
-
-    bytes32[] memory proofs = new bytes32[](0);
-    uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR + 1, leaves, proofs, 0);
-    assertEq(uint256(0), timestamp);
-  }
-
-  // Reverts
-
-  function test_TooManyLeaves_Revert() public {
-    bytes32[] memory leaves = new bytes32[](258);
-    bytes32[] memory proofs = new bytes32[](0);
-    vm.expectRevert(MerkleMultiProof.InvalidProof.selector);
-    s_offRamp.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
   }
 }
