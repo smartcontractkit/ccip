@@ -9,7 +9,7 @@ import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
-import {IRMNRemote, MerkleRoot} from "../interfaces/IRMNRemote.sol";
+import {IRMNRemote, MerkleRoot, Signature as RMNSig} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
@@ -128,6 +128,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   struct CommitReport {
     Internal.PriceUpdates priceUpdates; // Collection of gas and price updates to commit
     MerkleRoot[] merkleRoots; // Collection of merkle roots per source chain to commit
+    RMNSig[] rmnSignatures; // RMN signatures on the merkle roots
   }
 
   /// @dev Struct to hold a merkle root for a source chain so that an array of these can be passed in the resetUblessedRoots function.
@@ -573,6 +574,11 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   ) external {
     CommitReport memory commitReport = abi.decode(report, (CommitReport));
 
+    // Verify RMN signatures
+    if (commitReport.merkleRoots.length > 0) {
+      i_rmnRemote.verify(commitReport.merkleRoots, commitReport.rmnSignatures);
+    }
+
     // Check if the report contains price updates
     if (commitReport.priceUpdates.tokenPriceUpdates.length > 0 || commitReport.priceUpdates.gasPriceUpdates.length > 0)
     {
@@ -601,7 +607,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         revert InvalidInterval(root.sourceChainSelector, Interval({min: root.minSeqNr, max: root.maxSeqNr}));
       }
 
-      // TODO: confirm how RMN offchain blessing impacts commit report
       bytes32 merkleRoot = root.merkleRoot;
       if (merkleRoot == bytes32(0)) revert InvalidRoot();
       // If we reached this section, the report should contain a valid root

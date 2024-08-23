@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
-import {IRMNRemote} from "../../interfaces/IRMNRemote.sol";
+import {IRMNRemote, Signature as RMNSig} from "../../interfaces/IRMNRemote.sol";
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../NonceManager.sol";
@@ -57,6 +57,8 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
   uint8 internal constant s_F = 1;
 
   uint64 internal s_latestSequenceNumber;
+
+  RMNSig[] internal s_rmnSignatures;
 
   function setUp() public virtual override(FeeQuoterSetup, MultiOCR3BaseSetup) {
     FeeQuoterSetup.setUp();

@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../NonceManager.sol";
-import {MerkleRoot} from "../../interfaces/IRMNRemote.sol";
+import {MerkleRoot, Signature as RMNSig} from "../../interfaces/IRMNRemote.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 
@@ -148,6 +148,9 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
       merkleRoots[0] = MerkleHelper.getMerkleRoot(hashedMessages1);
       merkleRoots[1] = MerkleHelper.getMerkleRoot(hashedMessages2);
 
+      // TODO make these real sigs :)
+      RMNSig[] memory rmnSignatures = new RMNSig[](0);
+
       MerkleRoot[] memory roots = new MerkleRoot[](2);
       roots[0] = MerkleRoot({
         sourceChainSelector: SOURCE_CHAIN_SELECTOR,
@@ -165,7 +168,7 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
       });
 
       OffRamp.CommitReport memory report =
-        OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
+        OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: rmnSignatures});
 
       vm.resumeGasMetering();
       _commit(report, ++s_latestSequenceNumber);

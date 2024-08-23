@@ -90,6 +90,7 @@ contract BaseTest is Test {
     s_mockRMN = new MockRMN();
     s_mockRMNRemote = IRMNRemote(makeAddr("MOCK RMN REMOTE"));
     vm.etch(address(s_mockRMNRemote), bytes("fake bytecode"));
+    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNRemote.verify.selector), bytes(""));
   }
 
   function _getOutboundRateLimiterConfig() internal pure returns (RateLimiter.Config memory) {
