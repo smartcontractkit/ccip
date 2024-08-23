@@ -514,7 +514,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       isEnabled: true
     });
     s_priceRegistry.applyTokenTransferFeeConfigUpdates(
-      new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0), tokenTransferFeeConfigArgs
+      tokenTransferFeeConfigArgs, new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0)
     );
 
     vm.startPrank(address(s_sourceRouter));
@@ -689,7 +689,7 @@ contract OnRamp_withdrawFeeTokens is OnRampSetup {
       IERC20(feeTokens[i]).transfer(address(s_onRamp), amounts[i]);
     }
 
-    s_priceRegistry.applyFeeTokensUpdates(new address[](0), feeTokens);
+    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
 
     for (uint256 i = 0; i < feeTokens.length; ++i) {
       vm.expectEmit();

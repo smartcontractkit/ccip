@@ -220,11 +220,11 @@ contract PriceRegistry is
     i_maxFeeJuelsPerMsg = staticConfig.maxFeeJuelsPerMsg;
     i_stalenessThreshold = staticConfig.stalenessThreshold;
 
-    _applyFeeTokensUpdates(new address[](0), feeTokens);
+    _applyFeeTokensUpdates(feeTokens, new address[](0));
     _updateTokenPriceFeeds(tokenPriceFeeds);
     _applyDestChainConfigUpdates(destChainConfigArgs);
     _applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
-    _applyTokenTransferFeeConfigUpdates(new TokenTransferFeeConfigRemoveArgs[](0), tokenTransferFeeConfigArgs);
+    _applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, new TokenTransferFeeConfigRemoveArgs[](0));
   }
 
   // ================================================================
@@ -371,25 +371,25 @@ contract PriceRegistry is
   /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens
   /// and can be used to calculate fees.
   function applyFeeTokensUpdates(
-    address[] memory feeTokensToRemove,
-    address[] memory feeTokensToAdd
+    address[] memory feeTokensToAdd,
+    address[] memory feeTokensToRemove
   ) external onlyOwner {
-    _applyFeeTokensUpdates(feeTokensToRemove, feeTokensToAdd);
+    _applyFeeTokensUpdates(feeTokensToAdd, feeTokensToRemove);
   }
 
   /// @notice Add and remove tokens from feeTokens set.
   /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
   /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens
   /// and can be used to calculate fees.
-  function _applyFeeTokensUpdates(address[] memory feeTokensToRemove, address[] memory feeTokensToAdd) private {
-    for (uint256 i = 0; i < feeTokensToRemove.length; ++i) {
-      if (s_feeTokens.remove(feeTokensToRemove[i])) {
-        emit FeeTokenRemoved(feeTokensToRemove[i]);
-      }
-    }
+  function _applyFeeTokensUpdates(address[] memory feeTokensToAdd, address[] memory feeTokensToRemove) private {
     for (uint256 i = 0; i < feeTokensToAdd.length; ++i) {
       if (s_feeTokens.add(feeTokensToAdd[i])) {
         emit FeeTokenAdded(feeTokensToAdd[i]);
+      }
+    }
+    for (uint256 i = 0; i < feeTokensToRemove.length; ++i) {
+      if (s_feeTokens.remove(feeTokensToRemove[i])) {
+        emit FeeTokenRemoved(feeTokensToRemove[i]);
       }
     }
   }
@@ -726,24 +726,17 @@ contract PriceRegistry is
   /// @notice Sets the transfer fee config.
   /// @dev only callable by the owner or admin.
   function applyTokenTransferFeeConfigUpdates(
-    TokenTransferFeeConfigRemoveArgs[] memory tokensToUseDefaultFeeConfigs,
-    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs
+    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
+    TokenTransferFeeConfigRemoveArgs[] memory tokensToUseDefaultFeeConfigs
   ) external onlyOwner {
-    _applyTokenTransferFeeConfigUpdates(tokensToUseDefaultFeeConfigs, tokenTransferFeeConfigArgs);
+    _applyTokenTransferFeeConfigUpdates(tokenTransferFeeConfigArgs, tokensToUseDefaultFeeConfigs);
   }
 
   /// @notice internal helper to set the token transfer fee config.
   function _applyTokenTransferFeeConfigUpdates(
-    TokenTransferFeeConfigRemoveArgs[] memory tokensToUseDefaultFeeConfigs,
-    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs
+    TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
+    TokenTransferFeeConfigRemoveArgs[] memory tokensToUseDefaultFeeConfigs
   ) internal {
-    // Remove the custom fee configs for the tokens that are in the tokensToUseDefaultFeeConfigs array
-    for (uint256 i = 0; i < tokensToUseDefaultFeeConfigs.length; ++i) {
-      uint64 destChainSelector = tokensToUseDefaultFeeConfigs[i].destChainSelector;
-      address token = tokensToUseDefaultFeeConfigs[i].token;
-      delete s_tokenTransferFeeConfig[destChainSelector][token];
-      emit TokenTransferFeeConfigDeleted(destChainSelector, token);
-    }
     for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
       TokenTransferFeeConfigArgs memory tokenTransferFeeConfigArg = tokenTransferFeeConfigArgs[i];
       uint64 destChainSelector = tokenTransferFeeConfigArg.destChainSelector;
@@ -761,6 +754,14 @@ contract PriceRegistry is
 
         emit TokenTransferFeeConfigUpdated(destChainSelector, token, tokenTransferFeeConfig);
       }
+    }
+
+    // Remove the custom fee configs for the tokens that are in the tokensToUseDefaultFeeConfigs array
+    for (uint256 i = 0; i < tokensToUseDefaultFeeConfigs.length; ++i) {
+      uint64 destChainSelector = tokensToUseDefaultFeeConfigs[i].destChainSelector;
+      address token = tokensToUseDefaultFeeConfigs[i].token;
+      delete s_tokenTransferFeeConfig[destChainSelector][token];
+      emit TokenTransferFeeConfigDeleted(destChainSelector, token);
     }
   }
 
