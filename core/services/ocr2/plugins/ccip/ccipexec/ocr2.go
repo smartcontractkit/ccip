@@ -468,7 +468,8 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	return encodedReport, nil
 }
 
-func (r *ExecutionReportingPlugin) getF() int {
+// Returns required number of observations to reach consensus
+func (r *ExecutionReportingPlugin) getConsensusThreshold() int {
 	// Default consensus threshold is F+1
 	f := r.F
 	if r.batchingStrategy.GetBatchingStrategyID() == ZKOverflowBatchingStrategyID {
@@ -487,17 +488,17 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	} else if !healthy {
 		return false, nil, ccip.ErrChainIsNotHealthy
 	}
-	f := r.getF()
-	lggr.Infof("Consensus threshold F set to: %d", f)
+	consensusThreshold := r.getConsensusThreshold()
+	lggr.Infof("Consensus threshold set to: %d", consensusThreshold)
 
 	parsableObservations := ccip.GetParsableObservations[ccip.ExecutionObservation](lggr, observations)
 	// Need at least f observations
-	if len(parsableObservations) <= f {
-		lggr.Warnf("Insufficient observations: only %d received, but need more than %d to proceed (=F)", len(parsableObservations), f)
+	if len(parsableObservations) <= consensusThreshold {
+		lggr.Warnf("Insufficient observations: only %d received, but need more than %d to proceed", len(parsableObservations), consensusThreshold)
 		return false, nil, nil
 	}
 
-	observedMessages, err := calculateObservedMessagesConsensus(parsableObservations, f)
+	observedMessages, err := calculateObservedMessagesConsensus(parsableObservations, consensusThreshold)
 	if err != nil {
 		return false, nil, err
 	}

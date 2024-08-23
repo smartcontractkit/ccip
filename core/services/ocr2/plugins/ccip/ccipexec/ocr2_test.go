@@ -1470,7 +1470,7 @@ func TestExecutionReportingPlugin_getF(t *testing.T) {
 			assert.NoError(t, err)
 			p.batchingStrategy = bs
 
-			require.Equal(t, tc.expectedF, p.getF())
+			require.Equal(t, tc.expectedF, p.getConsensusThreshold())
 		})
 	}
 }
