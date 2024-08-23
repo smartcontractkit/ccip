@@ -3,8 +3,10 @@ pragma solidity 0.8.24;
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../NonceManager.sol";
+import {MerkleRoot} from "../../interfaces/IRMNRemote.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
+
 import "../helpers/MerkleHelper.sol";
 import "../offRamp/OffRampSetup.t.sol";
 import "../onRamp/OnRampSetup.t.sol";
@@ -146,15 +148,15 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
       merkleRoots[0] = MerkleHelper.getMerkleRoot(hashedMessages1);
       merkleRoots[1] = MerkleHelper.getMerkleRoot(hashedMessages2);
 
-      OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](2);
-      roots[0] = OffRamp.MerkleRoot({
+      MerkleRoot[] memory roots = new MerkleRoot[](2);
+      roots[0] = MerkleRoot({
         sourceChainSelector: SOURCE_CHAIN_SELECTOR,
         onrampAddress: abi.encode(address(s_onRamp)),
         minSeqNr: messages1[0].header.sequenceNumber,
         maxSeqNr: messages1[1].header.sequenceNumber,
         merkleRoot: merkleRoots[0]
       });
-      roots[1] = OffRamp.MerkleRoot({
+      roots[1] = MerkleRoot({
         sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
         onrampAddress: abi.encode(address(s_onRamp)),
         minSeqNr: messages2[0].header.sequenceNumber,

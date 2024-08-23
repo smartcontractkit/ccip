@@ -8,7 +8,8 @@ import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
-import {IRMN} from "../interfaces/IRMN.sol";
+import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
+import {IRMNRemote, MerkleRoot} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
@@ -120,16 +121,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   struct Interval {
     uint64 min; // ───╮ Minimum sequence number, inclusive
     uint64 max; // ───╯ Maximum sequence number, inclusive
-  }
-
-  /// @dev Struct to hold a merkle root and an interval for a source chain so that an array of these can be passed in the CommitReport.
-  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
-  struct MerkleRoot {
-    uint64 sourceChainSelector; // Remote source chain selector that the Merkle Root is scoped to
-    bytes onrampAddress; // generic, to support arbitrary sources; for EVM2EVM, use abi.encodePacked
-    uint64 minSeqNr; // Minimum sequence number, inclusive
-    uint64 maxSeqNr; // Maximum sequence number, inclusive
-    bytes32 merkleRoot; // Merkle root covering the interval & source chain messages
   }
 
   /// @notice Report that is committed by the observing DON at the committing phase
@@ -643,14 +634,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// committed.
   function getMerkleRoot(uint64 sourceChainSelector, bytes32 root) external view returns (uint256) {
     return s_roots[sourceChainSelector][root];
-  }
-
-  /// @notice Returns if a root is blessed or not.
-  /// @param root The merkle root to check the blessing status for.
-  /// @return blessed Whether the root is blessed or not.
-  function isBlessed(bytes32 root) public view returns (bool) {
-    // TODO: update RMN to also consider the source chain selector for blessing
-    return IRMN(i_rmnProxy).isBlessed(IRMN.TaggedRoot({commitStore: address(this), root: root}));
   }
 
   /// @notice Returns timestamp of when root was accepted or 0 if verification fails.
