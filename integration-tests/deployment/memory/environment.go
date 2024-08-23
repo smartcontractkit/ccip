@@ -2,11 +2,14 @@ package memory
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/consul/sdk/freeport"
+	"github.com/sethvargo/go-retry"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -17,7 +20,8 @@ import (
 )
 
 const (
-	Memory = "memory"
+	Memory    = "memory"
+	TxTimeout = 5 * time.Minute
 )
 
 type MemoryEnvironmentConfig struct {
@@ -40,18 +44,18 @@ func NewMemoryChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 			Client:      chain.Backend,
 			DeployerKey: chain.DeployerKey,
 			Confirm: func(tx common.Hash) error {
-				for {
+				return retry.Do(context.Background(), retry.WithMaxDuration(TxTimeout, retry.NewConstant(2*time.Second)), func(ctx context.Context) error {
 					chain.Backend.Commit()
 					receipt, err := chain.Backend.TransactionReceipt(context.Background(), tx)
 					if err != nil {
-						t.Log("failed to get receipt", err)
-						continue
+						return retry.RetryableError(fmt.Errorf("failed to get receipt %w", err))
 					}
 					if receipt.Status == 0 {
 						t.Logf("Status (reverted) %d for txhash %s\n", receipt.Status, tx.String())
+						return fmt.Errorf("status (reverted) %d for txhash %s", receipt.Status, tx.String())
 					}
 					return nil
-				}
+				})
 			},
 		}
 	}

@@ -1,17 +1,16 @@
-package deployment
+package devenv
 
 import (
 	"github.com/smartcontractkit/chainlink/integration-tests/web/sdk/client"
-	"github.com/smartcontractkit/chainlink/v2/core/services/feeds/proto"
 )
 
 type DON struct {
 	Bootstrap NodeDetail
-	Nodes     []client.Client
+	Nodes     []NodeDetail
 }
 
 type NodeDetail struct {
-	FMS proto.FeedsManagerClient
+	FMS client.Client
 }
 
 // For Each Node Operations

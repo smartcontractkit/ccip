@@ -1,4 +1,4 @@
-package deployment
+package devenv
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/smartcontractkit/ccip/integration-tests/deployment"
 	jobv1 "github.com/smartcontractkit/ccip/integration-tests/deployment/jd/job/v1"
 	nodev1 "github.com/smartcontractkit/ccip/integration-tests/deployment/jd/node/v1"
 )
@@ -80,7 +81,7 @@ func (jd JDClient) ListNodeChainConfigs(ctx context.Context, in *nodev1.ListNode
 	return jd.nodeClient.ListNodeChainConfigs(ctx, in, opts...)
 }
 
-func NewJDClient(cfg JDConfig) (OffchainClient, error) {
+func NewJDClient(cfg JDConfig) (deployment.OffchainClient, error) {
 	conn, err := NewClientConnection(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect Job Distributor service. Err: %w", err)
