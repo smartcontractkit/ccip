@@ -1085,6 +1085,65 @@ func (_c *FeeQuoterInterface_FilterPriceFeedPerTokenUpdated_Call) RunAndReturn(r
 	return _c
 }
 
+// FilterReportPermissionSet provides a mock function with given fields: opts, reportId
+func (_m *FeeQuoterInterface) FilterReportPermissionSet(opts *bind.FilterOpts, reportId [][32]byte) (*fee_quoter.FeeQuoterReportPermissionSetIterator, error) {
+	ret := _m.Called(opts, reportId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FilterReportPermissionSet")
+	}
+
+	var r0 *fee_quoter.FeeQuoterReportPermissionSetIterator
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, [][32]byte) (*fee_quoter.FeeQuoterReportPermissionSetIterator, error)); ok {
+		return rf(opts, reportId)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, [][32]byte) *fee_quoter.FeeQuoterReportPermissionSetIterator); ok {
+		r0 = rf(opts, reportId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*fee_quoter.FeeQuoterReportPermissionSetIterator)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.FilterOpts, [][32]byte) error); ok {
+		r1 = rf(opts, reportId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FeeQuoterInterface_FilterReportPermissionSet_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FilterReportPermissionSet'
+type FeeQuoterInterface_FilterReportPermissionSet_Call struct {
+	*mock.Call
+}
+
+// FilterReportPermissionSet is a helper method to define mock.On call
+//   - opts *bind.FilterOpts
+//   - reportId [][32]byte
+func (_e *FeeQuoterInterface_Expecter) FilterReportPermissionSet(opts interface{}, reportId interface{}) *FeeQuoterInterface_FilterReportPermissionSet_Call {
+	return &FeeQuoterInterface_FilterReportPermissionSet_Call{Call: _e.mock.On("FilterReportPermissionSet", opts, reportId)}
+}
+
+func (_c *FeeQuoterInterface_FilterReportPermissionSet_Call) Run(run func(opts *bind.FilterOpts, reportId [][32]byte)) *FeeQuoterInterface_FilterReportPermissionSet_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*bind.FilterOpts), args[1].([][32]byte))
+	})
+	return _c
+}
+
+func (_c *FeeQuoterInterface_FilterReportPermissionSet_Call) Return(_a0 *fee_quoter.FeeQuoterReportPermissionSetIterator, _a1 error) *FeeQuoterInterface_FilterReportPermissionSet_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *FeeQuoterInterface_FilterReportPermissionSet_Call) RunAndReturn(run func(*bind.FilterOpts, [][32]byte) (*fee_quoter.FeeQuoterReportPermissionSetIterator, error)) *FeeQuoterInterface_FilterReportPermissionSet_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FilterTokenTransferFeeConfigDeleted provides a mock function with given fields: opts, destChainSelector, token
 func (_m *FeeQuoterInterface) FilterTokenTransferFeeConfigDeleted(opts *bind.FilterOpts, destChainSelector []uint64, token []common.Address) (*fee_quoter.FeeQuoterTokenTransferFeeConfigDeletedIterator, error) {
 	ret := _m.Called(opts, destChainSelector, token)
@@ -2074,6 +2133,66 @@ func (_c *FeeQuoterInterface_GetValidatedTokenPrice_Call) RunAndReturn(run func(
 	return _c
 }
 
+// OnReport provides a mock function with given fields: opts, metadata, report
+func (_m *FeeQuoterInterface) OnReport(opts *bind.TransactOpts, metadata []byte, report []byte) (*types.Transaction, error) {
+	ret := _m.Called(opts, metadata, report)
+
+	if len(ret) == 0 {
+		panic("no return value specified for OnReport")
+	}
+
+	var r0 *types.Transaction
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []byte, []byte) (*types.Transaction, error)); ok {
+		return rf(opts, metadata, report)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []byte, []byte) *types.Transaction); ok {
+		r0 = rf(opts, metadata, report)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Transaction)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []byte, []byte) error); ok {
+		r1 = rf(opts, metadata, report)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FeeQuoterInterface_OnReport_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OnReport'
+type FeeQuoterInterface_OnReport_Call struct {
+	*mock.Call
+}
+
+// OnReport is a helper method to define mock.On call
+//   - opts *bind.TransactOpts
+//   - metadata []byte
+//   - report []byte
+func (_e *FeeQuoterInterface_Expecter) OnReport(opts interface{}, metadata interface{}, report interface{}) *FeeQuoterInterface_OnReport_Call {
+	return &FeeQuoterInterface_OnReport_Call{Call: _e.mock.On("OnReport", opts, metadata, report)}
+}
+
+func (_c *FeeQuoterInterface_OnReport_Call) Run(run func(opts *bind.TransactOpts, metadata []byte, report []byte)) *FeeQuoterInterface_OnReport_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*bind.TransactOpts), args[1].([]byte), args[2].([]byte))
+	})
+	return _c
+}
+
+func (_c *FeeQuoterInterface_OnReport_Call) Return(_a0 *types.Transaction, _a1 error) *FeeQuoterInterface_OnReport_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *FeeQuoterInterface_OnReport_Call) RunAndReturn(run func(*bind.TransactOpts, []byte, []byte) (*types.Transaction, error)) *FeeQuoterInterface_OnReport_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Owner provides a mock function with given fields: opts
 func (_m *FeeQuoterInterface) Owner(opts *bind.CallOpts) (common.Address, error) {
 	ret := _m.Called(opts)
@@ -2770,6 +2889,64 @@ func (_c *FeeQuoterInterface_ParsePriceFeedPerTokenUpdated_Call) RunAndReturn(ru
 	return _c
 }
 
+// ParseReportPermissionSet provides a mock function with given fields: log
+func (_m *FeeQuoterInterface) ParseReportPermissionSet(log types.Log) (*fee_quoter.FeeQuoterReportPermissionSet, error) {
+	ret := _m.Called(log)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ParseReportPermissionSet")
+	}
+
+	var r0 *fee_quoter.FeeQuoterReportPermissionSet
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.Log) (*fee_quoter.FeeQuoterReportPermissionSet, error)); ok {
+		return rf(log)
+	}
+	if rf, ok := ret.Get(0).(func(types.Log) *fee_quoter.FeeQuoterReportPermissionSet); ok {
+		r0 = rf(log)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*fee_quoter.FeeQuoterReportPermissionSet)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.Log) error); ok {
+		r1 = rf(log)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FeeQuoterInterface_ParseReportPermissionSet_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ParseReportPermissionSet'
+type FeeQuoterInterface_ParseReportPermissionSet_Call struct {
+	*mock.Call
+}
+
+// ParseReportPermissionSet is a helper method to define mock.On call
+//   - log types.Log
+func (_e *FeeQuoterInterface_Expecter) ParseReportPermissionSet(log interface{}) *FeeQuoterInterface_ParseReportPermissionSet_Call {
+	return &FeeQuoterInterface_ParseReportPermissionSet_Call{Call: _e.mock.On("ParseReportPermissionSet", log)}
+}
+
+func (_c *FeeQuoterInterface_ParseReportPermissionSet_Call) Run(run func(log types.Log)) *FeeQuoterInterface_ParseReportPermissionSet_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.Log))
+	})
+	return _c
+}
+
+func (_c *FeeQuoterInterface_ParseReportPermissionSet_Call) Return(_a0 *fee_quoter.FeeQuoterReportPermissionSet, _a1 error) *FeeQuoterInterface_ParseReportPermissionSet_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *FeeQuoterInterface_ParseReportPermissionSet_Call) RunAndReturn(run func(types.Log) (*fee_quoter.FeeQuoterReportPermissionSet, error)) *FeeQuoterInterface_ParseReportPermissionSet_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ParseTokenTransferFeeConfigDeleted provides a mock function with given fields: log
 func (_m *FeeQuoterInterface) ParseTokenTransferFeeConfigDeleted(log types.Log) (*fee_quoter.FeeQuoterTokenTransferFeeConfigDeleted, error) {
 	ret := _m.Called(log)
@@ -3058,6 +3235,65 @@ func (_c *FeeQuoterInterface_ProcessMessageArgs_Call) Return(_a0 fee_quoter.Proc
 }
 
 func (_c *FeeQuoterInterface_ProcessMessageArgs_Call) RunAndReturn(run func(*bind.CallOpts, uint64, common.Address, *big.Int, []byte) (fee_quoter.ProcessMessageArgs, error)) *FeeQuoterInterface_ProcessMessageArgs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetReportPermissions provides a mock function with given fields: opts, permissions
+func (_m *FeeQuoterInterface) SetReportPermissions(opts *bind.TransactOpts, permissions []fee_quoter.KeystoneFeedsPermissionHandlerPermission) (*types.Transaction, error) {
+	ret := _m.Called(opts, permissions)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetReportPermissions")
+	}
+
+	var r0 *types.Transaction
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []fee_quoter.KeystoneFeedsPermissionHandlerPermission) (*types.Transaction, error)); ok {
+		return rf(opts, permissions)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []fee_quoter.KeystoneFeedsPermissionHandlerPermission) *types.Transaction); ok {
+		r0 = rf(opts, permissions)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Transaction)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []fee_quoter.KeystoneFeedsPermissionHandlerPermission) error); ok {
+		r1 = rf(opts, permissions)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FeeQuoterInterface_SetReportPermissions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetReportPermissions'
+type FeeQuoterInterface_SetReportPermissions_Call struct {
+	*mock.Call
+}
+
+// SetReportPermissions is a helper method to define mock.On call
+//   - opts *bind.TransactOpts
+//   - permissions []fee_quoter.KeystoneFeedsPermissionHandlerPermission
+func (_e *FeeQuoterInterface_Expecter) SetReportPermissions(opts interface{}, permissions interface{}) *FeeQuoterInterface_SetReportPermissions_Call {
+	return &FeeQuoterInterface_SetReportPermissions_Call{Call: _e.mock.On("SetReportPermissions", opts, permissions)}
+}
+
+func (_c *FeeQuoterInterface_SetReportPermissions_Call) Run(run func(opts *bind.TransactOpts, permissions []fee_quoter.KeystoneFeedsPermissionHandlerPermission)) *FeeQuoterInterface_SetReportPermissions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*bind.TransactOpts), args[1].([]fee_quoter.KeystoneFeedsPermissionHandlerPermission))
+	})
+	return _c
+}
+
+func (_c *FeeQuoterInterface_SetReportPermissions_Call) Return(_a0 *types.Transaction, _a1 error) *FeeQuoterInterface_SetReportPermissions_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *FeeQuoterInterface_SetReportPermissions_Call) RunAndReturn(run func(*bind.TransactOpts, []fee_quoter.KeystoneFeedsPermissionHandlerPermission) (*types.Transaction, error)) *FeeQuoterInterface_SetReportPermissions_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -3940,6 +4176,66 @@ func (_c *FeeQuoterInterface_WatchPriceFeedPerTokenUpdated_Call) Return(_a0 even
 }
 
 func (_c *FeeQuoterInterface_WatchPriceFeedPerTokenUpdated_Call) RunAndReturn(run func(*bind.WatchOpts, chan<- *fee_quoter.FeeQuoterPriceFeedPerTokenUpdated, []common.Address) (event.Subscription, error)) *FeeQuoterInterface_WatchPriceFeedPerTokenUpdated_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// WatchReportPermissionSet provides a mock function with given fields: opts, sink, reportId
+func (_m *FeeQuoterInterface) WatchReportPermissionSet(opts *bind.WatchOpts, sink chan<- *fee_quoter.FeeQuoterReportPermissionSet, reportId [][32]byte) (event.Subscription, error) {
+	ret := _m.Called(opts, sink, reportId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WatchReportPermissionSet")
+	}
+
+	var r0 event.Subscription
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *fee_quoter.FeeQuoterReportPermissionSet, [][32]byte) (event.Subscription, error)); ok {
+		return rf(opts, sink, reportId)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *fee_quoter.FeeQuoterReportPermissionSet, [][32]byte) event.Subscription); ok {
+		r0 = rf(opts, sink, reportId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(event.Subscription)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.WatchOpts, chan<- *fee_quoter.FeeQuoterReportPermissionSet, [][32]byte) error); ok {
+		r1 = rf(opts, sink, reportId)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FeeQuoterInterface_WatchReportPermissionSet_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WatchReportPermissionSet'
+type FeeQuoterInterface_WatchReportPermissionSet_Call struct {
+	*mock.Call
+}
+
+// WatchReportPermissionSet is a helper method to define mock.On call
+//   - opts *bind.WatchOpts
+//   - sink chan<- *fee_quoter.FeeQuoterReportPermissionSet
+//   - reportId [][32]byte
+func (_e *FeeQuoterInterface_Expecter) WatchReportPermissionSet(opts interface{}, sink interface{}, reportId interface{}) *FeeQuoterInterface_WatchReportPermissionSet_Call {
+	return &FeeQuoterInterface_WatchReportPermissionSet_Call{Call: _e.mock.On("WatchReportPermissionSet", opts, sink, reportId)}
+}
+
+func (_c *FeeQuoterInterface_WatchReportPermissionSet_Call) Run(run func(opts *bind.WatchOpts, sink chan<- *fee_quoter.FeeQuoterReportPermissionSet, reportId [][32]byte)) *FeeQuoterInterface_WatchReportPermissionSet_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*bind.WatchOpts), args[1].(chan<- *fee_quoter.FeeQuoterReportPermissionSet), args[2].([][32]byte))
+	})
+	return _c
+}
+
+func (_c *FeeQuoterInterface_WatchReportPermissionSet_Call) Return(_a0 event.Subscription, _a1 error) *FeeQuoterInterface_WatchReportPermissionSet_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *FeeQuoterInterface_WatchReportPermissionSet_Call) RunAndReturn(run func(*bind.WatchOpts, chan<- *fee_quoter.FeeQuoterReportPermissionSet, [][32]byte) (event.Subscription, error)) *FeeQuoterInterface_WatchReportPermissionSet_Call {
 	_c.Call.Return(run)
 	return _c
 }
