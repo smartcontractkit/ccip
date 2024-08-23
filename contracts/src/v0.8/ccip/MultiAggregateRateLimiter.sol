@@ -147,7 +147,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers, IT
   function currentRateLimiterState(
     uint64 remoteChainSelector,
     bool isOutboundLane
-  ) external view returns (RateLimiter.TokenBucket memory tokenBucket) {
+  ) external view returns (RateLimiter.TokenBucket memory) {
     return _getTokenBucket(remoteChainSelector, isOutboundLane)._currentTokenBucketState();
   }
 
@@ -248,7 +248,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers, IT
   }
 
   /// @return priceRegistry The configured PriceRegistry address.
-  function getPriceRegistry() external view returns (address priceRegistry) {
+  function getPriceRegistry() external view returns (address) {
     return s_priceRegistry;
   }
 
