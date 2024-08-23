@@ -73,10 +73,12 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   }
 
   /// @dev Struct to hold the configs for a destination chain
+  /// @dev sequenceNumber, allowListEnabled, router will all be packed in 1 slot
   struct DestChainConfig {
     // The last used sequence number. This is zero in the case where no messages have yet been sent.
     // 0 is not a valid sequence number for any real transaction.
     uint64 sequenceNumber;
+    // boolean indicator to specify if allowList check is enabled
     bool allowListEnabled;
     // This is the local router address that is allowed to send messages to the destination chain.
     // This is NOT the receiving router address on the destination chain.
@@ -87,6 +89,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
 
   /// @dev Struct used as a return type for config query on Destination chain
   /// @dev sequenceNumber, allowListEnabled, router will all be packed in 1 slot
+  /// @dev DestChainConfig stores allowedList of senders as enumeratedSet. enumeratedSet cant be returned as-is,
+  /// @dev DestChainConfigInfo is used as a struct to return DestinationConfig info
   struct DestChainConfigInfo {
     // The last used sequence number. This is zero in the case where no messages has been sent yet.
     // 0 is not a valid sequence number for any real transaction.
@@ -373,21 +377,21 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
 
       s_destChainConfigs[destChainSelector].router = destChainConfigArg.router;
 
+      DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+
       emit DestChainConfigSet(
-        destChainSelector,
-        s_destChainConfigs[destChainSelector].sequenceNumber,
-        s_destChainConfigs[destChainSelector].router,
-        s_destChainConfigs[destChainSelector].allowListEnabled
+        destChainSelector, destChainConfig.sequenceNumber, destChainConfigArg.router, destChainConfig.allowListEnabled
       );
     }
   }
 
-  // ================================================================
-  // │                          Allowlist                           │
-  // ================================================================
-
-  function getDestChainConfig(uint64 destinationChainSelector) public view returns (DestChainConfigInfo memory) {
-    DestChainConfig storage config = s_destChainConfigs[destinationChainSelector];
+  /// @notice get ChainConfig configured for the DestinationChainSelector
+  /// @param destChainSelector The destination chain selector
+  /// @dev DestChainConfig stores allowedList of senders as enumeratedSet.
+  /// @dev As enumeratedSet cant be returned as-is, an array of allowedSenders returned in DestChainConfigInfo struct
+  /// @return DestChainConfigInfo returns DestinationChainConfig with array of allowedList of Senders
+  function getDestChainConfig(uint64 destChainSelector) public view returns (DestChainConfigInfo memory) {
+    DestChainConfig storage config = s_destChainConfigs[destChainSelector];
     return DestChainConfigInfo({
       sequenceNumber: config.sequenceNumber,
       allowListEnabled: config.allowListEnabled,
@@ -396,6 +400,13 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     });
   }
 
+  // ================================================================
+  // │                          Allowlist                           │
+  // ================================================================
+
+  /// @notice Updates allowListConfig for Senders
+  /// @dev configuration used to set the list of senders who are authorized to send messages
+  /// @param allowListConfigArgsItems Array of AllowListConfigArguments where each item is for a destChainSelector
   function applyAllowListUpdates(AllowListConfigArgs[] calldata allowListConfigArgsItems) external {
     if (msg.sender != owner()) {
       if (msg.sender != s_dynamicConfig.allowListAdmin) {
