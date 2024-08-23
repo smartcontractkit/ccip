@@ -492,7 +492,6 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	lggr.Infof("Consensus threshold set to: %d", consensusThreshold)
 
 	parsableObservations := ccip.GetParsableObservations[ccip.ExecutionObservation](lggr, observations)
-	// Need at least f observations
 	if len(parsableObservations) < consensusThreshold {
 		lggr.Warnf("Insufficient observations: only %d received, but need more than %d to proceed", len(parsableObservations), consensusThreshold)
 		return false, nil, nil
