@@ -9,6 +9,9 @@ bytes32 constant RMN_V1_6_ANY2EVM_REPORT = keccak256("RMN_V1_6_ANY2EVM_REPORT");
 
 /// @notice This contract supports verification of RMN reports for any Any2EVM OffRamp.
 contract RMNRemote is Ownable2Step, ITypeAndVersion {
+  /// @dev temp placeholder to exclude this contract from coverage
+  function test() public {}
+
   string public constant override typeAndVersion = "RMNRemote 1.6.0-dev";
 
   uint64 internal immutable i_chainSelector;

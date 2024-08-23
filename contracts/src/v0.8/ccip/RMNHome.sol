@@ -8,6 +8,9 @@ import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
 /// @notice Stores the home configuration for RMN, that is referenced by CCIP oracles, RMN nodes, and the RMNRemote
 /// contracts.
 contract RMNHome is Ownable2Step, ITypeAndVersion {
+  /// @dev temp placeholder to exclude this contract from coverage
+  function test() public {}
+
   string public constant override typeAndVersion = "RMNHome 1.6.0-dev";
   uint256 public constant CONFIG_RING_BUFFER_SIZE = 2;
 
