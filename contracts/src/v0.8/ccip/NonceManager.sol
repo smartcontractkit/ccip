@@ -45,18 +45,18 @@ contract NonceManager is INonceManager, AuthorizedCallers, ITypeAndVersion {
   function getIncrementedOutboundNonce(
     uint64 destChainSelector,
     address sender
-  ) external onlyAuthorizedCallers returns (uint64 incrementedOutboundNonce) {
-    incrementedOutboundNonce = _getOutboundNonce(destChainSelector, sender) + 1;
-    s_outboundNonces[destChainSelector][sender] = incrementedOutboundNonce;
+  ) external onlyAuthorizedCallers returns (uint64) {
+    uint64 outboundNonce = _getOutboundNonce(destChainSelector, sender) + 1;
+    s_outboundNonces[destChainSelector][sender] = outboundNonce;
 
-    return incrementedOutboundNonce;
+    return outboundNonce;
   }
 
   /// @notice Returns the outbound nonce for a given sender on a given destination chain.
   /// @param destChainSelector The destination chain selector.
   /// @param sender The sender address.
   /// @return outboundNonce The outbound nonce.
-  function getOutboundNonce(uint64 destChainSelector, address sender) external view returns (uint64 outboundNonce) {
+  function getOutboundNonce(uint64 destChainSelector, address sender) external view returns (uint64) {
     return _getOutboundNonce(destChainSelector, sender);
   }
 
@@ -80,7 +80,7 @@ contract NonceManager is INonceManager, AuthorizedCallers, ITypeAndVersion {
     uint64 sourceChainSelector,
     uint64 expectedNonce,
     bytes calldata sender
-  ) external onlyAuthorizedCallers returns (bool incremented) {
+  ) external onlyAuthorizedCallers returns (bool) {
     uint64 inboundNonce = _getInboundNonce(sourceChainSelector, sender) + 1;
 
     if (inboundNonce != expectedNonce) {
@@ -144,7 +144,7 @@ contract NonceManager is INonceManager, AuthorizedCallers, ITypeAndVersion {
   /// @notice Gets the previous onRamp address for the given chain selector
   /// @param chainSelector The chain selector
   /// @return previousRamps The previous on/offRamp addresses
-  function getPreviousRamps(uint64 chainSelector) external view returns (PreviousRamps memory previousRamps) {
+  function getPreviousRamps(uint64 chainSelector) external view returns (PreviousRamps memory) {
     return s_previousRamps[chainSelector];
   }
 }
