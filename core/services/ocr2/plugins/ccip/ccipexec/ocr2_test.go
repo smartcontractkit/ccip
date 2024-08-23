@@ -1441,24 +1441,24 @@ func TestExecutionReportingPlugin_ensurePriceRegistrySynchronization(t *testing.
 	require.Equal(t, mockPriceRegistryReader2, p.sourcePriceRegistry)
 }
 
-func TestExecutionReportingPlugin_getF(t *testing.T) {
+func TestExecutionReportingPlugin_getConsensusThreshold(t *testing.T) {
 	tests := []struct {
-		name               string
-		batchingStrategyID uint32
-		F                  int
-		expectedF          int
+		name                       string
+		batchingStrategyID         uint32
+		F                          int
+		expectedConsensusThreshold int
 	}{
 		{
-			name:               "zk batching strategy",
-			batchingStrategyID: uint32(1),
-			F:                  5,
-			expectedF:          10,
+			name:                       "zk batching strategy",
+			batchingStrategyID:         uint32(1),
+			F:                          5,
+			expectedConsensusThreshold: 11,
 		},
 		{
-			name:               "default batching strategy",
-			batchingStrategyID: uint32(0),
-			F:                  5,
-			expectedF:          5,
+			name:                       "default batching strategy",
+			batchingStrategyID:         uint32(0),
+			F:                          5,
+			expectedConsensusThreshold: 6,
 		},
 	}
 
@@ -1470,7 +1470,7 @@ func TestExecutionReportingPlugin_getF(t *testing.T) {
 			assert.NoError(t, err)
 			p.batchingStrategy = bs
 
-			require.Equal(t, tc.expectedF, p.getConsensusThreshold())
+			require.Equal(t, tc.expectedConsensusThreshold, p.getConsensusThreshold())
 		})
 	}
 }

@@ -471,14 +471,14 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 // Returns required number of observations to reach consensus
 func (r *ExecutionReportingPlugin) getConsensusThreshold() int {
 	// Default consensus threshold is F+1
-	f := r.F
+	consensusThreshold := r.F + 1
 	if r.batchingStrategy.GetBatchingStrategyID() == ZKOverflowBatchingStrategyID {
 		// For batching strategy 1, consensus threshold is 2F+1
 		// This is because chains that can overflow need to reach consensus during the inflight cache period
 		// to avoid 2 transmissions round of an overflown message.
-		f = 2 * f
+		consensusThreshold = 2*r.F + 1
 	}
-	return f
+	return consensusThreshold
 }
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
@@ -493,7 +493,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 
 	parsableObservations := ccip.GetParsableObservations[ccip.ExecutionObservation](lggr, observations)
 	// Need at least f observations
-	if len(parsableObservations) <= consensusThreshold {
+	if len(parsableObservations) < consensusThreshold {
 		lggr.Warnf("Insufficient observations: only %d received, but need more than %d to proceed", len(parsableObservations), consensusThreshold)
 		return false, nil, nil
 	}
