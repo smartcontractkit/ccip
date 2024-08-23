@@ -232,12 +232,7 @@ contract PriceRegistry is
   // ================================================================
 
   /// @inheritdoc IPriceRegistry
-  function getTokenPrice(address token)
-    public
-    view
-    override
-    returns (Internal.TimestampedPackedUint224 memory tokenPrice)
-  {
+  function getTokenPrice(address token) public view override returns (Internal.TimestampedPackedUint224 memory) {
     IPriceRegistry.TokenPriceFeedConfig memory priceFeedConfig = s_usdPriceFeedsPerToken[token];
     if (priceFeedConfig.dataFeedAddress == address(0)) {
       return s_usdPerToken[token];
@@ -247,7 +242,7 @@ contract PriceRegistry is
   }
 
   /// @inheritdoc IPriceRegistry
-  function getValidatedTokenPrice(address token) external view override returns (uint224 tokenPrice) {
+  function getValidatedTokenPrice(address token) external view override returns (uint224) {
     return _getValidatedTokenPrice(token);
   }
 
@@ -256,10 +251,10 @@ contract PriceRegistry is
     external
     view
     override
-    returns (Internal.TimestampedPackedUint224[] memory tokenPrices)
+    returns (Internal.TimestampedPackedUint224[] memory)
   {
     uint256 length = tokens.length;
-    tokenPrices = new Internal.TimestampedPackedUint224[](length);
+    Internal.TimestampedPackedUint224[] memory tokenPrices = new Internal.TimestampedPackedUint224[](length);
     for (uint256 i = 0; i < length; ++i) {
       tokenPrices[i] = getTokenPrice(tokens[i]);
     }
@@ -271,7 +266,7 @@ contract PriceRegistry is
     external
     view
     override
-    returns (IPriceRegistry.TokenPriceFeedConfig memory tokenPriceFeedConfig)
+    returns (IPriceRegistry.TokenPriceFeedConfig memory)
   {
     return s_usdPriceFeedsPerToken[token];
   }
@@ -281,7 +276,7 @@ contract PriceRegistry is
     external
     view
     override
-    returns (Internal.TimestampedPackedUint224 memory gasPrice)
+    returns (Internal.TimestampedPackedUint224 memory)
   {
     return s_usdPerUnitGasByDestChainSelector[destChainSelector];
   }
@@ -308,7 +303,7 @@ contract PriceRegistry is
     address fromToken,
     uint256 fromTokenAmount,
     address toToken
-  ) public view override returns (uint256 toTokenAmount) {
+  ) public view override returns (uint256) {
     /// Example:
     /// fromTokenAmount:   1e18      // 1 ETH
     /// ETH:               2_000e18
@@ -362,7 +357,7 @@ contract PriceRegistry is
   // ================================================================
 
   /// @inheritdoc IPriceRegistry
-  function getFeeTokens() external view returns (address[] memory feeTokens) {
+  function getFeeTokens() external view returns (address[] memory) {
     return s_feeTokens.values();
   }
 
