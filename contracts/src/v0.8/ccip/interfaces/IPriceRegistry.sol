@@ -33,10 +33,7 @@ interface IPriceRegistry {
   /// @notice Returns the token price data feed configuration
   /// @param token The token to retrieve the feed config for
   /// @return tokenPriceFeedConfig The token price data feed config (if feed address is 0, the feed config is disabled)
-  function getTokenPriceFeedConfig(address token)
-    external
-    view
-    returns (TokenPriceFeedConfig memory tokenPriceFeedConfig);
+  function getTokenPriceFeedConfig(address token) external view returns (TokenPriceFeedConfig memory);
 
   /// @notice Get an encoded `gasPrice` for a given destination chain ID.
   /// The 224-bit result encodes necessary gas price components.

@@ -487,7 +487,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   function _trialExecute(
     Internal.Any2EVMRampMessage memory message,
     bytes[] memory offchainTokenData
-  ) internal returns (Internal.MessageExecutionState executionState, bytes memory errData) {
+  ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
     try this.executeSingleMessage(message, offchainTokenData) {}
     catch (bytes memory err) {
       // return the message execution state as FAILURE and the revert data
@@ -495,7 +495,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       return (Internal.MessageExecutionState.FAILURE, err);
     }
     // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
-    return (Internal.MessageExecutionState.SUCCESS, errData);
+    return (Internal.MessageExecutionState.SUCCESS, "");
   }
 
   /// @notice Executes a single message.
@@ -935,8 +935,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     address receiver,
     uint64 sourceChainSelector,
     bytes[] calldata offchainTokenData
-  ) internal returns (Client.EVMTokenAmount[] memory) {
-    Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
+  ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
+    destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       destTokenAmounts[i] = _releaseOrMintSingleToken(
         sourceTokenAmounts[i], originalSender, receiver, sourceChainSelector, offchainTokenData[i]

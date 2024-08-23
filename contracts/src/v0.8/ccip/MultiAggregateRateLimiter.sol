@@ -130,7 +130,7 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers, IT
   /// @notice Retrieves the token value for a token using the PriceRegistry.
   /// @param tokenAmount The token and amount to get the value for.
   /// @return tokenValue USD value in 18 decimals.
-  function _getTokenValue(Client.EVMTokenAmount memory tokenAmount) internal view returns (uint256 tokenValue) {
+  function _getTokenValue(Client.EVMTokenAmount memory tokenAmount) internal view returns (uint256) {
     // not fetching validated price, as price staleness is not important for value-based rate limiting
     // we only need to verify the price is not 0
     uint224 pricePerToken = IPriceRegistry(s_priceRegistry).getTokenPrice(tokenAmount.token).value;

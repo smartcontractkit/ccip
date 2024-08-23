@@ -22,10 +22,10 @@ multi_aggregate_rate_limiter: ../../../contracts/solc/v0.8.24/MultiAggregateRate
 multi_ocr3_helper: ../../../contracts/solc/v0.8.24/MultiOCR3Helper/MultiOCR3Helper.abi ../../../contracts/solc/v0.8.24/MultiOCR3Helper/MultiOCR3Helper.bin aa299e0c2659d53aad4eace4d66be0e734b1366008593669cf30361ff529da6a
 nonce_manager: ../../../contracts/solc/v0.8.24/NonceManager/NonceManager.abi ../../../contracts/solc/v0.8.24/NonceManager/NonceManager.bin 6f64e1083b356c06ee66b9138e398b9c97a4cd3e8c9ec38cf3010cebc79af536
 ocr3_config_encoder: ../../../contracts/solc/v0.8.24/IOCR3ConfigEncoder/IOCR3ConfigEncoder.abi ../../../contracts/solc/v0.8.24/IOCR3ConfigEncoder/IOCR3ConfigEncoder.bin e21180898e1ad54a045ee20add85a2793c681425ea06f66d1a9e5cab128b6487
-offramp: ../../../contracts/solc/v0.8.24/OffRamp/OffRamp.abi ../../../contracts/solc/v0.8.24/OffRamp/OffRamp.bin 10d8b19bdbe0cbbe6f83892c819cc04f8bc73816be07edfb2411cc7bce7413fb
+offramp: ../../../contracts/solc/v0.8.24/OffRamp/OffRamp.abi ../../../contracts/solc/v0.8.24/OffRamp/OffRamp.bin 76ec9676116368ab7c7c7ed45191698a12e4d975633caea32d821a1125633589
 onramp: ../../../contracts/solc/v0.8.24/OnRamp/OnRamp.abi ../../../contracts/solc/v0.8.24/OnRamp/OnRamp.bin 123e949bc9607289382534c4432ecebe5b1da5ca92c1c6c8cc6b9be56c3352c6
 ping_pong_demo: ../../../contracts/solc/v0.8.24/PingPongDemo/PingPongDemo.abi ../../../contracts/solc/v0.8.24/PingPongDemo/PingPongDemo.bin 4e51d70bdb6d951041518a3d7fd3b33ba8d3954bcc3d078318055b833b880324
-price_registry: ../../../contracts/solc/v0.8.24/PriceRegistry/PriceRegistry.abi ../../../contracts/solc/v0.8.24/PriceRegistry/PriceRegistry.bin 8738aaf4eab8fab2dfe4585a36be37612f9cb2015239337638622124dffa871b
+price_registry: ../../../contracts/solc/v0.8.24/PriceRegistry/PriceRegistry.abi ../../../contracts/solc/v0.8.24/PriceRegistry/PriceRegistry.bin 8931609776700a2a8121c9fdd757dbf9207d8b97583e70c84ec2d88c839d4a30
 registry_module_owner_custom: ../../../contracts/solc/v0.8.24/RegistryModuleOwnerCustom/RegistryModuleOwnerCustom.abi ../../../contracts/solc/v0.8.24/RegistryModuleOwnerCustom/RegistryModuleOwnerCustom.bin 75be86323c227917a9bbc3f799d7ed02f92db546653a36db30ed0ebe64461353
 report_codec: ../../../contracts/solc/v0.8.24/ReportCodec/ReportCodec.abi ../../../contracts/solc/v0.8.24/ReportCodec/ReportCodec.bin 20292ddaba15096fe8060567cf56cda673b947df27241d0c49d2debc838feb24
 rmn_contract: ../../../contracts/solc/v0.8.24/RMN/RMN.abi ../../../contracts/solc/v0.8.24/RMN/RMN.bin 8b45b0fb08631c6b582fd3c0b4052a79cc2b4e091e6286af1ab131bef63661f9

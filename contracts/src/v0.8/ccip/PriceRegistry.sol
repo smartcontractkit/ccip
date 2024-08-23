@@ -315,7 +315,7 @@ contract PriceRegistry is
   /// @notice Gets the token price for a given token and reverts if the token is not supported
   /// @param token The address of the token to get the price for
   /// @return tokenPriceValue The token price
-  function _getValidatedTokenPrice(address token) internal view returns (uint224 tokenPriceValue) {
+  function _getValidatedTokenPrice(address token) internal view returns (uint224) {
     Internal.TimestampedPackedUint224 memory tokenPrice = getTokenPrice(token);
     // Token price must be set at least once
     if (tokenPrice.timestamp == 0 || tokenPrice.value == 0) revert TokenNotSupported(token);
@@ -939,7 +939,7 @@ contract PriceRegistry is
   /// @notice Returns the static PriceRegistry config.
   /// @dev RMN depends on this function, if updated, please notify the RMN maintainers.
   /// @return staticConfig The static configuration.
-  function getStaticConfig() external view returns (StaticConfig memory staticConfig) {
+  function getStaticConfig() external view returns (StaticConfig memory) {
     return StaticConfig({
       maxFeeJuelsPerMsg: i_maxFeeJuelsPerMsg,
       linkToken: i_linkToken,
