@@ -375,9 +375,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
         revert InvalidDestChainConfig(destChainSelector);
       }
 
-      s_destChainConfigs[destChainSelector].router = destChainConfigArg.router;
-
       DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
+      destChainConfig.router = destChainConfigArg.router;
 
       emit DestChainConfigSet(
         destChainSelector, destChainConfig.sequenceNumber, destChainConfigArg.router, destChainConfig.allowListEnabled
