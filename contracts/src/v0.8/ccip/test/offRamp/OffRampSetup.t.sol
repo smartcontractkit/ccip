@@ -298,7 +298,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
         destTokenAddress: abi.encode(s_destTokenBySourceToken[tokenAmounts[i].token]),
         extraData: "",
         amount: tokenAmounts[i].amount,
-        destGasAmount: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+        destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
       });
     }
 
@@ -416,7 +416,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
         destTokenAddress: abi.encode(s_destTokenBySourceToken[srcTokenAmounts[i].token]),
         extraData: "",
         amount: srcTokenAmounts[i].amount,
-        destGasAmount: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+        destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
       });
     }
     return sourceTokenData;

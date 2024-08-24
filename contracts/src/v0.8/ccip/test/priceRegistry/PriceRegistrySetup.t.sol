@@ -410,7 +410,7 @@ contract PriceRegistryFeeSetup is PriceRegistrySetup {
       destTokenAddress: abi.encode(destToken),
       extraData: "",
       amount: tokenAmount.amount,
-      destGasAmount: abi.encode(expectedDestGasAmount)
+      destExecData: abi.encode(expectedDestGasAmount)
     });
   }
 

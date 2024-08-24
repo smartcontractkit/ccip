@@ -295,7 +295,9 @@ library Internal {
     // has to be set for the specific token.
     bytes extraData;
     uint256 amount; // Amount of tokens.
-    bytes destGasAmount; // The amount of gas available for the releaseOrMint and transfer calls on the offRamp
+    // Destination chain specific execution data encoded in bytes
+    //(for EVM destination it consists of the amount of gas available for the releaseOrMint and transfer calls on the offRamp
+    bytes destExecData;
   }
 
   /// @notice Family-agnostic header for OnRamp & OffRamp messages.
