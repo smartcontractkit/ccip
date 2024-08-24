@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/google/uuid"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -21,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
 func GenericAddrToEvm(addr ccip.Address) (common.Address, error) {
@@ -70,6 +72,12 @@ type OffRampReader = ccipdata.OffRampReader
 type DynamicPriceGetterClient = pricegetter.DynamicPriceGetterClient
 
 type DynamicPriceGetter = pricegetter.DynamicPriceGetter
+
+type AllTokensPriceGetter = pricegetter.AllTokensPriceGetter
+
+func NewPipelineGetter(source string, runner pipeline.Runner, jobID int32, externalJobID uuid.UUID, name string, lggr logger.Logger) (*pricegetter.PipelineGetter, error) {
+	return pricegetter.NewPipelineGetter(source, runner, jobID, externalJobID, name, lggr)
+}
 
 func NewDynamicPriceGetterClient(batchCaller rpclib.EvmBatchCaller) DynamicPriceGetterClient {
 	return pricegetter.NewDynamicPriceGetterClient(batchCaller)

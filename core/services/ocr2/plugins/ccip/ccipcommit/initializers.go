@@ -3,13 +3,8 @@ package ccipcommit
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/big"
-	"strings"
 	"time"
-
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -74,45 +69,6 @@ func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider c
 	var commitStoreReader ccipdata.CommitStoreReader
 	commitStoreReader = ccip.NewProviderProxyCommitStoreReader(srcCommitStore, dstCommitStore)
 	commitLggr := lggr.Named("CCIPCommit").With("sourceChain", sourceChainID, "destChain", destChainID)
-
-	var priceGetter pricegetter.AllTokensPriceGetter
-	withPipeline := strings.Trim(pluginConfig.TokenPricesUSDPipeline, "\n\t ") != ""
-	if withPipeline {
-		priceGetter, err = pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
-		if err != nil {
-			return nil, fmt.Errorf("creating pipeline price getter: %w", err)
-		}
-	} else {
-		// Use dynamic price getter.
-		if pluginConfig.PriceGetterConfig == nil {
-			return nil, fmt.Errorf("priceGetterConfig is nil")
-		}
-
-		// Build price getter clients for all chains specified in the aggregator configurations.
-		// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
-		priceGetterClients := map[uint64]pricegetter.DynamicPriceGetterClient{}
-		for _, aggCfg := range pluginConfig.PriceGetterConfig.AggregatorPrices {
-			chainID := aggCfg.ChainID
-			// Retrieve the chain.
-			chain, _, err2 := ccipconfig.GetChainByChainID(chainSet, chainID)
-			if err2 != nil {
-				return nil, fmt.Errorf("retrieving chain for chainID %d: %w", chainID, err2)
-			}
-			caller := rpclib.NewDynamicLimitedBatchCaller(
-				lggr,
-				chain.Client(),
-				rpclib.DefaultRpcBatchSizeLimit,
-				rpclib.DefaultRpcBatchBackOffMultiplier,
-				rpclib.DefaultMaxParallelRpcCalls,
-			)
-			priceGetterClients[chainID] = pricegetter.NewDynamicPriceGetterClient(caller)
-		}
-
-		priceGetter, err = pricegetter.NewDynamicPriceGetter(*pluginConfig.PriceGetterConfig, priceGetterClients)
-		if err != nil {
-			return nil, fmt.Errorf("creating dynamic price getter: %w", err)
-		}
-	}
 
 	offRampReader, err := dstProvider.NewOffRampReader(ctx, pluginConfig.OffRamp)
 	if err != nil {

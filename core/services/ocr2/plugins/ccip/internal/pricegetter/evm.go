@@ -81,6 +81,14 @@ func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[u
 	return &priceGetter, nil
 }
 
+// Either the DynamicPriceGetter should return a list of ContractReaderConfigs, and then
+// I should migrate all the uses of BatchCall to use ContractReader. Or, I modify
+// DynamicPriceGetter to use contract reader under the hood. I'll have to spike to see
+// which one is easier
+func (d *DynamicPriceGetter) ContractReaderConfigs() []byte {
+	return make([]byte, 0)
+}
+
 // FilterConfiguredTokens implements the PriceGetter interface.
 // It filters a list of token addresses for only those that have a price resolution rule configured on the PriceGetterConfig
 func (d *DynamicPriceGetter) FilterConfiguredTokens(ctx context.Context, tokens []cciptypes.Address) (configured []cciptypes.Address, unconfigured []cciptypes.Address, err error) {

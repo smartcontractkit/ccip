@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 
 	"gopkg.in/guregu/null.v4"
 
@@ -1625,6 +1628,59 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		OffchainKeyring:        kb,
 		OnchainKeyring:         kb,
 		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
+	}
+
+	// TRYING TO FIGURE OUT CONTRACT READER
+	relay, err := d.RelayGetter.Get(dstRid)
+	if err != nil {
+		return nil, err
+	}
+
+	cr, err := relay.NewContractReader(ctx, make([]byte, 0))
+	if err != nil {
+		return nil, err
+	}
+
+	// -----
+
+	var priceGetter ccip.AllTokensPriceGetter
+	withPipeline := strings.Trim(pluginJobSpecConfig.TokenPricesUSDPipeline, "\n\t ") != ""
+	if withPipeline {
+		priceGetter, err = ccip.NewPipelineGetter(pluginJobSpecConfig.TokenPricesUSDPipeline, d.pipelineRunner, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
+		if err != nil {
+			return nil, fmt.Errorf("creating pipeline price getter: %w", err)
+		}
+	} else {
+		// Use dynamic price getter.
+		if pluginJobSpecConfig.PriceGetterConfig == nil {
+			return nil, fmt.Errorf("priceGetterConfig is nil")
+		}
+
+		// Build price getter clients for all chains specified in the aggregator configurations.
+		// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
+		priceGetterClients := map[uint64]ccip.DynamicPriceGetterClient{}
+		for _, aggCfg := range pluginJobSpecConfig.PriceGetterConfig.AggregatorPrices {
+			chainID := aggCfg.ChainID
+			// Retrieve the chain.
+			chain, _, err2 := ccipconfig.GetChainByChainID(d.legacyChains, chainID)
+			if err2 != nil {
+				return nil, fmt.Errorf("retrieving chain for chainID %d: %w", chainID, err2)
+			}
+			caller := ccip.NewDynamicLimitedBatchCaller(
+				lggr,
+				chain.Client(),
+				uint(ccip.DefaultRpcBatchSizeLimit),
+				uint(ccip.DefaultRpcBatchBackOffMultiplier),
+				uint(ccip.DefaultMaxParallelRpcCalls),
+			)
+			caller2 := cr
+			priceGetterClients[chainID] = ccip.NewDynamicPriceGetterClient(caller2)
+		}
+
+		priceGetter, err = ccip.NewDynamicPriceGetter(*pluginJobSpecConfig.PriceGetterConfig, priceGetterClients)
+		if err != nil {
+			return nil, fmt.Errorf("creating dynamic price getter: %w", err)
+		}
 	}
 
 	return ccipcommit.NewCommitServices(ctx, d.ds, srcProvider, dstProvider, d.legacyChains, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, int64(srcChainID), dstChainID, logError)
