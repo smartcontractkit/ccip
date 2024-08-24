@@ -866,7 +866,7 @@ contract PriceRegistry is
 
   /// @inheritdoc IPriceRegistry
   /// @dev precondition - rampTokenAmounts and sourceTokenAmounts lengths must be equal
-  function validatePoolReturnDataAndGetDestExecData(
+  function processPoolReturnData(
     uint64 destChainSelector,
     Internal.RampTokenAmount[] calldata rampTokenAmounts,
     Client.EVMTokenAmount[] calldata sourceTokenAmounts

@@ -192,7 +192,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
 
     // Validate pool return data after it is populated (view function - no state changes)
     bytes[] memory destExecDataPerToken = IPriceRegistry(s_dynamicConfig.priceRegistry)
-      .validatePoolReturnDataAndGetDestExecData(destChainSelector, newMessage.tokenAmounts, message.tokenAmounts);
+      .processPoolReturnData(destChainSelector, newMessage.tokenAmounts, message.tokenAmounts);
 
     for (uint256 i = 0; i < newMessage.tokenAmounts.length; ++i) {
       newMessage.tokenAmounts[i].destExecData = destExecDataPerToken[i];
@@ -255,7 +255,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
       destTokenAddress: poolReturnData.destTokenAddress,
       extraData: poolReturnData.destPoolData,
       amount: tokenAndAmount.amount,
-      destExecData: "" // This is set in the validatePoolReturnDataAndGetDestExecData function
+      destExecData: "" // This is set in the processPoolReturnData function
     });
   }
 
