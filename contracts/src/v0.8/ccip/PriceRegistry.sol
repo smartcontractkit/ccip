@@ -11,33 +11,31 @@ import {Internal} from "./libraries/Internal.sol";
 import {Pool} from "./libraries/Pool.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 
-import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
+import {KeystoneFeedsPermissionHandler} from "../keystone/KeystoneFeedsPermissionHandler.sol";
+import {IReceiver} from "../keystone/interfaces/IReceiver.sol";
+import {KeystoneFeedDefaultMetadataLib} from "../keystone/lib/KeystoneFeedDefaultMetadataLib.sol";
+import {EnumerableSet} from "../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
-/// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
-/// and the price of a token in USD allowing the owner or priceUpdater to update this value.
+/// @notice The PriceRegistry contract responsibility is to:
+///   - Store the current gas price in USD for a given destination chain,
+///   - Store the price of a token in USD allowing the owner or priceUpdater to update this value.
+///   - Manage chain specific fee calculations.
 /// The authorized callers in the contract represent the fee price updaters.
-contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
+contract PriceRegistry is
+  AuthorizedCallers,
+  IPriceRegistry,
+  ITypeAndVersion,
+  IReceiver,
+  KeystoneFeedsPermissionHandler
+{
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
-
-  /// @notice Token price data feed update
-  struct TokenPriceFeedUpdate {
-    address sourceToken; // Source token to update feed for
-    IPriceRegistry.TokenPriceFeedConfig feedConfig; // Feed config update data
-  }
-
-  /// @dev Struct that contains the static configuration
-  /// RMN depends on this struct, if changing, please notify the RMN maintainers.
-  // solhint-disable-next-line gas-struct-packing
-  struct StaticConfig {
-    uint96 maxFeeJuelsPerMsg; // ─╮ Maximum fee that can be charged for a message
-    address linkToken; // ────────╯ LINK token address
-    uint32 stalenessThreshold; // The amount of time a gas price can be stale before it is considered invalid.
-  }
+  using KeystoneFeedDefaultMetadataLib for bytes;
 
   error TokenNotSupported(address token);
   error ChainNotSupported(uint64 chain);
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
+  error StaleKeystoneUpdate(address token, uint256 feedTimestamp, uint256 storedTimeStamp);
   error DataFeedValueOutOfUint224Range();
   error InvalidDestBytesOverhead(address token, uint32 destBytesOverhead);
   error MessageGasLimitTooHigh();
@@ -64,6 +62,28 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   event DestChainConfigUpdated(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
   event DestChainAdded(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
 
+  /// @notice Token price data feed update
+  struct TokenPriceFeedUpdate {
+    address sourceToken; // Source token to update feed for
+    IPriceRegistry.TokenPriceFeedConfig feedConfig; // Feed config update data
+  }
+
+  /// @dev Struct that contains the static configuration
+  /// RMN depends on this struct, if changing, please notify the RMN maintainers.
+  // solhint-disable-next-line gas-struct-packing
+  struct StaticConfig {
+    uint96 maxFeeJuelsPerMsg; // ─╮ Maximum fee that can be charged for a message
+    address linkToken; // ────────╯ LINK token address
+    uint32 stalenessThreshold; // The amount of time a gas price can be stale before it is considered invalid.
+  }
+
+  /// @notice The struct representing the received CCIP feed report from keystone IReceiver.onReport()
+  struct ReceivedCCIPFeedReport {
+    address token; // Token address
+    uint224 price; // ─────────╮ Price of the token in USD with 18 decimals
+    uint32 timestamp; // ──────╯ Timestamp of the price update
+  }
+
   /// @dev Struct to hold the fee & validation configs for a destination chain
   struct DestChainConfig {
     bool isEnabled; // ──────────────────────────╮ Whether this destination chain is enabled
@@ -81,7 +101,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     uint32 defaultTokenDestBytesOverhead; // ────╮ Default extra data availability bytes charged per token transfer
     uint32 defaultTxGasLimit; //                 │ Default gas limit for a tx
     uint64 gasMultiplierWeiPerEth; //            │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
-    uint32 networkFeeUSDCents; //                │ Flat network fee to charge for messages,  multiples of 0.01 USD
+    uint32 networkFeeUSDCents; //                │ Flat network fee to charge for messages, multiples of 0.01 USD
     bool enforceOutOfOrder; //                   │ Whether to enforce the allowOutOfOrderExecution extraArg value to be true.
     bytes4 chainFamilySelector; // ──────────────╯ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
   }
@@ -110,7 +130,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   /// that an array of these can be passed in the TokenTransferFeeConfigArgs struct to set the mapping
   struct TokenTransferFeeConfigSingleTokenArgs {
     address token; // Token address
-    TokenTransferFeeConfig tokenTransferFeeConfig; // struct to hold the transfer fee configuration for token transfers
+    TokenTransferFeeConfig tokenTransferFeeConfig; // Struct to hold the transfer fee configuration for token transfers
   }
 
   /// @dev Struct to hold the token transfer fee configurations for a destination chain and a set of tokens. Same as TokenTransferFeeConfigSingleTokenArgs
@@ -175,9 +195,9 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   /// @dev The link token address
   address internal immutable i_linkToken;
 
-  // Subset of tokens which prices tracked by this registry which are fee tokens.
+  /// @dev Subset of tokens which prices tracked by this registry which are fee tokens.
   EnumerableSet.AddressSet private s_feeTokens;
-  // The amount of time a gas price can be stale before it is considered invalid.
+  /// @dev The amount of time a gas price can be stale before it is considered invalid.
   uint32 private immutable i_stalenessThreshold;
 
   constructor(
@@ -292,9 +312,9 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     return (fromTokenAmount * _getValidatedTokenPrice(fromToken)) / _getValidatedTokenPrice(toToken);
   }
 
-  /// @notice Gets the token price for a given token and revert if the token is not supported
+  /// @notice Gets the token price for a given token and reverts if the token is not supported
   /// @param token The address of the token to get the price for
-  /// @return the token price
+  /// @return tokenPriceValue The token price
   function _getValidatedTokenPrice(address token) internal view returns (uint224) {
     Internal.TimestampedPackedUint224 memory tokenPrice = getTokenPrice(token);
     // Token price must be set at least once
@@ -325,30 +345,11 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     if (dataFeedAnswer < 0) {
       revert DataFeedValueOutOfUint224Range();
     }
-    uint256 rebasedValue = uint256(dataFeedAnswer);
-
-    // Rebase formula for units in smallest token denomination: usdValue * (1e18 * 1e18) / 1eTokenDecimals
-    // feedValue * (10 ** (18 - feedDecimals)) * (10 ** (18 - erc20Decimals))
-    // feedValue * (10 ** ((18 - feedDecimals) + (18 - erc20Decimals)))
-    // feedValue * (10 ** (36 - feedDecimals - erc20Decimals))
-    // feedValue * (10 ** (36 - (feedDecimals + erc20Decimals)))
-    // feedValue * (10 ** (36 - excessDecimals))
-    // If excessDecimals > 36 => flip it to feedValue / (10 ** (excessDecimals - 36))
-
-    uint8 excessDecimals = dataFeedContract.decimals() + priceFeedConfig.tokenDecimals;
-
-    if (excessDecimals > 36) {
-      rebasedValue /= 10 ** (excessDecimals - 36);
-    } else {
-      rebasedValue *= 10 ** (36 - excessDecimals);
-    }
-
-    if (rebasedValue > type(uint224).max) {
-      revert DataFeedValueOutOfUint224Range();
-    }
+    uint224 rebasedValue =
+      _calculateRebasedValue(dataFeedContract.decimals(), priceFeedConfig.tokenDecimals, uint256(dataFeedAnswer));
 
     // Data feed staleness is unchecked to decouple the PriceRegistry from data feed delay issues
-    return Internal.TimestampedPackedUint224({value: uint224(rebasedValue), timestamp: uint32(block.timestamp)});
+    return Internal.TimestampedPackedUint224({value: rebasedValue, timestamp: uint32(block.timestamp)});
   }
 
   // ================================================================
@@ -361,9 +362,9 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   }
 
   /// @notice Add and remove tokens from feeTokens set.
+  /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
   /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens
   /// and can be used to calculate fees.
-  /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
   function applyFeeTokensUpdates(
     address[] memory feeTokensToAdd,
     address[] memory feeTokensToRemove
@@ -372,9 +373,9 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   }
 
   /// @notice Add and remove tokens from feeTokens set.
+  /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
   /// @param feeTokensToAdd The addresses of the tokens which are now considered fee tokens
   /// and can be used to calculate fees.
-  /// @param feeTokensToRemove The addresses of the tokens which are no longer considered feeTokens.
   function _applyFeeTokensUpdates(address[] memory feeTokensToAdd, address[] memory feeTokensToRemove) private {
     for (uint256 i = 0; i < feeTokensToAdd.length; ++i) {
       if (s_feeTokens.add(feeTokensToAdd[i])) {
@@ -432,6 +433,37 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
 
       s_usdPriceFeedsPerToken[sourceToken] = tokenPriceFeedConfig;
       emit PriceFeedPerTokenUpdated(sourceToken, tokenPriceFeedConfig);
+    }
+  }
+
+  /// @notice Handles the report containing price feeds and updates the internal price storage
+  /// @inheritdoc IReceiver
+  /// @dev This function is called to process incoming price feed data.
+  /// @param metadata Arbitrary metadata associated with the report (not used in this implementation).
+  /// @param report Encoded report containing an array of `ReceivedCCIPFeedReport` structs.
+  function onReport(bytes calldata metadata, bytes calldata report) external {
+    (bytes10 workflowName, address workflowOwner, bytes2 reportName) = metadata._extractMetadataInfo();
+
+    _validateReportPermission(msg.sender, workflowOwner, workflowName, reportName);
+
+    ReceivedCCIPFeedReport[] memory feeds = abi.decode(report, (ReceivedCCIPFeedReport[]));
+
+    for (uint256 i = 0; i < feeds.length; ++i) {
+      uint8 tokenDecimals = s_usdPriceFeedsPerToken[feeds[i].token].tokenDecimals;
+      if (tokenDecimals == 0) {
+        revert TokenNotSupported(feeds[i].token);
+      }
+      // Keystone reports prices in USD with 18 decimals, so we passing it as 18 in the _calculateRebasedValue function
+      uint224 rebasedValue = _calculateRebasedValue(18, tokenDecimals, feeds[i].price);
+
+      //if stale update then revert
+      if (feeds[i].timestamp < s_usdPerToken[feeds[i].token].timestamp) {
+        revert StaleKeystoneUpdate(feeds[i].token, feeds[i].timestamp, s_usdPerToken[feeds[i].token].timestamp);
+      }
+
+      s_usdPerToken[feeds[i].token] =
+        Internal.TimestampedPackedUint224({value: rebasedValue, timestamp: feeds[i].timestamp});
+      emit UsdPerTokenUpdated(feeds[i].token, rebasedValue, feeds[i].timestamp);
     }
   }
 
@@ -508,7 +540,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     return ((premiumFee * premiumMultiplierWeiPerEth) + executionCost + dataAvailabilityCost) / feeTokenPrice;
   }
 
-  /// @notice Sets the fee configuration for a token
+  /// @notice Sets the fee configuration for a token.
   /// @param premiumMultiplierWeiPerEthArgs Array of PremiumMultiplierWeiPerEthArgs structs.
   function applyPremiumMultiplierWeiPerEthUpdates(
     PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs
@@ -612,6 +644,39 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     return (tokenTransferFeeUSDWei, tokenTransferGas, tokenTransferBytesOverhead);
   }
 
+  /// @notice calculates the rebased value for 1e18 smallest token denomination
+  /// @param dataFeedDecimal decimal of the data feed
+  /// @param tokenDecimal decimal of the token
+  /// @param feedValue value of the data feed
+  /// @return rebasedValue rebased value
+  function _calculateRebasedValue(
+    uint8 dataFeedDecimal,
+    uint8 tokenDecimal,
+    uint256 feedValue
+  ) internal pure returns (uint224 rebasedValue) {
+    // Rebase formula for units in smallest token denomination: usdValue * (1e18 * 1e18) / 1eTokenDecimals
+    // feedValue * (10 ** (18 - feedDecimals)) * (10 ** (18 - erc20Decimals))
+    // feedValue * (10 ** ((18 - feedDecimals) + (18 - erc20Decimals)))
+    // feedValue * (10 ** (36 - feedDecimals - erc20Decimals))
+    // feedValue * (10 ** (36 - (feedDecimals + erc20Decimals)))
+    // feedValue * (10 ** (36 - excessDecimals))
+    // If excessDecimals > 36 => flip it to feedValue / (10 ** (excessDecimals - 36))
+    uint8 excessDecimals = dataFeedDecimal + tokenDecimal;
+    uint256 rebasedVal;
+
+    if (excessDecimals > 36) {
+      rebasedVal = feedValue / (10 ** (excessDecimals - 36));
+    } else {
+      rebasedVal = feedValue * (10 ** (36 - excessDecimals));
+    }
+
+    if (rebasedVal > type(uint224).max) {
+      revert DataFeedValueOutOfUint224Range();
+    }
+
+    return uint224(rebasedVal);
+  }
+
   /// @notice Returns the estimated data availability cost of the message.
   /// @dev To save on gas, we use a single destGasPerDataAvailabilityByte value for both zero and non-zero bytes.
   /// @param destChainConfig the config configured for the destination chain selector.
@@ -645,6 +710,7 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   /// @notice Gets the transfer fee config for a given token.
   /// @param destChainSelector The destination chain selector.
   /// @param token The token address.
+  /// @return tokenTransferFeeConfig The transfer fee config for the token.
   function getTokenTransferFeeConfig(
     uint64 destChainSelector,
     address token
@@ -699,19 +765,19 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   // ================================================================
 
   /// @notice Validates that the destAddress matches the expected format of the family.
-  /// @param chainFamilySelector Tag to identify the target family
-  /// @param destAddress Dest address to validate
-  /// @dev precondition - assumes the family tag is correct and validated
+  /// @param chainFamilySelector Tag to identify the target family.
+  /// @param destAddress Dest address to validate.
+  /// @dev precondition - assumes the family tag is correct and validated.
   function _validateDestFamilyAddress(bytes4 chainFamilySelector, bytes memory destAddress) internal pure {
     if (chainFamilySelector == Internal.CHAIN_FAMILY_SELECTOR_EVM) {
       Internal._validateEVMAddress(destAddress);
     }
   }
 
-  /// @dev Convert the extra args bytes into a struct with validations against the dest chain config
-  /// @param extraArgs The extra args bytes
-  /// @param destChainConfig Dest chain config to validate against
-  /// @return EVMExtraArgs the extra args struct (latest version)
+  /// @dev Convert the extra args bytes into a struct with validations against the dest chain config.
+  /// @param extraArgs The extra args bytes.
+  /// @param destChainConfig Dest chain config to validate against.
+  /// @return evmExtraArgs The EVMExtraArgs struct (latest version).
   function _parseEVMExtraArgsFromBytes(
     bytes calldata extraArgs,
     DestChainConfig memory destChainConfig
@@ -727,9 +793,9 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
     return evmExtraArgs;
   }
 
-  /// @dev Convert the extra args bytes into a struct
-  /// @param extraArgs The extra args bytes
-  /// @param defaultTxGasLimit default tx gas limit to use in the absence of extra args
+  /// @dev Convert the extra args bytes into a struct.
+  /// @param extraArgs The extra args bytes.
+  /// @param defaultTxGasLimit default tx gas limit to use in the absence of extra args.
   /// @return EVMExtraArgs the extra args struct (latest version)
   function _parseUnvalidatedEVMExtraArgsFromBytes(
     bytes calldata extraArgs,
@@ -755,11 +821,11 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   }
 
   /// @notice Validate the forwarded message to ensure it matches the configuration limits (message length, number of tokens)
-  /// and family-specific expectations (address format)
-  /// @param destChainConfig Dest chain config
+  /// and family-specific expectations (address format).
+  /// @param destChainConfig The destination chain config.
   /// @param dataLength The length of the data field of the message.
   /// @param numberOfTokens The number of tokens to be sent.
-  /// @param receiver Message receiver on the dest chain
+  /// @param receiver Message receiver on the dest chain.
   function _validateMessage(
     DestChainConfig memory destChainConfig,
     uint256 dataLength,
@@ -829,9 +895,9 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   // │                           Configs                            │
   // ================================================================
 
-  /// @notice Returns the configured config for the dest chain selector
-  /// @param destChainSelector destination chain selector to fetch config for
-  /// @return destChainConfig config for the dest chain
+  /// @notice Returns the configured config for the dest chain selector.
+  /// @param destChainSelector Destination chain selector to fetch config for.
+  /// @return destChainConfig Config for the destination chain.
   function getDestChainConfig(uint64 destChainSelector) external view returns (DestChainConfig memory) {
     return s_destChainConfigs[destChainSelector];
   }
@@ -871,8 +937,8 @@ contract PriceRegistry is AuthorizedCallers, IPriceRegistry, ITypeAndVersion {
   }
 
   /// @notice Returns the static PriceRegistry config.
-  /// @dev RMN depends on this function, if changing, please notify the RMN maintainers.
-  /// @return the configuration.
+  /// @dev RMN depends on this function, if updated, please notify the RMN maintainers.
+  /// @return staticConfig The static configuration.
   function getStaticConfig() external view returns (StaticConfig memory) {
     return StaticConfig({
       maxFeeJuelsPerMsg: i_maxFeeJuelsPerMsg,
