@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
 struct MerkleRoot {
   uint64 sourceChainSelector; // Remote source chain selector that the Merkle Root is scoped to
-  bytes onrampAddress; // generic, to support arbitrary sources; for EVM2EVM, use abi.encodePacked
+  bytes onRampAddress; // generic, to support arbitrary sources; for EVM2EVM, use abi.encode
   uint64 minSeqNr; // Minimum sequence number, inclusive
   uint64 maxSeqNr; // Maximum sequence number, inclusive
   bytes32 merkleRoot; // Merkle root covering the interval & source chain messages

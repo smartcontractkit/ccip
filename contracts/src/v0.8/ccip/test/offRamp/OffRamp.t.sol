@@ -914,7 +914,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     MerkleRoot[] memory roots = new MerkleRoot[](1);
     roots[0] = MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: 1,
       maxSeqNr: 2,
       merkleRoot: merkleRoot
@@ -2927,7 +2927,7 @@ contract OffRamp_commit is OffRampSetup {
     MerkleRoot[] memory roots = new MerkleRoot[](1);
     roots[0] = MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: 1,
       maxSeqNr: max1,
       merkleRoot: root
@@ -2956,7 +2956,7 @@ contract OffRamp_commit is OffRampSetup {
     MerkleRoot[] memory roots = new MerkleRoot[](1);
     roots[0] = MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: 1,
       maxSeqNr: maxSeq,
       merkleRoot: "stale report 1"
@@ -3107,7 +3107,7 @@ contract OffRamp_commit is OffRampSetup {
     roots = new MerkleRoot[](1);
     roots[0] = MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: 1,
       maxSeqNr: maxSeq,
       merkleRoot: "stale report"
@@ -3215,7 +3215,7 @@ contract OffRamp_commit is OffRampSetup {
     MerkleRoot[] memory roots = new MerkleRoot[](1);
     roots[0] = MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: 1,
       maxSeqNr: 4,
       merkleRoot: bytes32(0)
@@ -3232,7 +3232,7 @@ contract OffRamp_commit is OffRampSetup {
     MerkleRoot[] memory roots = new MerkleRoot[](1);
     roots[0] = MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: interval.min,
       maxSeqNr: interval.max,
       merkleRoot: bytes32(0)
@@ -3250,7 +3250,7 @@ contract OffRamp_commit is OffRampSetup {
     MerkleRoot[] memory roots = new MerkleRoot[](1);
     roots[0] = MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: interval.min,
       maxSeqNr: interval.max,
       merkleRoot: bytes32(0)
@@ -3294,7 +3294,7 @@ contract OffRamp_commit is OffRampSetup {
     MerkleRoot[] memory roots = new MerkleRoot[](1);
     roots[0] = MerkleRoot({
       sourceChainSelector: 0,
-      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: 1,
       maxSeqNr: 2,
       merkleRoot: "Only a single root"
@@ -3311,7 +3311,7 @@ contract OffRamp_commit is OffRampSetup {
     MerkleRoot[] memory roots = new MerkleRoot[](1);
     roots[0] = MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: 1,
       maxSeqNr: 2,
       merkleRoot: "Only a single root"
@@ -3333,7 +3333,7 @@ contract OffRamp_commit is OffRampSetup {
     MerkleRoot[] memory roots = new MerkleRoot[](1);
     roots[0] = MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onrampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
       minSeqNr: 1,
       maxSeqNr: s_maxInterval,
       merkleRoot: "test #2"
