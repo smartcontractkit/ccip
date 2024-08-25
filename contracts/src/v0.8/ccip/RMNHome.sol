@@ -115,6 +115,16 @@ contract RMNHome is Ownable2Step, ITypeAndVersion {
     emit ConfigSet(newConfigDigest, newVersionedConfig);
   }
 
+  /// @notice Revokes past configs, so that only the latest config remains. Call to promote staging to production.
+  function revokePastConfigs() external onlyOwner {
+    for (uint256 i = 0; i < CONFIG_RING_BUFFER_SIZE; ++i) {
+      if (s_latestConfigIndex != i && s_configCounts[i] > 0) {
+        emit ConfigRevoked(_configDigest(VersionedConfig({version: s_configCounts[i], config: s_configs[i]})));
+        delete s_configCounts[i];
+      }
+    }
+  }
+
   /// @return configDigest will be zero in case no config has been set
   function getLatestConfigDigestAndVersionedConfig()
     external
