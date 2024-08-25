@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -49,9 +51,10 @@ func NewDynamicPriceGetterClient(batchCaller rpclib.EvmBatchCaller) DynamicPrice
 }
 
 type DynamicPriceGetter struct {
-	cfg           config.DynamicPriceGetterConfig
-	evmClients    map[uint64]DynamicPriceGetterClient
-	aggregatorAbi abi.ABI
+	cfg             config.DynamicPriceGetterConfig
+	evmClients      map[uint64]DynamicPriceGetterClient
+	contractReaders map[uint64]types.ContractReader
+	aggregatorAbi   abi.ABI
 }
 
 func NewDynamicPriceGetterConfig(configJson string) (config.DynamicPriceGetterConfig, error) {
@@ -69,7 +72,7 @@ func NewDynamicPriceGetterConfig(configJson string) (config.DynamicPriceGetterCo
 
 // NewDynamicPriceGetter build a DynamicPriceGetter from a configuration and a map of chain ID to batch callers.
 // A batch caller should be provided for all retrieved prices.
-func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[uint64]DynamicPriceGetterClient) (*DynamicPriceGetter, error) {
+func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[uint64]DynamicPriceGetterClient, contractReaders map[uint64]types.ContractReader) (*DynamicPriceGetter, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("validating dynamic price getter config: %w", err)
 	}
@@ -77,7 +80,7 @@ func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[u
 	if err != nil {
 		return nil, fmt.Errorf("parsing offchainaggregator abi: %w", err)
 	}
-	priceGetter := DynamicPriceGetter{cfg, evmClients, aggregatorAbi}
+	priceGetter := DynamicPriceGetter{cfg, evmClients, contractReaders, aggregatorAbi}
 	return &priceGetter, nil
 }
 

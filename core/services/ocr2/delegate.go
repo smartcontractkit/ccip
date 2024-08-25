@@ -10,23 +10,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
-
-	"gopkg.in/guregu/null.v4"
-
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"google.golang.org/grpc"
+	"gopkg.in/guregu/null.v4"
+
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"google.golang.org/grpc"
 
 	ocr2keepers20 "github.com/smartcontractkit/chainlink-automation/pkg/v2"
 	ocr2keepers20config "github.com/smartcontractkit/chainlink-automation/pkg/v2/config"
@@ -41,10 +35,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop/reportingplugins/ocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	llotypes "github.com/smartcontractkit/chainlink-common/pkg/types/llo"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 	datastreamsllo "github.com/smartcontractkit/chainlink-data-streams/llo"
-
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	coreconfig "github.com/smartcontractkit/chainlink/v2/core/config"
@@ -55,8 +50,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/functions"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/generic"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager"
@@ -66,7 +64,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/median"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/mercury"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper"
-
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/autotelemetry21"
 	ocr2keeper21core "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/core"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/logprovider"
@@ -83,8 +80,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/synchronization"
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
-
-	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
 type ErrJobSpecNoRelayer struct {
@@ -1630,19 +1625,6 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 	}
 
-	// TRYING TO FIGURE OUT CONTRACT READER
-	relay, err := d.RelayGetter.Get(dstRid)
-	if err != nil {
-		return nil, err
-	}
-
-	cr, err := relay.NewContractReader(ctx, make([]byte, 0))
-	if err != nil {
-		return nil, err
-	}
-
-	// -----
-
 	var priceGetter ccip.AllTokensPriceGetter
 	withPipeline := strings.Trim(pluginJobSpecConfig.TokenPricesUSDPipeline, "\n\t ") != ""
 	if withPipeline {
@@ -1659,6 +1641,7 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		// Build price getter clients for all chains specified in the aggregator configurations.
 		// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
 		priceGetterClients := map[uint64]ccip.DynamicPriceGetterClient{}
+		contractReaders := map[uint64]types.ContractReader{}
 		for _, aggCfg := range pluginJobSpecConfig.PriceGetterConfig.AggregatorPrices {
 			chainID := aggCfg.ChainID
 			// Retrieve the chain.
@@ -1673,17 +1656,44 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 				uint(ccip.DefaultRpcBatchBackOffMultiplier),
 				uint(ccip.DefaultMaxParallelRpcCalls),
 			)
-			caller2 := cr
-			priceGetterClients[chainID] = ccip.NewDynamicPriceGetterClient(caller2)
+			priceGetterClients[chainID] = ccip.NewDynamicPriceGetterClient(caller)
+
+			// TRYING TO FIGURE OUT CONTRACT READER
+			relayID := types.RelayID{Network: spec.Relay, ChainID: strconv.FormatUint(chainID, 10)}
+			relay, err := d.RelayGetter.Get(relayID)
+			if err != nil {
+				return nil, err
+			}
+
+			contractReaderConfig := evmrelaytypes.ChainReaderConfig{
+				Contracts: map[string]evmrelaytypes.ChainContractReader{
+					"OffchainAggregator": {
+						ContractABI: ccip.OffChainAggregatorABI,
+					},
+				},
+			}
+
+			contractReaderConfigJsonBytes, err := json.Marshal(contractReaderConfig)
+			if err != nil {
+				return nil, err
+			}
+
+			contractReader, err := relay.NewContractReader(ctx, contractReaderConfigJsonBytes)
+			if err != nil {
+				return nil, err
+			}
+
+			contractReaders[chainID] = contractReader
+			// -----
 		}
 
-		priceGetter, err = ccip.NewDynamicPriceGetter(*pluginJobSpecConfig.PriceGetterConfig, priceGetterClients)
+		priceGetter, err = ccip.NewDynamicPriceGetter(*pluginJobSpecConfig.PriceGetterConfig, priceGetterClients, contractReaders)
 		if err != nil {
 			return nil, fmt.Errorf("creating dynamic price getter: %w", err)
 		}
 	}
 
-	return ccipcommit.NewCommitServices(ctx, d.ds, srcProvider, dstProvider, d.legacyChains, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, int64(srcChainID), dstChainID, logError)
+	return ccipcommit.NewCommitServices(ctx, d.ds, srcProvider, dstProvider, priceGetter, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, int64(srcChainID), dstChainID, logError)
 }
 
 func newCCIPCommitPluginBytes(isSourceProvider bool, sourceStartBlock uint64, destStartBlock uint64) config.CommitPluginConfig {

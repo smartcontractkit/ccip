@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/gethwrappers2/generated/offchainaggregator"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
@@ -83,8 +86,8 @@ func NewDynamicPriceGetterClient(batchCaller rpclib.EvmBatchCaller) DynamicPrice
 	return pricegetter.NewDynamicPriceGetterClient(batchCaller)
 }
 
-func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[uint64]DynamicPriceGetterClient) (*DynamicPriceGetter, error) {
-	return pricegetter.NewDynamicPriceGetter(cfg, evmClients)
+func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[uint64]DynamicPriceGetterClient, contractReaders map[uint64]types.ContractReader) (*DynamicPriceGetter, error) {
+	return pricegetter.NewDynamicPriceGetter(cfg, evmClients, contractReaders)
 }
 
 func NewDynamicLimitedBatchCaller(
@@ -141,3 +144,5 @@ func NewCommitOffchainConfig(
 ) ccip.CommitOffchainConfig {
 	return ccipdata.NewCommitOffchainConfig(gasPriceDeviationPPB, gasPriceHeartBeat, tokenPriceDeviationPPB, tokenPriceHeartBeat, inflightCacheExpiry, priceReportingDisabled)
 }
+
+const OffChainAggregatorABI = offchainaggregator.OffchainAggregatorABI
