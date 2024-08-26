@@ -1869,21 +1869,31 @@ contract PriceRegistry_processMessageArgs is PriceRegistryFeeSetup {
   }
 }
 
-contract PriceRegistry_validatePoolReturnData is PriceRegistryFeeSetup {
+contract PriceRegistry_processPoolReturnData is PriceRegistryFeeSetup {
   function test_WithSingleToken_Success() public view {
-    Client.EVMTokenAmount[] memory sourceTokenAmounts = new Client.EVMTokenAmount[](1);
+    Client.EVMTokenAmount[] memory sourceTokenAmounts = new Client.EVMTokenAmount[](2);
     sourceTokenAmounts[0].amount = 1e18;
     sourceTokenAmounts[0].token = s_sourceTokens[0];
+    sourceTokenAmounts[1].amount = 1e18;
+    sourceTokenAmounts[1].token = CUSTOM_TOKEN_2;
 
-    Internal.RampTokenAmount[] memory rampTokenAmounts = new Internal.RampTokenAmount[](1);
+    Internal.RampTokenAmount[] memory rampTokenAmounts = new Internal.RampTokenAmount[](2);
     rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry, DEST_CHAIN_SELECTOR);
+    rampTokenAmounts[1] = _getSourceTokenData(sourceTokenAmounts[1], s_tokenAdminRegistry, DEST_CHAIN_SELECTOR);
+    bytes[] memory expectedDestExecData = new bytes[](2);
+    expectedDestExecData[0] = abi.encode(s_priceRegistryTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.destGasOverhead);
+    expectedDestExecData[1] = abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD); //expected return data should be abi.encoded  default as isEnabled is false
 
     // No revert - successful
-    s_priceRegistry.processPoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
+    bytes[] memory destExecData = s_priceRegistry.processPoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
+
+    for (uint256 i = 0; i < destExecData.length; ++i) {
+      assertEq(destExecData[i], expectedDestExecData[i]);
+    }
   }
 
   function test_TokenAmountArraysMismatching_Revert() public {
-    Client.EVMTokenAmount[] memory sourceTokenAmounts = new Client.EVMTokenAmount[](1);
+    Client.EVMTokenAmount[] memory sourceTokenAmounts = new Client.EVMTokenAmount[](2);
     sourceTokenAmounts[0].amount = 1e18;
     sourceTokenAmounts[0].token = s_sourceTokens[0];
 

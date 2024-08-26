@@ -16,7 +16,10 @@ contract PriceRegistrySetup is TokenSetup {
   uint112 internal constant USD_PER_DATA_AVAILABILITY_GAS = 1e9; // 1 gwei
 
   address internal constant CUSTOM_TOKEN = address(12345);
+  address internal constant CUSTOM_TOKEN_2 = address(bytes20(keccak256("CUSTOM_TOKEN_2")));
+
   uint224 internal constant CUSTOM_TOKEN_PRICE = 1e17; // $0.1 CUSTOM
+  uint224 internal constant CUSTOM_TOKEN_PRICE_2 = 1e18; // $1 CUSTOM
 
   // Encode L1 gas price and L2 gas price into a packed price.
   // L1 gas price is left-shifted to the higher-order bits.
@@ -138,6 +141,22 @@ contract PriceRegistrySetup is TokenSetup {
         })
       })
     );
+    s_priceRegistryTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
+      PriceRegistry.TokenTransferFeeConfigSingleTokenArgs({
+        token: CUSTOM_TOKEN_2,
+        tokenTransferFeeConfig: PriceRegistry.TokenTransferFeeConfig({
+          minFeeUSDCents: 2_00, // 1 USD
+          maxFeeUSDCents: 2000_00, // 1,000 USD
+          deciBps: 10_0, // 10 bps, or 0.1%
+          destGasOverhead: 1,
+          destBytesOverhead: 200,
+          isEnabled: false
+        })
+      })
+    );
+
+    //setting up the destination token for CUSTOM_TOKEN_2 here as it is specific to these tests
+    s_destTokenBySourceToken[CUSTOM_TOKEN_2] = address(bytes20(keccak256("CUSTOM_TOKEN_2_DEST")));
 
     s_priceRegistry = new PriceRegistryHelper(
       PriceRegistry.StaticConfig({
