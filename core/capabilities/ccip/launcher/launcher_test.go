@@ -6,15 +6,15 @@ import (
 	"reflect"
 	"testing"
 
-	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types/mocks"
+	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-
+	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types/mocks"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -34,7 +34,7 @@ func Test_createOracle(t *testing.T) {
 		pluginType    cctypes.PluginType
 		ocrConfigs    []ccipreaderpkg.OCR3ConfigWithMeta
 	}
-	tests := []struct {
+	var tests = []struct {
 		name    string
 		args    args
 		expect  func(t *testing.T, args args, oracleCreator *mocks.OracleCreator)
@@ -46,13 +46,7 @@ func Test_createOracle(t *testing.T) {
 				myP2PKey,
 				mocks.NewOracleCreator(t),
 				cctypes.PluginTypeCCIPCommit,
-				[]ccipreaderpkg.OCR3ConfigWithMeta{
-					{
-						Config:       ccipreaderpkg.OCR3Config{},
-						ConfigCount:  1,
-						ConfigDigest: testutils.Random32Byte(),
-					},
-				},
+				ocr3WithMetaP2p(nil),
 			},
 			func(t *testing.T, args args, oracleCreator *mocks.OracleCreator) {
 				oracleCreator.
@@ -67,15 +61,7 @@ func Test_createOracle(t *testing.T) {
 				myP2PKey,
 				mocks.NewOracleCreator(t),
 				cctypes.PluginTypeCCIPCommit,
-				[]ccipreaderpkg.OCR3ConfigWithMeta{
-					{
-						Config: ccipreaderpkg.OCR3Config{
-							BootstrapP2PIds: [][32]byte{myP2PKey},
-						},
-						ConfigCount:  1,
-						ConfigDigest: testutils.Random32Byte(),
-					},
-				},
+				ocr3WithMetaP2p(&myP2PKey),
 			},
 			func(t *testing.T, args args, oracleCreator *mocks.OracleCreator) {
 				oracleCreator.
@@ -93,13 +79,7 @@ func Test_createOracle(t *testing.T) {
 				myP2PKey,
 				mocks.NewOracleCreator(t),
 				cctypes.PluginTypeCCIPCommit,
-				[]ccipreaderpkg.OCR3ConfigWithMeta{
-					{
-						Config:       ccipreaderpkg.OCR3Config{},
-						ConfigCount:  1,
-						ConfigDigest: testutils.Random32Byte(),
-					},
-				},
+				ocr3WithMetaP2p(nil),
 			},
 			func(t *testing.T, args args, oracleCreator *mocks.OracleCreator) {
 				oracleCreator.
@@ -114,15 +94,7 @@ func Test_createOracle(t *testing.T) {
 				myP2PKey,
 				mocks.NewOracleCreator(t),
 				cctypes.PluginTypeCCIPCommit,
-				[]ccipreaderpkg.OCR3ConfigWithMeta{
-					{
-						Config: ccipreaderpkg.OCR3Config{
-							BootstrapP2PIds: [][32]byte{myP2PKey},
-						},
-						ConfigCount:  1,
-						ConfigDigest: testutils.Random32Byte(),
-					},
-				},
+				ocr3WithMetaP2p(&myP2PKey),
 			},
 			func(t *testing.T, args args, oracleCreator *mocks.OracleCreator) {
 				oracleCreator.
@@ -197,10 +169,10 @@ func Test_createDON(t *testing.T) {
 			func(t *testing.T, args args, oracleCreator *mocks.OracleCreator, homeChainReader *mocks.HomeChainReader) {
 				homeChainReader.
 					On("GetOCRConfigs", mock.Anything, uint32(1), uint8(cctypes.PluginTypeCCIPCommit)).
-					Return([]ccipreaderpkg.OCR3ConfigWithMeta{{}}, nil)
+					Return(ocr3WithMetaP2p(nil), nil)
 				homeChainReader.
 					On("GetOCRConfigs", mock.Anything, uint32(1), uint8(cctypes.PluginTypeCCIPExec)).
-					Return([]ccipreaderpkg.OCR3ConfigWithMeta{{}}, nil)
+					Return(ocr3WithMetaP2p(nil), nil)
 				oracleCreator.
 					On("CreatePluginOracle", cctypes.PluginTypeCCIPCommit, mock.Anything).
 					Return(mocks.NewCCIPOracle(t), nil)
@@ -358,9 +330,9 @@ func Test_launcher_processDiff(t *testing.T) {
 					return mocks.NewHomeChainReader(t)
 				}, func(m *mocks.HomeChainReader) {
 					m.On("GetOCRConfigs", mock.Anything, uint32(1), uint8(cctypes.PluginTypeCCIPCommit)).
-						Return([]ccipreaderpkg.OCR3ConfigWithMeta{{}}, nil)
+						Return(ocr3WithMetaP2p(nil), nil)
 					m.On("GetOCRConfigs", mock.Anything, uint32(1), uint8(cctypes.PluginTypeCCIPExec)).
-						Return([]ccipreaderpkg.OCR3ConfigWithMeta{{}}, nil)
+						Return(ocr3WithMetaP2p(nil), nil)
 				}),
 				oracleCreator: newMock(t, func(t *testing.T) *mocks.OracleCreator {
 					return mocks.NewOracleCreator(t)
@@ -486,6 +458,25 @@ func Test_launcher_processDiff(t *testing.T) {
 			}
 			tt.assert(t, l)
 		})
+	}
+}
+
+func ocr3WithMetaP2p(bootstrapPeerID *ragep2ptypes.PeerID) []ccipreaderpkg.OCR3ConfigWithMeta {
+	var config ccipreaderpkg.OCR3Config
+	config = ccipreaderpkg.OCR3Config{}
+
+	if bootstrapPeerID != nil {
+		config = ccipreaderpkg.OCR3Config{
+			BootstrapP2PIds: [][32]byte{*bootstrapPeerID},
+		}
+	}
+
+	return []ccipreaderpkg.OCR3ConfigWithMeta{
+		{
+			Config:       config,
+			ConfigCount:  1,
+			ConfigDigest: testutils.Random32Byte(),
+		},
 	}
 }
 

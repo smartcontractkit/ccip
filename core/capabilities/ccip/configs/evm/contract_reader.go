@@ -4,15 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
-
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
+	"github.com/ethereum/go-ethereum/accounts/abi"
 
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
 	kcr "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 	evmrelaytypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
@@ -22,6 +23,7 @@ var (
 	capabilitiesRegsitryABI = evmtypes.MustGetABI(kcr.CapabilitiesRegistryABI)
 	ccipConfigABI           = evmtypes.MustGetABI(ccip_config.CCIPConfigABI)
 	priceRegistryABI        = evmtypes.MustGetABI(price_registry.PriceRegistryABI)
+	priceAggregatorABI      = evmtypes.MustGetABI(aggregator_v3_interface.AggregatorV3InterfaceABI)
 )
 
 // MustSourceReaderConfig returns a ChainReaderConfig that can be used to read from the onramp.
@@ -177,6 +179,35 @@ var SourceReaderConfig = evmrelaytypes.ChainReaderConfig{
 			},
 		},
 	},
+}
+
+func MergeReaderConfigs(configs ...evmrelaytypes.ChainReaderConfig) evmrelaytypes.ChainReaderConfig {
+	allContracts := make(map[string]evmrelaytypes.ChainContractReader)
+	for _, c := range configs {
+		for contractName, contractReader := range c.Contracts {
+			allContracts[contractName] = contractReader
+		}
+	}
+
+	return evmrelaytypes.ChainReaderConfig{Contracts: allContracts}
+}
+
+func PriceReaderConfig() evmrelaytypes.ChainReaderConfig {
+	return evmrelaytypes.ChainReaderConfig{
+		Contracts: map[string]evmrelaytypes.ChainContractReader{
+			consts.ContractNamePriceAggregator: {
+				ContractABI: aggregator_v3_interface.AggregatorV3InterfaceABI,
+				Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
+					consts.MethodNameGetLatestRoundData: {
+						ChainSpecificName: mustGetMethodName(consts.MethodNameGetLatestRoundData, priceAggregatorABI),
+					},
+					consts.MethodNameGetDecimals: {
+						ChainSpecificName: mustGetMethodName(consts.MethodNameGetDecimals, priceAggregatorABI),
+					},
+				},
+			},
+		},
+	}
 }
 
 // HomeChainReaderConfigRaw returns a ChainReaderConfig that can be used to read from the home chain.
