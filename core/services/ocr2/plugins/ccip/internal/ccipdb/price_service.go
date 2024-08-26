@@ -14,7 +14,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+<<<<<<< HEAD
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
+=======
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
@@ -24,6 +27,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
+<<<<<<< HEAD
+=======
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 )
 
 // PriceService manages DB access for gas and token price data.
@@ -49,6 +56,7 @@ const (
 	// Token prices are refreshed every 10 minutes, we only report prices for blue chip tokens, DS&A simulation show
 	// their prices are stable, 10-minute resolution is accurate enough.
 	tokenPriceUpdateInterval = 10 * time.Minute
+<<<<<<< HEAD
 
 	// Prices should expire after 25 minutes in DB. Prices should be fresh in the Commit plugin.
 	// 25 min provides sufficient buffer for the Commit plugin to withstand transient price update outages, while
@@ -66,6 +74,13 @@ type priceService struct {
 	cleanupInterval      time.Duration
 	gasUpdateInterval    time.Duration
 	tokenUpdateInterval  time.Duration
+=======
+)
+
+type priceService struct {
+	gasUpdateInterval   time.Duration
+	tokenUpdateInterval time.Duration
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 
 	lggr              logger.Logger
 	orm               cciporm.ORM
@@ -100,10 +115,15 @@ func NewPriceService(
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pw := &priceService{
+<<<<<<< HEAD
 		priceExpireThreshold: priceExpireThreshold,
 		cleanupInterval:      utils.WithJitter(priceCleanupInterval), // use WithJitter to avoid multiple services impacting DB at same time
 		gasUpdateInterval:    utils.WithJitter(gasPriceUpdateInterval),
 		tokenUpdateInterval:  utils.WithJitter(tokenPriceUpdateInterval),
+=======
+		gasUpdateInterval:   gasPriceUpdateInterval,
+		tokenUpdateInterval: tokenPriceUpdateInterval,
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 
 		lggr:              lggr,
 		orm:               orm,
@@ -142,6 +162,7 @@ func (p *priceService) Close() error {
 }
 
 func (p *priceService) run() {
+<<<<<<< HEAD
 	cleanupTicker := time.NewTicker(p.cleanupInterval)
 	gasUpdateTicker := time.NewTicker(p.gasUpdateInterval)
 	tokenUpdateTicker := time.NewTicker(p.tokenUpdateInterval)
@@ -149,6 +170,13 @@ func (p *priceService) run() {
 	go func() {
 		defer p.wg.Done()
 		defer cleanupTicker.Stop()
+=======
+	gasUpdateTicker := time.NewTicker(utils.WithJitter(p.gasUpdateInterval))
+	tokenUpdateTicker := time.NewTicker(utils.WithJitter(p.tokenUpdateInterval))
+
+	go func() {
+		defer p.wg.Done()
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 		defer gasUpdateTicker.Stop()
 		defer tokenUpdateTicker.Stop()
 
@@ -156,11 +184,14 @@ func (p *priceService) run() {
 			select {
 			case <-p.backgroundCtx.Done():
 				return
+<<<<<<< HEAD
 			case <-cleanupTicker.C:
 				err := p.runCleanup(p.backgroundCtx)
 				if err != nil {
 					p.lggr.Errorw("Error when cleaning up in-db prices in the background", "err", err)
 				}
+=======
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 			case <-gasUpdateTicker.C:
 				err := p.runGasPriceUpdate(p.backgroundCtx)
 				if err != nil {
@@ -240,6 +271,7 @@ func (p *priceService) GetGasAndTokenPrices(ctx context.Context, destChainSelect
 	return gasPrices, tokenPrices, nil
 }
 
+<<<<<<< HEAD
 func (p *priceService) runCleanup(ctx context.Context) error {
 	eg := new(errgroup.Group)
 
@@ -262,6 +294,8 @@ func (p *priceService) runCleanup(ctx context.Context) error {
 	return eg.Wait()
 }
 
+=======
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 func (p *priceService) runGasPriceUpdate(ctx context.Context) error {
 	// Protect against concurrent updates of `gasPriceEstimator` and `destPriceRegistryReader`
 	// Price updates happen infrequently - once every `gasPriceUpdateInterval` seconds.
@@ -446,28 +480,50 @@ func (p *priceService) observeTokenPriceUpdates(
 	return tokenPricesUSD, nil
 }
 
+<<<<<<< HEAD
 func (p *priceService) writeGasPricesToDB(ctx context.Context, sourceGasPriceUSD *big.Int) (err error) {
+=======
+func (p *priceService) writeGasPricesToDB(ctx context.Context, sourceGasPriceUSD *big.Int) error {
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 	if sourceGasPriceUSD == nil {
 		return nil
 	}
 
+<<<<<<< HEAD
 	return p.orm.InsertGasPricesForDestChain(ctx, p.destChainSelector, p.jobId, []cciporm.GasPriceUpdate{
+=======
+	_, err := p.orm.UpsertGasPricesForDestChain(ctx, p.destChainSelector, []cciporm.GasPrice{
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 		{
 			SourceChainSelector: p.sourceChainSelector,
 			GasPrice:            assets.NewWei(sourceGasPriceUSD),
 		},
 	})
+<<<<<<< HEAD
 }
 
 func (p *priceService) writeTokenPricesToDB(ctx context.Context, tokenPricesUSD map[cciptypes.Address]*big.Int) (err error) {
+=======
+	return err
+}
+
+func (p *priceService) writeTokenPricesToDB(ctx context.Context, tokenPricesUSD map[cciptypes.Address]*big.Int) error {
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 	if tokenPricesUSD == nil {
 		return nil
 	}
 
+<<<<<<< HEAD
 	var tokenPrices []cciporm.TokenPriceUpdate
 
 	for token, price := range tokenPricesUSD {
 		tokenPrices = append(tokenPrices, cciporm.TokenPriceUpdate{
+=======
+	var tokenPrices []cciporm.TokenPrice
+
+	for token, price := range tokenPricesUSD {
+		tokenPrices = append(tokenPrices, cciporm.TokenPrice{
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 			TokenAddr:  string(token),
 			TokenPrice: assets.NewWei(price),
 		})
@@ -478,7 +534,12 @@ func (p *priceService) writeTokenPricesToDB(ctx context.Context, tokenPricesUSD 
 		return tokenPrices[i].TokenAddr < tokenPrices[j].TokenAddr
 	})
 
+<<<<<<< HEAD
 	return p.orm.InsertTokenPricesForDestChain(ctx, p.destChainSelector, p.jobId, tokenPrices)
+=======
+	_, err := p.orm.UpsertTokenPricesForDestChain(ctx, p.destChainSelector, tokenPrices, p.tokenUpdateInterval)
+	return err
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 }
 
 // Input price is USD per full token, with 18 decimal precision

@@ -3,7 +3,11 @@ name: Chain Selectors Version Check
 on:
   push:
     branches:
+<<<<<<< HEAD
       - ccip-develop
+=======
+      - develop
+>>>>>>> upstream-release-2.15.0/release/2.15.0
       - release/*
     tags:
       - v*

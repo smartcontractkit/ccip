@@ -108,6 +108,7 @@ type Service interface {
 	RejectSpec(ctx context.Context, id int64) error
 	UpdateSpecDefinition(ctx context.Context, id int64, spec string) error
 
+	// Unsafe_SetConnectionsManager Only for testing
 	Unsafe_SetConnectionsManager(ConnectionsManager)
 }
 
@@ -208,7 +209,7 @@ func (s *service) RegisterManager(ctx context.Context, params RegisterManagerPar
 		var txerr error
 
 		id, txerr = tx.CreateManager(ctx, &mgr)
-		if err != nil {
+		if txerr != nil {
 			return txerr
 		}
 
@@ -218,6 +219,9 @@ func (s *service) RegisterManager(ctx context.Context, params RegisterManagerPar
 
 		return nil
 	})
+	if err != nil {
+		return 0, err
+	}
 
 	privkey, err := s.getCSAPrivateKey()
 	if err != nil {
@@ -1107,6 +1111,16 @@ func (s *service) observeJobProposalCounts(ctx context.Context) error {
 	return nil
 }
 
+// Unsafe_SetConnectionsManager sets the ConnectionsManager on the service.
+//
+// We need to be able to inject a mock for the client to facilitate integration
+// tests.
+//
+// ONLY TO BE USED FOR TESTING.
+func (s *service) Unsafe_SetConnectionsManager(connMgr ConnectionsManager) {
+	s.connMgr = connMgr
+}
+
 // findExistingJobForOCR2 looks for existing job for OCR2
 func findExistingJobForOCR2(ctx context.Context, j *job.Job, tx job.ORM) (int32, error) {
 	var contractID string
@@ -1128,16 +1142,6 @@ func findExistingJobForOCR2(ctx context.Context, j *job.Job, tx job.ORM) (int32,
 	}
 
 	return tx.FindOCR2JobIDByAddress(ctx, contractID, feedID)
-}
-
-// Unsafe_SetConnectionsManager sets the ConnectionsManager on the service.
-//
-// We need to be able to inject a mock for the client to facilitate integration
-// tests.
-//
-// ONLY TO BE USED FOR TESTING.
-func (s *service) Unsafe_SetConnectionsManager(connMgr ConnectionsManager) {
-	s.connMgr = connMgr
 }
 
 // findExistingJobForOCRFlux looks for existing job for OCR or flux

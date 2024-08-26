@@ -52,7 +52,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 juelsPerFeeCoinSource = """
 ds1          [type=bridge name=voter_turnout];
@@ -108,7 +107,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 juelsPerFeeCoinSource = """
 ds1          [type=bridge name=voter_turnout];
@@ -153,7 +151,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
@@ -177,7 +174,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
@@ -203,7 +199,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
@@ -229,7 +224,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
@@ -256,7 +250,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
@@ -282,7 +275,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
@@ -306,7 +298,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
@@ -347,7 +338,6 @@ answer1      [type=median index=0];
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 juelsPerFeeCoinSource = """
 ds1          [type=bridge name=voter_turnout];
@@ -386,7 +376,6 @@ answer1      [type=median index=0];
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 juelsPerFeeCoinSource = """
 ->
@@ -418,7 +407,6 @@ answer1      [type=median index=0];
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 juelsPerFeeCoinSource = """
 ds1          [type=bridge name=voter_turnout];
@@ -430,46 +418,6 @@ chainID = 1337
 				t.Log("relay", os.OCR2OracleSpec.Relay)
 				require.Error(t, err)
 				require.Contains(t, err.Error(), "no such relay blerg supported")
-			},
-		},
-		{
-			name: "Generic public onchain signing strategy with no public key",
-			toml: `
-type               = "offchainreporting2"
-pluginType         = "plugin"
-schemaVersion      = 1
-relay              = "evm"
-contractID         = "0x613a38AC1659769640aaE063C651F48E0250454C"
-p2pPeerID          = "12D3KooWHfYFQ8hGttAYbMCevQVESEQhzJAqFZokMVtom8bNxwGq"
-p2pv2Bootstrappers = [
-"12D3KooWHfYFQ8hGttAYbMCevQVESEQhzJAqFZokMVtom8bNxwGq@127.0.0.1:5001",
-]
-ocrKeyBundleID     = "73e8966a78ca09bb912e9565cfb79fbe8a6048fab1f0cf49b18047c3895e0447"
-monitoringEndpoint = "chain.link:4321"
-transmitterID = "0xF67D0290337bca0847005C7ffD1BC75BA9AAE6e4"
-observationTimeout = "10s"
-observationSource  = """
-ds1          [type=bridge name=voter_turnout];
-ds1_parse    [type=jsonparse path="one,two"];
-ds1_multiply [type=multiply times=1.23];
-ds1 -> ds1_parse -> ds1_multiply -> answer1;
-answer1      [type=median index=0];
-"""
-[relayConfig]
-chainID = 1337
-[onchainSigningStrategy]
-strategyName = "single-chain"
-[onchainSigningStrategy.config]
-evm = ""
-publicKey = ""
-[pluginConfig]
-pluginName = "median"
-telemetryType = "median"
-OCRVersion=2
-`,
-			assertion: func(t *testing.T, os job.Job, err error) {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), "must provide public key for the onchain signing strategy")
 			},
 		},
 		{
@@ -778,7 +726,6 @@ chainID = 4
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 
 [pluginConfig]
 `,
@@ -810,7 +757,6 @@ chainID = 4
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 
 [pluginConfig]
 PluginName="some random name"
@@ -844,7 +790,6 @@ chainID = 4
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 
 [pluginConfig]
 PluginName="some random name"
@@ -879,7 +824,6 @@ chainID = 4
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 
 [pluginConfig]
 PluginName="some random name"
@@ -997,7 +941,6 @@ func TestOCR2OnchainSigningStrategy_Unmarshal(t *testing.T) {
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = "08d14c6eed757414d72055d28de6caf06535806c6a14e450f3a2f1c854420e17"
-publicKey = "0x1234567890123456789012345678901234567890"
 `
 	oss := &envelope2{}
 	tree, err := toml.Load(payload)
@@ -1010,12 +953,9 @@ publicKey = "0x1234567890123456789012345678901234567890"
 	err = json.Unmarshal(b, oss)
 	require.NoError(t, err)
 
-	pk, err := oss.OnchainSigningStrategy.PublicKey()
-	require.NoError(t, err)
 	kbID, err := oss.OnchainSigningStrategy.KeyBundleID("evm")
 	require.NoError(t, err)
 
 	assert.False(t, oss.OnchainSigningStrategy.IsMultiChain())
-	assert.Equal(t, "0x1234567890123456789012345678901234567890", pk)
 	assert.Equal(t, "08d14c6eed757414d72055d28de6caf06535806c6a14e450f3a2f1c854420e17", kbID)
 }

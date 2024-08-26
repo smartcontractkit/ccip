@@ -368,7 +368,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
           revert SourceTokenDataTooLarge(tokenAndAmount.token);
         }
       }
-
       // We validate the token address to ensure it is a valid EVM address
       Internal._validateEVMAddress(poolReturnData.destTokenAddress);
 

@@ -3,19 +3,31 @@ on:
   workflow_run:
     workflows: [ CCIP Load Test ]
     types: [ completed ]
+<<<<<<< HEAD
     branches: [ ccip-develop ]
   workflow_dispatch:
 
 
 
+=======
+    branches: [ develop ]
+  workflow_dispatch:
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 # Only run 1 of this workflow at a time per PR
 concurrency:
   group: chaos-ccip-tests-chainlink-${{ github.ref }}
   cancel-in-progress: true
 
 env:
+<<<<<<< HEAD
   CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:${{ github.sha }}
+=======
+  # TODO: TT-1470 - Update image names as we solidify new realease strategy
+  CL_ECR: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
+  ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-tests:${{ github.sha }}
+>>>>>>> upstream-release-2.15.0/release/2.15.0
   MOD_CACHE_VERSION: 1
 
 jobs:
@@ -43,7 +55,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         with:
+<<<<<<< HEAD
           cl_repo: smartcontractkit/chainlink-ccip
+=======
+          cl_repo: smartcontractkit/chainlink
+>>>>>>> upstream-release-2.15.0/release/2.15.0
           cl_ref: ${{ github.sha }}
           push_tag: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink:${{ github.sha }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
@@ -123,6 +139,7 @@ jobs:
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
       - name: Prepare Base64 TOML override for CCIP secrets
         uses: ./.github/actions/setup-create-base64-config-ccip
+<<<<<<< HEAD
         with:
           runId: ${{ github.run_id }}
           testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
@@ -140,6 +157,22 @@ jobs:
           test_download_vendor_packages_command: make gomod
           cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
           cl_image_tag: ${{ github.sha }}
+=======
+        id: setup_create_base64_config_ccip
+        with:
+          runId: ${{ github.run_id }}
+          testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
+          chainlinkVersion: ${{ github.sha }}
+          logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
+      - name: Run Chaos Tests
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@d38226be720c5ccc1ff4d3cee40608ebf264cd59 # v2.3.26
+        env:
+          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
+          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
+        with:
+          test_command_to_run: cd ./integration-tests && go test -timeout 1h -count=1 -json -test.parallel 11 -run 'TestChaosCCIP' ./chaos 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci
+          test_download_vendor_packages_command: make gomod
+>>>>>>> upstream-release-2.15.0/release/2.15.0
           artifacts_location: ./integration-tests/chaos/logs
           publish_check_name: CCIP Chaos Test Results
           publish_report_paths: ./tests-chaos-report.xml
@@ -153,6 +186,16 @@ jobs:
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           cache_key_id: ccip-load-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "true"
+<<<<<<< HEAD
+=======
+          DEFAULT_LOKI_TENANT_ID: ${{ vars.LOKI_TENANT_ID }}
+          DEFAULT_LOKI_ENDPOINT: ${{ secrets.LOKI_URL }}
+          DEFAULT_LOKI_BASIC_AUTH: ${{ secrets.LOKI_BASIC_AUTH }}
+          DEFAULT_CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
+          DEFAULT_GRAFANA_BASE_URL: ${{ vars.GRAFANA_URL }}
+          DEFAULT_GRAFANA_DASHBOARD_URL: "/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
       ## Notify in slack if the job fails
       - name: Notify Slack
         if: failure() && github.event_name != 'workflow_dispatch'
@@ -205,6 +248,7 @@ jobs:
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
       - name: Prepare Base64 TOML override for CCIP secrests
         uses: ./.github/actions/setup-create-base64-config-ccip
+<<<<<<< HEAD
         with:
           runId: ${{ github.run_id }}
           testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
@@ -222,6 +266,22 @@ jobs:
           test_download_vendor_packages_command: make gomod
           cl_repo: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
           cl_image_tag: ${{ github.sha }}
+=======
+        id: setup_create_base64_config_ccip
+        with:
+          runId: ${{ github.run_id }}
+          testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
+          chainlinkVersion: ${{ github.sha }}
+          logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
+      - name: Run Load With Chaos Tests
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@d38226be720c5ccc1ff4d3cee40608ebf264cd59 # v2.3.26
+        env:
+          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
+          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
+        with:
+          test_command_to_run: cd ./integration-tests/ccip-tests && go test -timeout 2h -count=1 -json -test.parallel 4 -run '^TestLoadCCIPStableWithPodChaosDiffCommitAndExec' ./load 2>&1 | tee /tmp/gotest.log | gotestfmt
+          test_download_vendor_packages_command: make gomod
+>>>>>>> upstream-release-2.15.0/release/2.15.0
           artifacts_location: ./integration-tests/load/logs
           publish_check_name: CCIP Chaos With Load Test Results
           publish_report_paths: ./tests-chaos-with-load-report.xml
@@ -235,6 +295,15 @@ jobs:
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           cache_key_id: ccip-load-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "true"
+<<<<<<< HEAD
+=======
+          DEFAULT_LOKI_TENANT_ID: ${{ vars.LOKI_TENANT_ID }}
+          DEFAULT_LOKI_ENDPOINT: ${{ secrets.LOKI_URL }}
+          DEFAULT_LOKI_BASIC_AUTH: ${{ secrets.LOKI_BASIC_AUTH }}
+          DEFAULT_CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
+          DEFAULT_GRAFANA_BASE_URL: ${{ vars.GRAFANA_URL }}
+          DEFAULT_GRAFANA_DASHBOARD_URL: "/d/6vjVx-1V8/ccip-long-running-tests"
+>>>>>>> upstream-release-2.15.0/release/2.15.0
       ## Notify in slack if the job fails
       - name: Notify Slack
         if: failure() && github.event_name != 'workflow_dispatch'
@@ -249,4 +318,8 @@ jobs:
         if: always()
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/cleanup@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
         with:
+<<<<<<< HEAD
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
+=======
+          triggered_by: ${{ env.TEST_TRIGGERED_BY }}
+>>>>>>> upstream-release-2.15.0/release/2.15.0

@@ -35,7 +35,6 @@ func Test_TelemetryReporter_NewHead(t *testing.T) {
 		},
 	}
 	requestBytes, err := proto.Marshal(&telem.HeadReportRequest{
-		ChainID: "100",
 		Latest: &telem.Block{
 			Timestamp: uint64(head.Timestamp.UTC().Unix()),
 			Number:    42,
@@ -71,7 +70,6 @@ func Test_TelemetryReporter_NewHeadMissingFinalized(t *testing.T) {
 		IsFinalized: false,
 	}
 	requestBytes, err := proto.Marshal(&telem.HeadReportRequest{
-		ChainID: "100",
 		Latest: &telem.Block{
 			Timestamp: uint64(head.Timestamp.UTC().Unix()),
 			Number:    42,

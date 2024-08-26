@@ -34,12 +34,17 @@ For example, if you want to override the `Network` input in test and want to run
         export BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -i ./testconfig/override/mainnet.toml)
         ```
 
+<<<<<<< HEAD
 3. Secrets - You also need to set some secrets. This is a mandatory step needed to run the tests. Please refer to [sample-secrets.toml](./testconfig/examples/secrets.toml.example) for the list of secrets that are mandatory to run the tests.
+=======
+3. Secrets - You also need to set some secrets. This is a mandatory step needed to run the tests. Please refer to [.testsecrets.example](./examples/.testsecrets.example) for the list of secrets and instruction how to set them up.
+>>>>>>> upstream-release-2.15.0/release/2.15.0
    - The chainlink image and tag are required secrets for all the tests.
    - If you are running tests in live networks like testnet and mainnet, you need to set the secrets (rpc urls and private keys) for the respective networks.
    - If you are running tests in simulated networks no network specific secrets are required.
    here is a sample secrets.toml file, for running the tests in simulated networks, with the chainlink image and tag set as secrets:
 
+<<<<<<< HEAD
    ```toml
    [CCIP]
    [CCIP.Env]
@@ -62,6 +67,13 @@ For example, if you want to override the `Network` input in test and want to run
 
 We recommend against changing the content of [sample-secrets.toml](./testconfig/examples/secrets.toml.example). Please create a new file and set it as the secrets file.
 You can run the command to ignore the changes to the file.
+=======
+**Please note that the secrets should NOT be checked in to the repo and should be kept locally.**
+
+We recommend against changing the content of [secrets.toml.example](./testconfig/examples/secrets.toml.example). Please create a new file and set it as the secrets file.
+
+You can run this command to ignore any changes to the file.
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 
 ```bash
 git update-index --skip-worktree <path-to-secrets-file>

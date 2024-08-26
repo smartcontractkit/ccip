@@ -1,5 +1,6 @@
 # CCIP Configuration
 
+<<<<<<< HEAD
 The CCIP configuration is used to specify the test configuration for running the CCIP integration tests. 
 The configuration is specified in a TOML file. The configuration is used to specify the test environment, test type, test parameters, and other necessary details for running the tests.
 The test config is read in following order:
@@ -16,6 +17,26 @@ The test config is read in following order:
 ## CCIP.ContractVersions
 Specifies contract versions of different contracts to be referred by test.
 Supported versions are:
+=======
+The CCIP configuration is used to specify the test configuration for running the CCIP integration tests.
+The configuration is specified in a TOML file. The configuration is used to specify the test environment, test type, test parameters, and other necessary details for running the tests.
+The test config is read in following order:
+
+- The test reads the default configuration from [ccip-default.toml](./tomls/ccip-default.toml).
+- The default can be overridden by specifying the test config in a separate file.
+  - The file content needs to be encoded in base64 format and set in `BASE64_CCIP_CONFIG_OVERRIDE` environment variable.
+  - The config mentioned in this file will override the default config.
+  - Example override file - [override.toml.example](./examples/override.toml.example)
+- If there are sensitive details like private keys, credentials in test config, they can be specified in a separate dotenv file as env vars
+  - The `~/.testsecrets` file in home directory is automatically loaded and should have all test secrets as env vars  
+  - Example secret file - [.testsecrets.example](./examples/.testsecrets.example)
+
+## CCIP.ContractVersions
+
+Specifies contract versions of different contracts to be referred by test.
+Supported versions are:
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 - **PriceRegistry**: '1.2.0', 'Latest'
 - **OffRamp**: '1.2.0', 'Latest'
 - **OnRamp**: '1.2.0', 'Latest'
@@ -23,6 +44,10 @@ Supported versions are:
 - **CommitStore**: '1.2.0', 'Latest'
 
 Example Usage:
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 ```toml
 [CCIP.ContractVersions]
 PriceRegistry = "1.2.0"
@@ -33,14 +58,27 @@ CommitStore = "1.2.0"
 ```
 
 ## CCIP.Deployments
+<<<<<<< HEAD
 CCIP Deployment contains all necessary contract addresses for various networks. This is mandatory if the test are to be run for [existing deployments](#ccipgroupstestgroupexistingdeployment) 
 The deployment data can be specified -
  - Under `CCIP.Deployments.Data` field with value as stringify format of json. 
  - Under `CCIP.Deployments.DataFile` field with value as the path of the file containing the deployment data in json format.
+=======
+
+CCIP Deployment contains all necessary contract addresses for various networks. This is mandatory if the test are to be run for [existing deployments](#ccipgroupstestgroupexistingdeployment)
+The deployment data can be specified -
+
+- Under `CCIP.Deployments.Data` field with value as stringify format of json.
+- Under `CCIP.Deployments.DataFile` field with value as the path of the file containing the deployment data in json format.
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 
 The json schema is specified in https://github.com/smartcontractkit/ccip/blob/ccip-develop/integration-tests/ccip-tests/contracts/laneconfig/parse_contracts.go#L96
 
 Example Usage:
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 ```toml
 [CCIP.Deployments]
 Data = """
@@ -96,21 +134,36 @@ Data = """
 }
 """
 ```
+<<<<<<< HEAD
 Or 
+=======
+
+Or,
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 ```toml
 [CCIP.Deployments]
 DataFile = '<path/to/deployment.json>'
 ```
 
+<<<<<<< HEAD
 ## CCIP.Env 
 Specifies the environment details for the test to be run on.
 Mandatory fields are:
+=======
+## CCIP.Env
+
+Specifies the environment details for the test to be run on.
+Mandatory fields are:
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 - **Networks**: [CCIP.Env.Networks](#ccipenvnetworks)
 - **NewCLCluster**: [CCIP.Env.NewCLCluster](#ccipenvnewclcluster) - This is mandatory if the test needs to deploy Chainlink nodes.
 - **ExistingCLCluster**: [CCIP.Env.ExistingCLCluster](#ccipenvexistingclcluster) - This is mandatory if the test needs to run on existing Chainlink nodes to deploy ccip jobs.
 
 Test needs network/chain details to be set through configuration. This configuration is mandatory for running the tests.
 you have option to set the network details in two ways:
+<<<<<<< HEAD
 1. Using [CCIP.Env.Networks](#ccipenvnetworks) 
 2. Using a separate network config file -
    * refer to the example - [network_config.toml.example](./examples/network_config.toml.example)
@@ -118,10 +171,25 @@ you have option to set the network details in two ways:
    * set the base64'ed string content in `BASE64_NETWORK_CONFIG` environment variable.
 
 ### CCIP.Env.Networks
+=======
+
+1. Using [CCIP.Env.Networks](#ccipenvnetworks)
+2. Using a separate network config file -
+   - refer to the example - [network_config.toml.example](./examples/network_config.toml.example)
+   - once all necessary values are set, encode the toml file content in base64 format,
+   - set the base64'ed string content in `BASE64_NETWORK_CONFIG` environment variable.
+
+### CCIP.Env.Networks
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 Specifies the network details for the test to be run.
 The NetworkConfig is imported from https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/network.go#L39
 
 #### CCIP.Env.Networks.selected_networks
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 It denotes the network names in which tests will be run. These networks are used to deploy ccip contracts and set up lanes between them.
 If more than 2 networks are specified, then lanes will be set up between all possible pairs of networks.
 
@@ -132,28 +200,52 @@ The name of the networks are taken from [known_networks](https://github.com/smar
 If the network is not present in known_networks, then the network details can be specified in the config file itself under the following `EVMNetworks` key.
 
 #### CCIP.Env.Network.EVMNetworks
+<<<<<<< HEAD
 Specifies the network config to be used while creating blockchain EVMClient for test. 
+=======
+
+Specifies the network config to be used while creating blockchain EVMClient for test.
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 It is a map of network name to EVMNetworks where key is network name specified under `CCIP.Env.Networks.selected_networks` and value is `EVMNetwork`. 
 The EVMNetwork is imported from [EVMNetwork](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/blockchain/config.go#L43) in chainlink-testing-framework.
 
 If `CCIP.Env.Network.EVMNetworks` config is not set for a network name specified under `CCIP.Env.Networks.selected_networks`, test will try to find the corresponding network config from defined networks in `MappedNetworks` under [known_networks.go](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/networks/known_networks.go)
 
 #### CCIP.Env.Network.AnvilConfigs
+<<<<<<< HEAD
 If the test needs to run on chains created using Anvil, then the AnvilConfigs can be specified. 
 It is a map of network name to `AnvilConfig` where key is network name specified under `CCIP.Env.Networks.selected_networks` and value is `AnvilConfig`. 
 The AnvilConfig is imported from [AnvilConfig](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/network.go#L20) in chainlink-testing-framework.
 
+=======
+
+If the test needs to run on chains created using Anvil, then the AnvilConfigs can be specified.
+It is a map of network name to `AnvilConfig` where key is network name specified under `CCIP.Env.Networks.selected_networks` and value is `AnvilConfig`.
+The AnvilConfig is imported from [AnvilConfig](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/network.go#L20) in chainlink-testing-framework.
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 
 **The following network configs are required for tests running on live networks. It can be ignored if the tests are running on simulated networks.**
 Refer to [secrets.toml.example](./examples/secrets.toml.example) for details.
 
 #### CCIP.ENV.Network.RpcHttpUrls
+<<<<<<< HEAD
 RpcHttpUrls is the RPC HTTP endpoints for each network, key is the network name as declared in selected_networks slice.
 
 #### CCIP.ENV.Network.RpcWsUrls
 RpcWsUrls is the RPC WS endpoints for each network, key is the network name as declared in selected_networks slice.
 
 #### CCIP.ENV.Network.WalletKeys
+=======
+
+RpcHttpUrls is the RPC HTTP endpoints for each network, key is the network name as declared in selected_networks slice.
+
+#### CCIP.ENV.Network.RpcWsUrls
+
+RpcWsUrls is the RPC WS endpoints for each network, key is the network name as declared in selected_networks slice.
+
+#### CCIP.ENV.Network.WalletKeys
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 WalletKeys is the private keys for each network, key is the network name as declared in selected_networks slice.
 
 Example Usage of Network Config:
@@ -202,6 +294,7 @@ block_time = 1
 ```
 
 ### CCIP.Env.NewCLCluster
+<<<<<<< HEAD
 The NewCLCluster config holds the overall deployment configuration for Chainlink nodes. 
 
 #### CCIP.Env.NewCLCluster.NoOfNodes
@@ -265,6 +358,97 @@ Specifies whether to enable Prometheus PostgreSQL exporter. This is valid only i
 Specifies the arguments to be passed to the database. This is valid only if the deployment is on Kubernetes.
 
 Example Usage:
+=======
+
+The NewCLCluster config holds the overall deployment configuration for Chainlink nodes.
+
+#### CCIP.Env.NewCLCluster.NoOfNodes
+
+Specifies the number of Chainlink nodes to be deployed.
+
+#### CCIP.Env.NewCLCluster.Common
+
+Specifies the common configuration for all Chainlink nodes if they share the same configuration.
+
+##### Name
+
+Name of the node.
+
+##### NeedsUpgrade
+
+Indicates if the node needs an upgrade during test.
+
+##### ChainlinkImage
+
+Configuration for the Chainlink image.
+
+##### ChainlinkUpgradeImage
+
+Configuration for the Chainlink upgrade image. It is used when the node needs an upgrade.
+
+##### BaseConfigTOML
+
+String containing the base configuration toml content for the Chainlink node config.
+
+##### CommonChainConfigTOML
+
+String containing the common chain configuration toml content for all EVMNodes in chainlink node config.
+
+##### ChainConfigTOMLByChain
+
+String containing the chain-specific configuration toml content for individual EVMNodes in chainlink node config. This is keyed by chain ID.
+
+##### DBImage
+
+Database image for the Chainlink node.
+
+##### DBTag
+
+Database tag/version for the Chainlink node.
+
+#### CCIP.Env.NewCLCluster.Nodes
+
+Specifies the configuration for individual nodes if they differ from the common configuration. The fields are the same as the common configuration.
+
+#### CCIP.Env.NewCLCluster.NodeMemory
+
+Specifies the memory to be allocated for each Chainlink node. This is valid only if the deployment is on Kubernetes.
+
+#### CCIP.Env.NewCLCluster.NodeCPU
+
+Specifies the CPU to be allocated for each Chainlink node. This is valid only if the deployment is on Kubernetes.
+
+#### CCIP.Env.NewCLCluster.DBMemory
+
+Specifies the memory to be allocated for the database. This is valid only if the deployment is on Kubernetes.
+
+#### CCIP.Env.NewCLCluster.DBCPU
+
+Specifies the CPU to be allocated for the database. This is valid only if the deployment is on Kubernetes.
+
+#### CCIP.Env.NewCLCluster.IsStateful
+
+Specifies whether the deployment is StatefulSet on Kubernetes.
+
+#### CCIP.Env.NewCLCluster.DBStorageClass
+
+Specifies the storage class for the database. This is valid only if the deployment is StatefulSet on Kubernetes.
+
+#### CCIP.Env.NewCLCluster.DBCapacity
+
+Specifies the capacity of the database. This is valid only if the deployment is StatefulSet on Kubernetes.
+
+#### CCIP.Env.NewCLCluster.PromPgExporter
+
+Specifies whether to enable Prometheus PostgreSQL exporter. This is valid only if the deployment is on Kubernetes.
+
+#### CCIP.Env.NewCLCluster.DBArgs
+
+Specifies the arguments to be passed to the database. This is valid only if the deployment is on Kubernetes.
+
+Example Usage:
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 ```toml
 [CCIP.Env.NewCLCluster]
 NoOfNodes = 17
@@ -294,6 +478,7 @@ FeeCapDefault = '200 gwei'
 ```
 
 ### CCIP.Env.ExistingCLCluster
+<<<<<<< HEAD
 The ExistingCLCluster config holds the overall connection configuration for existing Chainlink nodes. 
 It is needed when the tests are to be run on Chainlink nodes already deployed on some environment. 
 If this is specified, test will not need to connect to k8 namespace using [CCIP.Env.EnvToConnect](#ccipenvenvtoconnect) . 
@@ -317,6 +502,44 @@ The password of the Chainlink node credential.
 The internal IP of the Chainlink node.
 
 Example Usage:
+=======
+
+The ExistingCLCluster config holds the overall connection configuration for existing Chainlink nodes.
+It is needed when the tests are to be run on Chainlink nodes already deployed on some environment.
+If this is specified, test will not need to connect to k8 namespace using [CCIP.Env.EnvToConnect](#ccipenvenvtoconnect).
+Test can directly connect to the existing Chainlink nodes using node credentials without knowing the k8 namespace details.
+
+#### CCIP.Env.ExistingCLCluster.Name
+
+Specifies the name of the existing Chainlink cluster. This is used to identify the cluster in the test.
+
+#### CCIP.Env.ExistingCLCluster.NoOfNodes
+
+Specifies the number of Chainlink nodes in the existing cluster.
+
+#### CCIP.Env.ExistingCLCluster.NodeConfigs
+
+Specifies the configuration for individual nodes in the existing cluster. Each node config contains the following fields to connect to the Chainlink node:
+
+##### CCIP.Env.ExistingCLCluster.NodeConfigs.URL
+
+The URL of the Chainlink node.
+
+##### CCIP.Env.ExistingCLCluster.NodeConfigs.Email
+
+The username/email of the Chainlink node credential.
+
+##### CCIP.Env.ExistingCLCluster.NodeConfigs.Password
+
+The password of the Chainlink node credential.
+
+##### CCIP.Env.ExistingCLCluster.NodeConfigs.InternalIP
+
+The internal IP of the Chainlink node.
+
+Example Usage:
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 ```toml
 [CCIP.Env.ExistingCLCluster]
 Name = 'crib-sample'
@@ -355,23 +578,46 @@ InternalIP = 'app-node-5'
 ```
 
 ### CCIP.Env.EnvToConnect
+<<<<<<< HEAD
 This is specified when the test needs to connect to already existing k8s namespace. User needs to have access to the k8 namespace to run the tests through specific kubeconfig file.
 Example usage:
+=======
+
+This is specified when the test needs to connect to already existing k8s namespace. User needs to have access to the k8 namespace to run the tests through specific kubeconfig file.
+Example usage:
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 ```toml
 [CCIP.Env]
 EnvToConnect="load-ccip-c8972"
 ```
+<<<<<<< HEAD
 ### CCIP.ENV.TTL
 Specifies the time to live for the k8 namespace. This is used to terminate the namespace after the tests are run. This is only valid if the tests are run on k8s.
 Example usage:
+=======
+
+### CCIP.ENV.TTL
+
+Specifies the time to live for the k8 namespace. This is used to terminate the namespace after the tests are run. This is only valid if the tests are run on k8s.
+Example usage:
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 ```toml
 [CCIP.Env]
 TTL = "11h"
 ```
 
 ### CCIP.Env.Logging
+<<<<<<< HEAD
 Specifies the logging configuration for the test. Imported from [LoggingConfig](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/logging.go#L11) in chainlink-testing-framework.
 Example usage:
+=======
+
+Specifies the logging configuration for the test. Imported from [LoggingConfig](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/logging.go#L11) in chainlink-testing-framework.
+Example usage:
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 ```toml
 [CCIP.Env.Logging]
 test_log_collect = false # if set to true will save logs even if test did not fail
@@ -394,15 +640,26 @@ dashboard_url = "/d/6vjVx-1V8/ccip-long-running-tests"
 ```
 
 ### CCIP.Env.Lane.LeaderLaneEnabled
+<<<<<<< HEAD
 Specifies whether to enable the leader lane feature. This setting is only applicable for new deployments.
 
 ## CCIP.Groups
 Specifies the test config specific to each test type. Available test types are:
+=======
+
+Specifies whether to enable the leader lane feature. This setting is only applicable for new deployments.
+
+## CCIP.Groups
+
+Specifies the test config specific to each test type. Available test types are:
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 - **CCIP.Groups.load**
 - **CCIP.Groups.smoke**
 - **CCIP.Groups.chaos**
 
 ### CCIP.Groups.[testgroup].KeepEnvAlive
+<<<<<<< HEAD
 Specifies whether to keep the k8 namespace alive after the test is run. This is only valid if the tests are run on k8s.
 
 ### CCIP.Groups.[testgroup].BiDirectionalLane
@@ -412,11 +669,27 @@ Specifies whether to set up bi-directional lanes between networks.
 Specifies whether commit and execution jobs are to be run on the same Chainlink node.
 
 ### CCIP.Groups.[testgroup].NoOfCommitNodes
+=======
+
+Specifies whether to keep the k8 namespace alive after the test is run. This is only valid if the tests are run on k8s.
+
+### CCIP.Groups.[testgroup].BiDirectionalLane
+
+Specifies whether to set up bi-directional lanes between networks.
+
+### CCIP.Groups.[testgroup].CommitAndExecuteOnSameDON
+
+Specifies whether commit and execution jobs are to be run on the same Chainlink node.
+
+### CCIP.Groups.[testgroup].NoOfCommitNodes
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 Specifies the number of nodes on which commit jobs are to be run. This needs to be lesser than the total number of nodes mentioned in [CCIP.Env.NewCLCluster.NoOfNodes](#ccipenvnewclclusternoofnodes) or [CCIP.Env.ExistingCLCluster.NoOfNodes](#ccipenvexistingclclusternoofnodes).
 If the value of total nodes is `n`, then the max value of NoOfCommitNodes should be less than `n-1`. As the first node is used for bootstrap job.
 If the NoOfCommitNodes is lesser than `n-1`, then the remaining nodes are used for execution jobs if `CCIP.Groups.[testgroup].CommitAndExecuteOnSameDON` is set to false.
 
 ### CCIP.Groups.[testgroup].TokenConfig
+<<<<<<< HEAD
 Specifies the token configuration for the test. The token configuration is used to set up tokens and token pools for all chains.
 
 #### CCIP.Groups.[testgroup].TokenConfig.NoOfTokensPerChain
@@ -435,12 +708,44 @@ Specifies the number of tokens to be set up with dynamic price update. The rest 
 Specifies the interval for dynamic price update for tokens. This is only valid if [NoOfTokensWithDynamicPrice](#ccipgroupstestgrouptokenconfignooftokenswithdynamicprice) is set to value greater tha zero.
 
 #### CCIP.Groups.[testgroup].TokenConfig.CCIPOwnerTokens
+=======
+
+Specifies the token configuration for the test. The token configuration is used to set up tokens and token pools for all chains.
+
+#### CCIP.Groups.[testgroup].TokenConfig.NoOfTokensPerChain
+
+Specifies the number of tokens to be set up for each chain.
+
+#### CCIP.Groups.[testgroup].TokenConfig.WithPipeline
+
+Specifies whether to set up token pipelines in commit jobspec. If set to false, the token prices will be set with DynamicPriceGetterConfig.
+
+#### CCIP.Groups.[testgroup].TokenConfig.TimeoutForPriceUpdate
+
+Specifies the timeout to wait for token and gas price updates to be available in price registry for each chain.
+
+#### CCIP.Groups.[testgroup].TokenConfig.NoOfTokensWithDynamicPrice
+
+Specifies the number of tokens to be set up with dynamic price update. The rest of the tokens will be set up with static price. This is only valid if [WithPipeline](#ccipgroupstestgrouptokenconfigwithpipeline) is set to false.
+
+#### CCIP.Groups.[testgroup].TokenConfig.DynamicPriceUpdateInterval
+
+Specifies the interval for dynamic price update for tokens. This is only valid if [NoOfTokensWithDynamicPrice](#ccipgroupstestgrouptokenconfignooftokenswithdynamicprice) is set to value greater tha zero.
+
+#### CCIP.Groups.[testgroup].TokenConfig.CCIPOwnerTokens
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 Specifies the tokens to be owned by the CCIP owner. If this is false, the tokens and pools will be owned by an address other than rest of CCIP contract admin addresses.
 This is applicable only if the contract versions are '1.5' or higher.
 
 Example Usage:
+<<<<<<< HEAD
 ```toml
 
+=======
+
+```toml
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 [CCIP.Groups.load.TokenConfig]
 TimeoutForPriceUpdate = '15m'
 NoOfTokensPerChain = 60
@@ -450,27 +755,57 @@ CCIPOwnerTokens = true
 ```
 
 ### CCIP.Groups.[testgroup].MsgDetails
+<<<<<<< HEAD
 Specifies the ccip message details to be sent by the test. 
 #### CCIP.Groups.[testgroup].MsgDetails.MsgType
 Specifies the type of message to be sent. The supported message types are:
+=======
+
+Specifies the ccip message details to be sent by the test.
+
+#### CCIP.Groups.[testgroup].MsgDetails.MsgType
+
+Specifies the type of message to be sent. The supported message types are:
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 - **Token**
 - **Data**
 - **DataWithToken**
 
 #### CCIP.Groups.[testgroup].MsgDetails.DestGasLimit
+<<<<<<< HEAD
 Specifies the gas limit for the destination chain. This is used to in `ExtraArgs` field of CCIPMessage. Change this to 0, if you are doing ccip-send to an EOA in the destination chain.
 
 #### CCIP.Groups.[testgroup].MsgDetails.DataLength
 Specifies the length of data to be sent in the message. This is only valid if [MsgType](#ccipgroupstestgroupmsgdetailsmsgtype) is set to 'Data' or 'DataWithToken'.
 
 #### CCIP.Groups.[testgroup].MsgDetails.NoOfTokens
+=======
+
+Specifies the gas limit for the destination chain. This is used to in `ExtraArgs` field of CCIPMessage. Change this to 0, if you are doing ccip-send to an EOA in the destination chain.
+
+#### CCIP.Groups.[testgroup].MsgDetails.DataLength
+
+Specifies the length of data to be sent in the message. This is only valid if [MsgType](#ccipgroupstestgroupmsgdetailsmsgtype) is set to 'Data' or 'DataWithToken'.
+
+#### CCIP.Groups.[testgroup].MsgDetails.NoOfTokens
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 Specifies the number of tokens to be sent in the message. This is only valid if [MsgType](#ccipgroupstestgroupmsgdetailsmsgtype) is set to 'Token' or 'DataWithToken'.
 It needs to be less than or equal to [NoOfTokensPerChain](#ccipgroupstestgrouptokenconfignooftokensperchain) specified in the test config.
 
 #### CCIP.Groups.[testgroup].MsgDetails.TokenAmount
+<<<<<<< HEAD
 Specifies the amount for each token to be sent in the message. This is only valid if [MsgType](#ccipgroupstestgroupmsgdetailsmsgtype) is set to 'Token' or 'DataWithToken'.
 
 Example Usage:
+=======
+
+Specifies the amount for each token to be sent in the message. This is only valid if [MsgType](#ccipgroupstestgroupmsgdetailsmsgtype) is set to 'Token' or 'DataWithToken'.
+
+Example Usage:
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 ```toml
 [CCIP.Groups.smoke.MsgDetails]
 MsgType = 'DataWithToken' 
@@ -481,6 +816,7 @@ AmountPerToken = 1
 ```
 
 ### CCIP.Groups.[testgroup].MulticallInOneTx
+<<<<<<< HEAD
 Specifies whether to send multiple ccip messages in a single transaction.
 
 ### CCIP.Groups.[testgroup].NoOfSendsInMulticall
@@ -490,6 +826,21 @@ Specifies the number of ccip messages to be sent in a single transaction. This i
 The test validates various events in a ccip request lifecycle, like commit, execute, etc. This field specifies the timeout for each phase in the lifecycle.
 The timeout is calculated from the time the previous phase event is received.
 The following contract events are validated:
+=======
+
+Specifies whether to send multiple ccip messages in a single transaction.
+
+### CCIP.Groups.[testgroup].NoOfSendsInMulticall
+
+Specifies the number of ccip messages to be sent in a single transaction. This is only valid if [MulticallInOneTx](#ccipgroupstestgroupmulticallinonetx) is set to true.
+
+### CCIP.Groups.[testgroup].PhaseTimeout
+
+The test validates various events in a ccip request lifecycle, like commit, execute, etc. This field specifies the timeout for each phase in the lifecycle.
+The timeout is calculated from the time the previous phase event is received.
+The following contract events are validated:
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 - **CCIPSendRequested on OnRamp**
 - **CCIPSendRequested event log to be Finalized**
 - **ReportAccepted on CommitStore**
@@ -497,13 +848,25 @@ The following contract events are validated:
 - **ExecutionStateChanged on OffRamp**
 
 ### CCIP.Groups.[testgroup].LocalCluster
+<<<<<<< HEAD
 Specifies whether the test is to be run on a local docker. If set to true, the test environment will be set up on a local docker.
 
 ### CCIP.Groups.[testgroup].ExistingDeployment
+=======
+
+Specifies whether the test is to be run on a local docker. If set to true, the test environment will be set up on a local docker.
+
+### CCIP.Groups.[testgroup].ExistingDeployment
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 Specifies whether the test is to be run on existing deployments. If set to true, the test will use the deployment data specified in [CCIP.Deployments](#ccipdeployments) for interacting with the ccip contracts.
 If the deployment data does not contain the required contract addresses, the test will fail.
 
 ### CCIP.Groups.[testgroup].ReuseContracts
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 Test loads contract/lane config from [contracts.json](../contracts/laneconfig/contracts.json) if no lane config is specified in [CCIP.Deployments](#ccipdeployments)
 If a certain contract is present in the contracts.json, the test will use the contract address from the contracts.json.
 This field specifies whether to reuse the contracts from [contracts.json](../contracts/laneconfig/contracts.json)
@@ -511,34 +874,64 @@ For example if the contracts.json contains the contract address for PriceRegistr
 If `ReuseContracts` is set to false, the test will redeploy the contract instead of using the contract address from contracts.json.
 
 ### CCIP.Groups.[testgroup].NodeFunding
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 Specified the native token funding for each Chainlink node. It assumes that the native token decimals is 18.
 The funding is done by the private key specified in [CCIP.Env.Networks](#ccipenvnetworks) for each network.
 The funding is done only if the test is run on local docker or k8s. This is not applicable for [existing deployments](#ccipgroupstestgroupexistingdeployment) is set to true.
 
 ### CCIP.Groups.[testgroup].NetworkPairs
+<<<<<<< HEAD
 Specifies the network pairs for which the test is to be run. The test will set up lanes only between the specified network pairs. 
 If the network pairs are not specified, the test will set up lanes between all possible pairs of networks mentioned in selected_networks in [CCIP.Env.Networks](#ccipenvnetworksselectednetworks)
 
 ### CCIP.Groups.[testgroup].NoOfNetworks
 Specifies the number of networks to be used for the test. 
 If the number of networks is greater than the total number of networks specified in [CCIP.Env.Networks.selected_networks](#ccipenvnetworksselectednetworks) :
+=======
+
+Specifies the network pairs for which the test is to be run. The test will set up lanes only between the specified network pairs.
+If the network pairs are not specified, the test will set up lanes between all possible pairs of networks mentioned in selected_networks in [CCIP.Env.Networks](#ccipenvnetworksselectednetworks)
+
+### CCIP.Groups.[testgroup].NoOfNetworks
+
+Specifies the number of networks to be used for the test.
+If the number of networks is greater than the total number of networks specified in [CCIP.Env.Networks.selected_networks](#ccipenvnetworksselectednetworks):
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 - the test will fail if the networks are live networks.
 - the test will create equal number of replicas of the first network with a new chain id if the networks are simulated networks. 
   For example, if the `selected_networks` is ['SIMULATED_1','SIMULATED_2'] and `NoOfNetworks` is 3, the test will create 1 more network config by copying the network config of `SIMULATED_1` with a different chain id and use that as 3rd network.
 
 ### CCIP.Groups.[testgroup].NoOfRoutersPerPair
+<<<<<<< HEAD
 Specifies the number of routers to be set up for each network.
 
 ### CCIP.Groups.[testgroup].MaxNoOfLanes
+=======
+
+Specifies the number of routers to be set up for each network.
+
+### CCIP.Groups.[testgroup].MaxNoOfLanes
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 Specifies the maximum number of lanes to be set up between networks. If this values is not set, the test will set up lanes between all possible pairs of networks mentioned in `selected_networks` in [CCIP.Env.Networks](#ccipenvnetworksselectednetworks).
 For example, if `selected_networks = ['SIMULATED_1', 'SIMULATED_2', 'SIMULATED_3']`, and `MaxNoOfLanes` is set to 2, it denotes that the test will randomly select the 2 lanes between all possible pairs `SIMULATED_1`, `SIMULATED_2`, and `SIMULATED_3` for the test run.
 
 ### CCIP.Groups.[testgroup].DenselyConnectedNetworkChainIds
+<<<<<<< HEAD
 This is applicable only if [MaxNoOfLanes](#ccipgroupstestgroupmaxnooflanes) is specified. 
+=======
+
+This is applicable only if [MaxNoOfLanes](#ccipgroupstestgroupmaxnooflanes) is specified.
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 Specifies the chain ids for networks to be densely connected. If this is provided the test will include all possible pairs of networks mentioned in `DenselyConnectedNetworkChainIds`.
 The rest of the networks will be connected randomly based on the value of `MaxNoOfLanes`.
 
 ### CCIP.Groups.[testgroup].ChaosDuration
+<<<<<<< HEAD
 Specifies the duration for which the chaos experiment is to be run. This is only valid if the test type is 'chaos'.
 
 ### CCIP.Groups.[testgroup].USDCMockDeployment
@@ -557,12 +950,44 @@ Specifies the value for the `InflightExpiry` in commit job's offchain config. Th
 ### CCIP.Groups.[testgroup].OffRampConfig
 Specifies the offramp configuration for the execution job. This is only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
 This is used to set values for following fields in execution jobspec's offchain and onchain config:
+=======
+
+Specifies the duration for which the chaos experiment is to be run. This is only valid if the test type is 'chaos'.
+
+### CCIP.Groups.[testgroup].USDCMockDeployment
+
+Specifies whether to deploy USDC mock contract for the test. This is only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
+
+The following fields are used for various parameters in OCR2 commit and execution jobspecs. All of these are only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
+
+### CCIP.Groups.[testgroup].CommitOCRParams
+
+Specifies the OCR parameters for the commit job. This is only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
+
+### CCIP.Groups.[testgroup].ExecuteOCRParams
+
+Specifies the OCR parameters for the execute job. This is only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
+
+### CCIP.Groups.[testgroup].CommitInflightExpiry
+
+Specifies the value for the `InflightExpiry` in commit job's offchain config. This is only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
+
+### CCIP.Groups.[testgroup].OffRampConfig
+
+Specifies the offramp configuration for the execution job. This is only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
+This is used to set values for following fields in execution jobspec's offchain and onchain config:
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 - **OffRampConfig.MaxDataBytes**
 - **OffRampConfig.BatchGasLimit**
 - **OffRampConfig.InflightExpiry**
 - **OffRampConfig.RootSnooze**
 
 Example Usage:
+<<<<<<< HEAD
+=======
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 ```toml
 [CCIP.Groups.load]
 CommitInflightExpiry = '5m'
@@ -594,6 +1019,7 @@ BatchGasLimit = 11000000
 MaxDataBytes = 1000
 InflightExpiry = '5m'
 RootSnooze = '5m'
+<<<<<<< HEAD
 
 ```
 
@@ -602,10 +1028,22 @@ This is only valid if the tests are run on remote runners in k8s. If set to true
 
 ### CCIP.Groups.[testgroup].LoadProfile
 Specifies the load profile for the test. Only valid if the testgroup is 'load'. 
+=======
+```
+
+### CCIP.Groups.[testgroup].StoreLaneConfig
+
+This is only valid if the tests are run on remote runners in k8s. If set to true, the test will store the lane config in the remote runner.
+
+### CCIP.Groups.[testgroup].LoadProfile
+
+Specifies the load profile for the test. Only valid if the testgroup is 'load'.
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 
 ### CCIP.Groups.[testgroup].LoadProfile.LoadFrequency.[DestNetworkName]
 
 #### CCIP.Groups.[testgroup].LoadProfile.RequestPerUnitTime
+<<<<<<< HEAD
 Specifies the number of requests to be sent per unit time. This is applicable to all networks if [LoadFrequency](#ccipgroupstestgrouploadprofileloadfrequencydestnetworkname) is not specified for a destination network.
 
 #### CCIP.Groups.[testgroup].LoadProfile.TimeUnit
@@ -624,13 +1062,48 @@ Specifies the duration network delay used for `NetworkChaos` experiment. This is
 If there are multiple chaos experiments, this specifies the duration to wait between each chaos experiment. This is only valid if the test is run on k8s and not on [existing deployments](#ccipgroupstestgroupexistingdeployment).
 
 #### CCIP.Groups.[testgroup].LoadProfile.SkipRequestIfAnotherRequestTriggeredWithin
+=======
+
+Specifies the number of requests to be sent per unit time. This is applicable to all networks if [LoadFrequency](#ccipgroupstestgrouploadprofileloadfrequencydestnetworkname) is not specified for a destination network.
+
+#### CCIP.Groups.[testgroup].LoadProfile.TimeUnit
+
+Specifies the unit of time for the load profile. This is applicable to all networks if [LoadFrequency](#ccipgroupstestgrouploadprofileloadfrequencydestnetworkname) is not specified for a destination network.
+
+#### CCIP.Groups.[testgroup].LoadProfile.StepDuration
+
+Specifies the duration for each step in the load profile. This is applicable to all networks if [LoadFrequency](#ccipgroupstestgrouploadprofileloadfrequencydestnetworkname) is not specified for a destination network.
+
+#### CCIP.Groups.[testgroup].LoadProfile.TestDuration
+
+Specifies the total duration for the load test.
+
+#### CCIP.Groups.[testgroup].LoadProfile.NetworkChaosDelay
+
+Specifies the duration network delay used for `NetworkChaos` experiment. This is only valid if the test is run on k8s and not on [existing deployments](#ccipgroupstestgroupexistingdeployment).
+
+#### CCIP.Groups.[testgroup].LoadProfile.WaitBetweenChaosDuringLoad
+
+If there are multiple chaos experiments, this specifies the duration to wait between each chaos experiment. This is only valid if the test is run on k8s and not on [existing deployments](#ccipgroupstestgroupexistingdeployment).
+
+#### CCIP.Groups.[testgroup].LoadProfile.SkipRequestIfAnotherRequestTriggeredWithin
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 If a request is triggered within this duration, the test will skip sending another request during load run. For Example, if `SkipRequestIfAnotherRequestTriggeredWithin` is set to `40m`, and a request is triggered at 0th second, the test will skip sending another request for another 40m.
 This particular field is used to avoid sending multiple requests in a short duration during load run.
 
 #### CCIP.Groups.[testgroup].LoadProfile.OptimizeSpace
+<<<<<<< HEAD
 This is used internally to optimize memory usage during load run. If set to true, after the initial lane set up is over the test will discard the lane config to save memory. 
 The test will only store contract addresses strictly necessary to trigger/validate ccip-send requests. 
 Except for following contracts all other contract addresses will be discarded after the initial lane set up -
+=======
+
+This is used internally to optimize memory usage during load run. If set to true, after the initial lane set up is over the test will discard the lane config to save memory.
+The test will only store contract addresses strictly necessary to trigger/validate ccip-send requests.
+Except for following contracts all other contract addresses will be discarded after the initial lane set up -
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 - Router
 - ARM
 - CommitStore
@@ -638,6 +1111,7 @@ Except for following contracts all other contract addresses will be discarded af
 - OnRamp
 
 #### CCIP.Groups.[testgroup].LoadProfile.FailOnFirstErrorInLoad
+<<<<<<< HEAD
 If set to true, the test will fail on the first error encountered during load run. If set to false, the test will continue to run even if there are errors during load run.
 
 #### CCIP.Groups.[testgroup].LoadProfile.SendMaxDataInEveryMsgCount
@@ -645,10 +1119,23 @@ Specifies the number of requests to send with maximum data in every mentioned co
 For example, if `SendMaxDataInEveryMsgCount` is set to 5, the test will send ccip message with max allowable data length(as set in onRamp config) in every 5th request.
 
 #### CCIP.Groups.[testgroup].LoadProfile.TestRunName
+=======
+
+If set to true, the test will fail on the first error encountered during load run. If set to false, the test will continue to run even if there are errors during load run.
+
+#### CCIP.Groups.[testgroup].LoadProfile.SendMaxDataInEveryMsgCount
+
+Specifies the number of requests to send with maximum data in every mentioned count iteration.
+For example, if `SendMaxDataInEveryMsgCount` is set to 5, the test will send ccip message with max allowable data length(as set in onRamp config) in every 5th request.
+
+#### CCIP.Groups.[testgroup].LoadProfile.TestRunName
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 Specifies the name of the test run. This is used to identify the test run in CCIP test dashboard or logs. If multiple tests are run with same `TestRunName`, the test results will be aggregated under the same test run in grafana dashboard.
 This is used when multiple iterations of tests are run against same release version to aggregate the results under same dashboard view.
 
 #### CCIP.Groups.[testgroup].LoadProfile.MsgProfile
+<<<<<<< HEAD
 Specifies the message profile for the test. The message profile is used to set up multiple ccip message details during load test.
 
 ##### CCIP.Groups.[testgroup].LoadProfile.MsgProfile.Frequencies
@@ -662,13 +1149,39 @@ Example Breakdown:
    - Message Type 2: (12 / 20) * 100% = 60%
    - Message Type 3: (3 / 20) * 100% = 15%
    - Message Type 4: (1 / 20) * 100% = 5%
+=======
+
+Specifies the message profile for the test. The message profile is used to set up multiple ccip message details during load test.
+
+##### CCIP.Groups.[testgroup].LoadProfile.MsgProfile.Frequencies
+
+Specifies the frequency of each message profile.
+For example, if `Frequencies` is set to [1, 2, 3], the test will send 1st message profile 1 time, 2nd message profile 2 times, and 3rd message profile 3 times in each iteration. Each iteration will be defined by (1+2+3) = 6 requests.
+Example Breakdown:
+
+- Frequencies = [4, 12, 3, 1]
+- Total Sum of Frequencies = 4 + 12 + 3 + 1 = 20
+- Percentages:
+  - Message Type 1: (4 / 20) * 100% = 20%
+  - Message Type 2: (12 / 20) * 100% = 60%
+  - Message Type 3: (3 / 20) * 100% = 15%
+  - Message Type 4: (1 / 20) * 100% = 5%
+>>>>>>> upstream-release-2.15.0/release/2.15.0
  These percentages reflect how often each message type should appear in the total set of messages.
  Please note - if the total set of messages is not equal to the multiple of sum of frequencies, the percentages will not be accurate.
 
 ##### CCIP.Groups.[testgroup].LoadProfile.MsgProfile.MsgDetails
+<<<<<<< HEAD
 Specifies the message details for each message profile. The fields are the same as [CCIP.Groups.[testgroup].MsgDetails](#ccipgroupstestgroupmsgdetails).
 
 example usage:
+=======
+
+Specifies the message details for each message profile. The fields are the same as [CCIP.Groups.[testgroup].MsgDetails](#ccipgroupstestgroupmsgdetails).
+
+example usage:
+
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 ```toml
 # to represent 20%, 60%, 15%, 5% of the total messages
 [CCIP.Groups.load.LoadProfile.MsgProfile]

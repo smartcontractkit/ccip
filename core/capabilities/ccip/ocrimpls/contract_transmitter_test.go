@@ -476,7 +476,8 @@ func makeTestEvmTxm(
 		lggr,
 		lp,
 		keyStore,
-		estimator)
+		estimator,
+		ht)
 	require.NoError(t, err, "can't create tx manager")
 
 	_, unsub := broadcaster.Subscribe(txm)
@@ -612,6 +613,7 @@ func (g *TestGasEstimatorConfig) LimitJobType() evmconfig.LimitJobType {
 func (g *TestGasEstimatorConfig) PriceMaxKey(addr common.Address) *assets.Wei {
 	return assets.GWei(1)
 }
+func (g *TestGasEstimatorConfig) EstimateGasLimit() bool { return false }
 
 func (e *TestEvmConfig) GasEstimator() evmconfig.GasEstimator {
 	return &TestGasEstimatorConfig{bumpThreshold: e.BumpThreshold}

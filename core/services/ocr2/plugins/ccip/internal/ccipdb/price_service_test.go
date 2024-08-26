@@ -19,7 +19,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+<<<<<<< HEAD
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+=======
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
@@ -30,6 +33,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 )
 
+<<<<<<< HEAD
 func TestPriceService_priceCleanup(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	jobId := int32(1)
@@ -105,6 +109,8 @@ func TestPriceService_priceCleanup(t *testing.T) {
 	}
 }
 
+=======
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 func TestPriceService_writeGasPrices(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	jobId := int32(1)
@@ -113,7 +119,11 @@ func TestPriceService_writeGasPrices(t *testing.T) {
 
 	gasPrice := big.NewInt(1e18)
 
+<<<<<<< HEAD
 	expectedGasPriceUpdate := []cciporm.GasPriceUpdate{
+=======
+	expectedGasPriceUpdate := []cciporm.GasPrice{
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 		{
 			SourceChainSelector: sourceChainSelector,
 			GasPrice:            assets.NewWei(gasPrice),
@@ -147,7 +157,11 @@ func TestPriceService_writeGasPrices(t *testing.T) {
 			}
 
 			mockOrm := ccipmocks.NewORM(t)
+<<<<<<< HEAD
 			mockOrm.On("InsertGasPricesForDestChain", ctx, destChainSelector, jobId, expectedGasPriceUpdate).Return(gasPricesError).Once()
+=======
+			mockOrm.On("UpsertGasPricesForDestChain", ctx, destChainSelector, expectedGasPriceUpdate).Return(int64(0), gasPricesError).Once()
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 
 			priceService := NewPriceService(
 				lggr,
@@ -180,7 +194,11 @@ func TestPriceService_writeTokenPrices(t *testing.T) {
 		"0x234": big.NewInt(3e18),
 	}
 
+<<<<<<< HEAD
 	expectedTokenPriceUpdate := []cciporm.TokenPriceUpdate{
+=======
+	expectedTokenPriceUpdate := []cciporm.TokenPrice{
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 		{
 			TokenAddr:  "0x123",
 			TokenPrice: assets.NewWei(big.NewInt(2e18)),
@@ -218,7 +236,12 @@ func TestPriceService_writeTokenPrices(t *testing.T) {
 			}
 
 			mockOrm := ccipmocks.NewORM(t)
+<<<<<<< HEAD
 			mockOrm.On("InsertTokenPricesForDestChain", ctx, destChainSelector, jobId, expectedTokenPriceUpdate).Return(tokenPricesError).Once()
+=======
+			mockOrm.On("UpsertTokenPricesForDestChain", ctx, destChainSelector, expectedTokenPriceUpdate, tokenPriceUpdateInterval).
+				Return(int64(len(expectedTokenPriceUpdate)), tokenPricesError).Once()
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 
 			priceService := NewPriceService(
 				lggr,
@@ -802,7 +825,11 @@ func setupORM(t *testing.T) cciporm.ORM {
 	t.Helper()
 
 	db := pgtest.NewSqlxDB(t)
+<<<<<<< HEAD
 	orm, err := cciporm.NewORM(db)
+=======
+	orm, err := cciporm.NewORM(db, logger.TestLogger(t))
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 
 	require.NoError(t, err)
 
@@ -824,7 +851,11 @@ func checkResultLen(t *testing.T, priceService PriceService, destChainSelector u
 	return nil
 }
 
+<<<<<<< HEAD
 func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
+=======
+func TestPriceService_priceWriteInBackground(t *testing.T) {
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 	lggr := logger.TestLogger(t)
 	jobId := int32(1)
 	destChainSelector := uint64(12345)
@@ -896,16 +927,22 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 
 	gasUpdateInterval := 2000 * time.Millisecond
 	tokenUpdateInterval := 5000 * time.Millisecond
+<<<<<<< HEAD
 	cleanupInterval := 3000 * time.Millisecond
+=======
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 
 	// run gas price task every 2 second
 	priceService.gasUpdateInterval = gasUpdateInterval
 	// run token price task every 5 second
 	priceService.tokenUpdateInterval = tokenUpdateInterval
+<<<<<<< HEAD
 	// run cleanup every 3 seconds
 	priceService.cleanupInterval = cleanupInterval
 	// expire all prices during every cleanup
 	priceService.priceExpireThreshold = time.Duration(0)
+=======
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 
 	// initially, db is empty
 	assert.NoError(t, checkResultLen(t, priceService, destChainSelector, 0, 0))
@@ -918,6 +955,7 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, checkResultLen(t, priceService, destChainSelector, 1, len(laneTokens)))
 
+<<<<<<< HEAD
 	// eventually prices will be cleaned
 	assert.Eventually(t, func() bool {
 		err := checkResultLen(t, priceService, destChainSelector, 0, 0)
@@ -938,4 +976,7 @@ func TestPriceService_priceWriteAndCleanupInBackground(t *testing.T) {
 		time.Sleep(time.Second)
 		assert.NoError(t, checkResultLen(t, priceService, destChainSelector, 0, 0))
 	}
+=======
+	assert.NoError(t, priceService.Close())
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 }

@@ -461,6 +461,7 @@ func (r *CommitReportingPlugin) selectPriceUpdates(ctx context.Context, now time
 // The returned latestGasPrice and latestTokenPrices should not contain nil values.
 func (r *CommitReportingPlugin) calculatePriceUpdates(gasPriceObs map[uint64][]*big.Int, tokenPriceObs map[cciptypes.Address][]*big.Int, latestGasPrice map[uint64]update, latestTokenPrices map[cciptypes.Address]update) ([]cciptypes.GasPrice, []cciptypes.TokenPrice, error) {
 	var tokenPriceUpdates []cciptypes.TokenPrice
+<<<<<<< HEAD
 	// Token prices are mostly heartbeat driven. To maximize heartbeat batching, the price inclusion rule is as follows:
 	// If any token requires heartbeat update, include all token prices in the report.
 	// Otherwise, only include token prices that exceed deviation threshold.
@@ -497,6 +498,26 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(gasPriceObs map[uint64][]*
 				})
 			}
 		}
+=======
+	for token, tokenPriceObservations := range tokenPriceObs {
+		medianPrice := ccipcalc.BigIntSortedMiddle(tokenPriceObservations)
+
+		latestTokenPrice, exists := latestTokenPrices[token]
+		if exists {
+			tokenPriceUpdatedRecently := time.Since(latestTokenPrice.timestamp) < r.offchainConfig.TokenPriceHeartBeat
+			tokenPriceNotChanged := !ccipcalc.Deviates(medianPrice, latestTokenPrice.value, int64(r.offchainConfig.TokenPriceDeviationPPB))
+			if tokenPriceUpdatedRecently && tokenPriceNotChanged {
+				r.lggr.Debugw("token price was updated recently, skipping the update",
+					"token", token, "newPrice", medianPrice, "existingPrice", latestTokenPrice.value)
+				continue // skip the update if we recently had a price update close to the new value
+			}
+		}
+
+		tokenPriceUpdates = append(tokenPriceUpdates, cciptypes.TokenPrice{
+			Token: token,
+			Value: medianPrice,
+		})
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 	}
 
 	// Determinism required.
@@ -505,6 +526,7 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(gasPriceObs map[uint64][]*
 	})
 
 	var gasPriceUpdate []cciptypes.GasPrice
+<<<<<<< HEAD
 	// Gas prices are mostly heartbeat driven. To maximize heartbeat batching, the price inclusion rule is as follows:
 	// If any source chain gas price requires heartbeat update, include all gas prices in the report.
 	// Otherwise, only include gas prices that exceed deviation threshold.
@@ -518,12 +540,15 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(gasPriceObs map[uint64][]*
 		}
 	}
 
+=======
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 	for chainSelector, gasPriceObservations := range gasPriceObs {
 		newGasPrice, err := r.gasPriceEstimator.Median(gasPriceObservations) // Compute the median price
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to calculate median gas price for chain selector %d: %w", chainSelector, err)
 		}
 
+<<<<<<< HEAD
 		if needGasHeartbeat {
 			r.lggr.Debugw("Gas price update included due to heartbeat", "chainSelector", chainSelector)
 			gasPriceUpdate = append(gasPriceUpdate, cciptypes.GasPrice{
@@ -535,10 +560,17 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(gasPriceObs map[uint64][]*
 
 		latestGasPrice, exists := latestGasPrice[chainSelector]
 		if exists && latestGasPrice.value != nil {
+=======
+		// Default to updating so that we update if there are no prior updates.
+		latestGasPrice, exists := latestGasPrice[chainSelector]
+		if exists && latestGasPrice.value != nil {
+			gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.GasPriceHeartBeat
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 			gasPriceDeviated, err := r.gasPriceEstimator.Deviates(newGasPrice, latestGasPrice.value)
 			if err != nil {
 				return nil, nil, err
 			}
+<<<<<<< HEAD
 			if gasPriceDeviated {
 				r.lggr.Debugw("Gas price update included due to deviation",
 					"chainSelector", chainSelector, "newPrice", newGasPrice, "existingPrice", latestGasPrice.value)
@@ -548,6 +580,19 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(gasPriceObs map[uint64][]*
 				})
 			}
 		}
+=======
+			if gasPriceUpdatedRecently && !gasPriceDeviated {
+				r.lggr.Debugw("gas price was updated recently and not deviated sufficiently, skipping the update",
+					"chainSelector", chainSelector, "newPrice", newGasPrice, "existingPrice", latestGasPrice.value)
+				continue
+			}
+		}
+
+		gasPriceUpdate = append(gasPriceUpdate, cciptypes.GasPrice{
+			DestChainSelector: chainSelector,
+			Value:             newGasPrice,
+		})
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 	}
 
 	sort.Slice(gasPriceUpdate, func(i, j int) bool {

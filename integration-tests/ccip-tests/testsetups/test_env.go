@@ -13,7 +13,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+<<<<<<< HEAD
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
+=======
+	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/config"
+	ctf_config_types "github.com/smartcontractkit/chainlink-testing-framework/config/types"
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/conversions"
 
@@ -256,7 +261,11 @@ func DeployLocalCluster(
 ) (*test_env.CLClusterTestEnv, func() error) {
 	selectedNetworks := testInputs.SelectedNetworks
 
+<<<<<<< HEAD
 	privateEthereumNetworks := []*ctfconfig.EthereumNetworkConfig{}
+=======
+	privateEthereumNetworks := []*ctf_config.EthereumNetworkConfig{}
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 	for _, network := range testInputs.EnvInput.PrivateEthereumNetworks {
 		privateEthereumNetworks = append(privateEthereumNetworks, network)
 
@@ -286,16 +295,27 @@ func DeployLocalCluster(
 		}
 
 		for _, network := range missing {
+<<<<<<< HEAD
 			chainConfig := &ctfconfig.EthereumChainConfig{}
+=======
+			chainConfig := &ctf_config.EthereumChainConfig{}
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 			err := chainConfig.Default()
 			if err != nil {
 				require.NoError(t, err, "failed to get default chain config: %w", err)
 			} else {
 				chainConfig.ChainID = int(network.ChainID)
+<<<<<<< HEAD
 				eth1 := ctfconfig.EthereumVersion_Eth1
 				geth := ctfconfig.ExecutionLayer_Geth
 
 				privateEthereumNetworks = append(privateEthereumNetworks, &ctfconfig.EthereumNetworkConfig{
+=======
+				eth1 := ctf_config_types.EthereumVersion_Eth1
+				geth := ctf_config_types.ExecutionLayer_Geth
+
+				privateEthereumNetworks = append(privateEthereumNetworks, &ctf_config.EthereumNetworkConfig{
+>>>>>>> upstream-release-2.15.0/release/2.15.0
 					EthereumVersion:     &eth1,
 					ExecutionLayer:      &geth,
 					EthereumChainConfig: chainConfig,

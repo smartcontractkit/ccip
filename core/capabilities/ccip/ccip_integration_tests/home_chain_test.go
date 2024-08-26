@@ -36,7 +36,6 @@ func TestHomeChainReader(t *testing.T) {
 	}
 	p2pIDs := integrationhelpers.P2pIDsFromInts(arr)
 	uni.AddCapability(p2pIDs)
-
 	//==============================Apply configs to Capability Contract=================================
 	encodedChainConfig, err := chainconfig.EncodeChainConfig(chainconfig.ChainConfig{
 		GasPriceDeviationPPB:    cciptypes.NewBigIntFromInt64(1000),

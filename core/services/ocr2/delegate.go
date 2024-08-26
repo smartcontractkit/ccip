@@ -66,7 +66,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/autotelemetry21"
 	ocr2keeper21core "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/core"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/logprovider"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
@@ -778,7 +777,7 @@ func (d *Delegate) newServicesGenericPlugin(
 				}
 				keyBundles[name] = os
 			}
-			onchainKeyringAdapter, err = ocrcommon.NewOCR3OnchainKeyringMultiChainAdapter(keyBundles, lggr)
+			onchainKeyringAdapter, err = ocrcommon.NewOCR3OnchainKeyringMultiChainAdapter(keyBundles, kb.PublicKey(), lggr)
 			if err != nil {
 				return nil, err
 			}
@@ -1186,14 +1185,6 @@ func (d *Delegate) newServicesOCR2Keepers21(
 	keeperProvider, ok := provider.(types.AutomationProvider)
 	if !ok {
 		return nil, errors.New("could not coerce PluginProvider to AutomationProvider")
-	}
-
-	// TODO: (AUTO-9355) remove once we remove v0
-	if useBufferV1 := cfg.UseBufferV1 != nil && *cfg.UseBufferV1; useBufferV1 {
-		logProviderFeatures, ok := keeperProvider.LogEventProvider().(logprovider.LogEventProviderFeatures)
-		if ok {
-			logProviderFeatures.WithBufferVersion("v1")
-		}
 	}
 
 	services, err := ocr2keeper.EVMDependencies21(kb)

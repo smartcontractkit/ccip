@@ -192,7 +192,7 @@ StartTimeout = '15s' # Default
 ListenIP = '0.0.0.0' # Default
 
 # Optional LDAP config if WebServer.AuthenticationMethod is set to 'ldap'
-# LDAP queries are all parameterized to support custom LDAP 'dn', 'cn', and attributes 
+# LDAP queries are all parameterized to support custom LDAP 'dn', 'cn', and attributes
 [WebServer.LDAP]
 # ServerTLS defines the option to require the secure ldaps
 ServerTLS = true # Default
@@ -282,7 +282,7 @@ ReaperThreshold = '24h' # Default
 # **ADVANCED**
 # ResultWriteQueueDepth controls how many writes will be buffered before subsequent writes are dropped, for jobs that write results asynchronously for performance reasons, such as OCR.
 ResultWriteQueueDepth = 100 # Default
-# VerboseLogging enables detailed logging of pipeline execution steps. 
+# VerboseLogging enables detailed logging of pipeline execution steps.
 # This can be useful for debugging failed runs without relying on the UI
 # or database.
 #
@@ -421,16 +421,16 @@ TraceLogging = false # Default
 # Enabled enables P2P V2.
 # Note: V1.Enabled is true by default, so it must be set false in order to run V2 only.
 Enabled = true # Default
-# AnnounceAddresses is the addresses the peer will advertise on the network in `host:port` form as accepted by the TCP version of Go’s `net.Dial`. 
-# The addresses should be reachable by other nodes on the network. When attempting to connect to another node, 
+# AnnounceAddresses is the addresses the peer will advertise on the network in `host:port` form as accepted by the TCP version of Go’s `net.Dial`.
+# The addresses should be reachable by other nodes on the network. When attempting to connect to another node,
 # a node will attempt to dial all of the other node’s AnnounceAddresses in round-robin fashion.
 AnnounceAddresses = ['1.2.3.4:9999', '[a52d:0:a88:1274::abcd]:1337'] # Example
 # DefaultBootstrappers is the default bootstrapper peers for libocr's v2 networking stack.
 #
-# Oracle nodes typically only know each other’s PeerIDs, but not their hostnames, IP addresses, or ports. 
-# DefaultBootstrappers are special nodes that help other nodes discover each other’s `AnnounceAddresses` so they can communicate. 
-# Nodes continuously attempt to connect to bootstrappers configured in here. When a node wants to connect to another node 
-# (which it knows only by PeerID, but not by address), it discovers the other node’s AnnounceAddresses from communications 
+# Oracle nodes typically only know each other’s PeerIDs, but not their hostnames, IP addresses, or ports.
+# DefaultBootstrappers are special nodes that help other nodes discover each other’s `AnnounceAddresses` so they can communicate.
+# Nodes continuously attempt to connect to bootstrappers configured in here. When a node wants to connect to another node
+# (which it knows only by PeerID, but not by address), it discovers the other node’s AnnounceAddresses from communications
 # received from its DefaultBootstrappers or other discovered nodes. To facilitate discovery,
 # nodes will regularly broadcast signed announcements containing their PeerID and AnnounceAddresses.
 DefaultBootstrappers = ['12D3KooWMHMRLQkgPbFSYHwD3NBuwtS1AmxhvKVUrcfyaGDASR4U@1.2.3.4:9999', '12D3KooWM55u5Swtpw9r8aFLQHEtw7HR4t44GdNs654ej5gRs2Dh@example.com:1234'] # Example
@@ -438,7 +438,7 @@ DefaultBootstrappers = ['12D3KooWMHMRLQkgPbFSYHwD3NBuwtS1AmxhvKVUrcfyaGDASR4U@1.
 DeltaDial = '15s' # Default
 # DeltaReconcile controls how often a Reconcile message is sent to every peer.
 DeltaReconcile = '1m' # Default
-# ListenAddresses is the addresses the peer will listen to on the network in `host:port` form as accepted by `net.Listen()`, 
+# ListenAddresses is the addresses the peer will listen to on the network in `host:port` form as accepted by `net.Listen()`,
 # but the host and port must be fully specified and cannot be empty. You can specify `0.0.0.0` (IPv4) or `::` (IPv6) to listen on all interfaces, but that is not recommended.
 ListenAddresses = ['1.2.3.4:9999', '[a52d:0:a88:1274::abcd]:1337'] # Example
 
@@ -470,16 +470,16 @@ TraceLogging = false # Default
 [Capabilities.Peering.V2]
 # Enabled enables P2P V2.
 Enabled = false # Default
-# AnnounceAddresses is the addresses the peer will advertise on the network in `host:port` form as accepted by the TCP version of Go’s `net.Dial`. 
-# The addresses should be reachable by other nodes on the network. When attempting to connect to another node, 
+# AnnounceAddresses is the addresses the peer will advertise on the network in `host:port` form as accepted by the TCP version of Go’s `net.Dial`.
+# The addresses should be reachable by other nodes on the network. When attempting to connect to another node,
 # a node will attempt to dial all of the other node’s AnnounceAddresses in round-robin fashion.
 AnnounceAddresses = ['1.2.3.4:9999', '[a52d:0:a88:1274::abcd]:1337'] # Example
 # DefaultBootstrappers is the default bootstrapper peers for libocr's v2 networking stack.
 #
-# Oracle nodes typically only know each other’s PeerIDs, but not their hostnames, IP addresses, or ports. 
-# DefaultBootstrappers are special nodes that help other nodes discover each other’s `AnnounceAddresses` so they can communicate. 
-# Nodes continuously attempt to connect to bootstrappers configured in here. When a node wants to connect to another node 
-# (which it knows only by PeerID, but not by address), it discovers the other node’s AnnounceAddresses from communications 
+# Oracle nodes typically only know each other’s PeerIDs, but not their hostnames, IP addresses, or ports.
+# DefaultBootstrappers are special nodes that help other nodes discover each other’s `AnnounceAddresses` so they can communicate.
+# Nodes continuously attempt to connect to bootstrappers configured in here. When a node wants to connect to another node
+# (which it knows only by PeerID, but not by address), it discovers the other node’s AnnounceAddresses from communications
 # received from its DefaultBootstrappers or other discovered nodes. To facilitate discovery,
 # nodes will regularly broadcast signed announcements containing their PeerID and AnnounceAddresses.
 DefaultBootstrappers = ['12D3KooWMHMRLQkgPbFSYHwD3NBuwtS1AmxhvKVUrcfyaGDASR4U@1.2.3.4:9999', '12D3KooWM55u5Swtpw9r8aFLQHEtw7HR4t44GdNs654ej5gRs2Dh@example.com:1234'] # Example
@@ -487,7 +487,7 @@ DefaultBootstrappers = ['12D3KooWMHMRLQkgPbFSYHwD3NBuwtS1AmxhvKVUrcfyaGDASR4U@1.
 DeltaDial = '15s' # Default
 # DeltaReconcile controls how often a Reconcile message is sent to every peer.
 DeltaReconcile = '1m' # Default
-# ListenAddresses is the addresses the peer will listen to on the network in `host:port` form as accepted by `net.Listen()`, 
+# ListenAddresses is the addresses the peer will listen to on the network in `host:port` form as accepted by `net.Listen()`,
 # but the host and port must be fully specified and cannot be empty. You can specify `0.0.0.0` (IPv4) or `::` (IPv6) to listen on all interfaces, but that is not recommended.
 ListenAddresses = ['1.2.3.4:9999', '[a52d:0:a88:1274::abcd]:1337'] # Example
 
@@ -617,15 +617,15 @@ VerboseLogging = false # Default
 # LatestReportTTL controls how "stale" we will allow a price to be e.g. if
 # set to 1s, a new price will always be fetched if the last result was
 # from 1 second ago or older.
-# 
+#
 # Another way of looking at it is such: the cache will _never_ return a
 # price that was queried from now-LatestReportTTL or before.
-# 
+#
 # Setting to zero disables caching entirely.
 LatestReportTTL = "1s" # Default
 # MaxStaleAge is that maximum amount of time that a value can be stale
 # before it is deleted from the cache (a form of garbage collection).
-# 
+#
 # This should generally be set to something much larger than
 # LatestReportTTL. Setting to zero disables garbage collection.
 MaxStaleAge = "1h" # Default
