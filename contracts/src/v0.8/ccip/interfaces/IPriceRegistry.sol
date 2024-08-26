@@ -24,6 +24,11 @@ interface IPriceRegistry {
   /// @return tokenPrices The tokenPrices for the given tokens.
   function getTokenPrices(address[] calldata tokens) external view returns (Internal.TimestampedPackedUint224[] memory);
 
+  /// @notice Returns the token price data feed configuration
+  /// @param token The token to retrieve the feed config for
+  /// @return tokenPriceFeedConfig The token price data feed config (if feed address is 0, the feed config is disabled)
+  function getTokenPriceFeedConfig(address token) external view returns (TokenPriceFeedConfig memory);
+
   /// @notice Get an encoded `gasPrice` for a given destination chain ID.
   /// The 224-bit result encodes necessary gas price components.
   /// On L1 chains like Ethereum or Avax, the only component is the gas price.
@@ -59,6 +64,6 @@ interface IPriceRegistry {
   ) external view returns (uint256 toTokenAmount);
 
   /// @notice Get the list of fee tokens.
-  /// @return The tokens set as fee tokens.
+  /// @return feeTokens The tokens set as fee tokens.
   function getFeeTokens() external view returns (address[] memory);
 }
