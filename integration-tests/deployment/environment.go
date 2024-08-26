@@ -15,6 +15,7 @@ import (
 	types2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	types3 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	csav1 "github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/csa/v1"
 	jobv1 "github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/job/v1"
 	nodev1 "github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/node/v1"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
@@ -32,6 +33,7 @@ type OffchainClient interface {
 	// The job distributor grpc interface can be used to abstract offchain read/writes
 	jobv1.JobServiceClient
 	nodev1.NodeServiceClient
+	csav1.CSAServiceClient
 }
 
 type Chain struct {

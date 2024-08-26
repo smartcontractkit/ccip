@@ -31,6 +31,7 @@ require (
 	github.com/rs/zerolog v1.32.0
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/segmentio/ksuid v1.0.4
+	github.com/sethvargo/go-retry v0.2.4
 	github.com/shopspring/decimal v1.4.0
 	github.com/slack-go/slack v0.12.2
 	github.com/smartcontractkit/ccip-owner-contracts v0.0.0-20240808195812-ae0378684685

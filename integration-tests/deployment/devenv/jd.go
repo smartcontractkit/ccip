@@ -1,7 +1,6 @@
 package devenv
 
 import (
-	"context"
 	"fmt"
 
 	"google.golang.org/grpc"
@@ -9,6 +8,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/ccip/integration-tests/deployment"
+	csav1 "github.com/smartcontractkit/ccip/integration-tests/deployment/jd/csa/v1"
 	jobv1 "github.com/smartcontractkit/ccip/integration-tests/deployment/jd/job/v1"
 	nodev1 "github.com/smartcontractkit/ccip/integration-tests/deployment/jd/node/v1"
 )
@@ -37,48 +37,9 @@ func NewClientConnection(cfg JDConfig) (*grpc.ClientConn, error) {
 }
 
 type JDClient struct {
-	nodeClient nodev1.NodeServiceClient
-	jobClient  jobv1.JobServiceClient
-}
-
-func (jd JDClient) GetJob(ctx context.Context, in *jobv1.GetJobRequest, opts ...grpc.CallOption) (*jobv1.GetJobResponse, error) {
-	return jd.jobClient.GetJob(ctx, in, opts...)
-}
-
-func (jd JDClient) GetProposal(ctx context.Context, in *jobv1.GetProposalRequest, opts ...grpc.CallOption) (*jobv1.GetProposalResponse, error) {
-	return jd.jobClient.GetProposal(ctx, in, opts...)
-}
-
-func (jd JDClient) ListJobs(ctx context.Context, in *jobv1.ListJobsRequest, opts ...grpc.CallOption) (*jobv1.ListJobsResponse, error) {
-	return jd.jobClient.ListJobs(ctx, in, opts...)
-}
-
-func (jd JDClient) ListProposals(ctx context.Context, in *jobv1.ListProposalsRequest, opts ...grpc.CallOption) (*jobv1.ListProposalsResponse, error) {
-	return jd.jobClient.ListProposals(ctx, in, opts...)
-}
-
-func (jd JDClient) ProposeJob(ctx context.Context, in *jobv1.ProposeJobRequest, opts ...grpc.CallOption) (*jobv1.ProposeJobResponse, error) {
-	return jd.jobClient.ProposeJob(ctx, in, opts...)
-}
-
-func (jd JDClient) RevokeJob(ctx context.Context, in *jobv1.RevokeJobRequest, opts ...grpc.CallOption) (*jobv1.RevokeJobResponse, error) {
-	return jd.jobClient.RevokeJob(ctx, in, opts...)
-}
-
-func (jd JDClient) DeleteJob(ctx context.Context, in *jobv1.DeleteJobRequest, opts ...grpc.CallOption) (*jobv1.DeleteJobResponse, error) {
-	return jd.jobClient.DeleteJob(ctx, in, opts...)
-}
-
-func (jd JDClient) GetNode(ctx context.Context, in *nodev1.GetNodeRequest, opts ...grpc.CallOption) (*nodev1.GetNodeResponse, error) {
-	return jd.nodeClient.GetNode(ctx, in, opts...)
-}
-
-func (jd JDClient) ListNodes(ctx context.Context, in *nodev1.ListNodesRequest, opts ...grpc.CallOption) (*nodev1.ListNodesResponse, error) {
-	return jd.nodeClient.ListNodes(ctx, in, opts...)
-}
-
-func (jd JDClient) ListNodeChainConfigs(ctx context.Context, in *nodev1.ListNodeChainConfigsRequest, opts ...grpc.CallOption) (*nodev1.ListNodeChainConfigsResponse, error) {
-	return jd.nodeClient.ListNodeChainConfigs(ctx, in, opts...)
+	nodev1.NodeServiceClient
+	jobv1.JobServiceClient
+	csav1.CSAServiceClient
 }
 
 func NewJDClient(cfg JDConfig) (deployment.OffchainClient, error) {
@@ -86,9 +47,9 @@ func NewJDClient(cfg JDConfig) (deployment.OffchainClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect Job Distributor service. Err: %w", err)
 	}
-
-	return &JDClient{
-		nodeClient: nodev1.NewNodeServiceClient(conn),
-		jobClient:  jobv1.NewJobServiceClient(conn),
+	return JDClient{
+		nodev1.NewNodeServiceClient(conn),
+		jobv1.NewJobServiceClient(conn),
+		csav1.NewCSAServiceClient(conn),
 	}, err
 }

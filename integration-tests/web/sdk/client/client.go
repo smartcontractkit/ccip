@@ -10,7 +10,7 @@ import (
 	"github.com/Khan/genqlient/graphql"
 
 	"github.com/smartcontractkit/ccip/integration-tests/web/sdk/client/internal/doer"
-	"github.com/smartcontractkit/ccip/integration-tests/web/sdk/internal/generated"
+	"github.com/smartcontractkit/ccip/integration-tests/web/sdk/generated"
 )
 
 type Client interface {

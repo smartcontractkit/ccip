@@ -7,13 +7,24 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"google.golang.org/grpc"
 
+	"github.com/smartcontractkit/ccip/integration-tests/deployment/jd/csa/v1"
 	jobv1 "github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/job/v1"
 	nodev1 "github.com/smartcontractkit/chainlink/integration-tests/deployment/jd/node/v1"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/validate"
 )
 
 type JobClient struct {
-	Nodes map[string]InMemoryNode
+	Nodes map[string]Node
+}
+
+func (j JobClient) GetKeypair(ctx context.Context, in *v1.GetKeypairRequest, opts ...grpc.CallOption) (*v1.GetKeypairResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (j JobClient) ListKeypairs(ctx context.Context, in *v1.ListKeypairsRequest, opts ...grpc.CallOption) (*v1.ListKeypairsResponse, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (j JobClient) GetNode(ctx context.Context, in *nodev1.GetNodeRequest, opts ...grpc.CallOption) (*nodev1.GetNodeResponse, error) {
@@ -121,6 +132,6 @@ func (j JobClient) DeleteJob(ctx context.Context, in *jobv1.DeleteJobRequest, op
 	panic("implement me")
 }
 
-func NewMemoryJobClient(nodesByPeerID map[string]InMemoryNode) *JobClient {
+func NewMemoryJobClient(nodesByPeerID map[string]Node) *JobClient {
 	return &JobClient{nodesByPeerID}
 }

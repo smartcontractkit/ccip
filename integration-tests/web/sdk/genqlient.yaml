@@ -5,7 +5,7 @@ schema: ./internal/schema.graphql
 operations:
 - ./internal/genqlient.graphql
 
-generated: ./internal/generated/generated.go
+generated: ./generated/generated.go
 
 bindings:
   Time:
