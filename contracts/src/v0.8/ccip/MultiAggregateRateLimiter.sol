@@ -68,10 +68,10 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers, IT
   /// @notice Rate limiter token bucket states per chain, with separate buckets for inbound and outbound lanes.
   mapping(uint64 remoteChainSelector => RateLimiterBuckets buckets) internal s_rateLimitersByChainSelector;
 
-  /// @param FeeQuoter the fee quoter to set.
+  /// @param feeQuoter the fee quoter to set.
   /// @param authorizedCallers the authorized callers to set.
   constructor(address feeQuoter, address[] memory authorizedCallers) AuthorizedCallers(authorizedCallers) {
-    _setPriceRegistry(feeQuoter);
+    _setFeeQuoter(feeQuoter);
   }
 
   /// @inheritdoc IMessageInterceptor

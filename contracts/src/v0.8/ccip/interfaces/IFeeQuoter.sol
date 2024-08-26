@@ -14,7 +14,7 @@ interface IFeeQuoter is IPriceRegistry {
 
   /// @notice Returns the token price data feed configuration
   /// @param token The token to retrieve the feed config for
-  /// @return dataFeedAddress The token price data feed config (if feed address is 0, the feed config is disabled)
+  /// @return tokenPriceFeedConfig The token price data feed config (if feed address is 0, the feed config is disabled)
   function getTokenPriceFeedConfig(address token) external view returns (TokenPriceFeedConfig memory);
 
   /// @notice Validates the ccip message & returns the fee

@@ -60,7 +60,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @notice Token price data feed update
   struct TokenPriceFeedUpdate {
     address sourceToken; // Source token to update feed for
-    IPriceRegistry.TokenPriceFeedConfig feedConfig; // Feed config update data
+    IFeeQuoter.TokenPriceFeedConfig feedConfig; // Feed config update data
   }
 
   /// @dev Struct that contains the static configuration
