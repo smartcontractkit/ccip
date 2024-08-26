@@ -67,6 +67,7 @@ type InternalRampTokenAmount struct {
 	DestTokenAddress  []byte
 	ExtraData         []byte
 	Amount            *big.Int
+	DestExecData      []byte
 }
 
 type OnRampAllowListConfigArgs struct {
@@ -1914,7 +1915,7 @@ func (OnRampAllowListSendersRemoved) Topic() common.Hash {
 }
 
 func (OnRampCCIPSendRequested) Topic() common.Hash {
-	return common.HexToHash("0x0f07cd31e53232da9125e517f09550fdde74bf43d6a0a76ebd41674dafe2ab29")
+	return common.HexToHash("0xcae3d9f68a9ed33d0a770e9bcc6fc25d4041dd6391e6cd8015546547a3c93140")
 }
 
 func (OnRampConfigSet) Topic() common.Hash {
