@@ -10,8 +10,9 @@ import (
 	// https://github.com/ethereum/go-ethereum/pull/28945
 
 	"github.com/ethereum/go-ethereum/accounts/usbwallet"
-	"github.com/smartcontractkit/ccip-owner-contracts/tools/executable"
-	"github.com/smartcontractkit/ccip-owner-contracts/tools/managed"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/executable"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/managed"
 )
 
 // Just run this locally to sign from the ledger.

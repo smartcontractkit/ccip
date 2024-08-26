@@ -2,6 +2,7 @@ package ccipdeployment
 
 import (
 	"context"
+	"sort"
 	"testing"
 	"time"
 
@@ -51,14 +52,18 @@ type DeployedTestEnvironment struct {
 func NewEnvironmentWithCR(t *testing.T, lggr logger.Logger, numChains int) DeployedTestEnvironment {
 	ctx := Context(t)
 	chains := memory.NewMemoryChains(t, numChains)
-	homeChainSel := uint64(0)
-	homeChainEVM := uint64(0)
+	// Lower chainSel is home chain.
+	var chainSels []uint64
 	// Say first chain is home chain.
 	for chainSel := range chains {
-		homeChainEVM, _ = chainsel.ChainIdFromSelector(chainSel)
-		homeChainSel = chainSel
-		break
+		chainSels = append(chainSels, chainSel)
 	}
+	sort.Slice(chainSels, func(i, j int) bool {
+		return chainSels[i] < chainSels[j]
+	})
+	// Take lowest for determinism.
+	homeChainSel := chainSels[0]
+	homeChainEVM, _ := chainsel.ChainIdFromSelector(homeChainSel)
 	ab, capReg, err := DeployCapReg(lggr, chains, homeChainSel)
 	require.NoError(t, err)
 

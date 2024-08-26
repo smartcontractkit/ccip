@@ -37,9 +37,8 @@ func TestAddChain(t *testing.T) {
 		}
 	}
 
-	// Now we attempt to add a new 4th chain.
-	// It is connected to all the other chains.
-	proposals, ab, err := AddChain(e.Env, e.Ab, newChain, initialDeploy)
+	// Enable inbound to new 4th chain.
+	proposals, ab, err := NewChainInbound(e.Env, e.Ab, e.HomeChainSel, newChain, initialDeploy)
 	require.NoError(t, err)
 	t.Log(proposals, ab)
 }

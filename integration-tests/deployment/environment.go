@@ -1,10 +1,12 @@
 package deployment
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -60,6 +62,20 @@ func (e Environment) AllChainSelectors() []uint64 {
 	return selectors
 }
 
+func ConfirmIfNoErrorWithBlock(chain Chain, tx *types.Transaction, err error) (uint64, error) {
+	if err != nil {
+		//revive:disable
+		var d rpc.DataError
+		ok := errors.As(err, &d)
+		if ok {
+			return 0, fmt.Errorf("got Data Error: %s", d.ErrorData())
+		}
+		return 0, err
+	}
+	b, err := chain.Confirm(tx.Hash())
+	return b, err
+}
+
 func ConfirmIfNoError(chain Chain, tx *types.Transaction, err error) error {
 	if err != nil {
 		//revive:disable
@@ -105,6 +121,7 @@ type OCRConfig struct {
 
 type Nodes []Node
 
+// PeerIDs returns peerIDs in a sorted list
 func (n Nodes) PeerIDs(chainSel uint64) [][32]byte {
 	var peerIDs [][32]byte
 	for _, node := range n {
@@ -113,7 +130,14 @@ func (n Nodes) PeerIDs(chainSel uint64) [][32]byte {
 		// Might make sense to change proto as peerID is 1-1 with node?
 		peerIDs = append(peerIDs, cfg.PeerID)
 	}
+	sort.Slice(peerIDs, func(i, j int) bool {
+		return bytes.Compare(peerIDs[i][:], peerIDs[j][:]) < 0
+	})
 	return peerIDs
+}
+
+func (n Nodes) DefaultF() uint8 {
+	return uint8(len(n) / 3)
 }
 
 func (n Nodes) BootstrapPeerIDs(chainSel uint64) [][32]byte {

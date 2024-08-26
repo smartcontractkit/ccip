@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/smartcontractkit/ccip/integration-tests/deployment/errors"
-	"github.com/smartcontractkit/ccip/integration-tests/deployment/managed"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/errors"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/managed"
 )
 
 func ProposalFromFile(proposalType managed.MCMSProposalType, filePath string) (managed.MCMSProposal, error) {

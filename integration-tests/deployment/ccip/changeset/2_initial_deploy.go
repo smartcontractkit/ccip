@@ -1,6 +1,8 @@
 package changeset
 
 import (
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/managed"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 
 	ccipdeployment "github.com/smartcontractkit/chainlink/integration-tests/deployment/ccip"
@@ -25,7 +27,7 @@ func Apply0002(env deployment.Environment, c ccipdeployment.DeployCCIPContractCo
 		return deployment.ChangesetOutput{}, err
 	}
 	return deployment.ChangesetOutput{
-		Proposals:   []deployment.Proposal{proposal},
+		Proposals:   []managed.MCMSWithTimelockProposal{proposal},
 		AddressBook: ab,
 		// Mapping of which nodes get which jobs.
 		JobSpecs: js,

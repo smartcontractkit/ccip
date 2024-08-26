@@ -10,17 +10,20 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment/executable"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment/managed"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 )
 
-// Add chain should deploy chain contracts.
-// And generate 3 proposals where we do testing in between each one.
-func AddChain(
+// AddChain deploys chain contracts for a new chain
+// and generates 3 proposals to connect that new chain to all existing chains.
+// We testing in between each proposal.
+func NewChainInbound(
 	e deployment.Environment,
 	ab deployment.AddressBook,
+	homeChainSel uint64,
 	newChainSel uint64,
 	sources []uint64,
 ) ([]managed.MCMSWithTimelockProposal, deployment.AddressBook, error) {
@@ -37,7 +40,7 @@ func AddChain(
 		return nil, ab, err
 	}
 
-	// 2. Generate proposal per source chain to enable new destination (from test router).
+	// 2. Generate proposal which enables new destination (from test router) on all source chains.
 	var batches []managed.DetailedBatchChainOperation
 	metaDataPerChain := make(map[string]managed.MCMSWithTimelockChainMetadata)
 	for _, source := range sources {
@@ -113,25 +116,55 @@ func AddChain(
 			TimelockAddress: state.Chains[source].TimelockAddr,
 		}
 	}
-	proposal1 := managed.MCMSWithTimelockProposal{
+
+	// Home chain new don.
+	// - Add new DONs for destination to home chain
+	nodes, err := deployment.NodeInfo(e.NodeIDs, e.Offchain)
+	if err != nil {
+		return nil, ab, err
+	}
+	newDONArgs, err := BuildAddDONArgs(e.Logger, state.Chains[newChainSel].OffRamp, e.Chains[newChainSel], nodes)
+	if err != nil {
+		return nil, ab, err
+	}
+	addDON, err := state.Chains[homeChainSel].CapabilityRegistry.AddDON(SimTransactOpts(),
+		nodes.PeerIDs(newChainSel), []capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
+			{
+				CapabilityId: CCIPCapabilityId,
+				Config:       newDONArgs,
+			},
+		}, false, false, nodes.DefaultF())
+	if err != nil {
+		return nil, ab, err
+	}
+	homeChain, _ := chainsel.ChainBySelector(homeChainSel)
+	metaDataPerChain[homeChain.Name] = managed.MCMSWithTimelockChainMetadata{
+		ExecutableMCMSChainMetadata: executable.ExecutableMCMSChainMetadata{
+			NonceOffset: 0,
+			MCMAddress:  state.Chains[homeChainSel].McmAddr,
+		},
+		TimelockAddress: state.Chains[homeChainSel].TimelockAddr,
+	}
+	batches = append(batches, managed.DetailedBatchChainOperation{
+		ChainIdentifier: homeChain.Name,
+		Batch: []managed.DetailedOperation{
+			{
+				// Enable the source in on ramp
+				Operation: executable.Operation{
+					To:    state.Chains[homeChainSel].CapabilityRegistry.Address(),
+					Data:  hexutil.Encode(addDON.Data()),
+					Value: 0,
+				},
+			},
+		},
+	})
+	newDestProposal := managed.MCMSWithTimelockProposal{
 		Operation:     managed.Schedule,
 		MinDelay:      "1h",
 		ChainMetadata: metaDataPerChain,
 		Transactions:  batches,
 	}
 
-	// Home chain proposal
-	// - Add new DONs for destination to home chain
-	//AddDON(
-	//	e.Logger,
-	//	c.Chains[c.HomeChainSel].CapabilityRegistry,
-	//	c.Chains[c.HomeChainSel].CCIPConfig,
-	//	chainState.OffRamp,
-	//	chain,
-	//	e.Chains[c.HomeChainSel],
-	//	nodes,
-	//	)
-	//
 	// New chain we can configure directly with deployer key first.
 	var offRampEnables []offramp.OffRampSourceChainConfigArgs
 	for _, source := range sources {
@@ -147,9 +180,23 @@ func AddChain(
 		return nil, ab, err
 	}
 
+	// We won't actually be able to setOCR3Config on the remote until the first proposal goes through.
 	// TODO: Outbound
-	return []managed.MCMSWithTimelockProposal{proposal1}, ab, nil
+	return []managed.MCMSWithTimelockProposal{newDestProposal}, ab, nil
 }
+
+//func ApplyInboundChainProposal(
+//	e deployment.Environment,
+//	ab deployment.AddressBook,
+//	proposal managed.MCMSWithTimelockProposal,
+//) (deployment.AddressBook, error) {
+//	state, err := LoadOnchainState(e, ab)
+//	if err != nil {
+//		return ab, err
+//	}
+//
+//	// Apply the proposal.
+//})
 
 // 1. Deploy contracts
 // 2. Proposal 1 (allow for inbound testing)

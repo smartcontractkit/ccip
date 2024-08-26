@@ -1,7 +1,7 @@
 package deployment
 
 import (
-	"github.com/smartcontractkit/ccip/integration-tests/deployment/managed"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/managed"
 )
 
 // Services as input to CI/Async tasks

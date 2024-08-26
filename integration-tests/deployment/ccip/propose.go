@@ -5,9 +5,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/ccip/integration-tests/deployment/executable"
-	"github.com/smartcontractkit/ccip/integration-tests/deployment/managed"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/executable"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/managed"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 )
