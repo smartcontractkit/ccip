@@ -882,7 +882,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       }
 
       _validateDestFamilyAddress(chainFamilySelector, rampTokenAmounts[i].destTokenAddress);
-      PriceRegistry.TokenTransferFeeConfig memory tokenTransferFeeConfig =
+      FeeQuoter.TokenTransferFeeConfig memory tokenTransferFeeConfig =
         s_tokenTransferFeeConfig[destChainSelector][sourceToken];
       uint32 defaultGasOverhead = s_destChainConfigs[destChainSelector].defaultTokenDestGasOverhead;
       // NOTE: Revisit this when adding new non-EVM chain family selector support

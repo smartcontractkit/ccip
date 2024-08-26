@@ -1835,7 +1835,7 @@ contract FeeQuoter_processMessageArgs is FeeQuoterFeeSetup {
 
 contract FeeQuoter_validatePoolReturnData is FeeQuoterFeeSetup {
   function test_ProcessPoolReturnData_Success() public view {
-    Client.EVMTokenAmount[] memory sourceTokenAmounts = new Client.EVMTokenAmount[](1);
+    Client.EVMTokenAmount[] memory sourceTokenAmounts = new Client.EVMTokenAmount[](2);
     sourceTokenAmounts[0].amount = 1e18;
     sourceTokenAmounts[0].token = s_sourceTokens[0];
     sourceTokenAmounts[1].amount = 1e18;
@@ -1846,13 +1846,13 @@ contract FeeQuoter_validatePoolReturnData is FeeQuoterFeeSetup {
     rampTokenAmounts[1] = _getSourceTokenData(sourceTokenAmounts[1], s_tokenAdminRegistry, DEST_CHAIN_SELECTOR);
     bytes[] memory expectedDestExecData = new bytes[](2);
     expectedDestExecData[0] = abi.encode(
-      s_priceRegistryTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.destGasOverhead
+      s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.destGasOverhead
     );
     expectedDestExecData[1] = abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD); //expected return data should be abi.encoded  default as isEnabled is false
 
     // No revert - successful
     bytes[] memory destExecData =
-      s_priceRegistry.processPoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
+      s_feeQuoter.processPoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
 
     for (uint256 i = 0; i < destExecData.length; ++i) {
       assertEq(destExecData[i], expectedDestExecData[i]);
@@ -1894,7 +1894,7 @@ contract FeeQuoter_validatePoolReturnData is FeeQuoterFeeSetup {
 
     // Set data to max length +1, should revert
     rampTokenAmounts[0].extraData = new bytes(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES + 1);
-    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.SourceTokenDataTooLarge.selector, sourceETH));
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.SourceTokenDataTooLarge.selector, sourceETH));
     s_feeQuoter.processPoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
 
     // Set token config to allow larger data

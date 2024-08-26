@@ -141,10 +141,10 @@ contract FeeQuoterSetup is TokenSetup {
         })
       })
     );
-    s_priceRegistryTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
-      PriceRegistry.TokenTransferFeeConfigSingleTokenArgs({
+    s_feeQuoterTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs.push(
+      FeeQuoter.TokenTransferFeeConfigSingleTokenArgs({
         token: CUSTOM_TOKEN_2,
-        tokenTransferFeeConfig: PriceRegistry.TokenTransferFeeConfig({
+        tokenTransferFeeConfig: FeeQuoter.TokenTransferFeeConfig({
           minFeeUSDCents: 2_00, // 1 USD
           maxFeeUSDCents: 2000_00, // 1,000 USD
           deciBps: 10_0, // 10 bps, or 0.1%
@@ -407,12 +407,9 @@ contract FeeQuoterFeeSetup is FeeQuoterSetup {
   ) internal view returns (Internal.RampTokenAmount memory) {
     address destToken = s_destTokenBySourceToken[tokenAmount.token];
 
-    uint256 tokenTransferFeeConfigArgIndex;
-    uint256 tokenTransferFeeConfigsIndex;
-
     uint32 expectedDestGasAmount;
-    PriceRegistry.TokenTransferFeeConfig memory tokenTransferFeeConfig =
-      PriceRegistry(s_priceRegistry).getTokenTransferFeeConfig(destChainSelector, tokenAmount.token);
+    FeeQuoter.TokenTransferFeeConfig memory tokenTransferFeeConfig =
+      FeeQuoter(s_feeQuoter).getTokenTransferFeeConfig(destChainSelector, tokenAmount.token);
     expectedDestGasAmount =
       tokenTransferFeeConfig.isEnabled ? tokenTransferFeeConfig.destGasOverhead : DEFAULT_TOKEN_DEST_GAS_OVERHEAD;
 
