@@ -735,13 +735,6 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
         destChainConfigArgs.destChainConfig.defaultTxGasLimit, 1, destChainConfigArgs.destChainConfig.maxPerMsgGasLimit
       )
     );
-    destChainConfigArgs.destChainConfig.defaultTokenDestBytesOverhead = uint32(
-      bound(
-        destChainConfigArgs.destChainConfig.defaultTokenDestBytesOverhead,
-        Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-        type(uint32).max
-      )
-    );
     destChainConfigArgs.destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
 
     bool isNewChain = destChainConfigArgs.destChainSelector != DEST_CHAIN_SELECTOR;
@@ -833,17 +826,6 @@ contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
     vm.expectRevert(
       abi.encodeWithSelector(FeeQuoter.InvalidDestChainConfig.selector, destChainConfigArg.destChainSelector)
     );
-    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
-  }
-
-  function test_InvalidDestBytesOverhead_Revert() public {
-    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
-    FeeQuoter.DestChainConfigArgs memory destChainConfigArg = destChainConfigArgs[0];
-
-    destChainConfigArg.destChainConfig.defaultTokenDestBytesOverhead = uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES - 1);
-
-    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.InvalidDestChainConfig.selector, DEST_CHAIN_SELECTOR));
-
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
   }
 
@@ -952,7 +934,6 @@ contract FeeQuoter_getDataAvailabilityCost is FeeQuoterSetup {
     destChainConfigArgs[0].destChainConfig.defaultTxGasLimit = GAS_LIMIT;
     destChainConfigArgs[0].destChainConfig.maxPerMsgGasLimit = GAS_LIMIT;
     destChainConfigArgs[0].destChainConfig.chainFamilySelector = Internal.CHAIN_FAMILY_SELECTOR_EVM;
-    destChainConfigArgs[0].destChainConfig.defaultTokenDestBytesOverhead = DEFAULT_TOKEN_BYTES_OVERHEAD;
 
     s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
 
@@ -1853,30 +1834,43 @@ contract FeeQuoter_processMessageArgs is FeeQuoterFeeSetup {
 }
 
 contract FeeQuoter_validatePoolReturnData is FeeQuoterFeeSetup {
-  function test_WithSingleToken_Success() public view {
+  function test_ProcessPoolReturnData_Success() public view {
     Client.EVMTokenAmount[] memory sourceTokenAmounts = new Client.EVMTokenAmount[](1);
     sourceTokenAmounts[0].amount = 1e18;
     sourceTokenAmounts[0].token = s_sourceTokens[0];
+    sourceTokenAmounts[1].amount = 1e18;
+    sourceTokenAmounts[1].token = CUSTOM_TOKEN_2;
 
-    Internal.RampTokenAmount[] memory rampTokenAmounts = new Internal.RampTokenAmount[](1);
-    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry);
+    Internal.RampTokenAmount[] memory rampTokenAmounts = new Internal.RampTokenAmount[](2);
+    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry, DEST_CHAIN_SELECTOR);
+    rampTokenAmounts[1] = _getSourceTokenData(sourceTokenAmounts[1], s_tokenAdminRegistry, DEST_CHAIN_SELECTOR);
+    bytes[] memory expectedDestExecData = new bytes[](2);
+    expectedDestExecData[0] = abi.encode(
+      s_priceRegistryTokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig.destGasOverhead
+    );
+    expectedDestExecData[1] = abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD); //expected return data should be abi.encoded  default as isEnabled is false
 
     // No revert - successful
-    s_feeQuoter.validatePoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
+    bytes[] memory destExecData =
+      s_priceRegistry.processPoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
+
+    for (uint256 i = 0; i < destExecData.length; ++i) {
+      assertEq(destExecData[i], expectedDestExecData[i]);
+    }
   }
 
   function test_TokenAmountArraysMismatching_Revert() public {
-    Client.EVMTokenAmount[] memory sourceTokenAmounts = new Client.EVMTokenAmount[](1);
+    Client.EVMTokenAmount[] memory sourceTokenAmounts = new Client.EVMTokenAmount[](2);
     sourceTokenAmounts[0].amount = 1e18;
     sourceTokenAmounts[0].token = s_sourceTokens[0];
 
     Internal.RampTokenAmount[] memory rampTokenAmounts = new Internal.RampTokenAmount[](1);
-    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry);
+    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry, DEST_CHAIN_SELECTOR);
 
     // Revert due to index out of bounds access
     vm.expectRevert();
 
-    s_feeQuoter.validatePoolReturnData(
+    s_feeQuoter.processPoolReturnData(
       DEST_CHAIN_SELECTOR, new Internal.RampTokenAmount[](1), new Client.EVMTokenAmount[](0)
     );
   }
@@ -1889,19 +1883,19 @@ contract FeeQuoter_validatePoolReturnData is FeeQuoterFeeSetup {
     sourceTokenAmounts[0].token = sourceETH;
 
     Internal.RampTokenAmount[] memory rampTokenAmounts = new Internal.RampTokenAmount[](1);
-    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry);
+    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry, DEST_CHAIN_SELECTOR);
 
     // No data set, should succeed
-    s_feeQuoter.validatePoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
+    s_feeQuoter.processPoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
 
     // Set max data length, should succeed
     rampTokenAmounts[0].extraData = new bytes(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES);
-    s_feeQuoter.validatePoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
+    s_feeQuoter.processPoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
 
     // Set data to max length +1, should revert
     rampTokenAmounts[0].extraData = new bytes(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES + 1);
-    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.SourceTokenDataTooLarge.selector, sourceETH));
-    s_feeQuoter.validatePoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
+    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.SourceTokenDataTooLarge.selector, sourceETH));
+    s_feeQuoter.processPoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
 
     // Set token config to allow larger data
     FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(1, 1);
@@ -1919,13 +1913,13 @@ contract FeeQuoter_validatePoolReturnData is FeeQuoterFeeSetup {
       tokenTransferFeeConfigArgs, new FeeQuoter.TokenTransferFeeConfigRemoveArgs[](0)
     );
 
-    s_feeQuoter.validatePoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
+    s_feeQuoter.processPoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
 
     // Set the token data larger than the configured token data, should revert
     rampTokenAmounts[0].extraData = new bytes(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES + 32 + 1);
 
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.SourceTokenDataTooLarge.selector, sourceETH));
-    s_feeQuoter.validatePoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
+    s_feeQuoter.processPoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
   }
 
   function test_InvalidEVMAddressDestToken_Revert() public {
@@ -1936,11 +1930,11 @@ contract FeeQuoter_validatePoolReturnData is FeeQuoterFeeSetup {
     sourceTokenAmounts[0].token = s_sourceTokens[0];
 
     Internal.RampTokenAmount[] memory rampTokenAmounts = new Internal.RampTokenAmount[](1);
-    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry);
+    rampTokenAmounts[0] = _getSourceTokenData(sourceTokenAmounts[0], s_tokenAdminRegistry, DEST_CHAIN_SELECTOR);
     rampTokenAmounts[0].destTokenAddress = nonEvmAddress;
 
     vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, nonEvmAddress));
-    s_feeQuoter.validatePoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
+    s_feeQuoter.processPoolReturnData(DEST_CHAIN_SELECTOR, rampTokenAmounts, sourceTokenAmounts);
   }
 }
 
