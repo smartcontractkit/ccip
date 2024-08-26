@@ -41,6 +41,7 @@ type Chain struct {
 	// Note the Sign function can be abstract supporting a variety of key storage mechanisms (e.g. KMS etc).
 	DeployerKey *bind.TransactOpts
 	Confirm     func(tx common.Hash) error
+	RetrySubmit func(tx *types.Transaction, err error) (*types.Transaction, error)
 }
 
 type Environment struct {

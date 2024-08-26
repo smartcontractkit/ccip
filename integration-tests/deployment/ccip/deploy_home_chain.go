@@ -61,6 +61,9 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 				chain.DeployerKey,
 				chain.Client,
 			)
+			if err2 != nil {
+				tx, err2 = chain.RetrySubmit(tx, err2)
+			}
 			return ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
 				Address: crAddr, Contract: cr, Tv: deployment.NewTypeAndVersion(CapabilitiesRegistry, deployment.Version1_0_0), Tx: tx, Err: err2,
 			}
