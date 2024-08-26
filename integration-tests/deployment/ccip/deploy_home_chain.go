@@ -9,10 +9,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -23,8 +21,8 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ccip_config"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_multi_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ocr3_config_encoder"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/capabilities_registry"
 )
 
@@ -35,7 +33,6 @@ const (
 
 	FirstBlockAge                           = 8 * time.Hour
 	RemoteGasPriceBatchWriteFrequency       = 30 * time.Minute
-	TokenPriceBatchWriteFrequency           = 30 * time.Minute
 	BatchGasLimit                           = 6_500_000
 	RelativeBoostPerWaitHour                = 1.5
 	InflightCacheExpiry                     = 10 * time.Minute
@@ -55,11 +52,7 @@ const (
 	MaxDurationShouldTransmitAcceptedReport = 10 * time.Second
 )
 
-var (
-	deviationPPB = ccipocr3.NewBigIntFromInt64(2e5)
-)
-
-func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainSel uint64) (deployment.AddressBook, error) {
+func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainSel uint64) (deployment.AddressBook, common.Address, error) {
 	ab := deployment.NewMemoryAddressBook()
 	chain := chains[chainSel]
 	capReg, err := deployContract(lggr, chain, ab,
@@ -69,12 +62,12 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 				chain.Client,
 			)
 			return ContractDeploy[*capabilities_registry.CapabilitiesRegistry]{
-				Address: crAddr, Contract: cr, TvStr: CapabilitiesRegistry_1_0_0, Tx: tx, Err: err2,
+				Address: crAddr, Contract: cr, Tv: deployment.NewTypeAndVersion(CapabilitiesRegistry, deployment.Version1_0_0), Tx: tx, Err: err2,
 			}
 		})
 	if err != nil {
 		lggr.Errorw("Failed to deploy capreg", "err", err)
-		return ab, err
+		return ab, common.Address{}, err
 	}
 	lggr.Infow("deployed capreg", "addr", capReg.Address)
 	ccipConfig, err := deployContract(
@@ -86,12 +79,12 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 				capReg.Address,
 			)
 			return ContractDeploy[*ccip_config.CCIPConfig]{
-				Address: ccAddr, TvStr: CCIPConfig_1_6_0, Tx: tx, Err: err2, Contract: cc,
+				Address: ccAddr, Tv: deployment.NewTypeAndVersion(CCIPConfig, deployment.Version1_6_0_dev), Tx: tx, Err: err2, Contract: cc,
 			}
 		})
 	if err != nil {
 		lggr.Errorw("Failed to deploy ccip config", "err", err)
-		return ab, err
+		return ab, common.Address{}, err
 	}
 	lggr.Infow("deployed ccip config", "addr", ccipConfig.Address)
 
@@ -106,7 +99,7 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 	})
 	if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
 		lggr.Errorw("Failed to add capabilities", "err", err)
-		return ab, err
+		return ab, common.Address{}, err
 	}
 	// TODO: Just one for testing.
 	tx, err = capReg.Contract.AddNodeOperators(chain.DeployerKey, []capabilities_registry.CapabilitiesRegistryNodeOperator{
@@ -117,9 +110,9 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 	})
 	if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
 		lggr.Errorw("Failed to add node operators", "err", err)
-		return ab, err
+		return ab, common.Address{}, err
 	}
-	return ab, nil
+	return ab, capReg.Address, nil
 }
 
 func sortP2PIDS(p2pIDs [][32]byte) {
@@ -189,55 +182,11 @@ func AddChainConfig(
 		chainConfig,
 	}
 	tx, err := ccipConfig.ApplyChainConfigUpdates(h.DeployerKey, nil, inputConfig)
-	if err != nil {
+	if err := deployment.ConfirmIfNoError(h, tx, err); err != nil {
 		return ccip_config.CCIPConfigTypesChainConfigInfo{}, err
 	}
-	if err := h.Confirm(tx.Hash()); err != nil {
-		return ccip_config.CCIPConfigTypesChainConfigInfo{}, err
-	}
+	lggr.Infow("Applied chain config updates", "chainConfig", chainConfig)
 	return chainConfig, nil
-}
-
-func getPluginConfig(
-	pluginType cctypes.PluginType,
-	weth *weth9.WETH9,
-	h deployment.Chain,
-) ([]byte, error) {
-	var encodedOffchainConfig []byte
-	var err2 error
-	if pluginType == cctypes.PluginTypeCCIPCommit {
-		encodedOffchainConfig, err2 = pluginconfig.EncodeCommitOffchainConfig(pluginconfig.CommitOffchainConfig{
-			RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(RemoteGasPriceBatchWriteFrequency),
-			TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(TokenPriceBatchWriteFrequency),
-			PriceSources:                      map[ocrtypes.Account]pluginconfig.ArbitrumPriceSource{
-				//ocrtypes.Account(weth.Address().Hex()): {
-				//  AggregatorAddress: h.mockAggregatorAddress.Hex(),
-				//	DeviationPPB: deviationPPB,
-				//},
-			},
-			TokenDecimals: map[ocrtypes.Account]uint8{
-				//ocrtypes.Account(weth.Address().Hex()): 18,
-			},
-			TokenPriceChainSelector: h.Selector,
-		})
-		if err2 != nil {
-			return nil, err2
-		}
-	} else {
-		encodedOffchainConfig, err2 = pluginconfig.EncodeExecuteOffchainConfig(pluginconfig.ExecuteOffchainConfig{
-			BatchGasLimit:             BatchGasLimit,
-			RelativeBoostPerWaitHour:  RelativeBoostPerWaitHour,
-			MessageVisibilityInterval: *commonconfig.MustNewDuration(FirstBlockAge),
-			InflightCacheExpiry:       *commonconfig.MustNewDuration(InflightCacheExpiry),
-			RootSnoozeTime:            *commonconfig.MustNewDuration(RootSnoozeTime),
-			BatchingStrategyID:        BatchingStrategyID,
-		})
-		if err2 != nil {
-			return nil, err2
-		}
-	}
-
-	return encodedOffchainConfig, nil
 }
 
 func AddDON(
@@ -245,8 +194,7 @@ func AddDON(
 	ccipCapabilityID [32]byte,
 	capReg *capabilities_registry.CapabilitiesRegistry,
 	ccipConfig *ccip_config.CCIPConfig,
-	weth *weth9.WETH9,
-	offRamp *evm_2_evm_multi_offramp.EVM2EVMMultiOffRamp,
+	offRamp *offramp.OffRamp,
 	dest deployment.Chain,
 	home deployment.Chain,
 	f uint8,
@@ -279,7 +227,24 @@ func AddDON(
 	// Add DON on capability registry contract
 	var ocr3Configs []ocr3_config_encoder.CCIPConfigTypesOCR3Config
 	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
-		encodedOffchainConfig, err2 := getPluginConfig(pluginType, weth, home)
+		var encodedOffchainConfig []byte
+		var err2 error
+		if pluginType == cctypes.PluginTypeCCIPCommit {
+			encodedOffchainConfig, err2 = pluginconfig.EncodeCommitOffchainConfig(pluginconfig.CommitOffchainConfig{
+				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(RemoteGasPriceBatchWriteFrequency),
+				// TODO: implement token price writes
+				// TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(tokenPriceBatchWriteFrequency),
+			})
+		} else {
+			encodedOffchainConfig, err2 = pluginconfig.EncodeExecuteOffchainConfig(pluginconfig.ExecuteOffchainConfig{
+				BatchGasLimit:             BatchGasLimit,
+				RelativeBoostPerWaitHour:  RelativeBoostPerWaitHour,
+				MessageVisibilityInterval: *commonconfig.MustNewDuration(FirstBlockAge),
+				InflightCacheExpiry:       *commonconfig.MustNewDuration(InflightCacheExpiry),
+				RootSnoozeTime:            *commonconfig.MustNewDuration(RootSnoozeTime),
+				BatchingStrategyID:        BatchingStrategyID,
+			})
+		}
 		if err2 != nil {
 			return err2
 		}
@@ -342,10 +307,6 @@ func AddDON(
 	// Trim first four bytes to remove function selector.
 	encodedConfigs := encodedCall[4:]
 
-	// commit so that we have an empty block to filter events from
-	// TODO: required?
-	//h.backend.Commit()
-
 	tx, err := capReg.AddDON(home.DeployerKey, p2pIDs, []capabilities_registry.CapabilitiesRegistryCapabilityConfiguration{
 		{
 			CapabilityId: ccipCapabilityID,
@@ -388,7 +349,7 @@ func AddDON(
 	}
 
 	// get the config digest from the ccip config contract and set config on the offramp.
-	var offrampOCR3Configs []evm_2_evm_multi_offramp.MultiOCR3BaseOCRConfigArgs
+	var offrampOCR3Configs []offramp.MultiOCR3BaseOCRConfigArgs
 	for _, pluginType := range []cctypes.PluginType{cctypes.PluginTypeCCIPCommit, cctypes.PluginTypeCCIPExec} {
 		ocrConfig, err2 := ccipConfig.GetOCRConfig(&bind.CallOpts{
 			Context: context.Background(),
@@ -400,7 +361,7 @@ func AddDON(
 			return errors.New("expected exactly one OCR3 config")
 		}
 
-		offrampOCR3Configs = append(offrampOCR3Configs, evm_2_evm_multi_offramp.MultiOCR3BaseOCRConfigArgs{
+		offrampOCR3Configs = append(offrampOCR3Configs, offramp.MultiOCR3BaseOCRConfigArgs{
 			ConfigDigest:                   ocrConfig[0].ConfigDigest,
 			OcrPluginType:                  uint8(pluginType),
 			F:                              f,
@@ -409,8 +370,6 @@ func AddDON(
 			Transmitters:                   transmitterAddresses,
 		})
 	}
-
-	//uni.backend.Commit()
 
 	tx, err = offRamp.SetOCR3Configs(dest.DeployerKey, offrampOCR3Configs)
 	if err := deployment.ConfirmIfNoError(dest, tx, err); err != nil {
@@ -425,7 +384,8 @@ func AddDON(
 			//return err
 			return deployment.MaybeDataErr(err)
 		}
-		// TODO: assertions
+		// TODO: assertions to be done as part of full state
+		// resprentation validation CCIP-3047
 		//require.Equalf(t, offrampOCR3Configs[pluginType].ConfigDigest, ocrConfig.ConfigInfo.ConfigDigest, "%s OCR3 config digest mismatch", pluginType.String())
 		//require.Equalf(t, offrampOCR3Configs[pluginType].F, ocrConfig.ConfigInfo.F, "%s OCR3 config F mismatch", pluginType.String())
 		//require.Equalf(t, offrampOCR3Configs[pluginType].IsSignatureVerificationEnabled, ocrConfig.ConfigInfo.IsSignatureVerificationEnabled, "%s OCR3 config signature verification mismatch", pluginType.String())
