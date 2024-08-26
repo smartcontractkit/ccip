@@ -24,7 +24,7 @@ nonce_manager: ../../../contracts/solc/v0.8.24/NonceManager/NonceManager.abi ../
 ocr3_config_encoder: ../../../contracts/solc/v0.8.24/IOCR3ConfigEncoder/IOCR3ConfigEncoder.abi ../../../contracts/solc/v0.8.24/IOCR3ConfigEncoder/IOCR3ConfigEncoder.bin e21180898e1ad54a045ee20add85a2793c681425ea06f66d1a9e5cab128b6487
 offramp: ../../../contracts/solc/v0.8.24/OffRamp/OffRamp.abi ../../../contracts/solc/v0.8.24/OffRamp/OffRamp.bin 76ec9676116368ab7c7c7ed45191698a12e4d975633caea32d821a1125633589
 onramp: ../../../contracts/solc/v0.8.24/OnRamp/OnRamp.abi ../../../contracts/solc/v0.8.24/OnRamp/OnRamp.bin 27c13817cd35e3550d8db2f7903eccd7a586bbaba4b3b8bdd6ac11a715135dce
-ping_pong_demo: ../../../contracts/solc/v0.8.24/PingPongDemo/PingPongDemo.abi ../../../contracts/solc/v0.8.24/PingPongDemo/PingPongDemo.bin 4e51d70bdb6d951041518a3d7fd3b33ba8d3954bcc3d078318055b833b880324
+ping_pong_demo: ../../../contracts/solc/v0.8.24/PingPongDemo/PingPongDemo.abi ../../../contracts/solc/v0.8.24/PingPongDemo/PingPongDemo.bin c1c2f8a65c7ffd971899cae7fe62f2da57d09e936151e2b92163c4bebe699d6b
 price_registry: ../../../contracts/solc/v0.8.24/PriceRegistry/PriceRegistry.abi ../../../contracts/solc/v0.8.24/PriceRegistry/PriceRegistry.bin 8931609776700a2a8121c9fdd757dbf9207d8b97583e70c84ec2d88c839d4a30
 registry_module_owner_custom: ../../../contracts/solc/v0.8.24/RegistryModuleOwnerCustom/RegistryModuleOwnerCustom.abi ../../../contracts/solc/v0.8.24/RegistryModuleOwnerCustom/RegistryModuleOwnerCustom.bin 75be86323c227917a9bbc3f799d7ed02f92db546653a36db30ed0ebe64461353
 report_codec: ../../../contracts/solc/v0.8.24/ReportCodec/ReportCodec.abi ../../../contracts/solc/v0.8.24/ReportCodec/ReportCodec.bin 20292ddaba15096fe8060567cf56cda673b947df27241d0c49d2debc838feb24
