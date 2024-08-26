@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
@@ -23,6 +25,13 @@ import (
 
 const decimalsMethodName = "decimals"
 const latestRoundDataMethodName = "latestRoundData"
+const OFFCHAIN_AGGREGATOR = "OffchainAggregator"
+
+type decimalsConfig struct {
+}
+
+type latestRoundDataConfig struct {
+}
 
 func init() {
 	// Ensure existence of latestRoundData method on the Aggregator contract.
@@ -82,14 +91,6 @@ func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[u
 	}
 	priceGetter := DynamicPriceGetter{cfg, evmClients, contractReaders, aggregatorAbi}
 	return &priceGetter, nil
-}
-
-// Either the DynamicPriceGetter should return a list of ContractReaderConfigs, and then
-// I should migrate all the uses of BatchCall to use ContractReader. Or, I modify
-// DynamicPriceGetter to use contract reader under the hood. I'll have to spike to see
-// which one is easier
-func (d *DynamicPriceGetter) ContractReaderConfigs() []byte {
-	return make([]byte, 0)
 }
 
 // FilterConfiguredTokens implements the PriceGetter interface.
@@ -165,6 +166,41 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 
 	nbDecimalCalls := len(batchCalls.decimalCalls)
 	nbLatestRoundDataCalls := len(batchCalls.decimalCalls)
+
+	// Retrieve contract reader for the chain
+	contractReader := d.contractReaders[chainID]
+
+	// Bind contract reader to the contract addresses necessary for the batch calls
+	bindings := make([]types.BoundContract, 0)
+	for _, call := range batchCalls.decimalCalls { // only need decimalCalls as addresses are same for latestRoundData
+		bindings = append(bindings, types.BoundContract{
+			Address: string(ccip.EvmAddrToGeneric(call.ContractAddress())),
+			Name:    OFFCHAIN_AGGREGATOR,
+		})
+	}
+
+	contractReader.Bind(ctx, bindings)
+
+	// Perform call
+	result, err := contractReader.BatchGetLatestValues(ctx, types.BatchGetLatestValuesRequest{
+		OFFCHAIN_AGGREGATOR: types.ContractBatch{
+			{
+				ReadName:  decimalsMethodName,
+				ReturnVal: &decimalsConfig{},
+			},
+			{
+				ReadName:  latestRoundDataMethodName,
+				ReturnVal: &latestRoundDataConfig{},
+			},
+		},
+	})
+
+	// Extract results
+	for _, batchResult := range result {
+		for _, read := range batchResult {
+			read.GetResult()
+		}
+	}
 
 	// Perform batched call (all decimals calls followed by latest round data calls).
 	calls := make([]rpclib.EvmCall, 0, nbDecimalCalls+nbLatestRoundDataCalls)
