@@ -8,29 +8,50 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment/memory"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/persistent"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
-func TestDeployCCIPContracts(t *testing.T) {
+func TestDeployCCIPContractsInMemory(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	e := memory.NewMemoryEnvironment(t, lggr, zapcore.InfoLevel, memory.MemoryEnvironmentConfig{
 		Bootstraps: 1,
 		Chains:     1,
 		Nodes:      4,
 	})
+	testDeployCCIPContractsWithEnv(t, lggr, e)
+}
+
+func TestDeployCCIPContractsPersistent(t *testing.T) {
+	lggr := logger.TestLogger(t)
+	e := persistent.NewPersistentEnvironment(t, lggr)
+	testDeployCCIPContractsWithEnv(t, lggr, e)
+}
+
+func testDeployCCIPContractsWithEnv(t *testing.T, lggr logger.Logger, e deployment.Environment) {
+	var ab deployment.AddressBook
 	// Deploy all the CCIP contracts.
-	homeChain := e.AllChainSelectors()[0]
-	capRegAddresses, _, err := DeployCapReg(lggr, e.Chains, homeChain)
-	require.NoError(t, err)
-	s, err := LoadOnchainState(e, capRegAddresses)
-	require.NoError(t, err)
-	ab, err := DeployCCIPContracts(e, DeployCCIPContractConfig{
-		HomeChainSel:     homeChain,
-		CCIPOnChainState: s,
-	})
-	require.NoError(t, err)
+	for _, chain := range e.AllChainSelectors() {
+		capRegAddresses, _, err := DeployCapReg(lggr, e.Chains, chain)
+		require.NoError(t, err)
+		s, err := LoadOnchainState(e, capRegAddresses)
+		require.NoError(t, err)
+		newAb, err := DeployCCIPContracts(e, DeployCCIPContractConfig{
+			HomeChainSel:     chain,
+			CCIPOnChainState: s,
+		})
+		require.NoError(t, err)
+		if ab == nil {
+			ab = newAb
+		} else {
+			mergeErr := ab.Merge(newAb)
+			require.NoError(t, mergeErr)
+		}
+	}
+
 	state, err := LoadOnchainState(e, ab)
 	require.NoError(t, err)
 	snap, err := state.Snapshot(e.AllChainSelectors())

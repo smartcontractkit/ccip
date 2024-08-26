@@ -41,7 +41,22 @@ type Chain struct {
 	// Note the Sign function can be abstract supporting a variety of key storage mechanisms (e.g. KMS etc).
 	DeployerKey *bind.TransactOpts
 	Confirm     func(tx common.Hash) error
+	// Function to execute if transaction submission fails.
 	RetrySubmit func(tx *types.Transaction, err error) (*types.Transaction, error)
+	// Seth-specific function that loads the ABI for a contract, so that we can decode it
+	// IMHO it would be better to add it to OnchainClient, as that it belongs there, but would mean we'd need a wrapper
+	// for bind.SimulatedBackend, which is a bit annoying.
+	LoadAbi func(contract interface{}) error
+}
+
+// NoOpRetrySubmit is a retry submit function that does nothing.
+func NoOpRetrySubmit(tx *types.Transaction, err error) (*types.Transaction, error) {
+	return nil, err
+}
+
+// NoOpLoadAbi is a load ABI function that does nothing.
+func NoOpLoadAbi(contract interface{}) error {
+	return nil
 }
 
 type Environment struct {

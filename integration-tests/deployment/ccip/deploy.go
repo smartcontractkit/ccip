@@ -87,7 +87,12 @@ func deployContract[C Contracts](
 		lggr.Errorw("Failed to deploy contract", "err", contractDeploy.Err)
 		return nil, contractDeploy.Err
 	}
-	err := chain.Confirm(contractDeploy.Tx.Hash())
+	err := chain.LoadAbi(contractDeploy.Contract)
+	if err != nil {
+		lggr.Errorw("Failed to load contract abi", "err", err)
+		return nil, err
+	}
+	err = chain.Confirm(contractDeploy.Tx.Hash())
 	if err != nil {
 		lggr.Errorw("Failed to confirm deployment", "err", err)
 		return nil, err

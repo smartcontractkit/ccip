@@ -53,6 +53,8 @@ func NewMemoryChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 					return nil
 				}
 			},
+			RetrySubmit: deployment.NoOpRetrySubmit,
+			LoadAbi:     deployment.NoOpLoadAbi,
 		}
 	}
 	return chains

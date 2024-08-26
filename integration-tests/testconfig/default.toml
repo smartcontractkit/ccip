@@ -99,16 +99,17 @@ FeeCapDefault = '200 gwei'
 # if transaction level doesn't match, then calling Decode() does nothing. It's advised to keep it set
 # to 'reverted' to limit noise. If you combine it with 'trace_to_json' it will save all possible data
 # in JSON files for reverted transactions.
-tracing_level = "reverted"
+tracing_level = "all"
 # saves each decoding/tracing results to JSON files; what exactly is saved depends on what we
 # were able te decode, we try to save maximum information possible. It can either be:
 # just tx hash, decoded transaction or call trace. Which transactions traces are saved depends
 # on 'tracing_level'.
+trace_outputs = ["console"]
 
 # number of addresses to be generated and runtime, if set to 0, no addresses will be generated
 # each generated address will receive a proportion of native tokens from root private key's balance
 # with the value equal to (root_balance / ephemeral_addresses_number) - transfer_fee * ephemeral_addresses_number
-ephemeral_addresses_number = 10
+ephemeral_addresses_number = 0
 
 # If enabled we will panic when getting transaction options if current key/address has a pending transaction
 # That's because the one we are about to send would get queued, possibly for a very long time

@@ -81,6 +81,9 @@ func DeployCapReg(lggr logger.Logger, chains map[uint64]deployment.Chain, chainS
 				chain.Client,
 				capReg.Address,
 			)
+			if err2 != nil {
+				tx, err2 = chain.RetrySubmit(tx, err2)
+			}
 			return ContractDeploy[*ccip_config.CCIPConfig]{
 				Address: ccAddr, Tv: deployment.NewTypeAndVersion(CCIPConfig, deployment.Version1_6_0_dev), Tx: tx, Err: err2, Contract: cc,
 			}
