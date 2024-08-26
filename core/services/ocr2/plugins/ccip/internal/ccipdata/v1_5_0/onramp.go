@@ -65,7 +65,6 @@ type OnRamp struct {
 	// The only way to change that is through the contract's constructor (redeployment)
 	cachedStaticConfig cache.OnceCtxFunction[evm_2_evm_onramp.EVM2EVMOnRampStaticConfig]
 	cachedRmnContract  cache.OnceCtxFunction[*rmn_contract.RMNContract]
-	daConfigCache      ccipdata.DAConfigCacheWriter
 }
 
 func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRamp, error) {
