@@ -35,6 +35,7 @@ require (
 	cosmossdk.io/depinject v1.0.0-alpha.4 // indirect
 	cosmossdk.io/errors v1.0.1 // indirect
 	cosmossdk.io/math v1.3.0 // indirect
+	github.com/awalterschulze/gographviz v2.0.3+incompatible // indirect
 	github.com/containerd/errdefs v0.1.0 // indirect
 	github.com/google/gnostic-models v0.6.9-0.20230804172637-c7be7c783f49 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
