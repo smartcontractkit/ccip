@@ -839,6 +839,11 @@ contract OnRamp_allowListConfigUpdates is OnRampSetup {
     emit OnRamp.DestChainConfigSet(9999, 0, IRouter(address(9999)), false);
     s_onRamp.applyDestChainConfigUpdates(configArgs);
 
+    (uint64 sequenceNumber, bool allowListEnabled, address router) = s_onRamp.getDestChainConfig(9999);
+    assertEq(sequenceNumber, 0);
+    assertEq(allowListEnabled, false);
+    assertEq(router, address(9999));
+
     uint64[] memory destinationChainSelectors = new uint64[](2);
     destinationChainSelectors[0] = DEST_CHAIN_SELECTOR;
     destinationChainSelectors[1] = uint64(99999);
