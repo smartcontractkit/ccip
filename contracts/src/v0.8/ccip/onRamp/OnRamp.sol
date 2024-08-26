@@ -381,6 +381,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     sequenceNumber = config.sequenceNumber;
     allowListEnabled = config.allowListEnabled;
     router = address(config.router);
+    return (sequenceNumber, allowListEnabled, router);
   }
 
   /// @notice get allowedSenders List configured for the DestinationChainSelector
