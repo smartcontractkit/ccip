@@ -863,9 +863,9 @@ contract OnRamp_allowListConfigUpdates is OnRampSetup {
     applyAllowListConfigArgsItems[0] = allowListConfigArgs;
 
     s_onRamp.applyAllowListUpdates(applyAllowListConfigArgsItems);
-    assertEq(4, s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).allowedSendersList.length);
+    assertEq(4, s_onRamp.getAllowedSendersList(DEST_CHAIN_SELECTOR).length);
 
-    assertEq(addedAllowlistedSenders, s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).allowedSendersList);
+    assertEq(addedAllowlistedSenders, s_onRamp.getAllowedSendersList(DEST_CHAIN_SELECTOR));
 
     address[] memory removedAllowlistedSenders = new address[](1);
     removedAllowlistedSenders[0] = vm.addr(2);
@@ -884,7 +884,7 @@ contract OnRamp_allowListConfigUpdates is OnRampSetup {
     allowListConfigArgsItems_2[0] = allowListConfigArgs;
 
     s_onRamp.applyAllowListUpdates(allowListConfigArgsItems_2);
-    assertEq(3, s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).allowedSendersList.length);
+    assertEq(3, s_onRamp.getAllowedSendersList(DEST_CHAIN_SELECTOR).length);
 
     addedAllowlistedSenders = new address[](2);
     addedAllowlistedSenders[0] = vm.addr(5);
@@ -909,7 +909,7 @@ contract OnRamp_allowListConfigUpdates is OnRampSetup {
     allowListConfigArgsItems_3[0] = allowListConfigArgs;
 
     s_onRamp.applyAllowListUpdates(allowListConfigArgsItems_3);
-    assertEq(3, s_onRamp.getDestChainConfig(DEST_CHAIN_SELECTOR).allowedSendersList.length);
+    assertEq(3, s_onRamp.getAllowedSendersList(DEST_CHAIN_SELECTOR).length);
   }
 
   function test_applyAllowList_Revert() public {

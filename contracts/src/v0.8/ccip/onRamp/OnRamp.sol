@@ -87,23 +87,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     EnumerableSet.AddressSet allowedSendersList;
   }
 
-  /// @dev Struct used as a return type for config query on Destination chain
-  /// @dev sequenceNumber, allowListEnabled, router will all be packed in 1 slot
-  /// @dev DestChainConfig stores allowedList of senders as enumeratedSet. enumeratedSet cant be returned as-is,
-  /// @dev DestChainConfigInfo is used as a struct to return DestinationConfig info
-  struct DestChainConfigInfo {
-    // The last used sequence number. This is zero in the case where no messages has been sent yet.
-    // 0 is not a valid sequence number for any real transaction.
-    uint64 sequenceNumber;
-    // boolean indicator to specify if allowList check is enabled
-    bool allowListEnabled;
-    // This is the local router address that is allowed to send messages to the destination chain.
-    // This is NOT the receiving router address on the destination chain.
-    IRouter router;
-    // This is the list of addresses allowed to send messages from onRamp
-    address[] allowedSendersList;
-  }
-
   /// @dev Same as DestChainConfig but with the destChainSelector so that an array of these
   /// can be passed in the constructor and the applyDestChainConfigUpdates function
   //solhint-disable gas-struct-packing
@@ -386,17 +369,25 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
 
   /// @notice get ChainConfig configured for the DestinationChainSelector
   /// @param destChainSelector The destination chain selector
-  /// @dev DestChainConfig stores allowedList of senders as enumeratedSet.
-  /// @dev As enumeratedSet cant be returned as-is, an array of allowedSenders returned in DestChainConfigInfo struct
-  /// @return DestChainConfigInfo returns DestinationChainConfig with array of allowedList of Senders
-  function getDestChainConfig(uint64 destChainSelector) public view returns (DestChainConfigInfo memory) {
+  /// @return sequenceNumber The last used sequence number
+  /// @return allowListEnabled boolean indicator to specify if allowList check is enabled
+  /// @return router address of the router
+  function getDestChainConfig(uint64 destChainSelector)
+    public
+    view
+    returns (uint64 sequenceNumber, bool allowListEnabled, address router)
+  {
     DestChainConfig storage config = s_destChainConfigs[destChainSelector];
-    return DestChainConfigInfo({
-      sequenceNumber: config.sequenceNumber,
-      allowListEnabled: config.allowListEnabled,
-      router: config.router,
-      allowedSendersList: config.allowedSendersList.values()
-    });
+    sequenceNumber = config.sequenceNumber;
+    allowListEnabled = config.allowListEnabled;
+    router = address(config.router);
+  }
+
+  /// @notice get allowedSenders List configured for the DestinationChainSelector
+  /// @param destChainSelector The destination chain selector
+  /// @return array of allowedList of Senders
+  function getAllowedSendersList(uint64 destChainSelector) public view returns (address[] memory) {
+    return s_destChainConfigs[destChainSelector].allowedSendersList.values();
   }
 
   // ================================================================
