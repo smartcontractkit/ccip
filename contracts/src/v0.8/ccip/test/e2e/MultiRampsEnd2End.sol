@@ -154,17 +154,17 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
       MerkleRoot[] memory roots = new MerkleRoot[](2);
       roots[0] = MerkleRoot({
         sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-        onRampAddress: abi.encode(address(s_onRamp)),
         minSeqNr: messages1[0].header.sequenceNumber,
         maxSeqNr: messages1[1].header.sequenceNumber,
-        merkleRoot: merkleRoots[0]
+        merkleRoot: merkleRoots[0],
+        onRampAddress: abi.encode(address(s_onRamp))
       });
       roots[1] = MerkleRoot({
         sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
-        onRampAddress: abi.encode(address(s_onRamp)),
         minSeqNr: messages2[0].header.sequenceNumber,
         maxSeqNr: messages2[0].header.sequenceNumber,
-        merkleRoot: merkleRoots[1]
+        merkleRoot: merkleRoots[1],
+        onRampAddress: abi.encode(address(s_onRamp))
       });
 
       OffRamp.CommitReport memory report =
