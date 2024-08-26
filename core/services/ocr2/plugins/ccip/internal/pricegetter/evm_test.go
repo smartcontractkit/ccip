@@ -4,6 +4,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,6 +25,7 @@ import (
 type testParameters struct {
 	cfg                          config.DynamicPriceGetterConfig
 	evmClients                   map[uint64]DynamicPriceGetterClient
+	contractReaders              map[uint64]types.ContractReader
 	tokens                       []common.Address
 	expectedTokenPrices          map[common.Address]big.Int
 	expectedTokenPricesForAll    map[common.Address]big.Int
@@ -98,7 +101,7 @@ func TestDynamicPriceGetterWithEmptyInput(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			pg, err := NewDynamicPriceGetter(test.param.cfg, test.param.evmClients)
+			pg, err := NewDynamicPriceGetter(test.param.cfg, test.param.evmClients, test.param.contractReaders)
 			if test.param.invalidConfigErrorExpected {
 				require.Error(t, err)
 				return
