@@ -77,12 +77,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   struct DestChainConfig {
     // The last used sequence number. This is zero in the case where no messages have yet been sent.
     // 0 is not a valid sequence number for any real transaction.
-    uint64 sequenceNumber;
-    // boolean indicator to specify if allowList check is enabled
-    bool allowListEnabled;
-    // This is the local router address that is allowed to send messages to the destination chain.
-    // This is NOT the receiving router address on the destination chain.
-    IRouter router;
+    uint64 sequenceNumber; // ──────╮ The last used sequence number
+    bool allowListEnabled; //       │ boolean indicator to specify if allowList check is enabled
+    IRouter router; // ─────────────╯ Local router address  that is allowed to send messages to the destination chain.
     // This is the list of addresses allowed to send messages from onRamp
     EnumerableSet.AddressSet allowedSendersList;
   }
