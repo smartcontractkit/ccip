@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	v4 "github.com/smartcontractkit/chainlink-common/pkg/types/mercury/v4"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -109,6 +110,10 @@ func (p *mercuryProvider) ReportCodecV1() v1.ReportCodec {
 
 func (p *mercuryProvider) ReportCodecV2() v2.ReportCodec {
 	return p.reportCodecV2
+}
+
+func (p *mercuryProvider) ReportCodecV4() v4.ReportCodec {
+	panic("asdf")
 }
 
 func (p *mercuryProvider) ReportCodecV3() v3.ReportCodec {

@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	valuespb "github.com/smartcontractkit/chainlink-common/pkg/values/pb"
+
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
@@ -127,7 +128,7 @@ func stepToState(step workflowStepRow) (*WorkflowExecutionStep, error) {
 			return nil, err
 		}
 
-		inputs = values.FromMapValueProto(vmProto)
+		inputs, _ = values.FromMapValueProto(vmProto)
 	}
 
 	var (
@@ -146,7 +147,7 @@ func stepToState(step workflowStepRow) (*WorkflowExecutionStep, error) {
 			return nil, err
 		}
 
-		outputs = values.FromProto(vProto)
+		outputs, _ = values.FromProto(vProto)
 	}
 
 	return &WorkflowExecutionStep{
