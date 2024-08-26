@@ -31,7 +31,8 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   uint64 internal s_proposedUSDCMigrationChain;
 
   mapping(uint64 chainSelector => uint256 lockedBalance) internal s_lockedTokensByChainSelector;
-  mapping(uint64 => bool) internal s_shouldUseLockRelease;
+
+  mapping(uint64 chainSelector => bool shouldUseLockRelease) internal s_shouldUseLockRelease;
 
   constructor(address token, address router) {
     i_USDC = IBurnMintERC20(token);
@@ -55,6 +56,9 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
     delete s_lockedTokensByChainSelector[burnChainSelector];
     delete s_proposedUSDCMigrationChain;
 
+    // This should only be called after this contract has been granted a "zero allowance minter role" on USDC by Circle,
+    // otherwise the call will revert. Executing this burn will functionally convert all USDC on the destination chain
+    // to canonical USDC by removing the canonical USDC backing it from circulation.
     i_USDC.burn(tokensToBurn);
 
     // Disable L/R automatically on burned chain and enable CCTP

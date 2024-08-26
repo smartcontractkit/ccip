@@ -107,6 +107,9 @@ contract USDCTokenPoolSetup is BaseTest {
 
     s_usdcTokenPool.setDomains(domains);
 
+    vm.expectEmit();
+    emit HybridLockReleaseUSDCTokenPool.LiquidityProviderSet(address(0), OWNER, DEST_CHAIN_SELECTOR);
+
     s_usdcTokenPool.setLiquidityProvider(DEST_CHAIN_SELECTOR, OWNER);
   }
 
@@ -138,7 +141,7 @@ contract USDCTokenPoolSetup is BaseTest {
 }
 
 contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
-  function test_LockOrBurn_onAltMechanism_Success() public {
+  function test_LockOrBurn_onLockReleaseMechanism_Success() public {
     bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
 
     // Mark the destination chain as supporting CCTP, so use L/R instead.
@@ -149,7 +152,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
 
     assertTrue(
       s_usdcTokenPool.shouldUseLockRelease(DEST_CHAIN_SELECTOR),
-      "Alt mech not configured for outgoing message to DEST_CHAIN_SELECTOR"
+      "Lock/Release mech not configured for outgoing message to DEST_CHAIN_SELECTOR"
     );
 
     uint256 amount = 1e6;
@@ -174,7 +177,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     assertEq(s_token.balanceOf(address(s_usdcTokenPool)), amount, "Incorrect token amount in the tokenPool");
   }
 
-  function test_MintOrRelease_OnAltMechanism_Success() public {
+  function test_MintOrRelease_OnLockReleaseMechanism_Success() public {
     address recipient = address(1234);
 
     // Designate the SOURCE_CHAIN as not using native-USDC, and so the L/R mechanism must be used instead
@@ -185,7 +188,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
 
     assertTrue(
       s_usdcTokenPool.shouldUseLockRelease(SOURCE_CHAIN_SELECTOR),
-      "Alt mech not configured for incoming message from SOURCE_CHAIN_SELECTOR"
+      "Lock/Release mech not configured for incoming message from SOURCE_CHAIN_SELECTOR"
     );
 
     vm.startPrank(OWNER);
@@ -236,7 +239,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
       liquidityAmount - amount,
       "Incorrect remaining liquidity in TokenPool"
     );
-    assertEq(s_token.balanceOf(recipient), amount, "Tokens not transferred to regipient");
+    assertEq(s_token.balanceOf(recipient), amount, "Tokens not transferred to recipient");
   }
 
   function test_LockOrBurn_PrimaryMechanism_Success() public {
@@ -326,11 +329,11 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     );
   }
 
-  function test_LockOrBurn_altMechanism_then_switchToPrimary_Success() public {
-    // Test Enabling the alt mechanism and sending an outgoing message
+  function test_LockOrBurn_LocKReleaseMechanism_then_switchToPrimary_Success() public {
+    // Test Enabling the LR mechanism and sending an outgoing message
     test_LockOrBurn_PrimaryMechanism_Success();
 
-    // Disable the Alt mechanism so that primary CCTP is used and then attempt to send a message
+    // Disable the LR mechanism so that primary CCTP is used and then attempt to send a message
     uint64[] memory destChainRemoves = new uint64[](1);
     destChainRemoves[0] = DEST_CHAIN_SELECTOR;
 
@@ -345,10 +348,10 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     test_LockOrBurn_PrimaryMechanism_Success();
   }
 
-  function test_MintOrRelease_altMechanism_then_switchToPrimary_Success() public {
-    test_MintOrRelease_OnAltMechanism_Success();
+  function test_MintOrRelease_OnLockReleaseMechanism_then_switchToPrimary_Success() public {
+    test_MintOrRelease_OnLockReleaseMechanism_Success();
 
-    // Disable the Alt mechanism so that primary CCTP is used and then attempt to send a message
+    // Disable the LR mechanism so that primary CCTP is used and then attempt to send a message
     uint64[] memory destChainRemoves = new uint64[](1);
     destChainRemoves[0] = SOURCE_CHAIN_SELECTOR;
 
@@ -359,9 +362,12 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
 
     s_usdcTokenPool.updateChainSelectorMechanisms(destChainRemoves, new uint64[](0));
 
+    vm.expectEmit();
+    emit HybridLockReleaseUSDCTokenPool.LiquidityProviderSet(OWNER, OWNER, SOURCE_CHAIN_SELECTOR);
+
     s_usdcTokenPool.setLiquidityProvider(SOURCE_CHAIN_SELECTOR, OWNER);
 
-    // Test incoming on the primary mechanism after disable alt, simulating Circle's new support for CCTP on
+    // Test incoming on the primary mechanism after disable LR, simulating Circle's new support for CCTP on
     // DEST_CHAIN_SELECTOR
     test_MintOrRelease_incomingMessageWithPrimaryMechanism();
   }
@@ -420,7 +426,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
 
     assertTrue(
       s_usdcTokenPool.shouldUseLockRelease(DEST_CHAIN_SELECTOR),
-      "Alt mech not configured for outgoing message to DEST_CHAIN_SELECTOR"
+      "Lock Release mech not configured for outgoing message to DEST_CHAIN_SELECTOR"
     );
 
     uint256 amount = 1e6;
@@ -459,7 +465,7 @@ contract HybridUSDCTokenPoolMigrationTests is HybridUSDCTokenPoolTests {
 
     assertTrue(
       s_usdcTokenPool.shouldUseLockRelease(DEST_CHAIN_SELECTOR),
-      "Alt mech not configured for outgoing message to DEST_CHAIN_SELECTOR"
+      "Lock/Release mech not configured for outgoing message to DEST_CHAIN_SELECTOR"
     );
 
     uint256 amount = 1e6;
@@ -531,7 +537,9 @@ contract HybridUSDCTokenPoolMigrationTests is HybridUSDCTokenPoolTests {
       "No tokens should be locked for DEST_CHAIN_SELECTOR after CCTP-approved burn"
     );
 
-    assertFalse(s_usdcTokenPool.shouldUseLockRelease(DEST_CHAIN_SELECTOR), "Alt mech should be disabled after a burn");
+    assertFalse(
+      s_usdcTokenPool.shouldUseLockRelease(DEST_CHAIN_SELECTOR), "Lock/Release mech should be disabled after a burn"
+    );
 
     test_LockOrBurn_PrimaryMechanism_Success();
   }

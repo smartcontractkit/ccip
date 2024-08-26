@@ -23,6 +23,9 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   using EnumerableSet for EnumerableSet.UintSet;
 
   event LiquidityTransferred(address indexed from, uint64 indexed remoteChainSelector, uint256 amount);
+  event LiquidityProviderSet(
+    address indexed oldProvider, address indexed newProvider, uint64 indexed remoteChainSelector
+  );
 
   event LockReleaseEnabled(uint64 indexed remoteChainSelector);
   event LockReleaseDisabled(uint64 indexed remoteChainSelector);
@@ -134,7 +137,11 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   /// @notice Sets the LiquidityManager address.
   /// @dev Only callable by the owner.
   function setLiquidityProvider(uint64 remoteChainSelector, address liquidityProvider) external onlyOwner {
+    address oldProvider = s_liquidityProvider[remoteChainSelector];
+
     s_liquidityProvider[remoteChainSelector] = liquidityProvider;
+
+    emit LiquidityProviderSet(oldProvider, liquidityProvider, remoteChainSelector);
   }
 
   /// @notice Adds liquidity to the pool for a specific chain. The tokens should be approved first.
