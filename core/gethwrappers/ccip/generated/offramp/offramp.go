@@ -119,7 +119,7 @@ type OffRampCommitReport struct {
 }
 
 type OffRampDynamicConfig struct {
-	PriceRegistry                           common.Address
+	FeeQuoter                               common.Address
 	PermissionLessExecutionThresholdSeconds uint32
 	MaxTokenTransferGas                     uint32
 	MaxPoolReleaseOrMintGas                 uint32

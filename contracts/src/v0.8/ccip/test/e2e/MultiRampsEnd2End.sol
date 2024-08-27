@@ -280,7 +280,7 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
       sender: abi.encode(msgEvent.sender),
       data: msgEvent.data,
       receiver: abi.decode(msgEvent.receiver, (address)),
-      gasLimit: s_priceRegistry.parseEVMExtraArgsFromBytes(msgEvent.extraArgs, DEST_CHAIN_SELECTOR).gasLimit,
+      gasLimit: s_feeQuoter.parseEVMExtraArgsFromBytes(msgEvent.extraArgs, DEST_CHAIN_SELECTOR).gasLimit,
       tokenAmounts: msgEvent.tokenAmounts
     });
   }
