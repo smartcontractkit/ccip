@@ -21,6 +21,7 @@ import {MultiOCR3Base} from "../ocr/MultiOCR3Base.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
 import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/ERC165Checker.sol";
+import "../libraries/Internal.sol";
 
 /// @notice OffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
@@ -41,6 +42,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error ManualExecutionNotYetEnabled(uint64 sourceChainSelector);
   error ManualExecutionGasLimitMismatch();
   error InvalidManualExecutionGasLimit(uint64 sourceChainSelector, uint256 index, uint256 newLimit);
+  error InvalidTokenGasOverride(bytes32 messageId, uint256 tokenIndex, uint256 oldLimit, uint256 tokenGasOverride);
+  error DestinationGasAmountCountMismatch(bytes32 messageId, uint64 sequenceNumber);
   error RootNotCommitted(uint64 sourceChainSelector);
   error RootAlreadyCommitted(uint64 sourceChainSelector, bytes32 merkleRoot);
   error InvalidRoot();
@@ -110,9 +113,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   struct DynamicConfig {
     address priceRegistry; // ──────────────────────────╮ Price registry address on the local chain
     uint32 permissionLessExecutionThresholdSeconds; //  │ Waiting time before manual execution is enabled
-    uint32 maxTokenTransferGas; //                      │ Maximum amount of gas passed on to token `transfer` call
-    uint32 maxPoolReleaseOrMintGas; // ─────────────────╯ Maximum amount of gas passed on to token pool when calling releaseOrMint
-    address messageValidator; // Optional message validator to validate incoming messages (zero address = no validator)
+    address messageValidator; //────────────────────────╯ Optional message validator to validate incoming messages (zero address = no validator)
   }
 
   /// @notice a sequenceNumber interval
@@ -140,6 +141,14 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   struct UnblessedRoot {
     uint64 sourceChainSelector; // Remote source chain selector that the Merkle Root is scoped to
     bytes32 merkleRoot; // Merkle root of a single remote source chain
+  }
+
+  struct GasLimitOverride {
+    /// @notice Overrides EVM2EVMMessage.gasLimit. A value of zero indicates no override and is valid.
+    uint256 receiverExecutionGasLimit;
+    /// @notice Overrides EVM2EVMMessage.sourceTokenData.destGasAmount. Must be same length as tokenAmounts. A value
+    /// of zero indicates no override and is valid.
+    uint32[] tokenGasOverrides;
   }
 
   // STATIC CONFIG
@@ -269,7 +278,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// The reports do not have to contain all the messages (they can be omitted). Multiple reports can be passed in simultaneously.
   function manuallyExecute(
     Internal.ExecutionReportSingleChain[] memory reports,
-    uint256[][] memory gasLimitOverrides
+    GasLimitOverride[][] memory gasLimitOverrides
   ) external {
     // We do this here because the other _execute path is already covered by MultiOCR3Base.
     _whenChainNotForked();
@@ -281,15 +290,34 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       Internal.ExecutionReportSingleChain memory report = reports[reportIndex];
 
       uint256 numMsgs = report.messages.length;
-      uint256[] memory msgGasLimitOverrides = gasLimitOverrides[reportIndex];
+      GasLimitOverride[] memory msgGasLimitOverrides = gasLimitOverrides[reportIndex];
       if (numMsgs != msgGasLimitOverrides.length) revert ManualExecutionGasLimitMismatch();
 
       for (uint256 msgIndex = 0; msgIndex < numMsgs; ++msgIndex) {
-        uint256 newLimit = msgGasLimitOverrides[msgIndex];
+        uint256 newLimit = msgGasLimitOverrides[msgIndex].receiverExecutionGasLimit;
         // Checks to ensure message cannot be executed with less gas than specified.
         if (newLimit != 0) {
           if (newLimit < report.messages[msgIndex].gasLimit) {
             revert InvalidManualExecutionGasLimit(report.sourceChainSelector, msgIndex, newLimit);
+          }
+        }
+        Internal.Any2EVMRampMessage memory message = report.messages[msgIndex];
+        if (message.tokenAmounts.length != msgGasLimitOverrides[msgIndex].tokenGasOverrides.length) {
+          revert DestinationGasAmountCountMismatch(message.header.messageId, message.header.sequenceNumber);
+        }
+
+        // The gas limit can not be lowered as that could cause the message to fail. If manual execution is done
+        // from an UNTOUCHED state and we would allow lower gas limit, anyone could grief by executing the message with
+        // lower gas limit than the DON would have used. This results in the message being marked FAILURE and the DON
+        // would not attempt it with the correct gas limit.
+        for (uint256 tokenIndex = 0; tokenIndex < message.tokenAmounts.length; ++tokenIndex) {
+          if (msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex] != 0) {
+            uint32 destGasAmount = abi.decode(message.tokenAmounts[tokenIndex].destExecData,(uint32));
+            if (msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex] < destGasAmount) {
+              revert InvalidTokenGasOverride(
+                message.header.messageId, tokenIndex, destGasAmount, msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex]
+              );
+            }
           }
         }
       }
@@ -302,7 +330,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// and expects the exec plugin type to be configured with no signatures.
   /// @param report serialized execution report
   function execute(bytes32[3] calldata reportContext, bytes calldata report) external {
-    _batchExecute(abi.decode(report, (Internal.ExecutionReportSingleChain[])), new uint256[][](0));
+    _batchExecute(abi.decode(report, (Internal.ExecutionReportSingleChain[])), new GasLimitOverride[][](0));
 
     bytes32[] memory emptySigs = new bytes32[](0);
     _transmit(uint8(Internal.OCRPluginType.Execution), reportContext, report, emptySigs, emptySigs, bytes32(""));
@@ -317,27 +345,27 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev If called from manual execution, each inner array's length has to match the number of messages.
   function _batchExecute(
     Internal.ExecutionReportSingleChain[] memory reports,
-    uint256[][] memory manualExecGasLimits
+    GasLimitOverride[][] memory manualExecGasOverrides
   ) internal {
     if (reports.length == 0) revert EmptyReport();
 
-    bool areManualGasLimitsEmpty = manualExecGasLimits.length == 0;
+    bool areManualGasLimitsEmpty = manualExecGasOverrides.length == 0;
     // Cache array for gas savings in the loop's condition
-    uint256[] memory emptyGasLimits = new uint256[](0);
+    GasLimitOverride[] memory emptyGasLimits = new GasLimitOverride[](0);
 
     for (uint256 i = 0; i < reports.length; ++i) {
-      _executeSingleReport(reports[i], areManualGasLimitsEmpty ? emptyGasLimits : manualExecGasLimits[i]);
+      _executeSingleReport(reports[i], areManualGasLimitsEmpty ? emptyGasLimits : manualExecGasOverrides[i]);
     }
   }
 
   /// @notice Executes a report, executing each message in order.
   /// @param report The execution report containing the messages and proofs.
-  /// @param manualExecGasLimits An array of gas limits to use for manual execution.
+  /// @param manualExecGasExecOverrides An array of gas limits to use for manual execution.
   /// @dev If called from the DON, this array is always empty.
   /// @dev If called from manual execution, this array is always same length as messages.
   function _executeSingleReport(
     Internal.ExecutionReportSingleChain memory report,
-    uint256[] memory manualExecGasLimits
+    GasLimitOverride[] memory manualExecGasExecOverrides
   ) internal {
     uint64 sourceChainSelector = report.sourceChainSelector;
     _whenNotCursed(sourceChainSelector);
@@ -366,13 +394,14 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       hashedLeaves[i] = Internal._hash(message, sourceChainConfig.onRamp);
     }
 
+    bool manualExecution = manualExecGasExecOverrides.length != 0;
+
     // SECURITY CRITICAL CHECK
     // NOTE: This check also verifies that all messages match the report's sourceChainSelector
     uint256 timestampCommitted = _verify(sourceChainSelector, hashedLeaves, report.proofs, report.proofFlagBits);
     if (timestampCommitted == 0) revert RootNotCommitted(sourceChainSelector);
 
     // Execute messages
-    bool manualExecution = manualExecGasLimits.length != 0;
     for (uint256 i = 0; i < numMsgs; ++i) {
       uint256 gasStart = gasleft();
       Internal.Any2EVMRampMessage memory message = report.messages[i];
@@ -394,8 +423,9 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         emit SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
         continue;
       }
-
+      uint32[] memory tokenGasOverrides;
       if (manualExecution) {
+        tokenGasOverrides = manualExecGasExecOverrides[i].tokenGasOverrides;
         bool isOldCommitReport =
           (block.timestamp - timestampCommitted) > s_dynamicConfig.permissionLessExecutionThresholdSeconds;
         // Manually execution is fine if we previously failed or if the commit report is just too old
@@ -405,8 +435,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         }
 
         // Manual execution gas limit can override gas limit specified in the message. Value of 0 indicates no override.
-        if (manualExecGasLimits[i] != 0) {
-          message.gasLimit = manualExecGasLimits[i];
+        if (manualExecGasExecOverrides[i].receiverExecutionGasLimit != 0) {
+          message.gasLimit = manualExecGasExecOverrides[i].receiverExecutionGasLimit;
         }
       } else {
         // DON can only execute a message once
@@ -444,7 +474,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
       _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
 
-      (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
+      (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData, tokenGasOverrides);
       _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
 
       // Since it's hard to estimate whether manual execution will succeed, we
@@ -486,9 +516,10 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @return errData Revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
     Internal.Any2EVMRampMessage memory message,
-    bytes[] memory offchainTokenData
+    bytes[] memory offchainTokenData,
+    uint32[] memory tokenGasOverrides
   ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
-    try this.executeSingleMessage(message, offchainTokenData) {}
+    try this.executeSingleMessage(message, offchainTokenData, tokenGasOverrides) {}
     catch (bytes memory err) {
       // return the message execution state as FAILURE and the revert data
       // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES
@@ -507,13 +538,14 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// (for example smart contract wallets) without an associated message.
   function executeSingleMessage(
     Internal.Any2EVMRampMessage memory message,
-    bytes[] calldata offchainTokenData
+    bytes[] calldata offchainTokenData,
+    uint32[] calldata tokenGasOverrides
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
       destTokenAmounts = _releaseOrMintTokens(
-        message.tokenAmounts, message.sender, message.receiver, message.header.sourceChainSelector, offchainTokenData
+        message.tokenAmounts, message.sender, message.receiver, message.header.sourceChainSelector, offchainTokenData, tokenGasOverrides
       );
     }
 
@@ -838,7 +870,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
     // We retrieve the local token balance of the receiver before the pool call.
     (uint256 balancePre, uint256 gasLeft) =
-      _getBalanceOfReceiver(receiver, localToken, s_dynamicConfig.maxPoolReleaseOrMintGas);
+      _getBalanceOfReceiver(receiver, localToken, abi.decode(sourceTokenAmount.destExecData, (uint32)));
 
     // We determined that the pool address is a valid EVM address, but that does not mean the code at this
     // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location
@@ -934,10 +966,15 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
-    bytes[] calldata offchainTokenData
+    bytes[] calldata offchainTokenData,
+    uint32[] calldata tokenGasOverrides
   ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
     destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
+    bool isTokenGasOverridesEmpty = tokenGasOverrides.length == 0;
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
+      if (!isTokenGasOverridesEmpty && tokenGasOverrides[i] != 0) {
+         sourceTokenAmounts[i].destExecData = abi.encode(tokenGasOverrides[i]);
+      }
       destTokenAmounts[i] = _releaseOrMintSingleToken(
         sourceTokenAmounts[i], originalSender, receiver, sourceChainSelector, offchainTokenData[i]
       );
