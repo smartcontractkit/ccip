@@ -3195,7 +3195,7 @@ func TestEthConfirmer_ProcessStuckTransactions(t *testing.T) {
 	fee := gas.EvmFee{Legacy: marketGasPrice}
 	bumpedLegacy := assets.GWei(30)
 	bumpedFee := gas.EvmFee{Legacy: bumpedLegacy}
-	feeEstimator.On("GetFee", mock.Anything, []byte{}, uint64(0), mock.Anything, mock.Anything).Return(fee, uint64(0), nil)
+	feeEstimator.On("GetFee", mock.Anything, []byte{}, uint64(0), mock.Anything, mock.Anything, mock.Anything).Return(fee, uint64(0), nil)
 	feeEstimator.On("BumpFee", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(bumpedFee, uint64(10_000), nil)
 	autoPurgeThreshold := uint32(5)
 	autoPurgeMinAttempts := uint32(3)
