@@ -8,11 +8,12 @@ import (
 	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/chainlink-testing-framework/client"
-	"github.com/smartcontractkit/chainlink-testing-framework/grafana"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/smartcontractkit/ccip/integration-tests/ccip-tests/testconfig"
+	"github.com/smartcontractkit/chainlink-testing-framework/client"
+	"github.com/smartcontractkit/chainlink-testing-framework/grafana"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 )
 
 // GasSuite is a test suite that generates gas chaos
