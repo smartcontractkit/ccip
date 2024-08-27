@@ -82,6 +82,9 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice Struct that contains the static configuration
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
+  /// @dev not sure why solhint complainins about this, seems like a buggy detector
+  /// https://github.com/protofire/solhint/issues/597
+  // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
     uint64 chainSelector; // ───╮  Destination chainSelector
     IRMNRemote rmnRemote; // ───╯  RMN Verification Contract
