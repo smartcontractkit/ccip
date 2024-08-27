@@ -12,9 +12,9 @@ import {Internal} from "../../libraries/Internal.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 
-import {HybridLockReleaseUSDCTokenPool} from "../../pools/Hybrid/HybridLockReleaseUSDCTokenPool.sol";
-import {USDCBridgeMigrator} from "../../pools/Hybrid/USDCBridgeMigrator.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
+import {HybridLockReleaseUSDCTokenPool} from "../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
+import {USDCBridgeMigrator} from "../../pools/USDC/USDCBridgeMigrator.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 import {USDCTokenPoolHelper} from "../helpers/USDCTokenPoolHelper.sol";
