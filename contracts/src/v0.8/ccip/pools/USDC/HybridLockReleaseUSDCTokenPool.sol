@@ -66,7 +66,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     // Circle requires a supply-lock to prevent outgoing messages once the migration process begins.
     // This prevents new outgoing messages once the migration has begun to ensure any the procedure runs as expected
-    if (s_proposedUSDCMigrationChain != 0 && s_proposedUSDCMigrationChain == lockOrBurnIn.remoteChainSelector) {
+    if (s_proposedUSDCMigrationChain == lockOrBurnIn.remoteChainSelector) {
       revert LanePausedForCCTPMigration(s_proposedUSDCMigrationChain);
     }
 
@@ -83,9 +83,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   {
     if (!shouldUseLockRelease(releaseOrMintIn.remoteChainSelector)) {
       return super.releaseOrMint(releaseOrMintIn);
-    } else {
-      return _lockReleaseIncomingMessage(releaseOrMintIn);
     }
+    return _lockReleaseIncomingMessage(releaseOrMintIn);
   }
 
   /// @notice Contains the alternative mechanism for incoming tokens, in this implementation is "Release" incoming tokens
@@ -96,8 +95,9 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   {
     _validateReleaseOrMint(releaseOrMintIn);
 
-    // Since the storage slot is increased whenever liquidity is provided, as long as
-    // sufficient tokens exist to release to the receiver, this will never underflow
+    // Since the stored value is only increased when liquidity is provided or tokens locked, nothing bad should
+    // happen from an underflow/revert, and prevents the contract from being drained by siloing available tokens
+    // based on the chain selector
     s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.amount;
 
     // Release to the offRamp, which forwards it to the recipient
