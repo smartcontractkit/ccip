@@ -1,6 +1,7 @@
 package ccipdeployment
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	owner_helpers "github.com/smartcontractkit/ccip-owner-contracts/gethwrappers"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
@@ -47,7 +49,17 @@ var (
 	// Note test router maps to a regular router contract.
 	TestRouter   deployment.ContractType = "TestRouter"
 	CCIPReceiver deployment.ContractType = "CCIPReceiver"
+
+	TestXXXMCMSSigner *ecdsa.PrivateKey
 )
+
+func init() {
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	TestXXXMCMSSigner = key
+}
 
 type Contracts interface {
 	*capabilities_registry.CapabilitiesRegistry |
@@ -249,6 +261,23 @@ func DeployChainContracts(
 	}
 	// TODO: Address soon
 	e.Logger.Infow("deployed mcm", "addr", mcm.Address)
+	// TODO: Real MCM configuration.
+	var quorums, parents [32]uint8
+	quorums[0] = 1
+	publicKey := TestXXXMCMSSigner.Public().(*ecdsa.PublicKey)
+	// Convert the public key to an Ethereum address
+	address := crypto.PubkeyToAddress(*publicKey)
+	tx, err := mcm.Contract.SetConfig(chain.DeployerKey,
+		[]common.Address{address},
+		[]uint8{0}, // Signer 1 is int group 0 (root group) with quorum 1.
+		quorums,
+		parents,
+		false,
+	)
+	if err := deployment.ConfirmIfNoError(chain, tx, err); err != nil {
+		e.Logger.Errorw("Failed to confirm mcm config", "err", err)
+		return ab, err
+	}
 
 	_, err = deployContract(e.Logger, chain, ab,
 		func(chain deployment.Chain) ContractDeploy[*owner_helpers.RBACTimelock] {
@@ -257,6 +286,7 @@ func DeployChainContracts(
 				chain.Client,
 				big.NewInt(0), // minDelay
 				mcm.Address,
+				// TODO: Actual MCM groups need to be parameterized.
 				[]common.Address{mcm.Address},            // proposers
 				[]common.Address{chain.DeployerKey.From}, //executors
 				[]common.Address{mcm.Address},            // cancellers
@@ -484,7 +514,7 @@ func DeployChainContracts(
 	e.Logger.Infow("deployed offramp", "addr", offRamp)
 
 	// Basic wiring is always needed.
-	tx, err := priceRegistry.Contract.ApplyAuthorizedCallerUpdates(chain.DeployerKey, price_registry.AuthorizedCallersAuthorizedCallerArgs{
+	tx, err = priceRegistry.Contract.ApplyAuthorizedCallerUpdates(chain.DeployerKey, price_registry.AuthorizedCallersAuthorizedCallerArgs{
 		// TODO: We enable the deployer initially to set prices
 		// Should be removed after.
 		AddedCallers: []common.Address{offRamp.Contract.Address(), chain.DeployerKey.From},

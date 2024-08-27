@@ -1,9 +1,14 @@
 package ccipdeployment
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/crypto"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment/executable"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
@@ -37,8 +42,37 @@ func TestAddChain(t *testing.T) {
 		}
 	}
 
+	executorClients := make(map[string]executable.ContractDeployBackend)
+	for _, chain := range e.Env.Chains {
+		chainselc, exists := chainsel.ChainBySelector(chain.Selector)
+		require.True(t, exists)
+		executorClients[chainselc.Name] = chain.Client
+	}
+
 	// Enable inbound to new 4th chain.
 	proposals, ab, err := NewChainInbound(e.Env, e.Ab, e.HomeChainSel, newChain, initialDeploy)
 	require.NoError(t, err)
+	require.Equal(t, 3, len(proposals[0].ChainMetadata))
+	// Sign this proposal with the deployer key.
+	execProposal, err := proposals[0].ToExecutableMCMSProposal()
+	require.NoError(t, err)
+	require.Equal(t, 4, len(execProposal.ExecutableMCMSProposalBase.ChainMetadata))
+	exec, err := execProposal.ToExecutor(executorClients)
+	require.NoError(t, err)
+	payload, err := exec.SigningHash()
+	require.NoError(t, err)
+	// Sign the payload
+	sig, err := crypto.Sign(payload.Bytes(), TestXXXMCMSSigner)
+	require.NoError(t, err)
+
+	// Sign the payload
+	unmarshalledSig := executable.Signature{}
+	err = json.Unmarshal(sig, &unmarshalledSig)
+	require.NoError(t, err)
+
+	// Add signature to proposal
+	proposals[0].AddSignature(unmarshalledSig)
+	require.NoError(t, exec.Execute())
+
 	t.Log(proposals, ab)
 }

@@ -28,6 +28,7 @@ type OnchainClient interface {
 	// For EVM specifically we can use existing geth interface
 	// to abstract chain clients.
 	bind.ContractBackend
+	bind.DeployBackend
 }
 
 type OffchainClient interface {
