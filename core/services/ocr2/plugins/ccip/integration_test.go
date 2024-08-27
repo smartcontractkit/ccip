@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"math/big"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -639,6 +640,7 @@ func TestIntegration_CCIP(t *testing.T) {
 	}
 }
 
+// TestReorg is to ensure CCIP works even when there is below finality depth reorg happens.
 func TestReorg(t *testing.T) {
 	t.Run("Reorg test to simulate caching problem", func(t *testing.T) {
 		ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(
