@@ -98,8 +98,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   /// @dev destChainSelector, allowListEnabled will be packed in 1 slot
   //solhint-disable gas-struct-packing
   struct AllowListConfigArgs {
-    uint64 destChainSelector; // Destination chain selector
-    bool allowListEnabled; // indicator to check if the allowedSendersList is enabled
+    uint64 destChainSelector; // ─────────────╮ Destination chain selector
+      //              │ destChainSelector and allowListEnabled are packed in the same slot
+    bool allowListEnabled; // ─────────────╯ boolean indicator to specify if allowList check is enabled.
     address[] addedAllowlistedSenders; // list of senders to be added to the allowedSendersList
     address[] removedAllowlistedSenders; // list of senders to be removed from the allowedSendersList
   }
