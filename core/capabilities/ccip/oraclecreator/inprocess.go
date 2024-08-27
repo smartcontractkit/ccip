@@ -28,7 +28,7 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	commitocr3 "github.com/smartcontractkit/chainlink-ccip/commitrmnocb"
+	commitocr3 "github.com/smartcontractkit/chainlink-ccip/commit"
 	execocr3 "github.com/smartcontractkit/chainlink-ccip/execute"
 	ccipreaderpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
@@ -178,9 +178,9 @@ func (i *inprocessOracleCreator) CreatePluginOracle(pluginType cctypes.PluginTyp
 	for _, chain := range i.chains.Slice() {
 		var chainReaderConfig evmrelaytypes.ChainReaderConfig
 		if chain.ID().Uint64() == destChainID {
-			chainReaderConfig = evmconfig.DestReaderConfig()
+			chainReaderConfig = evmconfig.DestReaderConfig
 		} else {
-			chainReaderConfig = evmconfig.SourceReaderConfig()
+			chainReaderConfig = evmconfig.SourceReaderConfig
 		}
 		cr, err2 := evm.NewChainReaderService(
 			context.Background(),
