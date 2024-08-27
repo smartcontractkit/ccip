@@ -21,7 +21,6 @@ contract OnRamp_constructor is OnRampSetup {
   function test_Constructor_Success() public {
     OnRamp.StaticConfig memory staticConfig = OnRamp.StaticConfig({
       chainSelector: SOURCE_CHAIN_SELECTOR,
-      rmnProxy: address(s_mockRMN),
       nonceManager: address(s_outboundNonceManager),
       tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
@@ -52,21 +51,6 @@ contract OnRamp_constructor is OnRampSetup {
     new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: 0,
-        rmnProxy: address(s_mockRMN),
-        nonceManager: address(s_outboundNonceManager),
-        tokenAdminRegistry: address(s_tokenAdminRegistry)
-      }),
-      _generateDynamicOnRampConfig(address(s_feeQuoter)),
-      _generateDestChainConfigArgs(IRouter(address(0)))
-    );
-  }
-
-  function test_Constructor_InvalidConfigRMNProxyEqAddressZero_Revert() public {
-    vm.expectRevert(OnRamp.InvalidConfig.selector);
-    s_onRamp = new OnRampHelper(
-      OnRamp.StaticConfig({
-        chainSelector: SOURCE_CHAIN_SELECTOR,
-        rmnProxy: address(0),
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
@@ -80,7 +64,6 @@ contract OnRamp_constructor is OnRampSetup {
     new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN),
         nonceManager: address(0),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
@@ -94,7 +77,6 @@ contract OnRamp_constructor is OnRampSetup {
     new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN),
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(0)
       }),
@@ -630,12 +612,6 @@ contract OnRamp_getFee is OnRampSetup {
   }
 
   // Reverts
-
-  function test_Unhealthy_Revert() public {
-    s_mockRMN.setGlobalCursed(true);
-    vm.expectRevert(abi.encodeWithSelector(OnRamp.CursedByRMN.selector, DEST_CHAIN_SELECTOR));
-    s_onRamp.getFee(DEST_CHAIN_SELECTOR, _generateEmptyMessage());
-  }
 
   function test_EnforceOutOfOrder_Revert() public {
     // Update dynamic config to enforce allowOutOfOrderExecution = true.
