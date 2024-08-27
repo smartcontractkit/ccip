@@ -241,7 +241,9 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
     vm.pauseGasMetering();
 
     uint256 gasLimit = s_feeQuoter.parseEVMExtraArgsFromBytes(msgEvent.extraArgs, DEST_CHAIN_SELECTOR).gasLimit;
-
+    for (uint256 i = 0; i < msgEvent.tokenAmounts.length; ++i) {
+      msgEvent.tokenAmounts[i].destExecData = abi.encode(MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS);
+    }
     return Internal.Any2EVMRampMessage({
       header: Internal.RampMessageHeader({
         messageId: msgEvent.header.messageId,
