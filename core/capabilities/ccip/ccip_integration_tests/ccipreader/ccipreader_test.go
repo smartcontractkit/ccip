@@ -339,7 +339,7 @@ func TestCCIPReader_GetExpectedNextSequenceNumber(t *testing.T) {
 	require.NoError(t, err)
 	s.sb.Commit()
 
-	seqNum, err := s.reader.GetExpectedNextSequenceNumber(ctx, chainS1)
+	seqNum, err := s.reader.GetExpectedNextSequenceNumber(ctx, chainS1, chainD)
 	require.NoError(t, err)
 	require.Equal(t, cciptypes.SeqNum(10)+1, seqNum)
 
@@ -347,7 +347,7 @@ func TestCCIPReader_GetExpectedNextSequenceNumber(t *testing.T) {
 	require.NoError(t, err)
 	s.sb.Commit()
 
-	seqNum, err = s.reader.GetExpectedNextSequenceNumber(ctx, chainS1)
+	seqNum, err = s.reader.GetExpectedNextSequenceNumber(ctx, chainS1, chainD)
 	require.NoError(t, err)
 	require.Equal(t, cciptypes.SeqNum(25)+1, seqNum)
 }
