@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/uuid"
@@ -47,6 +49,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/feeds"
 	"github.com/smartcontractkit/chainlink/v2/core/services/fluxmonitorv2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway"
+	"github.com/smartcontractkit/chainlink/v2/core/services/headreporter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keeper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
@@ -58,7 +61,6 @@ import (
 	externalp2p "github.com/smartcontractkit/chainlink/v2/core/services/p2p/wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/periodicbackup"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
-	"github.com/smartcontractkit/chainlink/v2/core/services/promreporter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/wsrpc"
@@ -75,8 +77,6 @@ import (
 )
 
 // Application implements the common functions used in the core node.
-//
-//go:generate mockery --quiet --name Application --output ../../internal/mocks/ --case=underscore
 type Application interface {
 	Start(ctx context.Context) error
 	Stop() error
@@ -208,22 +208,15 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 
 	var externalPeerWrapper p2ptypes.PeerWrapper
 	var getLocalNode func(ctx context.Context) (pkgcapabilities.Node, error)
-	if cfg.Capabilities().Peering().Enabled() {
-		externalPeer := externalp2p.NewExternalPeerWrapper(keyStore.P2P(), cfg.Capabilities().Peering(), opts.DS, globalLogger)
-		signer := externalPeer
-		externalPeerWrapper = externalPeer
+	var capabilityRegistrySyncer registrysyncer.Syncer
 
-		srvcs = append(srvcs, externalPeerWrapper)
-
-		dispatcher := remote.NewDispatcher(externalPeerWrapper, signer, opts.CapabilitiesRegistry, globalLogger)
-
+	if cfg.Capabilities().ExternalRegistry().Address() != "" {
 		rid := cfg.Capabilities().ExternalRegistry().RelayID()
 		registryAddress := cfg.Capabilities().ExternalRegistry().Address()
 		relayer, err := relayerChainInterops.Get(rid)
 		if err != nil {
 			return nil, fmt.Errorf("could not fetch relayer %s configured for capabilities registry: %w", rid, err)
 		}
-
 		registrySyncer, err := registrysyncer.New(
 			globalLogger,
 			relayer,
@@ -233,16 +226,32 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			return nil, fmt.Errorf("could not configure syncer: %w", err)
 		}
 
+		capabilityRegistrySyncer = registrySyncer
+		srvcs = append(srvcs, capabilityRegistrySyncer)
+	}
+
+	if cfg.Capabilities().Peering().Enabled() {
+		if capabilityRegistrySyncer == nil {
+			return nil, errors.Errorf("peering enabled but no capability registry found")
+		}
+		externalPeer := externalp2p.NewExternalPeerWrapper(keyStore.P2P(), cfg.Capabilities().Peering(), opts.DS, globalLogger)
+		signer := externalPeer
+		externalPeerWrapper = externalPeer
+
+		srvcs = append(srvcs, externalPeerWrapper)
+
+		dispatcher := remote.NewDispatcher(externalPeerWrapper, signer, opts.CapabilitiesRegistry, globalLogger)
+
 		wfLauncher := capabilities.NewLauncher(
 			globalLogger,
 			externalPeerWrapper,
 			dispatcher,
 			opts.CapabilitiesRegistry,
 		)
-		registrySyncer.AddLauncher(wfLauncher)
 
+		capabilityRegistrySyncer.AddLauncher(wfLauncher)
 		getLocalNode = wfLauncher.LocalNode
-		srvcs = append(srvcs, dispatcher, wfLauncher, registrySyncer)
+		srvcs = append(srvcs, dispatcher, wfLauncher)
 	}
 
 	// LOOPs can be created as options, in the  case of LOOP relayers, or
@@ -315,8 +324,6 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 
 	srvcs = append(srvcs, mailMon)
 	srvcs = append(srvcs, relayerChainInterops.Services()...)
-	promReporter := promreporter.NewPromReporter(opts.DS, legacyEVMChains, globalLogger)
-	srvcs = append(srvcs, promReporter)
 
 	// Initialize Local Users ORM and Authentication Provider specified in config
 	// BasicAdminUsersORM is initialized and required regardless of separate Authentication Provider
@@ -353,11 +360,19 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		jobORM         = job.NewORM(opts.DS, pipelineORM, bridgeORM, keyStore, globalLogger)
 		txmORM         = txmgr.NewTxStore(opts.DS, globalLogger)
 		streamRegistry = streams.NewRegistry(globalLogger, pipelineRunner)
-		workflowORM    = workflowstore.NewDBStore(opts.DS, clockwork.NewRealClock())
+		workflowORM    = workflowstore.NewDBStore(opts.DS, globalLogger, clockwork.NewRealClock())
 	)
 
+	promReporter := headreporter.NewPrometheusReporter(opts.DS, legacyEVMChains)
+	chainIDs := make([]*big.Int, legacyEVMChains.Len())
+	for i, chain := range legacyEVMChains.Slice() {
+		chainIDs[i] = chain.ID()
+	}
+	telemReporter := headreporter.NewTelemetryReporter(telemetryManager, globalLogger, chainIDs...)
+	headReporter := headreporter.NewHeadReporterService(opts.DS, globalLogger, promReporter, telemReporter)
+	srvcs = append(srvcs, headReporter)
 	for _, chain := range legacyEVMChains.Slice() {
-		chain.HeadBroadcaster().Subscribe(promReporter)
+		chain.HeadBroadcaster().Subscribe(headReporter)
 		chain.TxManager().RegisterResumeCallback(pipelineRunner.ResumeRun)
 	}
 
@@ -500,8 +515,6 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			globalLogger,
 			ocr2DelegateConfig,
 			keyStore.OCR2(),
-			keyStore.DKGSign(),
-			keyStore.DKGEncrypt(),
 			keyStore.Eth(),
 			opts.RelayerChainInteroperators,
 			mailMon,
@@ -515,6 +528,18 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			cfg.OCR2(),
 			cfg.Insecure(),
 			opts.RelayerChainInteroperators,
+		)
+		delegates[job.CCIP] = ccip.NewDelegate(
+			globalLogger,
+			loopRegistrarConfig,
+			pipelineRunner,
+			opts.RelayerChainInteroperators.LegacyEVMChains(),
+			capabilityRegistrySyncer,
+			opts.KeyStore,
+			opts.DS,
+			peerWrapper,
+			telemetryManager,
+			cfg.Capabilities(),
 		)
 	} else {
 		globalLogger.Debug("Off-chain reporting v2 disabled")
@@ -869,7 +894,7 @@ func (app *ChainlinkApplication) RunJobV2(
 				},
 			}
 		}
-		runID, _, err = app.pipelineRunner.ExecuteAndInsertFinishedRun(ctx, *jb.PipelineSpec, pipeline.NewVarsFrom(vars), app.logger, saveTasks)
+		runID, _, err = app.pipelineRunner.ExecuteAndInsertFinishedRun(ctx, *jb.PipelineSpec, pipeline.NewVarsFrom(vars), saveTasks)
 	}
 	return runID, err
 }

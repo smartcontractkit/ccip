@@ -35,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/forwarders"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	gasmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/keystore"
 	ksmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/keystore/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -59,7 +60,9 @@ func makeTestEvmTxm(
 		RpcBatchSize:             2,
 		KeepFinalizedBlocksDepth: 1000,
 	}
-	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.FixtureChainID, db, lggr), ethClient, lggr, lpOpts)
+
+	ht := headtracker.NewSimulatedHeadTracker(ethClient, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.FixtureChainID, db, lggr), ethClient, lggr, ht, lpOpts)
 
 	// logic for building components (from evm/evm_txm.go) -------
 	lggr.Infow("Initializing EVM transaction manager",
@@ -97,7 +100,8 @@ func TestTxm_SendNativeToken_DoesNotSendToZero(t *testing.T) {
 
 	keyStore := cltest.NewKeyStore(t, db).Eth()
 	ethClient := testutils.NewEthClientMockWithDefaultChain(t)
-	estimator := gas.NewEstimator(logger.Test(t), ethClient, config, evmConfig.GasEstimator())
+	estimator, err := gas.NewEstimator(logger.Test(t), ethClient, config, evmConfig.GasEstimator())
+	require.NoError(t, err)
 	txm, err := makeTestEvmTxm(t, db, ethClient, estimator, evmConfig, evmConfig.GasEstimator(), evmConfig.Transactions(), dbConfig, dbConfig.Listener(), keyStore)
 	require.NoError(t, err)
 
@@ -122,7 +126,8 @@ func TestTxm_CreateTransaction(t *testing.T) {
 
 	ethClient := testutils.NewEthClientMockWithDefaultChain(t)
 
-	estimator := gas.NewEstimator(logger.Test(t), ethClient, config, evmConfig.GasEstimator())
+	estimator, err := gas.NewEstimator(logger.Test(t), ethClient, config, evmConfig.GasEstimator())
+	require.NoError(t, err)
 	txm, err := makeTestEvmTxm(t, db, ethClient, estimator, evmConfig, evmConfig.GasEstimator(), evmConfig.Transactions(), dbConfig, dbConfig.Listener(), kst.Eth())
 	require.NoError(t, err)
 
@@ -403,7 +408,8 @@ func TestTxm_CreateTransaction_OutOfEth(t *testing.T) {
 	config, dbConfig, evmConfig := txmgr.MakeTestConfigs(t)
 
 	ethClient := testutils.NewEthClientMockWithDefaultChain(t)
-	estimator := gas.NewEstimator(logger.Test(t), ethClient, config, evmConfig.GasEstimator())
+	estimator, err := gas.NewEstimator(logger.Test(t), ethClient, config, evmConfig.GasEstimator())
+	require.NoError(t, err)
 	txm, err := makeTestEvmTxm(t, db, ethClient, estimator, evmConfig, evmConfig.GasEstimator(), evmConfig.Transactions(), dbConfig, dbConfig.Listener(), etKeyStore)
 	require.NoError(t, err)
 
@@ -494,7 +500,8 @@ func TestTxm_Lifecycle(t *testing.T) {
 	keyChangeCh := make(chan struct{})
 	unsub := cltest.NewAwaiter()
 	kst.On("SubscribeToKeyChanges", mock.Anything).Return(keyChangeCh, unsub.ItHappened)
-	estimator := gas.NewEstimator(logger.Test(t), ethClient, config, evmConfig.GasEstimator())
+	estimator, err := gas.NewEstimator(logger.Test(t), ethClient, config, evmConfig.GasEstimator())
+	require.NoError(t, err)
 	txm, err := makeTestEvmTxm(t, db, ethClient, estimator, evmConfig, evmConfig.GasEstimator(), evmConfig.Transactions(), dbConfig, dbConfig.Listener(), kst)
 	require.NoError(t, err)
 
@@ -549,7 +556,8 @@ func TestTxm_Reset(t *testing.T) {
 	ethClient.On("PendingNonceAt", mock.Anything, addr).Return(uint64(128), nil).Maybe()
 	ethClient.On("PendingNonceAt", mock.Anything, addr2).Return(uint64(44), nil).Maybe()
 
-	estimator := gas.NewEstimator(logger.Test(t), ethClient, cfg.EVM(), cfg.EVM().GasEstimator())
+	estimator, err := gas.NewEstimator(logger.Test(t), ethClient, cfg.EVM(), cfg.EVM().GasEstimator())
+	require.NoError(t, err)
 	txm, err := makeTestEvmTxm(t, db, ethClient, estimator, cfg.EVM(), cfg.EVM().GasEstimator(), cfg.EVM().Transactions(), gcfg.Database(), gcfg.Database().Listener(), kst.Eth())
 	require.NoError(t, err)
 
@@ -603,11 +611,11 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	ethClient.On("PendingNonceAt", mock.Anything, mock.Anything).Return(uint64(0), nil).Maybe()
 	feeEstimator := gasmocks.NewEvmFeeEstimator(t)
 	feeEstimator.On("Start", mock.Anything).Return(nil).Once()
+	feeEstimator.On("Close", mock.Anything).Return(nil).Once()
 	feeEstimator.On("OnNewLongestChain", mock.Anything, mock.Anything).Once()
 	txm, err := makeTestEvmTxm(t, db, ethClient, feeEstimator, cfg.EVM(), cfg.EVM().GasEstimator(), cfg.EVM().Transactions(), gcfg.Database(), gcfg.Database().Listener(), ethKeyStore)
 	require.NoError(t, err)
-	err = txm.Start(ctx)
-	require.NoError(t, err)
+	servicetest.Run(t, txm)
 
 	head := &evmtypes.Head{
 		Hash:   utils.NewHash(),
@@ -739,6 +747,7 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 	t.Run("returns fatal for fatal error state with terminally stuck error", func(t *testing.T) {
 		idempotencyKey := uuid.New().String()
 		_, fromAddress := cltest.MustInsertRandomKey(t, ethKeyStore)
+		// Test the internal terminally stuck error returns Fatal
 		nonce := evmtypes.Nonce(0)
 		broadcast := time.Now()
 		tx := &txmgr.Tx{
@@ -756,7 +765,30 @@ func TestTxm_GetTransactionStatus(t *testing.T) {
 		require.NoError(t, err)
 		state, err := txm.GetTransactionStatus(ctx, idempotencyKey)
 		require.Equal(t, commontypes.Fatal, state)
-		require.Error(t, err, evmclient.TerminallyStuckMsg)
+		require.Error(t, err)
+		require.Equal(t, evmclient.TerminallyStuckMsg, err.Error())
+
+		// Test a terminally stuck client error returns Fatal
+		nonce = evmtypes.Nonce(1)
+		idempotencyKey = uuid.New().String()
+		terminallyStuckClientError := "failed to add tx to the pool: not enough step counters to continue the execution"
+		tx = &txmgr.Tx{
+			Sequence:           &nonce,
+			IdempotencyKey:     &idempotencyKey,
+			FromAddress:        fromAddress,
+			EncodedPayload:     []byte{1, 2, 3},
+			FeeLimit:           feeLimit,
+			State:              txmgrcommon.TxFatalError,
+			Error:              null.NewString(terminallyStuckClientError, true),
+			BroadcastAt:        &broadcast,
+			InitialBroadcastAt: &broadcast,
+		}
+		err = txStore.InsertTx(ctx, tx)
+		require.NoError(t, err)
+		state, err = txm.GetTransactionStatus(ctx, idempotencyKey)
+		require.Equal(t, commontypes.Fatal, state)
+		require.Error(t, err)
+		require.Equal(t, terminallyStuckClientError, err.Error())
 	})
 
 	t.Run("returns failed for fatal error state with other error", func(t *testing.T) {

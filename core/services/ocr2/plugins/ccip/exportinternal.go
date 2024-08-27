@@ -3,6 +3,7 @@ package ccip
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/batchreader"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 )
@@ -39,8 +41,16 @@ func NewCommitStoreReader(lggr logger.Logger, versionFinder VersionFinder, addre
 	return factory.NewCommitStoreReader(lggr, versionFinder, address, ec, lp)
 }
 
+func CloseCommitStoreReader(lggr logger.Logger, versionFinder VersionFinder, address ccip.Address, ec client.Client, lp logpoller.LogPoller) error {
+	return factory.CloseCommitStoreReader(lggr, versionFinder, address, ec, lp)
+}
+
 func NewOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr ccip.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int, registerFilters bool) (ccipdata.OffRampReader, error) {
 	return factory.NewOffRampReader(lggr, versionFinder, addr, destClient, lp, estimator, destMaxGasPrice, registerFilters)
+}
+
+func CloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr ccip.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) error {
+	return factory.CloseOffRampReader(lggr, versionFinder, addr, destClient, lp, estimator, destMaxGasPrice)
 }
 
 func NewEvmVersionFinder() factory.EvmVersionFinder {
@@ -49,6 +59,10 @@ func NewEvmVersionFinder() factory.EvmVersionFinder {
 
 func NewOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress ccip.Address, sourceLP logpoller.LogPoller, source client.Client) (ccipdata.OnRampReader, error) {
 	return factory.NewOnRampReader(lggr, versionFinder, sourceSelector, destSelector, onRampAddress, sourceLP, source)
+}
+
+func CloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress ccip.Address, sourceLP logpoller.LogPoller, source client.Client) error {
+	return factory.CloseOnRampReader(lggr, versionFinder, sourceSelector, destSelector, onRampAddress, sourceLP, source)
 }
 
 type OffRampReader = ccipdata.OffRampReader
@@ -73,6 +87,10 @@ func NewDynamicLimitedBatchCaller(
 
 func NewUSDCReader(lggr logger.Logger, jobID string, transmitter common.Address, lp logpoller.LogPoller, registerFilters bool) (*ccipdata.USDCReaderImpl, error) {
 	return ccipdata.NewUSDCReader(lggr, jobID, transmitter, lp, registerFilters)
+}
+
+func CloseUSDCReader(lggr logger.Logger, jobID string, transmitter common.Address, lp logpoller.LogPoller) error {
+	return ccipdata.CloseUSDCReader(lggr, jobID, transmitter, lp)
 }
 
 type USDCReaderImpl = ccipdata.USDCReaderImpl
@@ -100,4 +118,18 @@ func (c *ChainAgnosticPriceRegistry) NewPriceRegistryReader(ctx context.Context,
 
 func NewChainAgnosticPriceRegistry(provider ChainAgnosticPriceRegistryFactory) *ChainAgnosticPriceRegistry {
 	return &ChainAgnosticPriceRegistry{provider}
+}
+
+type JSONCommitOffchainConfigV1_2_0 = v1_2_0.JSONCommitOffchainConfig
+type CommitOnchainConfig = ccipdata.CommitOnchainConfig
+
+func NewCommitOffchainConfig(
+	gasPriceDeviationPPB uint32,
+	gasPriceHeartBeat time.Duration,
+	tokenPriceDeviationPPB uint32,
+	tokenPriceHeartBeat time.Duration,
+	inflightCacheExpiry time.Duration,
+	priceReportingDisabled bool,
+) ccip.CommitOffchainConfig {
+	return ccipdata.NewCommitOffchainConfig(gasPriceDeviationPPB, gasPriceHeartBeat, tokenPriceDeviationPPB, tokenPriceHeartBeat, inflightCacheExpiry, priceReportingDisabled)
 }

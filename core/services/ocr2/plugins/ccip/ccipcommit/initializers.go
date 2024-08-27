@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/pkg/errors"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"go.uber.org/multierr"
 
@@ -21,8 +21,6 @@ import (
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
@@ -30,7 +28,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
@@ -43,7 +40,15 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
-func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider commontypes.CCIPCommitProvider, dstProvider commontypes.CCIPCommitProvider, srcChain legacyevm.Chain, dstChain legacyevm.Chain, chainSet legacyevm.LegacyChainContainer, jb job.Job, lggr logger.Logger, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, new bool, sourceChainID int64, destChainID int64, logError func(string)) ([]job.ServiceCtx, error) {
+var defaultNewReportingPluginRetryConfig = ccipdata.RetryConfig{
+	InitialDelay: time.Second,
+	MaxDelay:     10 * time.Minute,
+	// Retry for approximately 4hrs (MaxDelay of 10m = 6 times per hour, times 4 hours, plus 10 because the first
+	// 10 retries only take 20 minutes due to an initial retry of 1s and exponential backoff)
+	MaxRetries: (6 * 4) + 10,
+}
+
+func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider commontypes.CCIPCommitProvider, dstProvider commontypes.CCIPCommitProvider, chainSet legacyevm.LegacyChainContainer, jb job.Job, lggr logger.Logger, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, new bool, sourceChainID int64, destChainID int64, logError func(string)) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 
 	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
@@ -52,28 +57,25 @@ func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider c
 		return nil, err
 	}
 
-	// TODO CCIP-2493 EVM family specific behavior leaked for CommitStore, which requires access to two relayers
-	versionFinder := factory.NewEvmVersionFinder()
 	commitStoreAddress := common.HexToAddress(spec.ContractID)
-	sourceMaxGasPrice := srcChain.Config().EVM().GasEstimator().PriceMax().ToInt()
-	commitStoreReader, err := ccip.NewCommitStoreReader(lggr, versionFinder, ccipcalc.EvmAddrToGeneric(commitStoreAddress), dstChain.Client(), dstChain.LogPoller())
+
+	// commit store contract doesn't exist on the source chain, but we have an implementation of it
+	// to get access to a gas estimator on the source chain
+	srcCommitStore, err := srcProvider.NewCommitStoreReader(ctx, ccipcalc.EvmAddrToGeneric(commitStoreAddress))
 	if err != nil {
 		return nil, err
 	}
 
-	err = commitStoreReader.SetGasEstimator(ctx, srcChain.GasEstimator())
+	dstCommitStore, err := dstProvider.NewCommitStoreReader(ctx, ccipcalc.EvmAddrToGeneric(commitStoreAddress))
 	if err != nil {
 		return nil, err
 	}
 
-	err = commitStoreReader.SetSourceMaxGasPrice(ctx, sourceMaxGasPrice)
-	if err != nil {
-		return nil, err
-	}
-
+	var commitStoreReader ccipdata.CommitStoreReader
+	commitStoreReader = ccip.NewProviderProxyCommitStoreReader(srcCommitStore, dstCommitStore)
 	commitLggr := lggr.Named("CCIPCommit").With("sourceChain", sourceChainID, "destChain", destChainID)
 
-	var priceGetter pricegetter.PriceGetter
+	var priceGetter pricegetter.AllTokensPriceGetter
 	withPipeline := strings.Trim(pluginConfig.TokenPricesUSDPipeline, "\n\t ") != ""
 	if withPipeline {
 		priceGetter, err = pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
@@ -177,17 +179,18 @@ func NewCommitServices(ctx context.Context, ds sqlutil.DataSource, srcProvider c
 	)
 
 	wrappedPluginFactory := NewCommitReportingPluginFactory(CommitPluginStaticConfig{
-		lggr:                  lggr,
-		onRampReader:          onRampReader,
-		sourceChainSelector:   staticConfig.SourceChainSelector,
-		sourceNative:          sourceNative,
-		offRamp:               offRampReader,
-		commitStore:           commitStoreReader,
-		destChainSelector:     staticConfig.ChainSelector,
-		priceRegistryProvider: ccip.NewChainAgnosticPriceRegistry(dstProvider),
-		metricsCollector:      metricsCollector,
-		chainHealthcheck:      chainHealthCheck,
-		priceService:          priceService,
+		lggr:                          lggr,
+		newReportingPluginRetryConfig: defaultNewReportingPluginRetryConfig,
+		onRampReader:                  onRampReader,
+		sourceChainSelector:           staticConfig.SourceChainSelector,
+		sourceNative:                  sourceNative,
+		offRamp:                       offRampReader,
+		commitStore:                   commitStoreReader,
+		destChainSelector:             staticConfig.ChainSelector,
+		priceRegistryProvider:         ccip.NewChainAgnosticPriceRegistry(dstProvider),
+		metricsCollector:              metricsCollector,
+		chainHealthcheck:              chainHealthCheck,
+		priceService:                  priceService,
 	})
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetInt64(destChainID))
 	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(commitLggr, true, logError)
@@ -224,22 +227,13 @@ func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (f
 // https://github.com/smartcontractkit/ccip/blob/68e2197472fb017dd4e5630d21e7878d58bc2a44/core/services/feeds/service.go#L716
 // TODO once that transaction is broken up, we should be able to simply rely on oracle.Close() to cleanup the filters.
 // Until then we have to deterministically reload the readers from the spec (and thus their filters) and close them.
-func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer) error {
-	params, err := extractJobSpecParams(jb, chainSet)
-	if err != nil {
-		return err
-	}
-	versionFinder := factory.NewEvmVersionFinder()
-	// TODO CCIP-2498 Use provider to close
+func UnregisterCommitPluginLpFilters(srcProvider commontypes.CCIPCommitProvider, dstProvider commontypes.CCIPCommitProvider) error {
 	unregisterFuncs := []func() error{
 		func() error {
-			return factory.CloseCommitStoreReader(lggr, versionFinder, params.commitStoreAddress, params.destChain.Client(), params.destChain.LogPoller())
+			return srcProvider.Close()
 		},
 		func() error {
-			return factory.CloseOnRampReader(lggr, versionFinder, params.commitStoreStaticCfg.SourceChainSelector, params.commitStoreStaticCfg.ChainSelector, cciptypes.Address(params.commitStoreStaticCfg.OnRamp.String()), params.sourceChain.LogPoller(), params.sourceChain.Client())
-		},
-		func() error {
-			return factory.CloseOffRampReader(lggr, versionFinder, params.pluginConfig.OffRamp, params.destChain.Client(), params.destChain.LogPoller(), params.destChain.GasEstimator(), params.destChain.Config().EVM().GasEstimator().PriceMax().ToInt())
+			return dstProvider.Close()
 		},
 	}
 
@@ -250,51 +244,4 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb
 		}
 	}
 	return multiErr
-}
-
-type jobSpecParams struct {
-	pluginConfig         ccipconfig.CommitPluginJobSpecConfig
-	commitStoreAddress   cciptypes.Address
-	commitStoreStaticCfg commit_store.CommitStoreStaticConfig
-	sourceChain          legacyevm.Chain
-	destChain            legacyevm.Chain
-}
-
-func extractJobSpecParams(jb job.Job, chainSet legacyevm.LegacyChainContainer) (*jobSpecParams, error) {
-	if jb.OCR2OracleSpec == nil {
-		return nil, errors.New("spec is nil")
-	}
-	spec := jb.OCR2OracleSpec
-
-	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
-	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
-	if err != nil {
-		return nil, err
-	}
-	// ensure addresses are formatted properly - (lowercase to eip55 for evm)
-	pluginConfig.OffRamp = ccipcalc.HexToAddress(string(pluginConfig.OffRamp))
-
-	destChain, _, err := ccipconfig.GetChainFromSpec(spec, chainSet)
-	if err != nil {
-		return nil, err
-	}
-
-	commitStoreAddress := common.HexToAddress(spec.ContractID)
-	staticConfig, err := ccipdata.FetchCommitStoreStaticConfig(commitStoreAddress, destChain.Client())
-	if err != nil {
-		return nil, fmt.Errorf("get commit store static config: %w", err)
-	}
-
-	sourceChain, _, err := ccipconfig.GetChainByChainSelector(chainSet, staticConfig.SourceChainSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	return &jobSpecParams{
-		pluginConfig:         pluginConfig,
-		commitStoreAddress:   ccipcalc.EvmAddrToGeneric(commitStoreAddress),
-		commitStoreStaticCfg: staticConfig,
-		sourceChain:          sourceChain,
-		destChain:            destChain,
-	}, nil
 }

@@ -29,7 +29,7 @@ on:
         type: string
 
 env:
-  CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
+  CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/ccip
   INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
   MOD_CACHE_VERSION: 2
 
@@ -167,17 +167,17 @@ jobs:
             echo "Will test all EVM implementations"
             echo "evm_implementations=geth,besu,nethermind,erigon" >> $GITHUB_OUTPUT
           fi
-      - name: Select Chainlink version
+      - name: Select Chainlink CCIP version
         id: select-chainlink-version
         run: |
           PATH=$PATH:$(go env GOPATH)/bin
           export PATH          
           
           if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
-            echo "Fetching latest Chainlink stable version"
+            echo "Fetching latest Chainlink CCIP stable version"
             implementations_arr=()
             # we use 100 days since we really want the latest one, and it's highly improbable there won't be a release in last 100 days
-            chainlink_version=$(ghlatestreleasechecker "smartcontractkit/chainlink" 100) 
+            chainlink_version=$(ghlatestreleasechecker "smartcontractkit/ccip" 100) 
             echo "chainlink_version=$chainlink_version" >> $GITHUB_OUTPUT
           elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             echo "Fetching Chainlink version from input"
@@ -199,7 +199,7 @@ jobs:
             echo "chainlink_version=$chainlink_version" >> $GITHUB_OUTPUT
           elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
             echo "Fetching Chainlink version from tag"
-            chainlink_version="${{ github.ref }}"
+            chainlink_version="${{ github.ref_name }}"
             echo "chainlink_version=$chainlink_version" >> $GITHUB_OUTPUT
           else
             echo "Unsupported trigger event. It's probably an issue with the pipeline definition. Please reach out to the Test Tooling team."
@@ -613,7 +613,7 @@ jobs:
                       "type": "section",
                       "text": {
                         "type": "mrkdwn",
-                        "text": "${{ contains(join(needs.*.result, ','), 'failure') && 'Some tests failed, notifying <@U03GWA0NSF7>' || 'All Good!' }}"
+                        "text": "${{ contains(join(needs.*.result, ','), 'failure') && 'Some tests failed! Notifying <!subteam^S06HJ46A1EX|ccip-qa>' || 'All Good!' }}"
                       }
                     },
                     {
@@ -659,7 +659,7 @@ jobs:
           PATH=$PATH:$(go env GOPATH)/bin
           export PATH
           
-          workflowresultparser -workflowRunID ${{ github.run_id }} -githubToken ${{ github.token }} -githubRepo "${{ github.repository }}" -jobNameRegex "^CCIP Compatibility with (.*?)$" -namedKey="CCIP" -outputFile=output.json
+          workflowresultparser -workflowRunID ${{ github.run_id }} -githubToken ${{ github.token }} -githubRepo "${{ github.repository }}" -jobNameRegex "^CCIP Compatibility with (.*)$" -namedKey="CCIP" -outputFile=output.json
           
           echo "base64_parsed_results=$(base64 -w 0 output.json)" >> $GITHUB_OUTPUT
 

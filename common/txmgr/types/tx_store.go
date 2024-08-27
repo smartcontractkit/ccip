@@ -13,8 +13,6 @@ import (
 )
 
 // TxStore is a superset of all the needed persistence layer methods
-//
-//go:generate mockery --quiet --name TxStore --output ./mocks/ --case=underscore
 type TxStore[
 	// Represents an account address, in native chain format.
 	ADDR types.Hashable,
@@ -134,4 +132,5 @@ type ChainReceipt[TX_HASH, BLOCK_HASH types.Hashable] interface {
 	GetFeeUsed() uint64
 	GetTransactionIndex() uint
 	GetBlockHash() BLOCK_HASH
+	GetRevertReason() *string
 }

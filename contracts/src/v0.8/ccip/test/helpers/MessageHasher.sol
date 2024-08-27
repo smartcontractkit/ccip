@@ -6,21 +6,18 @@ import {Internal} from "../../libraries/Internal.sol";
 
 /// @notice MessageHasher is a contract that utility functions to hash an Any2EVMRampMessage
 /// and encode various preimages for the final hash of the message.
+/// @dev This is only deployed in tests and is not part of the production contracts.
 contract MessageHasher {
   function hash(Internal.Any2EVMRampMessage memory message, bytes memory onRamp) public pure returns (bytes32) {
     return Internal._hash(message, onRamp);
   }
 
-  function encodeTokenAmountsHashPreimage(Client.EVMTokenAmount[] memory tokenAmounts)
+  function encodeTokenAmountsHashPreimage(Internal.RampTokenAmount[] memory rampTokenAmounts)
     public
     pure
     returns (bytes memory)
   {
-    return abi.encode(tokenAmounts);
-  }
-
-  function encodeSourceTokenDataHashPreimage(bytes[] memory sourceTokenData) public pure returns (bytes memory) {
-    return abi.encode(sourceTokenData);
+    return abi.encode(rampTokenAmounts);
   }
 
   function encodeMetadataHashPreimage(
@@ -48,11 +45,27 @@ contract MessageHasher {
     bytes32 implicitMetadataHash,
     bytes32 fixedSizeFieldsHash,
     bytes32 dataHash,
-    bytes32 tokenAmountsHash,
-    bytes32 sourceTokenDataHash
+    bytes32 tokenAmountsHash
   ) public pure returns (bytes memory) {
-    return abi.encode(
-      leafDomainSeparator, implicitMetadataHash, fixedSizeFieldsHash, dataHash, tokenAmountsHash, sourceTokenDataHash
-    );
+    return abi.encode(leafDomainSeparator, implicitMetadataHash, fixedSizeFieldsHash, dataHash, tokenAmountsHash);
+  }
+
+  function encodeEVMExtraArgsV1(Client.EVMExtraArgsV1 memory extraArgs) public pure returns (bytes memory) {
+    return Client._argsToBytes(extraArgs);
+  }
+
+  function encodeEVMExtraArgsV2(Client.EVMExtraArgsV2 memory extraArgs) public pure returns (bytes memory) {
+    return Client._argsToBytes(extraArgs);
+  }
+
+  function decodeEVMExtraArgsV1(uint256 gasLimit) public pure returns (Client.EVMExtraArgsV1 memory) {
+    return Client.EVMExtraArgsV1(gasLimit);
+  }
+
+  function decodeEVMExtraArgsV2(
+    uint256 gasLimit,
+    bool allowOutOfOrderExecution
+  ) public pure returns (Client.EVMExtraArgsV2 memory) {
+    return Client.EVMExtraArgsV2(gasLimit, allowOutOfOrderExecution);
   }
 }

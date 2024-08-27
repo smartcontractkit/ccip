@@ -27,22 +27,16 @@ const (
 )
 
 // GasPriceEstimatorCommit provides gasPriceEstimatorCommon + features needed in commit plugin, e.g. price deviation check.
-//
-//go:generate mockery --quiet --name GasPriceEstimatorCommit --output . --filename gas_price_estimator_commit_mock.go --inpackage --case=underscore
 type GasPriceEstimatorCommit interface {
 	cciptypes.GasPriceEstimatorCommit
 }
 
 // GasPriceEstimatorExec provides gasPriceEstimatorCommon + features needed in exec plugin, e.g. message cost estimation.
-//
-//go:generate mockery --quiet --name GasPriceEstimatorExec --output . --filename gas_price_estimator_exec_mock.go --inpackage --case=underscore
 type GasPriceEstimatorExec interface {
 	cciptypes.GasPriceEstimatorExec
 }
 
 // GasPriceEstimator provides complete gas price estimator functions.
-//
-//go:generate mockery --quiet --name GasPriceEstimator --output . --filename gas_price_estimator_mock.go --inpackage --case=underscore
 type GasPriceEstimator interface {
 	cciptypes.GasPriceEstimator
 }
@@ -54,25 +48,11 @@ func NewGasPriceEstimatorForCommitPlugin(
 	daDeviationPPB int64,
 	execDeviationPPB int64,
 ) (GasPriceEstimatorCommit, error) {
-	execEstimator := ExecGasPriceEstimator{
-		estimator:    estimator,
-		maxGasPrice:  maxExecGasPrice,
-		deviationPPB: execDeviationPPB,
-	}
-
 	switch commitStoreVersion.String() {
 	case "1.0.0", "1.1.0":
-		return execEstimator, nil
+		return NewExecGasPriceEstimator(estimator, maxExecGasPrice, execDeviationPPB), nil
 	case "1.2.0":
-		return DAGasPriceEstimator{
-			execEstimator:       execEstimator,
-			l1Oracle:            estimator.L1Oracle(),
-			priceEncodingLength: daGasPriceEncodingLength,
-			daDeviationPPB:      daDeviationPPB,
-			daOverheadGas:       0,
-			gasPerDAByte:        0,
-			daMultiplier:        0,
-		}, nil
+		return NewDAGasPriceEstimator(estimator, maxExecGasPrice, execDeviationPPB, daDeviationPPB), nil
 	default:
 		return nil, errors.Errorf("Invalid commitStore version: %s", commitStoreVersion)
 	}

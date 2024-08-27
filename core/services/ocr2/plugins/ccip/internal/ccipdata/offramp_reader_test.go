@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -23,7 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_2_0"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -166,10 +167,15 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 		RpcBatchSize:             2,
 		KeepFinalizedBlocksDepth: 1000,
 	}
+	headTracker := headtracker.NewSimulatedHeadTracker(bc, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+	if lpOpts.PollPeriod == 0 {
+		lpOpts.PollPeriod = 1 * time.Hour
+	}
 	lp := logpoller.NewLogPoller(
 		orm,
 		bc,
 		log,
+		headTracker,
 		lpOpts)
 	assert.NoError(t, orm.InsertBlock(ctx, common.Hash{}, 1, time.Now(), 1))
 	// Setup offRamp.
@@ -305,7 +311,7 @@ func setupOffRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 		Context: testutils.Context(t),
 	})
 	require.NoError(t, err)
-	require.Equal(t, "EVM2EVMOffRamp 1.5.0-dev", tav)
+	require.Equal(t, "EVM2EVMOffRamp 1.5.0", tav)
 	return offRampAddr
 }
 
@@ -314,7 +320,7 @@ func deployMockArm(
 	user *bind.TransactOpts,
 	bc *client.SimulatedBackendClient,
 ) common.Address {
-	armAddr, tx, _, err := mock_arm_contract.DeployMockARMContract(user, bc)
+	armAddr, tx, _, err := mock_rmn_contract.DeployMockRMNContract(user, bc)
 	require.NoError(t, err)
 	bc.Commit()
 	ccipdata.AssertNonRevert(t, tx, bc, user)
@@ -347,7 +353,7 @@ func deployCommitStore(
 	}
 	tav, err := cs.TypeAndVersion(callOpts)
 	require.NoError(t, err)
-	require.Equal(t, "CommitStore 1.5.0-dev", tav)
+	require.Equal(t, "CommitStore 1.5.0", tav)
 	return csAddr
 }
 

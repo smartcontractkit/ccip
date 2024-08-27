@@ -54,7 +54,7 @@ var (
 func TestOCRChaos(t *testing.T) {
 	t.Parallel()
 	l := logging.GetTestLogger(t)
-	config, err := tc.GetConfig("Chaos", tc.OCR)
+	config, err := tc.GetConfig([]string{"Chaos"}, tc.OCR)
 	require.NoError(t, err, "Error getting config")
 
 	var overrideFn = func(_ interface{}, target interface{}) {
@@ -178,8 +178,7 @@ func TestOCRChaos(t *testing.T) {
 				require.NoError(t, err, "Error tearing down environment")
 			})
 
-			ms, err := ctfClient.ConnectMockServer(testEnvironment)
-			require.NoError(t, err, "Creating mockserver clients shouldn't fail")
+			ms := ctfClient.ConnectMockServer(testEnvironment)
 
 			linkContract, err := contracts.DeployLinkTokenContract(l, seth)
 			require.NoError(t, err, "Error deploying link token contract")

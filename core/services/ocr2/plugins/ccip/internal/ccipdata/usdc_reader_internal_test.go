@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -74,6 +75,35 @@ func TestLogPollerClient_GetUSDCMessagePriorToLogIndexInTx(t *testing.T) {
 		lp.AssertExpectations(t)
 	})
 
+	t.Run("logs fetched from memory in subsequent calls", func(t *testing.T) {
+		lp := lpmocks.NewLogPoller(t)
+		u, _ := NewUSDCReader(lggr, "job_123", utils.RandomAddress(), lp, false)
+
+		lp.On("IndexedLogsByTxHash",
+			mock.Anything,
+			u.usdcMessageSent,
+			u.transmitterAddress,
+			txHash,
+		).Return([]logpoller.Log{
+			{LogIndex: ccipLogIndex - 2, Data: hexutil.MustDecode(expectedData)},
+			{LogIndex: ccipLogIndex - 1, Data: []byte("-2")},
+			{LogIndex: ccipLogIndex, Data: []byte("0")},
+			{LogIndex: ccipLogIndex + 1, Data: []byte("1")},
+		}, nil).Once()
+
+		// first call logs must be fetched from lp
+		usdcMessageData, err := u.GetUSDCMessagePriorToLogIndexInTx(context.Background(), ccipLogIndex, 1, txHash.String())
+		assert.NoError(t, err)
+		assert.Equal(t, expectedPostParse, hexutil.Encode(usdcMessageData))
+
+		// subsequent call, logs must be fetched from memory
+		usdcMessageData, err = u.GetUSDCMessagePriorToLogIndexInTx(context.Background(), ccipLogIndex, 1, txHash.String())
+		assert.NoError(t, err)
+		assert.Equal(t, expectedPostParse, hexutil.Encode(usdcMessageData))
+
+		lp.AssertExpectations(t)
+	})
+
 	t.Run("none found", func(t *testing.T) {
 		lp := lpmocks.NewLogPoller(t)
 		u, _ := NewUSDCReader(lggr, "job_123", utils.RandomAddress(), lp, false)
@@ -119,7 +149,11 @@ func TestFilters(t *testing.T) {
 			RpcBatchSize:             1,
 			KeepFinalizedBlocksDepth: 100,
 		}
-		lp := logpoller.NewLogPoller(o, esc, lggr, lpOpts)
+		headTracker := headtracker.NewSimulatedHeadTracker(esc, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+		if lpOpts.PollPeriod == 0 {
+			lpOpts.PollPeriod = 1 * time.Hour
+		}
+		lp := logpoller.NewLogPoller(o, esc, lggr, headTracker, lpOpts)
 
 		jobID1 := "job-1"
 		jobID2 := "job-2"

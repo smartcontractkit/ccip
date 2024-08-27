@@ -103,6 +103,11 @@ func (d *DynamicPriceGetter) FilterConfiguredTokens(ctx context.Context, tokens 
 	return configured, unconfigured, nil
 }
 
+// It returns the prices of all tokens defined in the price getter.
+func (d *DynamicPriceGetter) GetJobSpecTokenPricesUSD(ctx context.Context) (map[cciptypes.Address]*big.Int, error) {
+	return d.TokenPricesUSD(ctx, d.getAllTokensDefined())
+}
+
 // TokenPricesUSD implements the PriceGetter interface.
 // It returns static prices stored in the price getter, and batch calls aggregators (one per chain) to retrieve aggregator-based prices.
 func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
@@ -114,6 +119,18 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []ccipty
 		return nil, err
 	}
 	return prices, nil
+}
+
+func (d *DynamicPriceGetter) getAllTokensDefined() []cciptypes.Address {
+	tokens := make([]cciptypes.Address, 0)
+
+	for addr := range d.cfg.AggregatorPrices {
+		tokens = append(tokens, ccipcalc.EvmAddrToGeneric(addr))
+	}
+	for addr := range d.cfg.StaticPrices {
+		tokens = append(tokens, ccipcalc.EvmAddrToGeneric(addr))
+	}
+	return tokens
 }
 
 // performBatchCalls performs batch calls on all chains to retrieve token prices.
@@ -156,7 +173,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 		v, err1 := rpclib.ParseOutput[uint8](res, 0)
 		if err1 != nil {
 			callSignature := batchCalls.decimalCalls[i].String()
-			return fmt.Errorf("parse contract output while calling %v on chain %d: %w", callSignature, chainID, err)
+			return fmt.Errorf("parse contract output while calling %v on chain %d: %w", callSignature, chainID, err1)
 		}
 		decimals = append(decimals, v)
 	}
@@ -167,7 +184,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 		v, err1 := rpclib.ParseOutput[*big.Int](res, 1)
 		if err1 != nil {
 			callSignature := batchCalls.latestRoundDataCalls[i].String()
-			return fmt.Errorf("parse contract output while calling %v on chain %d: %w", callSignature, chainID, err)
+			return fmt.Errorf("parse contract output while calling %v on chain %d: %w", callSignature, chainID, err1)
 		}
 		latestRounds = append(latestRounds, v)
 	}

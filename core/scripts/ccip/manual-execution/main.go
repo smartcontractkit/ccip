@@ -18,13 +18,14 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"go.uber.org/multierr"
+
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	"manual-execution/helpers"
 )
 
-const NumberOfBlocks = 5000
+const NumberOfBlocks = 20000
 
 // Config represents configuration fields
 type Config struct {
@@ -41,18 +42,19 @@ type Config struct {
 }
 
 type execArgs struct {
-	cfg             Config
-	seqNum          uint64
-	msgID           [32]byte
-	sourceChain     *ethclient.Client
-	sourceChainId   *big.Int
-	destChain       *ethclient.Client
-	destUser        *bind.TransactOpts
-	destChainId     *big.Int
-	srcStartBlock   *big.Int
-	destStartBlock  uint64
-	destLatestBlock uint64
-	OnRamp          common.Address
+	cfg               Config
+	seqNum            uint64
+	msgID             [32]byte
+	sourceChain       *ethclient.Client
+	sourceChainId     *big.Int
+	destChain         *ethclient.Client
+	destUser          *bind.TransactOpts
+	destChainId       *big.Int
+	srcStartBlock     *big.Int
+	destStartBlock    uint64
+	destLatestBlock   uint64
+	OnRamp            common.Address
+	tokenGasOverrides []*big.Int
 }
 
 func main() {
@@ -299,12 +301,18 @@ func (args *execArgs) execute() error {
 		ProofFlagBits:     helpers.ProofFlagsToBits(proof.SourceFlags),
 	}
 
-	// Execute.
-	gasLimitOverrides := make([]*big.Int, len(offRampProof.Messages))
-	for i := range offRampProof.Messages {
-		gasLimitOverrides[i] = big.NewInt(int64(args.cfg.GasLimitOverride))
+	gasLimitOverrides := make([]*helpers.EVM2EVMOffRampGasLimitOverride, len(offRampProof.Messages))
+
+	for range offRampProof.Messages {
+		evm2evmOffRampGasLimitOverride := &helpers.EVM2EVMOffRampGasLimitOverride{
+			ReceiverExecutionGasLimit: big.NewInt(int64(args.cfg.GasLimitOverride)),
+			TokenGasOverrides:         args.tokenGasOverrides,
+		}
+		gasLimitOverrides = append(gasLimitOverrides, evm2evmOffRampGasLimitOverride)
 	}
 
+	// GasLimit may need to be raised if the TX is reverting. Must be set to a value larger than the GasLimitOverride.
+	// args.destUser.GasLimit = 5000000
 	tx, err := helpers.ManuallyExecute(args.destChain, args.destUser, args.cfg.OffRamp, offRampProof, gasLimitOverrides)
 	if err != nil {
 		return err
@@ -312,6 +320,7 @@ func (args *execArgs) execute() error {
 	// wait for tx confirmation
 	err = helpers.WaitForSuccessfulTxReceipt(args.destChain, tx.Hash())
 	if err != nil {
+		log.Println("Failures may be due to insufficient gas, try increasing args.destUser.GasLimit.")
 		return err
 	}
 

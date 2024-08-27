@@ -279,6 +279,8 @@ Mode = 'tls'
 TLSCertPath = ''
 
 [Mercury]
+VerboseLogging = false
+
 [Mercury.Cache]
 LatestReportTTL = '1s'
 MaxStaleAge = '1h0m0s'
@@ -331,6 +333,8 @@ NoNewHeadsThreshold = '3m0s'
 OperatorFactoryAddress = '0x3E64Cd889482443324F91bFA9c84fE72A511f48A'
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
+FinalizedBlockOffset = 0
+NoNewFinalizedHeadsThreshold = '9m0s'
 
 [EVM.Transactions]
 ForwardersEnabled = false
@@ -351,8 +355,8 @@ Mode = 'BlockHistory'
 PriceDefault = '20 gwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
 PriceMin = '1 gwei'
-LimitDefault = 500000
-LimitMax = 500000
+LimitDefault = 8000000
+LimitMax = 8000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
@@ -385,6 +389,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
+EnforceRepeatableRead = false
+DeathDeclarationDelay = '10s'
 
 [EVM.OCR]
 ContractConfirmations = 4

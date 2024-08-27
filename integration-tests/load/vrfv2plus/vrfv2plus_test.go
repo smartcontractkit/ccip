@@ -43,7 +43,7 @@ func TestVRFV2PlusPerformance(t *testing.T) {
 	l := logging.GetTestLogger(t)
 	testType, err := tc.GetConfigurationNameFromEnv()
 	require.NoError(t, err)
-	testConfig, err := tc.GetConfig(testType, tc.VRFv2Plus)
+	testConfig, err := tc.GetChainAndTestTypeSpecificConfig(testType, tc.VRFv2Plus)
 	require.NoError(t, err)
 	cfgl := testConfig.Logging.Loki
 
@@ -186,7 +186,7 @@ func TestVRFV2PlusBHSPerformance(t *testing.T) {
 
 	testType, err := tc.GetConfigurationNameFromEnv()
 	require.NoError(t, err)
-	testConfig, err := tc.GetConfig(testType, tc.VRFv2Plus)
+	testConfig, err := tc.GetChainAndTestTypeSpecificConfig(testType, tc.VRFv2Plus)
 	require.NoError(t, err)
 	vrfv2PlusConfig := testConfig.VRFv2Plus
 	testReporter := &testreporters.VRFV2PlusTestReporter{}
@@ -309,11 +309,12 @@ func TestVRFV2PlusBHSPerformance(t *testing.T) {
 		latestBlockNumber, err := sethClient.Client.BlockNumber(testcontext.Get(t))
 		require.NoError(t, err, "error getting latest block number")
 		_, err = actions.WaitForBlockNumberToBe(
+			testcontext.Get(t),
 			latestBlockNumber+uint64(257),
 			sethClient,
 			&wgBlockNumberTobe,
+			nil,
 			configCopy.VRFv2Plus.General.WaitFor256BlocksTimeout.Duration,
-			t,
 			l,
 		)
 		wgBlockNumberTobe.Wait()
@@ -332,13 +333,15 @@ func TestVRFV2PlusBHSPerformance(t *testing.T) {
 			Float64("SubscriptionRefundingAmountNative", *configCopy.VRFv2Plus.General.SubscriptionRefundingAmountNative).
 			Float64("SubscriptionRefundingAmountLink", *configCopy.VRFv2Plus.General.SubscriptionRefundingAmountLink).
 			Strs("SubIDs", subIDsString).
-			Msg("Funding Subscriptions with Link and Native Tokens")
+			Str("Funding type", *configCopy.VRFv2Plus.General.SubscriptionBillingType).
+			Msg("Funding Subscriptions with Link and/or Native Tokens")
 		err = vrfv2plus.FundSubscriptions(
 			big.NewFloat(*configCopy.VRFv2Plus.General.SubscriptionRefundingAmountNative),
 			big.NewFloat(*configCopy.VRFv2Plus.General.SubscriptionRefundingAmountLink),
 			vrfContracts.LinkToken,
 			vrfContracts.CoordinatorV2Plus,
 			underfundedSubIDs,
+			*configCopy.VRFv2Plus.General.SubscriptionBillingType,
 		)
 		require.NoError(t, err, "error funding subscriptions")
 

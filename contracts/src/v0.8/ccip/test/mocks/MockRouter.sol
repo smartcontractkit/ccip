@@ -12,7 +12,7 @@ import {Internal} from "../../libraries/Internal.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ERC165Checker} from
-  "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/ERC165Checker.sol";
+  "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/ERC165Checker.sol";
 
 contract MockCCIPRouter is IRouter, IRouterClient {
   using SafeERC20 for IERC20;
@@ -20,13 +20,13 @@ contract MockCCIPRouter is IRouter, IRouterClient {
 
   error InvalidAddress(bytes encodedAddress);
   error InvalidExtraArgsTag();
-  error ReceiverError(bytes error);
+  error ReceiverError(bytes err);
 
   event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp, bytes32 calldataHash);
   event MsgExecuted(bool success, bytes retData, uint256 gasUsed);
 
   uint16 public constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
-  uint64 public constant DEFAULT_GAS_LIMIT = 200_000;
+  uint32 public constant DEFAULT_GAS_LIMIT = 200_000;
 
   uint256 internal s_mockFeeTokenAmount; //use setFee() to change to non-zero to test fees
 

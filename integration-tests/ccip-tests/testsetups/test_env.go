@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
+	ctfconfigtypes "github.com/smartcontractkit/chainlink-testing-framework/config/types"
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/conversions"
 
@@ -292,8 +293,8 @@ func DeployLocalCluster(
 				require.NoError(t, err, "failed to get default chain config: %w", err)
 			} else {
 				chainConfig.ChainID = int(network.ChainID)
-				eth1 := ctfconfig.EthereumVersion_Eth1
-				geth := ctfconfig.ExecutionLayer_Geth
+				eth1 := ctfconfigtypes.EthereumVersion_Eth1
+				geth := ctfconfigtypes.ExecutionLayer_Geth
 
 				privateEthereumNetworks = append(privateEthereumNetworks, &ctfconfig.EthereumNetworkConfig{
 					EthereumVersion:     &eth1,
@@ -483,10 +484,15 @@ func DeployEnvironments(
 					anvilConfig.BlockGaslimit = pointer.ToInt64(100000000)
 				}
 				testEnvironment.
-					AddHelm(foundry.New(&foundry.Props{
+					AddHelm(foundry.NewVersioned("0.2.1", &foundry.Props{
 						NetworkName: network.Name,
 						Values: map[string]interface{}{
 							"fullnameOverride": actions.NetworkName(network.Name),
+							"image": map[string]interface{}{
+								"repository": "ghcr.io/foundry-rs/foundry",
+								"tag":        "nightly-5ac78a9cd4b94dc53d1fe5e0f42372b28b5a7559",
+								//	"tag":        "nightly-ea2eff95b5c17edd3ffbdfc6daab5ce5cc80afc0",
+							},
 							"anvil": map[string]interface{}{
 								"chainId":                   fmt.Sprintf("%d", network.ChainID),
 								"blockTime":                 anvilConfig.BlockTime,
@@ -500,7 +506,10 @@ func DeployEnvironments(
 								"blockGasLimit":             fmt.Sprintf("%d", pointer.GetInt64(anvilConfig.BlockGaslimit)),
 								"baseFee":                   fmt.Sprintf("%d", pointer.GetInt64(anvilConfig.BaseFee)),
 							},
-							"resources": AnvilResourceProfile,
+							"resources": GethResourceProfile,
+							"cache": map[string]interface{}{
+								"capacity": "150Gi",
+							},
 						},
 					}))
 				selectedNetworks[i].Simulated = true

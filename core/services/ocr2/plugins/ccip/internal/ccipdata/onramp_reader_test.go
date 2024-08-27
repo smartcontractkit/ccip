@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -85,10 +86,15 @@ func setupOnRampReaderTH(t *testing.T, version string) onRampReaderTH {
 		RpcBatchSize:             2,
 		KeepFinalizedBlocksDepth: 1000,
 	}
+	headTracker := headtracker.NewSimulatedHeadTracker(bc, lpOpts.UseFinalityTag, lpOpts.FinalityDepth)
+	if lpOpts.PollPeriod == 0 {
+		lpOpts.PollPeriod = 1 * time.Hour
+	}
 	lp := logpoller.NewLogPoller(
 		orm,
 		bc,
 		log,
+		headTracker,
 		lpOpts)
 
 	// Setup onRamp.
@@ -345,8 +351,7 @@ func setupOnRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 		MaxDataBytes:                      0,
 		MaxPerMsgGasLimit:                 0,
 		DefaultTokenFeeUSDCents:           50,
-		DefaultTokenDestGasOverhead:       34_000,
-		DefaultTokenDestBytesOverhead:     500,
+		DefaultTokenDestGasOverhead:       125_000,
 	}
 	rateLimiterConfig := evm_2_evm_onramp.RateLimiterConfig{
 		IsEnabled: false,

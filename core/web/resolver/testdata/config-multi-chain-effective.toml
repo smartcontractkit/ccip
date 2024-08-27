@@ -223,6 +223,8 @@ Mode = 'tls'
 TLSCertPath = ''
 
 [Mercury]
+VerboseLogging = false
+
 [Mercury.Cache]
 LatestReportTTL = '1s'
 MaxStaleAge = '1h0m0s'
@@ -275,6 +277,8 @@ NoNewHeadsThreshold = '3m0s'
 OperatorFactoryAddress = '0x3E64Cd889482443324F91bFA9c84fE72A511f48A'
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
+FinalizedBlockOffset = 0
+NoNewFinalizedHeadsThreshold = '9m0s'
 
 [EVM.Transactions]
 ForwardersEnabled = false
@@ -295,8 +299,8 @@ Mode = 'BlockHistory'
 PriceDefault = '20 gwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
 PriceMin = '1 gwei'
-LimitDefault = 500000
-LimitMax = 500000
+LimitDefault = 8000000
+LimitMax = 8000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
@@ -329,6 +333,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
+EnforceRepeatableRead = false
+DeathDeclarationDelay = '10s'
 
 [EVM.OCR]
 ContractConfirmations = 4
@@ -371,6 +377,8 @@ NoNewHeadsThreshold = '3m0s'
 OperatorFactoryAddress = '0x8007e24251b1D2Fc518Eb843A701d9cD21fe0aA3'
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
+FinalizedBlockOffset = 0
+NoNewFinalizedHeadsThreshold = '0s'
 
 [EVM.Transactions]
 ForwardersEnabled = false
@@ -391,8 +399,8 @@ Mode = 'BlockHistory'
 PriceDefault = '9.223372036854775807 ether'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
 PriceMin = '1 gwei'
-LimitDefault = 500000
-LimitMax = 500000
+LimitDefault = 8000000
+LimitMax = 8000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '5 gwei'
@@ -425,6 +433,8 @@ SyncThreshold = 5
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
+EnforceRepeatableRead = false
+DeathDeclarationDelay = '10s'
 
 [EVM.OCR]
 ContractConfirmations = 4
@@ -461,6 +471,8 @@ NonceAutoSync = true
 NoNewHeadsThreshold = '30s'
 RPCDefaultBatchSize = 100
 RPCBlockQueryDelay = 10
+FinalizedBlockOffset = 0
+NoNewFinalizedHeadsThreshold = '6m0s'
 
 [EVM.Transactions]
 ForwardersEnabled = false
@@ -481,8 +493,8 @@ Mode = 'FixedPrice'
 PriceDefault = '30 gwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
 PriceMin = '30 gwei'
-LimitDefault = 500000
-LimitMax = 500000
+LimitDefault = 8000000
+LimitMax = 8000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
 BumpMin = '20 gwei'
@@ -515,6 +527,8 @@ SyncThreshold = 10
 LeaseDuration = '0s'
 NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
+EnforceRepeatableRead = false
+DeathDeclarationDelay = '10s'
 
 [EVM.OCR]
 ContractConfirmations = 4
