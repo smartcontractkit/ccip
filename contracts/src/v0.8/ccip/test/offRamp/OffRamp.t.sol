@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {IFeeQuoter} from "../../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
-import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
+import {FeeQuoter} from "../../FeeQuoter.sol";
 import {NonceManager} from "../../NonceManager.sol";
-import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
@@ -38,7 +38,7 @@ contract OffRamp_constructor is OffRampSetup {
       tokenAdminRegistry: address(s_tokenAdminRegistry),
       nonceManager: address(s_inboundNonceManager)
     });
-    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(address(s_priceRegistry));
+    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(address(s_feeQuoter));
 
     OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](2);
     sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
@@ -159,7 +159,7 @@ contract OffRamp_constructor is OffRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
-      _generateDynamicOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_feeQuoter)),
       sourceChainConfigs
     );
   }
@@ -185,7 +185,7 @@ contract OffRamp_constructor is OffRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
-      _generateDynamicOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_feeQuoter)),
       sourceChainConfigs
     );
   }
@@ -205,7 +205,7 @@ contract OffRamp_constructor is OffRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
-      _generateDynamicOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_feeQuoter)),
       sourceChainConfigs
     );
   }
@@ -225,7 +225,7 @@ contract OffRamp_constructor is OffRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
-      _generateDynamicOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_feeQuoter)),
       sourceChainConfigs
     );
   }
@@ -245,7 +245,7 @@ contract OffRamp_constructor is OffRampSetup {
         tokenAdminRegistry: ZERO_ADDRESS,
         nonceManager: address(s_inboundNonceManager)
       }),
-      _generateDynamicOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_feeQuoter)),
       sourceChainConfigs
     );
   }
@@ -265,7 +265,7 @@ contract OffRamp_constructor is OffRampSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: ZERO_ADDRESS
       }),
-      _generateDynamicOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_feeQuoter)),
       sourceChainConfigs
     );
   }
@@ -273,7 +273,7 @@ contract OffRamp_constructor is OffRampSetup {
 
 contract OffRamp_setDynamicConfig is OffRampSetup {
   function test_SetDynamicConfig_Success() public {
-    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(address(s_priceRegistry));
+    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(address(s_feeQuoter));
 
     vm.expectEmit();
     emit OffRamp.DynamicConfigSet(dynamicConfig);
@@ -285,7 +285,7 @@ contract OffRamp_setDynamicConfig is OffRampSetup {
   }
 
   function test_SetDynamicConfigWithValidator_Success() public {
-    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(address(s_priceRegistry));
+    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(address(s_feeQuoter));
     dynamicConfig.messageValidator = address(s_inboundMessageValidator);
 
     vm.expectEmit();
@@ -301,14 +301,14 @@ contract OffRamp_setDynamicConfig is OffRampSetup {
 
   function test_NonOwner_Revert() public {
     vm.startPrank(STRANGER);
-    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(address(s_priceRegistry));
+    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(address(s_feeQuoter));
 
     vm.expectRevert("Only callable by owner");
 
     s_offRamp.setDynamicConfig(dynamicConfig);
   }
 
-  function test_PriceRegistryZeroAddress_Revert() public {
+  function test_FeeQuoterZeroAddress_Revert() public {
     OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(ZERO_ADDRESS);
 
     vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
@@ -2956,8 +2956,7 @@ contract OffRamp_commit is OffRampSetup {
 
   function test_StaleReportWithRoot_Success() public {
     uint64 maxSeq = 12;
-    uint224 tokenStartPrice =
-      IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value;
+    uint224 tokenStartPrice = IFeeQuoter(s_offRamp.getDynamicConfig().feeQuoter).getTokenPrice(s_sourceFeeToken).value;
 
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
@@ -2992,9 +2991,7 @@ contract OffRamp_commit is OffRampSetup {
 
     assertEq(maxSeq * 2 + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
     assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
-    assertEq(
-      tokenStartPrice, IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
-    );
+    assertEq(tokenStartPrice, IFeeQuoter(s_offRamp.getDynamicConfig().feeQuoter).getTokenPrice(s_sourceFeeToken).value);
   }
 
   function test_OnlyTokenPriceUpdates_Success() public {
@@ -3003,7 +3000,7 @@ contract OffRamp_commit is OffRampSetup {
       OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
 
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    emit FeeQuoter.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
 
     vm.expectEmit();
     emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
@@ -3019,7 +3016,7 @@ contract OffRamp_commit is OffRampSetup {
       OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
 
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    emit FeeQuoter.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
 
     vm.expectEmit();
     emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
@@ -3034,7 +3031,7 @@ contract OffRamp_commit is OffRampSetup {
       OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
 
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    emit FeeQuoter.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
     _commit(commitReport, s_latestSequenceNumber);
 
     assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
@@ -3069,7 +3066,7 @@ contract OffRamp_commit is OffRampSetup {
 
     // The same sequence number can be reported again
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    emit FeeQuoter.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
 
     _commit(commitReport, s_latestSequenceNumber);
   }
@@ -3085,7 +3082,7 @@ contract OffRamp_commit is OffRampSetup {
     });
 
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, tokenPrice1, block.timestamp);
+    emit FeeQuoter.UsdPerTokenUpdated(s_sourceFeeToken, tokenPrice1, block.timestamp);
 
     vm.expectEmit();
     emit MultiOCR3Base.Transmitted(uint8(Internal.OCRPluginType.Commit), s_configDigestCommit, s_latestSequenceNumber);
@@ -3111,9 +3108,7 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
 
     assertEq(maxSeq + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
-    assertEq(
-      tokenPrice1, IPriceRegistry(s_offRamp.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
-    );
+    assertEq(tokenPrice1, IFeeQuoter(s_offRamp.getDynamicConfig().feeQuoter).getTokenPrice(s_sourceFeeToken).value);
     assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
   }
 
@@ -3261,7 +3256,7 @@ contract OffRamp_commit is OffRampSetup {
       OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
 
     vm.expectEmit();
-    emit PriceRegistry.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    emit FeeQuoter.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
     _commit(commitReport, s_latestSequenceNumber);
 
     vm.expectRevert(OffRamp.StaleCommitReport.selector);
