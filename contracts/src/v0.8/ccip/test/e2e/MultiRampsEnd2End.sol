@@ -26,19 +26,6 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
 
   mapping(address destPool => address sourcePool) internal s_sourcePoolByDestPool;
 
-  struct MultiRampsE2ELocalVars {
-    IERC20 token0;
-    IERC20 token1;
-    uint256 balance0Pre;
-    uint256 balance1Pre;
-    bytes32[] merkleRoots;
-    OffRamp.MerkleRoot[] roots;
-    bytes32[] proofs;
-    bytes32[] hashedLeaves;
-    Internal.ExecutionReportSingleChain[] reports;
-    OffRamp.CommitReport report;
-  }
-
   function setUp() public virtual override(OnRampSetup, OffRampSetup) {
     OnRampSetup.setUp();
     OffRampSetup.setUp();
@@ -119,95 +106,96 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
   function test_E2E_3MessagesMMultiOffRampSuccess_gas() public {
     vm.pauseGasMetering();
 
-    MultiRampsE2ELocalVars memory multiRampsE2ELocalVars;
-
-    multiRampsE2ELocalVars.token0 = IERC20(s_sourceTokens[0]);
-    multiRampsE2ELocalVars.token1 = IERC20(s_sourceTokens[1]);
-    multiRampsE2ELocalVars.balance0Pre = multiRampsE2ELocalVars.token0.balanceOf(OWNER);
-    multiRampsE2ELocalVars.balance1Pre = multiRampsE2ELocalVars.token1.balanceOf(OWNER);
-
-    // Send messages
     Internal.Any2EVMRampMessage[] memory messages1 = new Internal.Any2EVMRampMessage[](2);
-    messages1[0] = _sendRequest(1, SOURCE_CHAIN_SELECTOR, 1, s_metadataHash, s_sourceRouter, s_tokenAdminRegistry);
-    messages1[1] = _sendRequest(2, SOURCE_CHAIN_SELECTOR, 2, s_metadataHash, s_sourceRouter, s_tokenAdminRegistry);
     Internal.Any2EVMRampMessage[] memory messages2 = new Internal.Any2EVMRampMessage[](1);
-    messages2[0] =
-      _sendRequest(1, SOURCE_CHAIN_SELECTOR + 1, 1, s_metadataHash2, s_sourceRouter2, s_tokenAdminRegistry2);
 
-    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, _generateTokenMessage());
-    // Asserts that the tokens have been sent and the fee has been paid.
-    assertEq(
-      multiRampsE2ELocalVars.balance0Pre - (messages1.length + messages2.length) * (i_tokenAmount0 + expectedFee),
-      multiRampsE2ELocalVars.token0.balanceOf(OWNER)
-    );
-    assertEq(
-      multiRampsE2ELocalVars.balance1Pre - (messages1.length + messages2.length) * i_tokenAmount1,
-      multiRampsE2ELocalVars.token1.balanceOf(OWNER)
-    );
+    // Scoped to sending to reduce stack pressure
+    {
+      IERC20 token0 = IERC20(s_sourceTokens[0]);
+      IERC20 token1 = IERC20(s_sourceTokens[1]);
+
+      uint256 balance0Pre = token0.balanceOf(OWNER);
+      uint256 balance1Pre = token1.balanceOf(OWNER);
+
+      // Send messages
+      messages1[0] = _sendRequest(1, SOURCE_CHAIN_SELECTOR, 1, s_metadataHash, s_sourceRouter, s_tokenAdminRegistry);
+      messages1[1] = _sendRequest(2, SOURCE_CHAIN_SELECTOR, 2, s_metadataHash, s_sourceRouter, s_tokenAdminRegistry);
+      messages2[0] =
+        _sendRequest(1, SOURCE_CHAIN_SELECTOR + 1, 1, s_metadataHash2, s_sourceRouter2, s_tokenAdminRegistry2);
+
+      uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, _generateTokenMessage());
+      // Asserts that the tokens have been sent and the fee has been paid.
+      assertEq(
+        balance0Pre - (messages1.length + messages2.length) * (i_tokenAmount0 + expectedFee), token0.balanceOf(OWNER)
+      );
+      assertEq(balance1Pre - (messages1.length + messages2.length) * i_tokenAmount1, token1.balanceOf(OWNER));
+    }
 
     // Commit
-    bytes32[] memory hashedMessages1 = new bytes32[](2);
-    hashedMessages1[0] = messages1[0]._hash(abi.encode(address(s_onRamp)));
-    hashedMessages1[1] = messages1[1]._hash(abi.encode(address(s_onRamp)));
-    bytes32[] memory hashedMessages2 = new bytes32[](1);
-    hashedMessages2[0] = messages2[0]._hash(abi.encode(address(s_onRamp2)));
 
-    multiRampsE2ELocalVars.merkleRoots = new bytes32[](2);
-    multiRampsE2ELocalVars.merkleRoots[0] = MerkleHelper.getMerkleRoot(hashedMessages1);
-    multiRampsE2ELocalVars.merkleRoots[1] = MerkleHelper.getMerkleRoot(hashedMessages2);
+    bytes32[] memory merkleRoots = new bytes32[](2);
 
-    multiRampsE2ELocalVars.roots = new OffRamp.MerkleRoot[](2);
-    multiRampsE2ELocalVars.roots[0] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: OffRamp.Interval(messages1[0].header.sequenceNumber, messages1[1].header.sequenceNumber),
-      merkleRoot: multiRampsE2ELocalVars.merkleRoots[0]
-    });
-    multiRampsE2ELocalVars.roots[1] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
-      interval: OffRamp.Interval(messages2[0].header.sequenceNumber, messages2[0].header.sequenceNumber),
-      merkleRoot: multiRampsE2ELocalVars.merkleRoots[1]
-    });
+    // Scoped to commit to reduce stack pressure
+    {
+      bytes32[] memory hashedMessages1 = new bytes32[](2);
+      hashedMessages1[0] = messages1[0]._hash(abi.encode(address(s_onRamp)));
+      hashedMessages1[1] = messages1[1]._hash(abi.encode(address(s_onRamp)));
+      bytes32[] memory hashedMessages2 = new bytes32[](1);
+      hashedMessages2[0] = messages2[0]._hash(abi.encode(address(s_onRamp2)));
 
-    multiRampsE2ELocalVars.report =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: multiRampsE2ELocalVars.roots});
+      merkleRoots[0] = MerkleHelper.getMerkleRoot(hashedMessages1);
+      merkleRoots[1] = MerkleHelper.getMerkleRoot(hashedMessages2);
 
-    vm.resumeGasMetering();
-    _commit(multiRampsE2ELocalVars.report, ++s_latestSequenceNumber);
-    vm.pauseGasMetering();
+      OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](2);
+      roots[0] = OffRamp.MerkleRoot({
+        sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+        interval: OffRamp.Interval(messages1[0].header.sequenceNumber, messages1[1].header.sequenceNumber),
+        merkleRoot: merkleRoots[0]
+      });
+      roots[1] = OffRamp.MerkleRoot({
+        sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
+        interval: OffRamp.Interval(messages2[0].header.sequenceNumber, messages2[0].header.sequenceNumber),
+        merkleRoot: merkleRoots[1]
+      });
 
-    s_mockRMN.setTaggedRootBlessed(
-      IRMN.TaggedRoot({commitStore: address(s_offRamp), root: multiRampsE2ELocalVars.merkleRoots[0]}), true
-    );
-    s_mockRMN.setTaggedRootBlessed(
-      IRMN.TaggedRoot({commitStore: address(s_offRamp), root: multiRampsE2ELocalVars.merkleRoots[1]}), true
-    );
+      OffRamp.CommitReport memory report =
+        OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
 
-    multiRampsE2ELocalVars.proofs = new bytes32[](0);
-    multiRampsE2ELocalVars.hashedLeaves = new bytes32[](1);
-    multiRampsE2ELocalVars.hashedLeaves[0] = multiRampsE2ELocalVars.merkleRoots[0];
-    uint256 timestamp = s_offRamp.verify(
-      SOURCE_CHAIN_SELECTOR, multiRampsE2ELocalVars.hashedLeaves, multiRampsE2ELocalVars.proofs, 2 ** 2 - 1
-    );
-    assertEq(BLOCK_TIME, timestamp);
-    multiRampsE2ELocalVars.hashedLeaves[0] = multiRampsE2ELocalVars.merkleRoots[1];
-    timestamp = s_offRamp.verify(
-      SOURCE_CHAIN_SELECTOR + 1, multiRampsE2ELocalVars.hashedLeaves, multiRampsE2ELocalVars.proofs, 2 ** 2 - 1
-    );
-    assertEq(BLOCK_TIME, timestamp);
+      vm.resumeGasMetering();
+      _commit(report, ++s_latestSequenceNumber);
+      vm.pauseGasMetering();
+    }
 
-    // We change the block time so when execute would e.g. use the current
-    // block time instead of the committed block time the value would be
-    // incorrect in the checks below.
-    vm.warp(BLOCK_TIME + 2000);
+    // Scoped to RMN and verify to reduce stack pressure
+    {
+      s_mockRMN.setTaggedRootBlessed(IRMN.TaggedRoot({commitStore: address(s_offRamp), root: merkleRoots[0]}), true);
+      s_mockRMN.setTaggedRootBlessed(IRMN.TaggedRoot({commitStore: address(s_offRamp), root: merkleRoots[1]}), true);
+
+      bytes32[] memory proofs = new bytes32[](0);
+      bytes32[] memory hashedLeaves = new bytes32[](1);
+      hashedLeaves[0] = merkleRoots[0];
+
+      uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR, hashedLeaves, proofs, 2 ** 2 - 1);
+      assertEq(BLOCK_TIME, timestamp);
+      hashedLeaves[0] = merkleRoots[1];
+      timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR + 1, hashedLeaves, proofs, 2 ** 2 - 1);
+      assertEq(BLOCK_TIME, timestamp);
+
+      // We change the block time so when execute would e.g. use the current
+      // block time instead of the committed block time the value would be
+      // incorrect in the checks below.
+      vm.warp(BLOCK_TIME + 2000);
+    }
 
     // Execute
-    multiRampsE2ELocalVars.reports = new Internal.ExecutionReportSingleChain[](2);
-    multiRampsE2ELocalVars.reports[0] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR, messages1);
-    multiRampsE2ELocalVars.reports[1] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR + 1, messages2);
+
+    Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](2);
+    reports[0] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR, messages1);
+    reports[1] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR + 1, messages2);
 
     vm.resumeGasMetering();
     vm.recordLogs();
-    _execute(multiRampsE2ELocalVars.reports);
+    _execute(reports);
 
     assertExecutionStateChangedEventLogs(
       SOURCE_CHAIN_SELECTOR,
