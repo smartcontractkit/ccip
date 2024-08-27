@@ -536,7 +536,8 @@ func createConfigV2Chain(chainId *big.Int) *v2.EVMConfig {
 	sourceC.GasEstimator.Mode = &fixedPrice
 	d, _ := config.NewDuration(100 * time.Millisecond)
 	sourceC.LogPollInterval = &d
-	fd := uint32(2)
+	// Fixme: hack, this should be parametrized for tests
+	fd := uint32(50)
 	sourceC.FinalityDepth = &fd
 	return &v2.EVMConfig{
 		ChainID: (*evmUtils.Big)(chainId),
