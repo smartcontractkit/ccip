@@ -671,12 +671,11 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
 
   function test_SetConfigInvalidConfig_Revert() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
-      priceRegistry: address(23423),
+      feeQuoter: address(23423),
       messageValidator: address(0),
       feeAggregator: FEE_AGGREGATOR,
       allowListAdmin: address(0)
     });
-
 
     // Invalid price reg reverts.
     newConfig.feeQuoter = address(0);
@@ -686,7 +685,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
 
   function test_SetConfigInvalidConfigFeeAggregatorEqAddressZero_Revert() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
-      priceRegistry: address(23423),
+      feeQuoter: address(23423),
       messageValidator: address(0),
       feeAggregator: address(0),
       allowListAdmin: address(0)

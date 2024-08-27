@@ -84,7 +84,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     );
   }
 
-  function _generateDynamicOnRampConfig(address priceRegistry) internal pure returns (OnRamp.DynamicConfig memory) {
+  function _generateDynamicOnRampConfig(address feeQuoter) internal pure returns (OnRamp.DynamicConfig memory) {
     return OnRamp.DynamicConfig({
       feeQuoter: feeQuoter,
       messageValidator: address(0),
