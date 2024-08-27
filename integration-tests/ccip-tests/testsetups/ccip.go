@@ -59,18 +59,6 @@ var (
 			"memory": "6Gi",
 		},
 	}
-	AnvilResourceProfile = map[string]interface{}{
-		"requests": map[string]interface{}{
-			"cpu":               "4",
-			"memory":            "6Gi",
-			"ephemeral-storage": "25Gi",
-		},
-		"limits": map[string]interface{}{
-			"cpu":               "4",
-			"memory":            "6Gi",
-			"ephemeral-storage": "25Gi",
-		},
-	}
 	// to set default values through test config use sync.once
 	setContractVersion sync.Once
 	setOCRParams       sync.Once
