@@ -95,9 +95,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   {
     _validateReleaseOrMint(releaseOrMintIn);
 
-    // Since the stored value is only increased when liquidity is provided or tokens locked, nothing bad should
-    // happen from an underflow/revert, and prevents the contract from being drained by siloing available tokens
-    // based on the chain selector
+    // Decrease internal tracking of locked tokens to ensure accurate accounting for burnLockedUSDC() migration
     s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.amount;
 
     // Release to the offRamp, which forwards it to the recipient
