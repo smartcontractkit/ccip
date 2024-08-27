@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_v3_aggregator_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_5_0"
@@ -641,4 +642,83 @@ func TestIntegration_CCIP(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestReorg(t *testing.T) {
+	t.Run("Reorg test to simulate caching problem", func(t *testing.T) {
+		ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
+		testPricePipeline, linkUSD, ethUSD := ccipTH.CreatePricesPipeline(t)
+		defer linkUSD.Close()
+		defer ethUSD.Close()
+		ccipTH.SetUpNodesAndJobs(t, testPricePipeline, "", "")
+
+		gasLimit := big.NewInt(200_003) // prime number
+		tokenAmount := big.NewInt(100)
+
+		forkBlock, err := ccipTH.Dest.Chain.BlockByNumber(context.Background(), nil)
+		require.NoError(t, err)
+		fmt.Println("Current head time: ", forkBlock.Time())
+
+		err = ccipTH.Dest.Chain.AdjustTime(2 * time.Hour)
+		require.NoError(t, err)
+
+		ccipTH.Dest.Chain.Commit()
+
+		adjustedBlock, err := ccipTH.Dest.Chain.BlockByNumber(context.Background(), nil)
+		require.NoError(t, err)
+		fmt.Println("Current head time: ", adjustedBlock.Time())
+
+		// send a request
+		ccipTH.SendMessage(t, gasLimit, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
+		// finality hack
+		for i := 0; i < 60; i++ {
+			ccipTH.Source.Chain.Commit()
+		}
+		ccipTH.Dest.Chain.Commit()
+		ccipTH.Dest.User.GasLimit = 100000
+		ccipTH.EventuallySendRequested(t, uint64(1))
+		ccipTH.EventuallyReportCommitted(t, 1)
+		executionLog := ccipTH.AllNodesHaveExecutedSeqNums(t, 1, 1)
+		ccipTH.AssertExecState(t, executionLog[0], testhelpers.ExecutionStateSuccess)
+
+		currentBlock, err := ccipTH.Dest.Chain.BlockByNumber(context.Background(), nil)
+		require.NoError(t, err)
+
+		fmt.Println("Current head time: ", currentBlock.Time())
+		fmt.Println("Current head block: ", currentBlock.NumberU64())
+
+		fmt.Println("Fork block time: ", forkBlock.Time())
+		fmt.Println("Fork block block: ", forkBlock.NumberU64())
+
+		// FIXME LogPoller breaks at this stage, finality is too low for the destination chain
+		require.NoError(t, ccipTH.Dest.Chain.Fork(testutils.Context(t), forkBlock.Hash()))
+
+		noOfBlocks := int(currentBlock.NumberU64() - forkBlock.NumberU64())
+		for i := 0; i < noOfBlocks+1; i++ {
+			ccipTH.Dest.Chain.Commit()
+		}
+
+		bb, err := ccipTH.Dest.Chain.BlockByNumber(context.Background(), nil)
+		require.NoError(t, err)
+		fmt.Println("Current head time: ", bb.Time())
+
+		// Make sure first commit report is executed
+		ccipTH.EventuallyReportCommitted(t, 1)
+		executionLog = ccipTH.AllNodesHaveExecutedSeqNums(t, 1, 1)
+		ccipTH.AssertExecState(t, executionLog[0], testhelpers.ExecutionStateSuccess)
+
+		// Send another message, it should work as well
+		ccipTH.SendMessage(t, gasLimit, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
+		// finality hack
+		for i := 0; i < 60; i++ {
+			ccipTH.Source.Chain.Commit()
+		}
+		ccipTH.Source.Chain.Commit()
+		ccipTH.Dest.Chain.Commit()
+		ccipTH.EventuallySendRequested(t, uint64(2))
+
+		ccipTH.EventuallyReportCommitted(t, 2)
+		executionLog = ccipTH.AllNodesHaveExecutedSeqNums(t, 1, 2)
+		ccipTH.AssertExecState(t, executionLog[0], testhelpers.ExecutionStateSuccess)
+	})
 }
