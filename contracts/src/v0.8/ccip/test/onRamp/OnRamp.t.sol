@@ -5,7 +5,7 @@ import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
-import {PriceRegistry} from "../../PriceRegistry.sol";
+import {FeeQuoter} from "../../FeeQuoter.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {Pool} from "../../libraries/Pool.sol";
@@ -25,7 +25,7 @@ contract OnRamp_constructor is OnRampSetup {
       nonceManager: address(s_outboundNonceManager),
       tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
-    OnRamp.DynamicConfig memory dynamicConfig = _generateDynamicOnRampConfig(address(s_priceRegistry));
+    OnRamp.DynamicConfig memory dynamicConfig = _generateDynamicOnRampConfig(address(s_feeQuoter));
 
     vm.expectEmit();
     emit OnRamp.ConfigSet(staticConfig, dynamicConfig);
@@ -56,7 +56,7 @@ contract OnRamp_constructor is OnRampSetup {
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      _generateDynamicOnRampConfig(address(s_priceRegistry)),
+      _generateDynamicOnRampConfig(address(s_feeQuoter)),
       _generateDestChainConfigArgs(IRouter(address(0)))
     );
   }
@@ -70,7 +70,7 @@ contract OnRamp_constructor is OnRampSetup {
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      _generateDynamicOnRampConfig(address(s_priceRegistry)),
+      _generateDynamicOnRampConfig(address(s_feeQuoter)),
       _generateDestChainConfigArgs(IRouter(address(0)))
     );
   }
@@ -84,7 +84,7 @@ contract OnRamp_constructor is OnRampSetup {
         nonceManager: address(0),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      _generateDynamicOnRampConfig(address(s_priceRegistry)),
+      _generateDynamicOnRampConfig(address(s_feeQuoter)),
       _generateDestChainConfigArgs(IRouter(address(0)))
     );
   }
@@ -98,7 +98,7 @@ contract OnRamp_constructor is OnRampSetup {
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(0)
       }),
-      _generateDynamicOnRampConfig(address(s_priceRegistry)),
+      _generateDynamicOnRampConfig(address(s_feeQuoter)),
       _generateDestChainConfigArgs(IRouter(address(0)))
     );
   }
@@ -115,7 +115,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
 
     address[] memory feeTokens = new address[](1);
     feeTokens[0] = s_sourceTokens[1];
-    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
+    s_feeQuoter.applyFeeTokensUpdates(feeTokens, new address[](0));
 
     uint64[] memory destinationChainSelectors = new uint64[](1);
     destinationChainSelectors[0] = DEST_CHAIN_SELECTOR;
@@ -300,8 +300,8 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     IERC20(s_sourceTokens[1]).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     // Calculate conversion done by prices contract
-    uint256 feeTokenPrice = s_priceRegistry.getTokenPrice(s_sourceTokens[1]).value;
-    uint256 linkTokenPrice = s_priceRegistry.getTokenPrice(s_sourceFeeToken).value;
+    uint256 feeTokenPrice = s_feeQuoter.getTokenPrice(s_sourceTokens[1]).value;
+    uint256 linkTokenPrice = s_feeQuoter.getTokenPrice(s_sourceFeeToken).value;
     uint256 conversionRate = (feeTokenPrice * 1e18) / linkTokenPrice;
     uint256 expectedJuels = (feeAmount * conversionRate) / 1e18;
 
@@ -395,7 +395,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.extraArgs = bytes("bad args");
 
-    vm.expectRevert(PriceRegistry.InvalidExtraArgsTag.selector);
+    vm.expectRevert(FeeQuoter.InvalidExtraArgsTag.selector);
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
@@ -461,7 +461,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     vm.startPrank(OWNER);
 
     Internal.PriceUpdates memory priceUpdates = _getSingleTokenPriceUpdateStruct(wrongToken, 1);
-    s_priceRegistry.updatePrices(priceUpdates);
+    s_feeQuoter.updatePrices(priceUpdates);
 
     // Change back to the router
     vm.startPrank(address(s_sourceRouter));
@@ -485,7 +485,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
     vm.expectRevert(
-      abi.encodeWithSelector(PriceRegistry.MessageFeeTooHigh.selector, MAX_MSG_FEES_JUELS + 1, MAX_MSG_FEES_JUELS)
+      abi.encodeWithSelector(FeeQuoter.MessageFeeTooHigh.selector, MAX_MSG_FEES_JUELS + 1, MAX_MSG_FEES_JUELS)
     );
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, MAX_MSG_FEES_JUELS + 1, OWNER);
@@ -535,17 +535,15 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     newPool.setSourceTokenData(new bytes(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES + 1));
 
     vm.startPrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.SourceTokenDataTooLarge.selector, sourceETH));
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.SourceTokenDataTooLarge.selector, sourceETH));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
     // Set token config to allow larger data
     vm.startPrank(OWNER);
-    PriceRegistry.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs =
-      _generateTokenTransferFeeConfigArgs(1, 1);
+    FeeQuoter.TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs = _generateTokenTransferFeeConfigArgs(1, 1);
     tokenTransferFeeConfigArgs[0].destChainSelector = DEST_CHAIN_SELECTOR;
     tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].token = sourceETH;
-    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = PriceRegistry
-      .TokenTransferFeeConfig({
+    tokenTransferFeeConfigArgs[0].tokenTransferFeeConfigs[0].tokenTransferFeeConfig = FeeQuoter.TokenTransferFeeConfig({
       minFeeUSDCents: 1,
       maxFeeUSDCents: 0,
       deciBps: 0,
@@ -553,8 +551,8 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) + 32,
       isEnabled: true
     });
-    s_priceRegistry.applyTokenTransferFeeConfigUpdates(
-      tokenTransferFeeConfigArgs, new PriceRegistry.TokenTransferFeeConfigRemoveArgs[](0)
+    s_feeQuoter.applyTokenTransferFeeConfigUpdates(
+      tokenTransferFeeConfigArgs, new FeeQuoter.TokenTransferFeeConfigRemoveArgs[](0)
     );
 
     vm.startPrank(address(s_sourceRouter));
@@ -565,7 +563,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     newPool.setSourceTokenData(new bytes(uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) + 32 + 1));
 
     vm.startPrank(address(s_sourceRouter));
-    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.SourceTokenDataTooLarge.selector, sourceETH));
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.SourceTokenDataTooLarge.selector, sourceETH));
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
   }
 }
@@ -589,7 +587,7 @@ contract OnRamp_getFee is OnRampSetup {
       message.feeToken = testTokens[i];
 
       uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
-      uint256 expectedFeeAmount = s_priceRegistry.getValidatedFee(DEST_CHAIN_SELECTOR, message);
+      uint256 expectedFeeAmount = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
 
       assertEq(expectedFeeAmount, feeAmount);
     }
@@ -605,7 +603,7 @@ contract OnRamp_getFee is OnRampSetup {
       message.feeToken = testTokens[i];
 
       uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
-      uint256 expectedFeeAmount = s_priceRegistry.getValidatedFee(DEST_CHAIN_SELECTOR, message);
+      uint256 expectedFeeAmount = s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
 
       assertEq(expectedFeeAmount, feeAmount);
     }
@@ -624,16 +622,16 @@ contract OnRamp_getFee is OnRampSetup {
     vm.stopPrank();
     vm.startPrank(OWNER);
 
-    PriceRegistry.DestChainConfigArgs[] memory destChainConfigArgs = _generatePriceRegistryDestChainConfigArgs();
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
     destChainConfigArgs[0].destChainConfig.enforceOutOfOrder = true;
-    s_priceRegistry.applyDestChainConfigUpdates(destChainConfigArgs);
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
     vm.stopPrank();
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     // Empty extraArgs to should revert since it enforceOutOfOrder is true.
     message.extraArgs = "";
 
-    vm.expectRevert(PriceRegistry.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
+    vm.expectRevert(FeeQuoter.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
     s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
   }
 }
@@ -642,7 +640,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
   function test_SetDynamicConfig_Success() public {
     OnRamp.StaticConfig memory staticConfig = s_onRamp.getStaticConfig();
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
-      priceRegistry: address(23423),
+      feeQuoter: address(23423),
       messageValidator: makeAddr("messageValidator"),
       feeAggregator: FEE_AGGREGATOR,
       allowListAdmin: address(0)
@@ -654,14 +652,14 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     s_onRamp.setDynamicConfig(newConfig);
 
     OnRamp.DynamicConfig memory gotDynamicConfig = s_onRamp.getDynamicConfig();
-    assertEq(newConfig.priceRegistry, gotDynamicConfig.priceRegistry);
+    assertEq(newConfig.feeQuoter, gotDynamicConfig.feeQuoter);
   }
 
   // Reverts
 
-  function test_SetConfigInvalidConfigPriceRegistryEqAddressZero_Revert() public {
+  function test_SetConfigInvalidConfigFeeQuoterEqAddressZero_Revert() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
-      priceRegistry: address(0),
+      feeQuoter: address(0),
       feeAggregator: FEE_AGGREGATOR,
       messageValidator: makeAddr("messageValidator"),
       allowListAdmin: address(0)
@@ -679,8 +677,9 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
       allowListAdmin: address(0)
     });
 
+
     // Invalid price reg reverts.
-    newConfig.priceRegistry = address(0);
+    newConfig.feeQuoter = address(0);
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     s_onRamp.setDynamicConfig(newConfig);
   }
@@ -692,6 +691,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
       feeAggregator: address(0),
       allowListAdmin: address(0)
     });
+
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     s_onRamp.setDynamicConfig(newConfig);
   }
@@ -739,7 +739,7 @@ contract OnRamp_withdrawFeeTokens is OnRampSetup {
       IERC20(feeTokens[i]).transfer(address(s_onRamp), amounts[i]);
     }
 
-    s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
+    s_feeQuoter.applyFeeTokensUpdates(feeTokens, new address[](0));
 
     for (uint256 i = 0; i < feeTokens.length; ++i) {
       vm.expectEmit();

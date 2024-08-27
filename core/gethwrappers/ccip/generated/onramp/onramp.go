@@ -83,7 +83,7 @@ type OnRampDestChainConfigArgs struct {
 }
 
 type OnRampDynamicConfig struct {
-	PriceRegistry    common.Address
+	FeeQuoter        common.Address
 	MessageValidator common.Address
 	FeeAggregator    common.Address
 	AllowListAdmin   common.Address
