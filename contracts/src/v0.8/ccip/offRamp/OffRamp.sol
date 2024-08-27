@@ -8,7 +8,6 @@ import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
-import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IRMNRemote, MerkleRoot, Signature as RMNSig} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
