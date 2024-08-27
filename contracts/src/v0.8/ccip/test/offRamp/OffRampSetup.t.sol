@@ -227,9 +227,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
     return OffRamp.DynamicConfig({
       permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
       priceRegistry: priceRegistry,
-      messageValidator: address(0),
-      maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
-      maxTokenTransferGas: MAX_TOKEN_POOL_TRANSFER_GAS
+      messageValidator: address(0)
     });
   }
 
@@ -376,11 +374,11 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
   function _getGasLimitsFromMessages(Internal.Any2EVMRampMessage[] memory messages)
     internal
     pure
-    returns (uint256[] memory)
+    returns (OffRamp.GasLimitOverride[] memory)
   {
-    uint256[] memory gasLimits = new uint256[](messages.length);
+    OffRamp.GasLimitOverride[] memory gasLimits = new OffRamp.GasLimitOverride[](messages.length);
     for (uint256 i = 0; i < messages.length; ++i) {
-      gasLimits[i] = messages[i].gasLimit;
+      gasLimits[i].receiverExecutionGasLimit = messages[i].gasLimit;
     }
 
     return gasLimits;
@@ -388,8 +386,6 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
 
   function _assertSameConfig(OffRamp.DynamicConfig memory a, OffRamp.DynamicConfig memory b) public pure {
     assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
-    assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);
-    assertEq(a.maxTokenTransferGas, b.maxTokenTransferGas);
     assertEq(a.messageValidator, b.messageValidator);
     assertEq(a.priceRegistry, b.priceRegistry);
   }
