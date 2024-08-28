@@ -17,7 +17,7 @@ set_config:
       echo "export BASE64_NETWORK_CONFIG=$$(base64 -i $(network_config_toml))" >> ./testconfig/override/.env; \
     fi
 
-	if [-s "$(secret_toml)" ]; then \
+	if [ -s "$(secret_toml)" ]; then \
 		echo "setting secret config with $(secret_toml)"; \
 		echo "export BASE64_CCIP_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" >> ./testconfig/override/.env; \
 		echo "export TEST_BASE64_CCIP_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" >> ./testconfig/override/.env; \

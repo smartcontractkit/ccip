@@ -1709,6 +1709,7 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 // CCIPMsg constructs the message for a CCIP request
 func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 	receiver common.Address,
+	allowOutOfOrder bool,
 	gasLimit *big.Int,
 ) (router.ClientEVM2AnyMessage, error) {
 	length := sourceCCIP.MsgDataLength
@@ -1750,7 +1751,7 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 		return router.ClientEVM2AnyMessage{}, fmt.Errorf("failed encoding the receiver address: %w", err)
 	}
 
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(gasLimit, false)
+	extraArgs, err := testhelpers.GetEVMExtraArgsV2(gasLimit, allowOutOfOrder)
 	if err != nil {
 		return router.ClientEVM2AnyMessage{}, fmt.Errorf("failed encoding the options field: %w", err)
 	}
@@ -1760,13 +1761,14 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 		Data:         []byte(data),
 		TokenAmounts: tokenAndAmounts,
 		FeeToken:     common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-		ExtraArgs:    extraArgsV1,
+		ExtraArgs:    extraArgs,
 	}, nil
 }
 
 // SendRequest sends a CCIP request to the source chain's router contract
 func (sourceCCIP *SourceCCIPModule) SendRequest(
 	receiver common.Address,
+	allowOutOfOrder bool,
 	gasLimit *big.Int,
 ) (common.Hash, time.Duration, *big.Int, error) {
 	var d time.Duration
@@ -1775,7 +1777,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 		return common.Hash{}, d, nil, fmt.Errorf("failed getting the chain selector: %w", err)
 	}
 	// form the message for transfer
-	msg, err := sourceCCIP.CCIPMsg(receiver, gasLimit)
+	msg, err := sourceCCIP.CCIPMsg(receiver, allowOutOfOrder, gasLimit)
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed forming the ccip msg: %w", err)
 	}
@@ -2790,10 +2792,10 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporter
 
 // Multicall sends multiple ccip-send requests in a single transaction
 // It will create one transaction for all the requests and will wait for the confirmation
-func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) error {
+func (lane *CCIPLane) Multicall(noOfRequests int, allowOutOfOrder bool, multiSendAddr common.Address) error {
 	var ccipMultipleMsg []contracts.CCIPMsgData
 	feeToken := common.HexToAddress(lane.Source.Common.FeeToken.Address())
-	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, big.NewInt(DefaultDestinationGasLimit))
+	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, allowOutOfOrder, big.NewInt(DefaultDestinationGasLimit))
 	if err != nil {
 		return fmt.Errorf("failed to form the ccip message: %w", err)
 	}
@@ -2882,11 +2884,12 @@ func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) 
 
 // SendRequests sends individual ccip-send requests in different transactions
 // It will create noOfRequests transactions
-func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
+func (lane *CCIPLane) SendRequests(noOfRequests int, allowOutOfOrder bool, gasLimit *big.Int) error {
 	for i := 1; i <= noOfRequests; i++ {
 		stat := testreporters.NewCCIPRequestStats(int64(lane.NumberOfReq+i), lane.SourceNetworkName, lane.DestNetworkName)
 		txHash, txConfirmationDur, fee, err := lane.Source.SendRequest(
 			lane.Dest.ReceiverDapp.EthAddress,
+			allowOutOfOrder,
 			gasLimit,
 		)
 		if err != nil {
@@ -3496,7 +3499,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		srcConf                = lane.SrcNetworkLaneCfg
 		destConf               = lane.DstNetworkLaneCfg
 		commitAndExecOnSameDON = pointer.GetBool(testConf.CommitAndExecuteOnSameDON)
-		withPipeline           = pointer.GetBool(testConf.TokenConfig.WithPipeline)
 		configureCLNodes       = !pointer.GetBool(testConf.ExistingDeployment)
 	)
 
@@ -3571,69 +3573,11 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		bootstrapExec = clNodes[1] // for a set-up of different commit and execution nodes second node is the bootstrapper for execution nodes
 	}
 
-	// save the current block numbers. If there is a delay between job start up and ocr config set up, the jobs will
-	// replay the log polling from these mentioned block number. The dest block number should ideally be the block number on which
-	// contract config is set and the source block number should be the one on which the ccip send request is performed.
-	// Here for simplicity we are just taking the current block number just before the job is created.
-	currentBlockOnDest, err := destChainClient.LatestBlockNumber(context.Background())
+	jobParams, err := lane.BuildCCIPJobSpecParams(testConf, env)
 	if err != nil {
-		return fmt.Errorf("getting current block should be successful in destination chain %w", err)
+		return fmt.Errorf("failed to build job spec params: %w", err)
 	}
 
-	var killgrave *ctftestenv.Killgrave
-	if env.LocalCluster != nil {
-		killgrave = env.LocalCluster.MockAdapter
-	}
-	var tokenAddresses []string
-	for _, token := range lane.Dest.Common.BridgeTokens {
-		tokenAddresses = append(tokenAddresses, token.Address())
-	}
-	tokenAddresses = append(tokenAddresses, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex(), lane.Dest.Common.WrappedNative.Hex())
-
-	// Only one off pipeline or price getter to be set.
-	tokenPricesUSDPipeline := ""
-	tokenPricesConfigJson := ""
-	if withPipeline {
-		tokensUSDUrl := TokenPricePipelineURLs(tokenAddresses, killgrave, env.MockServer)
-		tokenPricesUSDPipeline = TokenFeeForMultipleTokenAddr(tokensUSDUrl)
-	} else {
-		tokenPricesConfigJson, err = lane.TokenPricesConfig()
-		if err != nil {
-			return fmt.Errorf("error getting token prices config %w", err)
-		}
-		lane.Logger.Info().Str("tokenPricesConfigJson", tokenPricesConfigJson).Msg("Price getter config")
-	}
-
-	jobParams := integrationtesthelpers.CCIPJobSpecParams{
-		OffRamp:                lane.Dest.OffRamp.EthAddress,
-		CommitStore:            lane.Dest.CommitStore.EthAddress,
-		SourceChainName:        sourceChainClient.GetNetworkName(),
-		DestChainName:          destChainClient.GetNetworkName(),
-		DestEvmChainId:         destChainClient.GetChainID().Uint64(),
-		SourceStartBlock:       lane.Source.SrcStartBlock,
-		TokenPricesUSDPipeline: tokenPricesUSDPipeline,
-		PriceGetterConfig:      tokenPricesConfigJson,
-		DestStartBlock:         currentBlockOnDest,
-	}
-	if !lane.Source.Common.ExistingDeployment && lane.Source.Common.IsUSDCDeployment() {
-		api := ""
-		if killgrave != nil {
-			api = killgrave.InternalEndpoint
-		}
-		if env.MockServer != nil {
-			api = env.MockServer.Config.ClusterURL
-		}
-		if lane.Source.Common.TokenTransmitter == nil {
-			return fmt.Errorf("token transmitter address not set")
-		}
-		// Only one USDC allowed per chain
-		jobParams.USDCConfig = &config.USDCConfig{
-			SourceTokenAddress:              common.HexToAddress(lane.Source.Common.BridgeTokens[0].Address()),
-			SourceMessageTransmitterAddress: lane.Source.Common.TokenTransmitter.ContractAddress,
-			AttestationAPI:                  api,
-			AttestationAPITimeoutSeconds:    5,
-		}
-	}
 	if !bootstrapAdded.Load() {
 		bootstrapAdded.Store(true)
 		err := CreateBootstrapJob(jobParams, bootstrapCommit, bootstrapExec)
@@ -3671,7 +3615,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
 	}
 
-	err = CreateOCR2CCIPExecutionJobs(lane.Logger, jobParams, execNodes, env.nodeMutexes, jobErrGroup)
+	err = CreateOCR2CCIPExecutionJobs(lane.Logger, jobParams, execNodes, env, jobErrGroup)
 	if err != nil {
 		return fmt.Errorf("failed to create ocr2 execution jobs: %w", err)
 	}
@@ -3686,6 +3630,85 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	lane.Source.Common.ChainClient.ParallelTransactions(false)
 
 	return nil
+}
+
+// BuildCCIPJobSpecParams builds the job spec params for CCIP jobs
+// Note this does not include any P2P information
+func (lane *CCIPLane) BuildCCIPJobSpecParams(
+	testConf *testconfig.CCIPTestGroupConfig,
+	env *CCIPTestEnv,
+) (integrationtesthelpers.CCIPJobSpecParams, error) {
+	var (
+		withPipeline           = pointer.GetBool(testConf.TokenConfig.WithPipeline)
+		tokenPricesUSDPipeline string
+		tokenPricesConfigJson  string
+		err                    error
+		killgrave              *ctftestenv.Killgrave
+		tokenAddresses         []string
+	)
+
+	if env.LocalCluster != nil {
+		killgrave = env.LocalCluster.MockAdapter
+	}
+
+	for _, token := range lane.Dest.Common.BridgeTokens {
+		tokenAddresses = append(tokenAddresses, token.Address())
+	}
+	tokenAddresses = append(tokenAddresses,
+		lane.Dest.Common.FeeToken.Address(),
+		lane.Source.Common.WrappedNative.Hex(),
+		lane.Dest.Common.WrappedNative.Hex(),
+	)
+	// Only one off pipeline or price getter to be set.
+	if withPipeline {
+		tokensUSDUrl := TokenPricePipelineURLs(tokenAddresses, killgrave, env.MockServer)
+		tokenPricesUSDPipeline = TokenFeeForMultipleTokenAddr(tokensUSDUrl)
+	} else {
+		tokenPricesConfigJson, err = lane.TokenPricesConfig()
+		if err != nil {
+			return integrationtesthelpers.CCIPJobSpecParams{}, fmt.Errorf("error getting token prices config %w", err)
+		}
+		lane.Logger.Info().Str("tokenPricesConfigJson", tokenPricesConfigJson).Msg("Price getter config")
+	}
+	// save the current block numbers. If there is a delay between job start up and ocr config set up, the jobs will
+	// replay the log polling from these mentioned block number. The dest block number should ideally be the block number on which
+	// contract config is set and the source block number should be the one on which the ccip send request is performed.
+	// Here for simplicity we are just taking the current block number just before the job is created.
+	currentBlockOnDest, err := lane.Dest.Common.ChainClient.LatestBlockNumber(context.Background())
+	if err != nil {
+		return integrationtesthelpers.CCIPJobSpecParams{}, fmt.Errorf("getting current block should be successful in destination chain %w", err)
+	}
+	jobParams := integrationtesthelpers.CCIPJobSpecParams{
+		OffRamp:                lane.Dest.OffRamp.EthAddress,
+		CommitStore:            lane.Dest.CommitStore.EthAddress,
+		SourceChainName:        lane.Source.Common.ChainClient.GetNetworkName(),
+		DestChainName:          lane.Dest.Common.ChainClient.GetNetworkName(),
+		DestEvmChainId:         lane.Dest.Common.ChainClient.GetChainID().Uint64(),
+		SourceStartBlock:       lane.Source.SrcStartBlock,
+		TokenPricesUSDPipeline: tokenPricesUSDPipeline,
+		PriceGetterConfig:      tokenPricesConfigJson,
+		DestStartBlock:         currentBlockOnDest,
+	}
+	if !lane.Source.Common.ExistingDeployment && lane.Source.Common.IsUSDCDeployment() {
+		api := ""
+		if killgrave != nil {
+			api = killgrave.InternalEndpoint
+		}
+		if env.MockServer != nil {
+			api = env.MockServer.Config.ClusterURL
+		}
+		if lane.Source.Common.TokenTransmitter == nil {
+			return integrationtesthelpers.CCIPJobSpecParams{}, fmt.Errorf("token transmitter address not set")
+		}
+		// Only one USDC allowed per chain
+		jobParams.USDCConfig = &config.USDCConfig{
+			SourceTokenAddress:              common.HexToAddress(lane.Source.Common.BridgeTokens[0].Address()),
+			SourceMessageTransmitterAddress: lane.Source.Common.TokenTransmitter.ContractAddress,
+			AttestationAPI:                  api,
+			AttestationAPITimeoutSeconds:    5,
+		}
+	}
+	return jobParams, nil
 }
 
 // SetOCR2Config sets the oracle config in ocr2 contracts. If execNodes is nil, commit and execution jobs are set up in same DON
@@ -3862,7 +3885,7 @@ func CreateOCR2CCIPExecutionJobs(
 	lggr *zerolog.Logger,
 	jobParams integrationtesthelpers.CCIPJobSpecParams,
 	execNodes []*client.CLNodesWithKeys,
-	mutexes []*sync.Mutex,
+	env *CCIPTestEnv,
 	group *errgroup.Group,
 ) error {
 	ocr2SpecExec, err := jobParams.ExecutionJobSpec()
@@ -3894,7 +3917,7 @@ func CreateOCR2CCIPExecutionJobs(
 					ForwardingAllowed: ocr2SpecExec.ForwardingAllowed,
 					OCR2OracleSpec:    ocr2SpecExec.OCR2OracleSpec,
 					ObservationSource: ocr2SpecExec.ObservationSource,
-				}, mutexes[i])
+				}, env.nodeMutexes[i])
 			})
 		}
 	}

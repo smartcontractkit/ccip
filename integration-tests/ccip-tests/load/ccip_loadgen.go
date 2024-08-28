@@ -131,7 +131,8 @@ func (c *CCIPE2ELoad) BeforeAllCall() {
 		c.EOAReceiver = c.msg.Receiver
 	}
 	if c.SendMaxDataIntermittentlyInMsgCount > 0 {
-		c.MaxDataBytes, err = sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
+		cfg, err := sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
+		c.MaxDataBytes = cfg.MaxDataBytes
 		require.NoError(c.t, err, "failed to fetch dynamic config")
 	}
 	// if the msg is sent via multicall, transfer the token transfer amount to multicall contract

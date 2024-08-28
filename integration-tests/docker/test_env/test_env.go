@@ -107,6 +107,9 @@ func (te *CLClusterTestEnv) StartEthereumNetwork(cfg *ctf_config.EthereumNetwork
 		return blockchain.EVMNetwork{}, test_env.RpcProvider{}, err
 	}
 
+	// DEBUG: Proxy
+	rpc = newProxy(rpc, fmt.Sprint(cfg.EthereumChainConfig.ChainID))
+
 	return n, rpc, nil
 }
 
