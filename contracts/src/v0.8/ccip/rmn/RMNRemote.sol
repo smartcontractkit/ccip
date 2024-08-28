@@ -9,7 +9,7 @@ bytes32 constant RMN_V1_6_ANY2EVM_REPORT = keccak256("RMN_V1_6_ANY2EVM_REPORT");
 
 /// @dev XXX DO NOT USE THIS CONTRACT, NOT PRODUCTION READY XXX
 /// @notice This contract supports verification of RMN reports for any Any2EVM OffRamp.
-contract RMNRemote is OwnerIsCreator, ITypeAndVersion {
+contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNRemote {
   /// @dev temp placeholder to exclude this contract from coverage
   function test() public {}
 
@@ -133,6 +133,17 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion {
       ++numSigners;
     }
     if (numSigners < s_config.minSigners) revert ThresholdNotMet();
+  }
+
+  /// @notice If there is an active global or legacy curse, this function returns true.
+  function isCursed() external view returns (bool) {
+    return false; // XXX temporary workaround
+  }
+
+  /// @notice If there is an active global curse, or an active curse for `subject`, this function returns true.
+  /// @param subject To check whether a particular chain is cursed, set to bytes16(uint128(chainSelector)).
+  function isCursed(bytes16 subject) external view returns (bool) {
+    return false; // XXX temporary workaround
   }
 
   ///
