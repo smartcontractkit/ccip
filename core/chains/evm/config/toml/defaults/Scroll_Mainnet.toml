@@ -8,15 +8,26 @@ MinIncomingConfirmations = 1
 NoNewHeadsThreshold = '0'
 
 [GasEstimator]
+# BumpThreshold can be removed from here when core enables bumping for Scroll.
+BumpThreshold = 3
+LimitDefault = 8000000
 EIP1559DynamicFees = true
-PriceMin = '1 wei'
-BumpMin = '1 gwei'
+FeeCapDefault = '1000 gwei'
+TipCapDefault = '5 gwei'
+TipCapMin = '1 gwei'
 
 [GasEstimator.BlockHistory]
-BlockHistorySize = 24
+# Default is 8, which leads to bumpy gas prices. In CCIP we want to smooth out
+# the gas prices, so we increase the sample size.`
+BlockHistorySize = 200
 
+# Scroll has avg finality time of 1 hour and 3 sec/block block rate.
 [HeadTracker]
-HistoryDepth = 50
+HistoryDepth = 1200
+
+[Transactions.AutoPurge]
+Enabled = true
+DetectionApiUrl = 'https://sepolia-venus.scroll.io'
 
 [OCR]
 ContractConfirmations = 1

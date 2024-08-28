@@ -1,7 +1,8 @@
 ChainID = '196'
 ChainType = 'xlayer'
-FinalityDepth = 500
-NoNewHeadsThreshold = '6m'
+FinalityDepth = 1000
+NoNewHeadsThreshold = '1m'
+FinalityTagEnabled = true
 MinIncomingConfirmations = 1
 LogPollInterval = '30s'
 RPCBlockQueryDelay = 15
@@ -13,13 +14,22 @@ ContractConfirmations = 1
 [Transactions]
 ResendAfterThreshold = '3m'
 
+[Transactions.AutoPurge]
+Enabled = true
+MinAttempts = 3
+
 [GasEstimator]
+# ccip default gasPrice
+PriceMax = '1000 gwei'
 PriceMin = '100 mwei'
-BumpPercent = 40
-BumpMin = '100 mwei'
+# ccip default gasLimit
+LimitDefault = 8000000
+BumpPercent = 10
 
 [GasEstimator.BlockHistory]
-BlockHistorySize = 12
+# Default is 8, which leads to bumpy gas prices. In CCIP we want to smooth out
+# the gas prices, so we increase the sample size.`
+BlockHistorySize = 200
 
 [HeadTracker]
 HistoryDepth = 2000
