@@ -128,7 +128,6 @@ jobs:
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
       ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
-      BASE64_NETWORK_CONFIG: ${{ secrets.BASE64_NETWORK_CONFIG }}
 
     steps:
       - name: Collect Metrics
@@ -149,10 +148,6 @@ jobs:
         id: set_override_config
         shell: bash
         run: |
-          # this key secrets.QA_SHARED_803C_KEY has a story behind it. To know more, see CCIP-2875 and SECHD-16575 tickets.
-          BASE64_NETWORK_CONFIG=$(echo $BASE64_NETWORK_CONFIG | base64 -w 0 -d | sed -e 's/evm_key/${{ secrets.QA_SHARED_803C_KEY }}/g' | base64 -w 0)
-          echo ::add-mask::$BASE64_NETWORK_CONFIG
-          echo "BASE64_NETWORK_CONFIG=$BASE64_NETWORK_CONFIG" >> "$GITHUB_ENV"
           SLACK_USER=$(jq -r '.inputs.slackMemberID' $GITHUB_EVENT_PATH)
           echo ::add-mask::$SLACK_USER
           echo "SLACK_USER=$SLACK_USER" >> "$GITHUB_ENV"
@@ -183,7 +178,7 @@ jobs:
           chainlinkVersion: ${{ env.CHAINLINK_VERSION }}
           logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@d38226be720c5ccc1ff4d3cee40608ebf264cd59 # v2.3.26
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@6bff93c41685269bafbd056b55419bb8c6dcceda # v2.3.32
         env:
           TEST_SUITE: load
           TEST_ARGS: -test.timeout 900h
@@ -194,9 +189,27 @@ jobs:
           TEST_TRIGGERED_BY: ccip-load-test-ci
           BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
           TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}          
+          E2E_TEST_CHAINLINK_IMAGE: ${{ env.CHAINLINK_IMAGE }}
+          E2E_TEST_LOKI_TENANT_ID: ${{ vars.LOKI_TENANT_ID }}
+          E2E_TEST_LOKI_ENDPOINT: ${{ secrets.LOKI_URL }}
+          E2E_TEST_LOKI_BASIC_AUTH: ${{ secrets.LOKI_BASIC_AUTH }}
+          E2E_TEST_GRAFANA_BASE_URL: ${{ vars.GRAFANA_URL }}
+          E2E_TEST_GRAFANA_DASHBOARD_URL: "/d/6vjVx-1V8/ccip-long-running-tests"
+          # Default private key test secret loaded from Github Secret as only security team has access to it.
+          # this key secrets.QA_SHARED_803C_KEY has a story behind it. To know more, see CCIP-2875 and SECHD-16575 tickets.
+          E2E_TEST_ETHEREUM_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+          E2E_TEST_ARBITRUM_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+          E2E_TEST_BASE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+          E2E_TEST_WEMIX_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+          E2E_TEST_AVALANCHE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+          E2E_TEST_ZKSYNC_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+          E2E_TEST_MODE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+          E2E_TEST_METIS_ANDROMEDA_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
         with:
           test_command_to_run: cd ./integration-tests/ccip-tests && go test -v -timeout 70m -count=1 -json -run ^TestLoadCCIPStableRPS$ ./load 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          # Other default test secrets loaded from dotenv Github Secret.
+          test_secrets_defaults_base64: ${{ secrets.CCIP_DEFAULT_TEST_SECRETS }}
           test_secrets_override_base64: ${{ secrets[inputs.test_secrets_override_key] }}
           token: ${{ secrets.GITHUB_TOKEN }}
           go_mod_path: ./integration-tests/go.mod
@@ -209,12 +222,6 @@ jobs:
           cache_key_id: ccip-load-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "true"
           should_cleanup: false
-          DEFAULT_CHAINLINK_IMAGE: ${{ env.CHAINLINK_IMAGE }}
-          DEFAULT_LOKI_TENANT_ID: ${{ vars.LOKI_TENANT_ID }}
-          DEFAULT_LOKI_ENDPOINT: ${{ secrets.LOKI_URL }}
-          DEFAULT_LOKI_BASIC_AUTH: ${{ secrets.LOKI_BASIC_AUTH }}
-          DEFAULT_GRAFANA_BASE_URL: ${{ vars.GRAFANA_URL }}
-          DEFAULT_GRAFANA_DASHBOARD_URL: "/d/6vjVx-1V8/ccip-long-running-tests"
           
   ccip-smoke-test:
     name: CCIP smoke Test
@@ -236,7 +243,6 @@ jobs:
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
       ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
-      BASE64_NETWORK_CONFIG: ${{ secrets.BASE64_NETWORK_CONFIG }}
 
     steps:
       - name: Collect Metrics
@@ -257,9 +263,6 @@ jobs:
         id: set_override_config
         shell: bash
         run: |
-          BASE64_NETWORK_CONFIG=$(echo $BASE64_NETWORK_CONFIG | base64 -w 0 -d | sed -e 's/evm_key/${{ secrets.QA_SHARED_803C_KEY }}/g' | base64 -w 0)
-          echo ::add-mask::$BASE64_NETWORK_CONFIG
-          echo "BASE64_NETWORK_CONFIG=$BASE64_NETWORK_CONFIG" >> "$GITHUB_ENV"
           SLACK_USER=$(jq -r '.inputs.slackMemberID' $GITHUB_EVENT_PATH)
           echo ::add-mask::$SLACK_USER
           echo "SLACK_USER=$SLACK_USER" >> "$GITHUB_ENV"
@@ -284,7 +287,7 @@ jobs:
           chainlinkVersion: ${{ env.CHAINLINK_VERSION }}
           logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
       - name: Run Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@d38226be720c5ccc1ff4d3cee40608ebf264cd59 # v2.3.26
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@6bff93c41685269bafbd056b55419bb8c6dcceda # v2.3.32
         env:
           TEST_SUITE: smoke
           TEST_ARGS: -test.timeout 900h
@@ -295,9 +298,28 @@ jobs:
           TEST_TRIGGERED_BY: ccip-smoke-test-ci
           BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
           TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}                    
+          E2E_TEST_CHAINLINK_IMAGE: ${{ env.CHAINLINK_IMAGE }}
+          E2E_TEST_LOKI_TENANT_ID: ${{ vars.LOKI_TENANT_ID }}
+          E2E_TEST_LOKI_ENDPOINT: ${{ secrets.LOKI_URL }}
+          E2E_TEST_LOKI_BASIC_AUTH: ${{ secrets.LOKI_BASIC_AUTH }}
+          E2E_TEST_GRAFANA_BASE_URL: ${{ vars.GRAFANA_URL }}
+          E2E_TEST_GRAFANA_DASHBOARD_URL: "/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
+          # Default private key test secret loaded from Github Secret as only security team has access to it.
+          # this key secrets.QA_SHARED_803C_KEY has a story behind it. To know more, see CCIP-2875 and SECHD-16575 tickets.
+          E2E_TEST_ETHEREUM_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+          E2E_TEST_ARBITRUM_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+          E2E_TEST_BASE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+          E2E_TEST_WEMIX_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+          E2E_TEST_AVALANCHE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+          E2E_TEST_ZKSYNC_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+          E2E_TEST_MODE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+          E2E_TEST_METIS_ANDROMEDA_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
         with:
           test_command_to_run: cd ./integration-tests/ccip-tests && go test -v -timeout 70m -count=1 -p 30 -json -run ^TestSmokeCCIPForBidirectionalLane$ ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          # Other default test secrets loaded from dotenv Github Secret.
+          test_secrets_defaults_base64: ${{ secrets.CCIP_DEFAULT_TEST_SECRETS }}
+          test_secrets_override_base64: ${{ secrets[inputs.test_secrets_override_key] }}
           token: ${{ secrets.GITHUB_TOKEN }}
           go_mod_path: ./integration-tests/go.mod
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
@@ -309,9 +331,3 @@ jobs:
           cache_key_id: ccip-smoke-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "true"
           should_cleanup: false
-          DEFAULT_CHAINLINK_IMAGE: ${{ env.CHAINLINK_IMAGE }}
-          DEFAULT_LOKI_TENANT_ID: ${{ vars.LOKI_TENANT_ID }}
-          DEFAULT_LOKI_ENDPOINT: ${{ secrets.LOKI_URL }}
-          DEFAULT_LOKI_BASIC_AUTH: ${{ secrets.LOKI_BASIC_AUTH }}
-          DEFAULT_GRAFANA_BASE_URL: ${{ vars.GRAFANA_URL }}
-          DEFAULT_GRAFANA_DASHBOARD_URL: "/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
