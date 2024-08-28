@@ -452,8 +452,6 @@ func DeployChainContracts(e deployment.Environment, chain deployment.Chain, ab d
 				offramp.OffRampDynamicConfig{
 					FeeQuoter:                               feeQuoter.Address,
 					PermissionLessExecutionThresholdSeconds: uint32(86400),
-					MaxTokenTransferGas:                     uint32(200_000),
-					MaxPoolReleaseOrMintGas:                 uint32(200_000),
 				},
 				[]offramp.OffRampSourceChainConfigArgs{},
 			)
