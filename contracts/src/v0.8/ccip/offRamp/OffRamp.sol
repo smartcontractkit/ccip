@@ -22,7 +22,6 @@ import {MultiOCR3Base} from "../ocr/MultiOCR3Base.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
 import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/ERC165Checker.sol";
-import "../libraries/Internal.sol";
 
 /// @notice OffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
@@ -314,10 +313,13 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         // would not attempt it with the correct gas limit.
         for (uint256 tokenIndex = 0; tokenIndex < message.tokenAmounts.length; ++tokenIndex) {
           if (msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex] != 0) {
-            uint32 destGasAmount = abi.decode(message.tokenAmounts[tokenIndex].destExecData,(uint32));
+            uint32 destGasAmount = abi.decode(message.tokenAmounts[tokenIndex].destExecData, (uint32));
             if (msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex] < destGasAmount) {
               revert InvalidTokenGasOverride(
-                message.header.messageId, tokenIndex, destGasAmount, msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex]
+                message.header.messageId,
+                tokenIndex,
+                destGasAmount,
+                msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex]
               );
             }
           }
@@ -476,7 +478,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
       _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
 
-      (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData, tokenGasOverrides);
+      (Internal.MessageExecutionState newState, bytes memory returnData) =
+        _trialExecute(message, offchainTokenData, tokenGasOverrides);
       _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
 
       // Since it's hard to estimate whether manual execution will succeed, we
@@ -548,7 +551,12 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
       destTokenAmounts = _releaseOrMintTokens(
-        message.tokenAmounts, message.sender, message.receiver, message.header.sourceChainSelector, offchainTokenData, tokenGasOverrides
+        message.tokenAmounts,
+        message.sender,
+        message.receiver,
+        message.header.sourceChainSelector,
+        offchainTokenData,
+        tokenGasOverrides
       );
     }
 
@@ -976,7 +984,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     bool isTokenGasOverridesEmpty = tokenGasOverrides.length == 0;
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       if (!isTokenGasOverridesEmpty && tokenGasOverrides[i] != 0) {
-         sourceTokenAmounts[i].destExecData = abi.encode(tokenGasOverrides[i]);
+        sourceTokenAmounts[i].destExecData = abi.encode(tokenGasOverrides[i]);
       }
       destTokenAmounts[i] = _releaseOrMintSingleToken(
         sourceTokenAmounts[i], originalSender, receiver, sourceChainSelector, offchainTokenData[i]
