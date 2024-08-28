@@ -109,11 +109,16 @@ contract RMNRemote is Ownable2Step, ITypeAndVersion {
   }
 
   /// @notice Verifies signatures of RMN nodes, on dest lane updates as provided in the CommitReport
+  /// @param offrampAddress is not inferred by msg.sender, in case the call is made through ARMProxy
   /// @param destLaneUpdates must be well formed, and is a representation of the CommitReport received from the oracles
   /// @param signatures must be sorted in ascending order by signer address
   /// @dev Will revert if verification fails. Needs to be called by the OffRamp for which the signatures are produced,
   /// otherwise verification will fail.
-  function verify(DestLaneUpdate[] memory destLaneUpdates, Signature[] memory signatures) external view {
+  function verify(
+    address offrampAddress,
+    DestLaneUpdate[] memory destLaneUpdates,
+    Signature[] memory signatures
+  ) external view {
     if (s_configCount == 0) {
       revert ConfigNotSet();
     }
@@ -125,7 +130,7 @@ contract RMNRemote is Ownable2Step, ITypeAndVersion {
           destChainId: block.chainid,
           destChainSelector: i_chainSelector,
           rmnRemoteContractAddress: address(this),
-          offrampAddress: msg.sender,
+          offrampAddress: offrampAddress,
           rmnHomeContractConfigDigest: s_config.rmnHomeContractConfigDigest,
           destLaneUpdates: destLaneUpdates
         })
