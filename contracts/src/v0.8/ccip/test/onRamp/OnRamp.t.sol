@@ -569,6 +569,26 @@ contract OnRamp_getFee is OnRampSetup {
     }
   }
 
+  function test_GetFeeOfZeroForTokenMessage_Success() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    uint256 feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+    assertTrue(feeAmount > 0);
+
+    FeeQuoter.PremiumMultiplierWeiPerEthArgs[] memory tokenMults = new FeeQuoter.PremiumMultiplierWeiPerEthArgs[](1);
+    tokenMults[0] = FeeQuoter.PremiumMultiplierWeiPerEthArgs({token: message.feeToken, premiumMultiplierWeiPerEth: 0});
+    s_feeQuoter.applyPremiumMultiplierWeiPerEthUpdates(tokenMults);
+
+    FeeQuoter.DestChainConfigArgs[] memory destChainConfigArgs = _generateFeeQuoterDestChainConfigArgs();
+    destChainConfigArgs[0].destChainConfig.destDataAvailabilityMultiplierBps = 0;
+    destChainConfigArgs[0].destChainConfig.gasMultiplierWeiPerEth = 0;
+    s_feeQuoter.applyDestChainConfigUpdates(destChainConfigArgs);
+
+    feeAmount = s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+
+    assertEq(0, feeAmount);
+  }
+
   // Reverts
 
   function test_Unhealthy_Revert() public {
