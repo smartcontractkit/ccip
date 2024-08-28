@@ -7,10 +7,11 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocr3 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
