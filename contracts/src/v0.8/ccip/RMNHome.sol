@@ -21,7 +21,7 @@ contract RMNHome is Ownable2Step, ITypeAndVersion {
 
   struct SourceChain {
     uint64 chainSelector;
-    uint64[] observerNodeIndices; // indices into Config.nodes, strictly increasing
+    uint256 observerNodesBitmap; // observerNodesBitmap & (1<<i) == (1<<i) iff nodes[i] is an observer for this source chain
     uint64 minObservers; // required to agree on an observation for this source chain
   }
 
@@ -56,6 +56,11 @@ contract RMNHome is Ownable2Step, ITypeAndVersion {
   function setConfig(Config calldata newConfig, bool revokePastConfigs) external onlyOwner {
     // sanity checks
     {
+      if (newConfig.nodes.length > 256) {
+        // so that observerNodesBitmap can be uint256
+        revert OutOfBoundsNodesLength();
+      }
+
       // no peerId or offchainPublicKey is duplicated
       for (uint256 i = 0; i < newConfig.nodes.length; ++i) {
         for (uint256 j = i + 1; j < newConfig.nodes.length; ++j) {
@@ -74,21 +79,19 @@ contract RMNHome is Ownable2Step, ITypeAndVersion {
           revert OutOfOrderSourceChains();
         }
 
-        // all observerNodeIndices are valid
-        for (uint256 j = 0; j < newConfig.sourceChains[i].observerNodeIndices.length; ++j) {
-          if (
-            j > 0
-              && !(newConfig.sourceChains[i].observerNodeIndices[j - 1] < newConfig.sourceChains[i].observerNodeIndices[j])
-          ) {
-            revert OutOfOrderObserverNodeIndices();
-          }
-          if (!(newConfig.sourceChains[i].observerNodeIndices[j] < newConfig.nodes.length)) {
-            revert OutOfBoundsObserverNodeIndex();
-          }
+        // all observer node indices are valid
+        uint256 bitmap = newConfig.sourceChains[i].observerNodesBitmap;
+        if (bitmap & (type(uint256).max >> (256 - newConfig.nodes.length)) != bitmap) {
+          revert OutOfBoundsObserverNodeIndex();
+        }
+
+        uint256 observersCount = 0;
+        for (; bitmap != 0; ++observersCount) {
+          bitmap &= bitmap - 1;
         }
 
         // minObservers are tenable
-        if (!(newConfig.sourceChains[i].minObservers <= newConfig.sourceChains[i].observerNodeIndices.length)) {
+        if (newConfig.sourceChains[i].minObservers > observersCount) {
           revert MinObserversTooHigh();
         }
       }
@@ -165,10 +168,10 @@ contract RMNHome is Ownable2Step, ITypeAndVersion {
   /// Errors
   ///
 
+  error OutOfBoundsNodesLength();
   error DuplicatePeerId();
   error DuplicateOffchainPublicKey();
   error OutOfOrderSourceChains();
-  error OutOfOrderObserverNodeIndices();
   error OutOfBoundsObserverNodeIndex();
   error MinObserversTooHigh();
 }
