@@ -3,7 +3,6 @@ package launcher
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sync"
 	"time"
 
@@ -27,8 +26,6 @@ var (
 	_ registrysyncer.Launcher = (*launcher)(nil)
 )
 
-type CreateOracleFunc func(cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error)
-
 func New(
 	capabilityVersion,
 	capabilityLabelledName string,
@@ -36,7 +33,7 @@ func New(
 	lggr logger.Logger,
 	homeChainReader ccipreader.HomeChain,
 	tickInterval time.Duration,
-	createOracle CreateOracleFunc,
+	oracleCreator cctypes.OracleCreator,
 ) *launcher {
 	return &launcher{
 		capabilityVersion:      capabilityVersion,
@@ -49,9 +46,9 @@ func New(
 			IDsToNodes:        make(map[p2ptypes.PeerID]kcr.CapabilitiesRegistryNodeInfo),
 			IDsToCapabilities: make(map[registrysyncer.HashedCapabilityID]kcr.CapabilitiesRegistryCapabilityInfo),
 		},
-		dons:         make(map[registrysyncer.DonID]*ccipDeployment),
-		tickInterval: tickInterval,
-		createOracle: createOracle,
+		dons:          make(map[registrysyncer.DonID]*ccipDeployment),
+		tickInterval:  tickInterval,
+		oracleCreator: oracleCreator,
 	}
 }
 
@@ -68,11 +65,11 @@ type launcher struct {
 	// latestState is the latest capability registry state received from the syncer.
 	latestState registrysyncer.State
 	// regState is the latest capability registry state that we have successfully processed.
-	regState     registrysyncer.State
-	lock         sync.RWMutex
-	wg           sync.WaitGroup
-	tickInterval time.Duration
-	createOracle CreateOracleFunc
+	regState      registrysyncer.State
+	lock          sync.RWMutex
+	wg            sync.WaitGroup
+	tickInterval  time.Duration
+	oracleCreator cctypes.OracleCreator
 
 	// dons is a map of CCIP DON IDs to the OCR instances that are running on them.
 	// we can have up to two OCR instances per CCIP plugin, since we are running two plugins,
@@ -200,7 +197,7 @@ func (l *launcher) processUpdate(updated map[registrysyncer.DonID]kcr.Capabiliti
 			l.homeChainReader,
 			*prevDeployment,
 			don,
-			l.createOracle,
+			l.oracleCreator,
 		)
 		if err != nil {
 			return err
@@ -230,7 +227,7 @@ func (l *launcher) processAdded(added map[registrysyncer.DonID]kcr.CapabilitiesR
 			l.p2pID,
 			l.homeChainReader,
 			don,
-			l.createOracle,
+			l.oracleCreator,
 		)
 		if err != nil {
 			return err
@@ -290,7 +287,7 @@ func updateDON(
 	homeChainReader ccipreader.HomeChain,
 	prevDeployment ccipDeployment,
 	don kcr.CapabilitiesRegistryDONInfo,
-	createOracleFunc CreateOracleFunc,
+	oracleCreator cctypes.OracleCreator,
 ) (futDeployment *ccipDeployment, err error) {
 	if !isMemberOfDON(don, p2pID) {
 		lggr.Infow("Not a member of this DON, skipping", "donId", don.Id, "p2pId", p2pID.String())
@@ -310,12 +307,12 @@ func updateDON(
 			don.Id, err)
 	}
 
-	commitBgd, err := createFutureBlueGreenDeployment(prevDeployment, commitOCRConfigs, createOracleFunc, cctypes.PluginTypeCCIPCommit)
+	commitBgd, err := createFutureBlueGreenDeployment(prevDeployment, commitOCRConfigs, oracleCreator, cctypes.PluginTypeCCIPCommit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create future blue-green deployment for CCIP commit plugin: %w, don id: %d", err, don.Id)
 	}
 
-	execBgd, err := createFutureBlueGreenDeployment(prevDeployment, execOCRConfigs, createOracleFunc, cctypes.PluginTypeCCIPExec)
+	execBgd, err := createFutureBlueGreenDeployment(prevDeployment, execOCRConfigs, oracleCreator, cctypes.PluginTypeCCIPExec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create future blue-green deployment for CCIP exec plugin: %w, don id: %d", err, don.Id)
 	}
@@ -333,13 +330,13 @@ func updateDON(
 func createFutureBlueGreenDeployment(
 	prevDeployment ccipDeployment,
 	ocrConfigs []ccipreader.OCR3ConfigWithMeta,
-	createOracleFunc CreateOracleFunc,
+	oracleCreator cctypes.OracleCreator,
 	pluginType cctypes.PluginType,
 ) (blueGreenDeployment, error) {
 	var deployment blueGreenDeployment
 	if isNewGreenInstance(pluginType, ocrConfigs, prevDeployment) {
 		// this is a new green instance.
-		greenOracle, err := createOracleFunc(cctypes.OCR3ConfigWithMeta(ocrConfigs[1]))
+		greenOracle, err := oracleCreator.Create(cctypes.OCR3ConfigWithMeta(ocrConfigs[1]))
 		if err != nil {
 			return blueGreenDeployment{}, fmt.Errorf("failed to create CCIP commit oracle: %w", err)
 		}
@@ -363,7 +360,7 @@ func createDON(
 	p2pID ragep2ptypes.PeerID,
 	homeChainReader ccipreader.HomeChain,
 	don kcr.CapabilitiesRegistryDONInfo,
-	createOracleFunc CreateOracleFunc,
+	oracleCreator cctypes.OracleCreator,
 ) (*ccipDeployment, error) {
 	// this should be a retryable error.
 	commitOCRConfigs, err := homeChainReader.GetOCRConfigs(context.Background(), don.Id, uint8(cctypes.PluginTypeCCIPCommit))
@@ -387,27 +384,19 @@ func createDON(
 		return nil, fmt.Errorf("expected exactly one OCR config for CCIP exec plugin (don id: %d), got %d", don.Id, len(execOCRConfigs))
 	}
 
-	// The assumption is that all CCIP dons will have the same set of bootstrappers,
-	// so we check against that assumption here.
-	commitBootstrappers := commitOCRConfigs[0].Config.BootstrapP2PIds
-	execBootstrappers := execOCRConfigs[0].Config.BootstrapP2PIds
-	if !slices.Equal(commitBootstrappers, execBootstrappers) {
-		return nil, fmt.Errorf("commit and exec plugin bootstrappers do not match for CCIP DON %d", don.Id)
-	}
-
-	if !isMemberOfDON(don, p2pID) && !isMemberOfBootstrapSubcommittee(commitBootstrappers, p2pID) {
+	if !isMemberOfDON(don, p2pID) && oracleCreator.Type() == cctypes.OracleTypePlugin {
 		lggr.Infow("Not a member of this DON and not a bootstrap node either, skipping", "donId", don.Id, "p2pId", p2pID.String())
 		return nil, nil
 	}
 
 	// at this point we know we are either a member of the DON or a bootstrap node.
-	// the injected createOracleFunc will create the appropriate oracle.
-	commitOracle, err := createOracleFunc(cctypes.OCR3ConfigWithMeta(commitOCRConfigs[0]))
+	// the injected oracleCreator will create the appropriate oracle.
+	commitOracle, err := oracleCreator.Create(cctypes.OCR3ConfigWithMeta(commitOCRConfigs[0]))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CCIP commit oracle: %w", err)
 	}
 
-	execOracle, err := createOracleFunc(cctypes.OCR3ConfigWithMeta(execOCRConfigs[0]))
+	execOracle, err := oracleCreator.Create(cctypes.OCR3ConfigWithMeta(execOCRConfigs[0]))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CCIP exec oracle: %w", err)
 	}

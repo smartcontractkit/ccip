@@ -45,15 +45,15 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 )
 
-var _ cctypes.OracleCreator = &inprocessOracleCreator{}
+var _ cctypes.OracleCreator = &pluginOracleCreator{}
 
 const (
 	defaultCommitGasLimit = 500_000
 )
 
-// inprocessOracleCreator creates oracles that reference plugins running
+// pluginOracleCreator creates oracles that reference plugins running
 // in the same process as the chainlink node, i.e not LOOPPs.
-type inprocessOracleCreator struct {
+type pluginOracleCreator struct {
 	ocrKeyBundles         map[string]ocr2key.KeyBundle
 	transmitters          map[types.RelayID][]string
 	chains                legacyevm.LegacyChainContainer
@@ -69,7 +69,7 @@ type inprocessOracleCreator struct {
 	homeChainReader       ccipreaderpkg.HomeChain
 }
 
-func New(
+func NewPluginOracleCreator(
 	ocrKeyBundles map[string]ocr2key.KeyBundle,
 	transmitters map[types.RelayID][]string,
 	chains legacyevm.LegacyChainContainer,
@@ -84,7 +84,7 @@ func New(
 	bootstrapperLocators []commontypes.BootstrapperLocator,
 	homeChainReader ccipreaderpkg.HomeChain,
 ) cctypes.OracleCreator {
-	return &inprocessOracleCreator{
+	return &pluginOracleCreator{
 		ocrKeyBundles:         ocrKeyBundles,
 		transmitters:          transmitters,
 		chains:                chains,
@@ -101,8 +101,13 @@ func New(
 	}
 }
 
-// CreatePluginOracle implements types.OracleCreator.
-func (i *inprocessOracleCreator) CreatePluginOracle(config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+// Type implements types.OracleCreator.
+func (i *pluginOracleCreator) Type() cctypes.OracleType {
+	return cctypes.OracleTypePlugin
+}
+
+// Create implements types.OracleCreator.
+func (i *pluginOracleCreator) Create(config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
 	pluginType := cctypes.PluginType(config.Config.PluginType)
 
 	// Assuming that the chain selector is referring to an evm chain for now.
@@ -204,7 +209,7 @@ func (i *inprocessOracleCreator) CreatePluginOracle(config cctypes.OCR3ConfigWit
 	return oracle, nil
 }
 
-func (i *inprocessOracleCreator) createFactoryAndTransmitter(
+func (i *pluginOracleCreator) createFactoryAndTransmitter(
 	config cctypes.OCR3ConfigWithMeta,
 	destRelayID types.RelayID,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
@@ -257,7 +262,7 @@ func (i *inprocessOracleCreator) createFactoryAndTransmitter(
 	return factory, transmitter, nil
 }
 
-func (i *inprocessOracleCreator) createReadersAndWriters(
+func (i *pluginOracleCreator) createReadersAndWriters(
 	destChainID uint64,
 	pluginType cctypes.PluginType,
 	config cctypes.OCR3ConfigWithMeta,

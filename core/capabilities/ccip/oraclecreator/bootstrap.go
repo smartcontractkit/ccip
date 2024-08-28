@@ -8,17 +8,52 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/libocr/commontypes"
 	libocr3 "github.com/smartcontractkit/libocr/offchainreporting2plus"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/ocrimpls"
 	cctypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/synchronization"
+	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 )
 
-// CreateBootstrapOracle implements types.OracleCreator.
-func (i *inprocessOracleCreator) CreateBootstrapOracle(config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
+var _ cctypes.OracleCreator = &bootstrapOracleCreator{}
+
+type bootstrapOracleCreator struct {
+	peerWrapper           *ocrcommon.SingletonPeerWrapper
+	bootstrapperLocators  []commontypes.BootstrapperLocator
+	db                    ocr3types.Database
+	monitoringEndpointGen telemetry.MonitoringEndpointGenerator
+	lggr                  logger.Logger
+}
+
+func NewBootstrapOracleCreator(
+	peerWrapper *ocrcommon.SingletonPeerWrapper,
+	bootstrapperLocators []commontypes.BootstrapperLocator,
+	db ocr3types.Database,
+	monitoringEndpointGen telemetry.MonitoringEndpointGenerator,
+	lggr logger.Logger,
+) cctypes.OracleCreator {
+	return &bootstrapOracleCreator{
+		peerWrapper:           peerWrapper,
+		bootstrapperLocators:  bootstrapperLocators,
+		db:                    db,
+		monitoringEndpointGen: monitoringEndpointGen,
+		lggr:                  lggr,
+	}
+}
+
+// Type implements types.OracleCreator.
+func (i *bootstrapOracleCreator) Type() cctypes.OracleType {
+	return cctypes.OracleTypeBootstrap
+}
+
+// Create implements types.OracleCreator.
+func (i *bootstrapOracleCreator) Create(config cctypes.OCR3ConfigWithMeta) (cctypes.CCIPOracle, error) {
 	// Assuming that the chain selector is referring to an evm chain for now.
 	// TODO: add an api that returns chain family.
 	// NOTE: this doesn't really matter for the bootstrap node, it doesn't do anything on-chain.

@@ -127,7 +127,10 @@ func TestIntegration_OCR3Nodes(t *testing.T) {
 			chainSelector,
 			uni,
 			fChain,
-			bootstrapP2PID,
+			// NOTE: this done purely to make the CCIPConfig contract happy, since it asserts that the bootstrap P2P Ids
+			// must be a subset of the committee P2P ids.
+			// They will be removed in an upcoming PR.
+			p2pIDs[0],
 			p2pIDs,
 			oracles[uni.chainID],
 		)
