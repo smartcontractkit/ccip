@@ -25,10 +25,10 @@ FeeCapDefault = '200 gwei'
 """
 
 [CCIP.Env.Network]
-selected_networks= ['source-chain', 'dest-chain']
+selected_networks= ['chain1', 'chain2']
 
-[CCIP.Env.Network.EVMNetworks.source-chain]
-evm_name = 'source-chain'
+[CCIP.Env.Network.EVMNetworks.chain1]
+evm_name = 'chain1'
 evm_chain_id = 1337
 evm_urls = ['ws://127.0.0.1:9546']
 evm_http_urls = ['http://127.0.0.1:9544']
@@ -43,8 +43,8 @@ evm_gas_estimation_buffer = 1000
 evm_supports_eip1559 = true
 evm_default_gas_limit = 6000000
 
-[CCIP.Env.Network.EVMNetworks.dest-chain]
-evm_name = 'dest-chain'
+[CCIP.Env.Network.EVMNetworks.chain2]
+evm_name = 'chain2'
 evm_chain_id = 2337
 evm_urls = ['ws://127.0.0.1:7546']
 evm_http_urls = ['http://127.0.0.1:7544']
