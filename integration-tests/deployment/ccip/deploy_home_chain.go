@@ -291,7 +291,6 @@ func AddDON(
 			F:                     configF,
 			OffchainConfigVersion: offchainConfigVersion,
 			OfframpAddress:        offRamp.Address().Bytes(),
-			BootstrapP2PIds:       [][32]byte{bootstrapP2PID},
 			P2pIds:                p2pIDs,
 			Signers:               signersBytes,
 			Transmitters:          transmittersBytes,

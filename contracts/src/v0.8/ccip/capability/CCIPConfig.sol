@@ -7,7 +7,6 @@ import {ICapabilitiesRegistry} from "./interfaces/ICapabilitiesRegistry.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
-import {SortedSetValidationUtil} from "../../shared/util/SortedSetValidationUtil.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {CCIPConfigTypes} from "./libraries/CCIPConfigTypes.sol";
 
@@ -38,7 +37,6 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   error TooManyOCR3Configs();
   error TooManySigners();
   error TooManyTransmitters();
-  error TooManyBootstrapP2PIds();
   error P2PIdsLengthNotMatching(uint256 p2pIdsLength, uint256 signersLength, uint256 transmittersLength);
   error NotEnoughTransmitters(uint256 got, uint256 minimum);
   error FMustBePositive();
@@ -409,11 +407,6 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     if (cfg.p2pIds.length != cfg.signers.length || cfg.p2pIds.length != cfg.transmitters.length) {
       revert P2PIdsLengthNotMatching(cfg.p2pIds.length, cfg.signers.length, cfg.transmitters.length);
     }
-    if (cfg.bootstrapP2PIds.length > cfg.p2pIds.length) revert TooManyBootstrapP2PIds();
-
-    // check for duplicate p2p ids and bootstrapP2PIds.
-    // check that p2p ids in cfg.bootstrapP2PIds are included in cfg.p2pIds.
-    SortedSetValidationUtil._checkIsValidUniqueSubset(cfg.bootstrapP2PIds, cfg.p2pIds);
 
     // Check that the readers are in the capabilities registry.
     for (uint256 i = 0; i < cfg.signers.length; ++i) {
@@ -443,7 +436,6 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
           ocr3Config.pluginType,
           ocr3Config.offrampAddress,
           configCount,
-          ocr3Config.bootstrapP2PIds,
           ocr3Config.p2pIds,
           ocr3Config.signers,
           ocr3Config.transmitters,
