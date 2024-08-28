@@ -116,7 +116,7 @@ func (l *LoadArgs) scheduleForDest(destNetworkName string) []*wasp.Segment {
 			Msg("LoadProfile provided")
 		for networkName, freq := range l.TestCfg.TestGroupInput.LoadProfile.FrequencyByDestination {
 			l.lggr.Debug().Str("Destination", destNetworkName).Str("NetworkName", networkName).Msg("Checking frequency for destination")
-			if strings.ToLower(destNetworkName) == strings.ToLower(networkName) {
+			if strings.EqualFold(destNetworkName, networkName) {
 				l.lggr.Info().Str("Destination", destNetworkName).
 					Ints64("RequestPerUnitTime", freq.RequestPerUnitTime).
 					Msg("Using frequency for destination")
