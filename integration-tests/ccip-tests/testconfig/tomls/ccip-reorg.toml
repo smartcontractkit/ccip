@@ -1,6 +1,29 @@
 [CCIP]
 [CCIP.Env]
 Mockserver = 'http://mockserver:1080'
+
+[CCIP.Env.NewCLCluster]
+NoOfNodes = 6
+NodeMemory = '4Gi'
+NodeCPU = '2'
+DBMemory = '4Gi'
+DBCPU = '2'
+DBCapacity = '10Gi'
+IsStateful = true
+DBArgs = ['shared_buffers=1536MB', 'effective_cache_size=4096MB', 'work_mem=64MB']
+
+[CCIP.Env.NewCLCluster.Common]
+CommonChainConfigTOML = """
+LogPollInterval = '1s'
+[HeadTracker]
+HistoryDepth = 30
+
+[GasEstimator]
+PriceMax = '200 gwei'
+LimitDefault = 6000000
+FeeCapDefault = '200 gwei'
+"""
+
 [CCIP.Env.Network]
 selected_networks= ['source-chain', 'dest-chain']
 
@@ -36,31 +59,9 @@ evm_supports_eip1559 = true
 evm_default_gas_limit = 6000000
 evm_finality_depth = 10
 
-[CCIP.Env.NewCLCluster]
-NoOfNodes = 6
-NodeMemory = '4Gi'
-NodeCPU = '2'
-DBMemory = '4Gi'
-DBCPU = '2'
-DBCapacity = '10Gi'
-IsStateful = true
-DBArgs = ['shared_buffers=1536MB', 'effective_cache_size=4096MB', 'work_mem=64MB']
-
-[CCIP.Env.NewCLCluster.Common]
-CommonChainConfigTOML = """
-LogPollInterval = '1s'
-[HeadTracker]
-HistoryDepth = 30
-
-[GasEstimator]
-PriceMax = '200 gwei'
-LimitDefault = 6000000
-FeeCapDefault = '200 gwei'
-"""
-
 [CCIP.Groups.smoke]
 BiDirectionalLane = true
-PhaseTimeout = '3m'       # Duration to wait for the each phase validation(SendRequested, Commit, RMN Blessing, Execution) to time-out.
+PhaseTimeout = '2m'
 LocalCluster = true
 
 [CCIP.Groups.smoke.ReorgProfile]
