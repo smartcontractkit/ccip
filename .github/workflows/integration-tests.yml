@@ -374,11 +374,25 @@ jobs:
             run: -run ^TestSmokeCCIPForBidirectionalLane$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/leader-lane.toml
           - name: ccip-smoke-reorg
-            nodes: 3
+            nodes: 1
             dir: ccip-tests/smoke
             os: ubuntu-latest
             file: ccip
-            run: -run ^TestSmokeCCIPReorg -v
+            run: -run ^TestSmokeCCIPReorgBelowFinality$ -v
+            config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-reorg.toml
+          - name: ccip-smoke-reorg
+            nodes: 1
+            dir: ccip-tests/smoke
+            os: ubuntu-latest
+            file: ccip
+            run: -run ^TestSmokeCCIPReorgAboveFinalityAtDestination$ -v
+            config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-reorg.toml
+          - name: ccip-smoke-reorg
+            nodes: 1
+            dir: ccip-tests/smoke
+            os: ubuntu-latest
+            file: ccip
+            run: -run ^TestSmokeCCIPReorgAboveFinalityAtSource$ -v
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-reorg.toml
           - name: runlog
             id: runlog
