@@ -19,7 +19,7 @@ import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableMap.sol";
+import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableMap.sol";
 
 /// @notice The onRamp is a contract that handles lane-specific fee logic, NOP payments and
 /// bridgeable token support.
@@ -149,7 +149,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   // STATIC CONFIG
-  string public constant override typeAndVersion = "EVM2EVMOnRamp 1.5.0-dev";
+  string public constant override typeAndVersion = "EVM2EVMOnRamp 1.5.0";
   /// @dev metadataHash is a lane-specific prefix for a message hash preimage which ensures global uniqueness
   /// Ensures that 2 identical messages sent to 2 different lanes will have a distinct hash.
   /// Must match the metadataHash used in computing leaf hashes offchain for the root committed in

@@ -1,23 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IPoolV1} from "../../interfaces/IPool.sol";
-
-import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
-import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
-import {TokenPool} from "../../pools/TokenPool.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
+
+import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {EVM2EVMOnRampHelper} from "../helpers/EVM2EVMOnRampHelper.sol";
-import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
+contract EVM2EVMOnRampSetup is TokenSetup, FeeQuoterSetup {
   uint256 internal immutable i_tokenAmount0 = 9;
   uint256 internal immutable i_tokenAmount1 = 7;
 
@@ -32,11 +28,11 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   EVM2EVMOnRamp.FeeTokenConfigArgs[] internal s_feeTokenConfigArgs;
   EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] internal s_tokenTransferFeeConfigArgs;
 
-  function setUp() public virtual override(TokenSetup, PriceRegistrySetup) {
+  function setUp() public virtual override(TokenSetup, FeeQuoterSetup) {
     TokenSetup.setUp();
-    PriceRegistrySetup.setUp();
+    FeeQuoterSetup.setUp();
 
-    s_priceRegistry.updatePrices(getSingleTokenPriceUpdateStruct(CUSTOM_TOKEN, CUSTOM_TOKEN_PRICE));
+    s_feeQuoter.updatePrices(_getSingleTokenPriceUpdateStruct(CUSTOM_TOKEN, CUSTOM_TOKEN_PRICE));
 
     address WETH = s_sourceRouter.getWrappedNative();
 
@@ -65,7 +61,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         minFeeUSDCents: 1_00, // 1 USD
         maxFeeUSDCents: 1000_00, // 1,000 USD
         deciBps: 2_5, // 2.5 bps, or 0.025%
-        destGasOverhead: 140_000,
+        destGasOverhead: 84_000,
         destBytesOverhead: uint32(Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES),
         aggregateRateLimitEnabled: true
       })
@@ -76,7 +72,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         minFeeUSDCents: 2_00, // 1 USD
         maxFeeUSDCents: 500_00, // 500 USD
         deciBps: 10_0, // 10 bps, or 0.1%
-        destGasOverhead: 130_000,
+        destGasOverhead: 83_000,
         destBytesOverhead: 200,
         aggregateRateLimitEnabled: true
       })
@@ -93,8 +89,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         rmnProxy: address(s_mockRMN),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
-      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
-      getOutboundRateLimiterConfig(),
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_feeQuoter)),
+      _getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
       getNopsAndWeights()
@@ -151,7 +147,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   }
 
   function _generateTokenMessage() public view returns (Client.EVM2AnyMessage memory) {
-    Client.EVMTokenAmount[] memory tokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    Client.EVMTokenAmount[] memory tokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     tokenAmounts[0].amount = i_tokenAmount0;
     tokenAmounts[1].amount = i_tokenAmount1;
     return Client.EVM2AnyMessage({
