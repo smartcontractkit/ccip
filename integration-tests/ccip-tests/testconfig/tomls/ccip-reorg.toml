@@ -65,6 +65,5 @@ LocalCluster = true
 
 [CCIP.Groups.smoke.ReorgProfile]
 FinalityDelta = 5
-Duration = '1m'
 
 

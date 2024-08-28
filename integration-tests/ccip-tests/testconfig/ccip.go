@@ -252,8 +252,7 @@ func (l *LoadProfile) SetTestRunName(name string) {
 }
 
 type ReorgProfile struct {
-	FinalityDelta int              `toml:",omitempty"`
-	Duration      *config.Duration `toml:",omitempty"`
+	FinalityDelta int `toml:",omitempty"`
 }
 
 func (gp *ReorgProfile) Validate() error {

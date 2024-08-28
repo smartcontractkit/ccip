@@ -378,7 +378,7 @@ jobs:
             dir: ccip-tests/smoke
             os: ubuntu-latest
             file: ccip
-            run: -run ^TestSmokeCCIPReorg
+            run: -run ^TestSmokeCCIPReorg -v
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-reorg.toml
           - name: runlog
             id: runlog
