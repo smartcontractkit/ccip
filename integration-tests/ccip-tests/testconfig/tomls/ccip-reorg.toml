@@ -59,10 +59,6 @@ FeeCapDefault = '200 gwei'
 """
 
 [CCIP.Groups.smoke]
-NetworkPairs = [
-    'source-chain,dest-chain',
-]
-
 BiDirectionalLane = true
 PhaseTimeout = '3m'       # Duration to wait for the each phase validation(SendRequested, Commit, RMN Blessing, Execution) to time-out.
 LocalCluster = true
