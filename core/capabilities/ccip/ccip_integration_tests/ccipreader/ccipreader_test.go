@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -115,7 +116,7 @@ func TestCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 		)
 		require.NoError(t, err)
 		return len(reports) == numReports-1
-	}, 10*time.Second, 50*time.Millisecond)
+	}, tests.WaitTimeout(t), 50*time.Millisecond)
 
 	assert.Len(t, reports[0].Report.MerkleRoots, 1)
 	assert.Equal(t, chainS1, reports[0].Report.MerkleRoots[0].ChainSel)
@@ -268,7 +269,7 @@ func TestCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 		)
 		require.NoError(t, err)
 		return len(msgs) == 2
-	}, 10*time.Second, 100*time.Millisecond)
+	}, tests.WaitTimeout(t), 100*time.Millisecond)
 
 	require.Len(t, msgs, 2)
 	// sort to ensure ascending order of sequence numbers.
