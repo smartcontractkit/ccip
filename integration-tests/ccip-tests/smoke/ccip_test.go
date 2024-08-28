@@ -9,6 +9,7 @@ import (
 
 	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
@@ -896,45 +897,49 @@ func TestSmokeCCIPOutOfOrderExecution(t *testing.T) {
 		src.TransferAmount[0] = big.NewInt(1)
 		lane.RecordStateBeforeTransfer()
 		intendedOrder := []string{} // message IDs in intended order
+		outOfOrderID := ""
 
 		go func() {
 			// DEBUG: Checking Message IDs
 			ccipSendReqChan := make(chan *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested)
 			sendReqSub, err := src.OnRamp.WatchCCIPSendRequested(&bind.WatchOpts{}, ccipSendReqChan)
 			require.NoError(t, err)
+			restCl := resty.New()
 			defer sendReqSub.Unsubscribe()
 			for {
 				select {
 				case err = <-sendReqSub.Err():
-					log.Error().Err(err).Msg("Error in sendReqSub")
-					sendReqSub.Unsubscribe()
+					if err != nil {
+						log.Error().Err(err).Msg("Error in sendReqSub")
+						sendReqSub.Unsubscribe()
 
-					sendReqSub, err = src.OnRamp.WatchCCIPSendRequested(&bind.WatchOpts{}, ccipSendReqChan)
-					require.NoError(t, err)
+						sendReqSub, err = src.OnRamp.WatchCCIPSendRequested(&bind.WatchOpts{}, ccipSendReqChan)
+						require.NoError(t, err)
+					}
 				case ccipSendReq := <-ccipSendReqChan:
-					msgID := fmt.Sprintf("0x%x", ccipSendReq.Message.MessageId[:])
-					log.Warn().Str("ID", msgID).Bool("Strict", ccipSendReq.Message.Strict).Msg("CCIPSendRequested")
+					msgID := fmt.Sprintf("%x", ccipSendReq.Message.MessageId[:])
+					log.Info().
+						Str("msgID", msgID).
+						Uint64("Amount", ccipSendReq.Message.TokenAmounts[0].Amount.Uint64()).
+						Msg("Received CCIPSendRequested")
 					intendedOrder = append(intendedOrder, msgID)
+					if ccipSendReq.Message.TokenAmounts[0].Amount.Cmp(big.NewInt(6)) != 0 {
+						resp, err := restCl.R().SetQueryParam("msgID", msgID).Get("http://localhost:8081/msgID")
+						require.NoError(t, err)
+						require.Equal(t, "200 OK", resp.Status())
+					} else {
+						outOfOrderID = msgID
+					}
 				}
 			}
 		}()
 
+		src.TransferAmount[0] = big.NewInt(1)
 		err = lane.SendRequests(1, false, big.NewInt(actions.DefaultDestinationGasLimit))
 		require.NoError(t, err)
-		time.Sleep(10 * time.Second)
-		err = lane.SendRequests(1, false, big.NewInt(actions.DefaultDestinationGasLimit))
-		require.NoError(t, err)
-		time.Sleep(10 * time.Second)
-		err = lane.SendRequests(1, false, big.NewInt(actions.DefaultDestinationGasLimit))
-		require.NoError(t, err)
-		time.Sleep(10 * time.Second)
-		err = lane.SendRequests(1, false, big.NewInt(actions.DefaultDestinationGasLimit))
-		require.NoError(t, err)
-		time.Sleep(10 * time.Second)
-		err = lane.SendRequests(1, false, big.NewInt(actions.DefaultDestinationGasLimit))
-		require.NoError(t, err)
-		time.Sleep(10 * time.Second)
+		time.Sleep(2 * time.Minute)
 
+		src.TransferAmount[0] = big.NewInt(6)
 		err = lane.SendRequests(1, true, big.NewInt(actions.DefaultDestinationGasLimit))
 		require.NoError(t, err)
 
@@ -946,9 +951,14 @@ func TestSmokeCCIPOutOfOrderExecution(t *testing.T) {
 		require.NoError(t, err)
 		actualOrder := []string{}
 		for events.Next() {
-			actualOrder = append(actualOrder, fmt.Sprintf("0x%x", events.Event.MessageId[:]))
+			actualOrder = append(actualOrder, fmt.Sprintf("%x", events.Event.MessageId[:]))
 		}
-		log.Info().Strs("Intended", intendedOrder).Strs("Actual", actualOrder).Msg("Messages!")
+		fmt.Printf("Out of order message ID: %s\n", outOfOrderID)
+		fmt.Println("i: M?    | Intended Order                                                  | Actual Order ")
+		fmt.Println("--------------------------------------------------------------------------------------------------")
+		for index := range intendedOrder {
+			fmt.Printf("%d: %t | %s | %s | \n", index, intendedOrder[index] == actualOrder[index], intendedOrder[index], actualOrder[index])
+		}
 	}
 }
 

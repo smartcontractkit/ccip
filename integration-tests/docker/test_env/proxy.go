@@ -22,7 +22,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 )
 
 type proxy struct {
@@ -34,7 +33,7 @@ type proxy struct {
 	logFile        *os.File
 	txFile         *os.File
 	upgrader       websocket.Upgrader
-	sendRawTxCount int
+	blockingMsgIDs map[string]time.Time
 }
 
 func newProxy(rpcProvider test_env.RpcProvider, chainID string) test_env.RpcProvider {
@@ -50,15 +49,16 @@ func newProxy(rpcProvider test_env.RpcProvider, chainID string) test_env.RpcProv
 		targetHTTP: rpcProvider.PublicHttpUrls()[0],
 		targetWS:   rpcProvider.PublicWsUrls()[0],
 		upgrader: websocket.Upgrader{
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
+			ReadBufferSize:  2048,
+			WriteBufferSize: 2048,
 			CheckOrigin:     func(_ *http.Request) bool { return true },
 		},
-		logger:  zerolog.New(logFile).With().Timestamp().Logger(),
-		logFile: logFile,
-		txFile:  txFile,
-		chainID: chainID,
-		port:    8080,
+		logger:         zerolog.New(logFile).With().Timestamp().Logger(),
+		logFile:        logFile,
+		txFile:         txFile,
+		chainID:        chainID,
+		blockingMsgIDs: map[string]time.Time{},
+		port:           8080,
 	}
 
 	if chainID == "2337" {
@@ -81,6 +81,7 @@ func newProxy(rpcProvider test_env.RpcProvider, chainID string) test_env.RpcProv
 	go func() {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", p.handler)
+		mux.HandleFunc("/msgID", p.newMsgID)
 		p.logger.Info().Str("Source", fmt.Sprintf("0.0.0.0:%d", p.port)).Str("HTTP Target", p.targetHTTP).Str("WS Target", p.targetWS).Msg("Starting Proxy Server")
 		p.logger.Error().Err(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", p.port), mux)).Msg("Failed to start proxy server")
 	}()
@@ -91,6 +92,13 @@ func newProxy(rpcProvider test_env.RpcProvider, chainID string) test_env.RpcProv
 		[]string{fmt.Sprintf("http://localhost:%d/", p.port)},
 		[]string{fmt.Sprintf("ws://localhost:%d/", p.port)},
 	)
+}
+
+func (p *proxy) newMsgID(w http.ResponseWriter, r *http.Request) {
+	msgID := r.URL.Query().Get("msgID")
+	p.blockingMsgIDs[msgID] = time.Now().Add(8 * time.Minute)
+	p.logger.Info().Str("msgID", msgID).Msg("Added msgID to block list")
+	w.WriteHeader(http.StatusOK)
 }
 
 func (p *proxy) handler(w http.ResponseWriter, r *http.Request) {
@@ -119,48 +127,56 @@ func (p *proxy) handleHttp(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = io.NopCloser(strings.NewReader(string(body)))
 
-	p.logger.Info().Str("Body", string(body)).Msg("HTTP Request")
+	toFilter, err := p.filterTxs(body)
+	if err != nil {
+		p.logger.Error().Err(err).Msg("Failed to filter transactions")
+		return
+	}
 
+	if toFilter {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	proxy.ServeHTTP(w, r)
+}
+
+func (p *proxy) filterTxs(body []byte) (bool, error) {
 	// Write transactions to file
-	var bodyArray []map[string]any
+	if p.chainID != "2337" {
+		return false, nil
+	}
 	var bodyMap map[string]any
-	if string(body)[0] == '[' {
-		err = json.Unmarshal(body, &bodyArray)
+	if string(body)[0] != '[' {
+		err := json.Unmarshal(body, &bodyMap)
 		if err != nil {
-			p.logger.Error().Err(err).Str("Raw Body", string(body)).Msg("Failed to unmarshal request body")
+			return false, fmt.Errorf("Failed to unmarshal body: %w", err)
 		}
-		for _, b := range bodyArray {
-			if method, ok := b["method"]; ok {
-				if isValidMethod(method.(string)) {
-					_, err := p.txFile.WriteString(string(body) + ",\n")
-					if err != nil {
-						p.logger.Error().Err(err).Str("Body", string(body)).Msg("Failed to write transaction to file")
+		bodyMap["timestamp"] = time.Now().Format(time.TimeOnly)
+		bodyMap["type"] = "http"
+		if method, ok := bodyMap["method"]; ok {
+			if isValidMethod(method.(string)) {
+				params := bodyMap["params"].([]any)
+				paramsStr := ""
+				for _, param := range params {
+					switch param.(type) {
+					case string:
+						paramsStr += strings.TrimPrefix(param.(string), "0x")
+					case map[string]any:
+						for _, v := range param.(map[string]any) {
+							paramsStr += v.(string)
+						}
 					}
 				}
-			}
-		}
-	} else {
-		err = json.Unmarshal(body, &bodyMap)
-		if err != nil {
-			p.logger.Error().Err(err).Str("Raw Body", string(body)).Msg("Failed to unmarshal request body")
-		}
-		if method, ok := bodyMap["method"]; ok {
-			bodyMap["timestamp"] = time.Now().String()
-			if isValidMethod(method.(string)) {
-				bodyMap["sendRawTxCount"] = p.sendRawTxCount
-				p.sendRawTxCount++
 
-				params := bodyMap["params"].([]any)
-				paramsStr := strings.TrimPrefix(params[0].(string), "0x")
 				txBytes, err := hex.DecodeString(paramsStr)
 				if err != nil {
-					p.logger.Error().Err(err).Str("Body", string(body)).Msg("Failed to decode transaction")
+					return false, fmt.Errorf("Failed to decode transaction bytes: %w", err)
 				}
 
 				var tx types.Transaction
 				err = rlp.DecodeBytes(txBytes, &tx)
 				if err != nil {
-					p.logger.Error().Err(err).Str("Body", string(body)).Msg("Failed to decode transaction")
+					return false, fmt.Errorf("Failed to decode transaction: %w", err)
 				}
 				bodyMap["to"] = tx.To().Hex()
 				bodyMap["nonce"] = tx.Nonce()
@@ -168,45 +184,50 @@ func (p *proxy) handleHttp(w http.ResponseWriter, r *http.Request) {
 				bodyMap["hash"] = tx.Hash().Hex()
 
 				if len(tx.Data()) > 4 {
-					var parsedABI abi.ABI
-					if p.chainID == "1337" {
-						parsedABI, err = abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
-					} else {
-						parsedABI, err = abi.JSON(strings.NewReader(evm_2_evm_offramp.EVM2EVMOffRampABI))
-					}
+					parsedABI, err := abi.JSON(strings.NewReader(evm_2_evm_offramp.EVM2EVMOffRampABI))
 					if err != nil {
-						p.logger.Error().Err(err).Str("Body", string(body)).Msg("Failed to parse ABI")
+						return false, fmt.Errorf("Failed to parse ABI: %w", err)
 					}
-
 					method, err := parsedABI.MethodById(tx.Data()[:4])
 					if err != nil {
-						p.logger.Error().Err(err).Str("Body", string(body)).Msg("Failed to get method by ID")
 						bodyMap["method"] = err.Error()
 					} else {
 						bodyMap["method"] = method.Name
-						inputs, err := method.Inputs.UnpackValues(tx.Data()[4:])
-						if err != nil {
-							p.logger.Error().Err(err).Str("Body", string(body)).Msg("Failed to unpack inputs")
-							bodyMap["inputs"] = err.Error()
-						} else {
-							bodyMap["inputs"] = inputs
+					}
+
+					dataString := hex.EncodeToString(tx.Data())
+					blockedMsgIDs := []string{}
+					for id := range p.blockingMsgIDs {
+						if strings.Contains(dataString, id) {
+							blockedMsgIDs = append(blockedMsgIDs, id)
+						}
+						if len(blockedMsgIDs) > 0 {
+							bodyMap["blockedMsgIDs"] = blockedMsgIDs
+							bodyMap["progressBlockingMsgIDs"] = p.blockingMsgIDs
 						}
 					}
 				}
 
 				jsonStr, err := json.Marshal(bodyMap)
 				if err != nil {
-					p.logger.Error().Err(err).Str("Body", string(body)).Msg("Failed to marshal request body")
+					return false, fmt.Errorf("Failed to marshal body map: %w", err)
 				}
 				_, err = p.txFile.WriteString(string(jsonStr) + ",\n")
 				if err != nil {
-					p.logger.Error().Err(err).Str("Body", string(body)).Msg("Failed to write transaction to file")
+					return false, fmt.Errorf("Failed to write transaction to file: %w", err)
+				}
+			}
+		}
+		if ids, ok := bodyMap["blockedMsgIDs"]; ok {
+			stringIDs := ids.([]string)
+			for _, id := range stringIDs {
+				if time.Now().Before(p.blockingMsgIDs[id]) {
+					return true, nil
 				}
 			}
 		}
 	}
-
-	proxy.ServeHTTP(w, r)
+	return false, nil
 }
 
 func isValidMethod(meth string) bool {
@@ -247,8 +268,7 @@ func (p *proxy) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	defer clientConn.Close()
 
 	// Handle close messages from the client
-	clientConn.SetCloseHandler(func(code int, text string) error {
-		p.logger.Debug().Int("Code", code).Str("Text", text).Msg("Client requested close")
+	clientConn.SetCloseHandler(func(_ int, _ string) error {
 		return clientConn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 	})
 
@@ -289,7 +309,25 @@ func (p *proxy) proxyWebSocketMessages(src, dest *websocket.Conn, done chan stru
 			return
 		}
 
-		p.logger.Info().Str("Message", string(message)).Msg("WS Request")
+		var messageMap map[string]any
+		err = json.Unmarshal(message, &messageMap)
+		if err != nil {
+			return
+		}
+		if method, ok := messageMap["method"]; ok {
+			if isValidMethod(method.(string)) {
+				messageMap["timestamp"] = time.Now().Format(time.TimeOnly)
+				messageMap["type"] = "ws"
+				jsonStr, err := json.Marshal(messageMap)
+				if err != nil {
+					return
+				}
+				_, err = p.txFile.WriteString(string(jsonStr) + ",\n")
+				if err != nil {
+					return
+				}
+			}
+		}
 
 		// Forward the WebSocket message to the destination
 		err = dest.WriteMessage(messageType, message)
