@@ -614,6 +614,15 @@ contract OnRamp_getFee is OnRampSetup {
     vm.expectRevert(FeeQuoter.ExtraArgOutOfOrderExecutionMustBeTrue.selector);
     s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
   }
+
+  function test_NotAFeeTokenButPricedToken_Revert() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.feeToken = s_sourceTokens[1];
+
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.FeeTokenNotSupported.selector, message.feeToken));
+
+    s_onRamp.getFee(DEST_CHAIN_SELECTOR, message);
+  }
 }
 
 contract OnRamp_setDynamicConfig is OnRampSetup {

@@ -28,6 +28,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   using KeystoneFeedDefaultMetadataLib for bytes;
 
   error TokenNotSupported(address token);
+  error FeeTokenNotSupported(address token);
   error ChainNotSupported(uint64 chain);
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
   error StaleKeystoneUpdate(address token, uint256 feedTimestamp, uint256 storedTimeStamp);
@@ -473,6 +474,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   ) external view returns (uint256 feeTokenAmount) {
     DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
     if (!destChainConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
+    if (!s_feeTokens.contains(message.feeToken)) revert FeeTokenNotSupported(message.feeToken);
 
     uint256 numberOfTokens = message.tokenAmounts.length;
     _validateMessage(destChainConfig, message.data.length, numberOfTokens, message.receiver);
