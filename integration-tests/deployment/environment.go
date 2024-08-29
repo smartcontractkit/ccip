@@ -39,8 +39,16 @@ type Chain struct {
 	Selector uint64
 	Client   OnchainClient
 	// Note the Sign function can be abstract supporting a variety of key storage mechanisms (e.g. KMS etc).
-	DeployerKey *bind.TransactOpts
+	DeployerKey  *bind.TransactOpts
+	DeployerKeys []*bind.TransactOpts
+	// Function to execute if transaction submission fails.
+	RetrySubmit func(tx *types.Transaction, err error) (*types.Transaction, error)
 	Confirm     func(tx common.Hash) error
+}
+
+// NoOpRetrySubmit is a retry submit function that does nothing.
+func NoOpRetrySubmit(_ *types.Transaction, err error) (*types.Transaction, error) {
+	return nil, err
 }
 
 type Environment struct {
