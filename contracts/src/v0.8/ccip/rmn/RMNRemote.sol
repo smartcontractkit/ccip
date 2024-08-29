@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {IRMNRemote, MerkleRoot, Signature} from "../interfaces/IRMNRemote.sol";
+import {IRMNRemote, MerkleRoot} from "../interfaces/IRMNRemote.sol";
 
 bytes32 constant RMN_V1_6_ANY2EVM_REPORT = keccak256("RMN_V1_6_ANY2EVM_REPORT");
 

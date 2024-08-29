@@ -8,16 +8,17 @@ struct MerkleRoot {
   uint64 minSeqNr; //              | Minimum sequence number, inclusive
   uint64 maxSeqNr; // ─────────────╯ Maximum sequence number, inclusive
   bytes32 merkleRoot; //             Merkle root covering the interval & source chain messages
-  bytes onRampAddress; //            generic, to support arbitrary sources; for EVM2EVM, use abi.encode
-}
-
-struct Signature {
-  bytes32 r;
-  bytes32 s;
+  bytes onRampAddress; //            Generic onramp address, to support arbitrary sources; for EVM, use abi.encode
 }
 
 /// @notice This interface contains the only RMN-related functions that might be used on-chain by other CCIP contracts.
 interface IRMNRemote {
+  /// @notice signature components from RMN nodes
+  struct Signature {
+    bytes32 r;
+    bytes32 s;
+  }
+
   function verify(MerkleRoot[] memory merkleRoots, Signature[] memory signatures) external view;
 
   /// @notice If there is an active global or legacy curse, this function returns true.

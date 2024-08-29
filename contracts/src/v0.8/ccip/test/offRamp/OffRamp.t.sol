@@ -2847,9 +2847,9 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     }
   }
 
-  function test_Fuzz_applySourceChainConfigUpdate_Success(
-    OffRamp.SourceChainConfigArgs memory sourceChainConfigArgs
-  ) public {
+  function test_Fuzz_applySourceChainConfigUpdate_Success(OffRamp.SourceChainConfigArgs memory sourceChainConfigArgs)
+    public
+  {
     // Skip invalid inputs
     vm.assume(sourceChainConfigArgs.sourceChainSelector != 0);
     vm.assume(sourceChainConfigArgs.onRamp.length != 0);
@@ -3302,37 +3302,43 @@ contract OffRamp_commit is OffRampSetup {
   }
 
   function test_InvalidInterval_Revert() public {
-    OffRamp.Interval memory interval = OffRamp.Interval(2, 2);
     MerkleRoot[] memory roots = new MerkleRoot[](1);
     roots[0] = MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      minSeqNr: interval.min,
-      maxSeqNr: interval.max,
+      minSeqNr: 2,
+      maxSeqNr: 2,
       merkleRoot: bytes32(0),
       onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
     });
     OffRamp.CommitReport memory commitReport =
       OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
 
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidInterval.selector, roots[0].sourceChainSelector, interval));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        OffRamp.InvalidInterval.selector, roots[0].sourceChainSelector, roots[0].minSeqNr, roots[0].maxSeqNr
+      )
+    );
     _commit(commitReport, s_latestSequenceNumber);
   }
 
   function test_InvalidIntervalMinLargerThanMax_Revert() public {
     s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
-    OffRamp.Interval memory interval = OffRamp.Interval(1, 0);
     MerkleRoot[] memory roots = new MerkleRoot[](1);
     roots[0] = MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      minSeqNr: interval.min,
-      maxSeqNr: interval.max,
+      minSeqNr: 1,
+      maxSeqNr: 0,
       merkleRoot: bytes32(0),
       onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
     });
     OffRamp.CommitReport memory commitReport =
       OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
 
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidInterval.selector, roots[0].sourceChainSelector, interval));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        OffRamp.InvalidInterval.selector, roots[0].sourceChainSelector, roots[0].minSeqNr, roots[0].maxSeqNr
+      )
+    );
     _commit(commitReport, s_latestSequenceNumber);
   }
 

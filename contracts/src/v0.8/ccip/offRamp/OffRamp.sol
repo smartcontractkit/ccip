@@ -8,7 +8,7 @@ import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
-import {IRMNRemote, MerkleRoot, Signature as RMNSig} from "../interfaces/IRMNRemote.sol";
+import {IRMNRemote, MerkleRoot} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
@@ -56,7 +56,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
   error InvalidStaticConfig(uint64 sourceChainSelector);
   error StaleCommitReport();
-  error InvalidInterval(uint64 sourceChainSelector, Interval interval);
+  error InvalidInterval(uint64 sourceChainSelector, uint64 min, uint64 max);
   error ZeroAddressNotAllowed();
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
 
@@ -83,7 +83,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice Struct that contains the static configuration
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
-  /// @dev not sure why solhint complainins about this, seems like a buggy detector
+  /// @dev not sure why solhint complains about this, seems like a buggy detector
   /// https://github.com/protofire/solhint/issues/597
   // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
@@ -120,24 +120,12 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     address messageValidator; // Optional message validator to validate incoming messages (zero address = no validator)
   }
 
-  /// @notice a sequenceNumber interval
-  struct Interval {
-    uint64 min; // ───╮ Minimum sequence number, inclusive
-    uint64 max; // ───╯ Maximum sequence number, inclusive
-  }
-
   /// @notice Report that is committed by the observing DON at the committing phase
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct CommitReport {
     Internal.PriceUpdates priceUpdates; // Collection of gas and price updates to commit
     MerkleRoot[] merkleRoots; // Collection of merkle roots per source chain to commit
-    RMNSig[] rmnSignatures; // RMN signatures on the merkle roots
-  }
-
-  /// @dev Struct to hold a merkle root for a source chain so that an array of these can be passed in the resetUblessedRoots function.
-  struct UnblessedRoot {
-    uint64 sourceChainSelector; // Remote source chain selector that the Merkle Root is scoped to
-    bytes32 merkleRoot; // Merkle root of a single remote source chain
+    IRMNRemote.Signature[] rmnSignatures; // RMN signatures on the merkle roots
   }
 
   // STATIC CONFIG
@@ -611,7 +599,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
 
       if (sourceChainConfig.minSeqNr != root.minSeqNr || root.minSeqNr > root.maxSeqNr) {
-        revert InvalidInterval(root.sourceChainSelector, Interval({min: root.minSeqNr, max: root.maxSeqNr}));
+        revert InvalidInterval(root.sourceChainSelector, root.minSeqNr, root.maxSeqNr);
       }
 
       bytes32 merkleRoot = root.merkleRoot;
