@@ -15,6 +15,8 @@
     "compile:native": "./scripts/native_solc_compile_all",
     "compile": "hardhat compile --no-typechain",
     "zksync:compile": "npx hardhat compile --config ./hardhat.ccip.zksync.config.ts --no-typechain",
+    "zksync:verify:sepolia": "npx hardhat run zksync-verify.ts --network zkSyncSepolia --config ./hardhat.ccip.zksync.config.ts",
+    "zksync:verify": "npx hardhat run zksync-verify.ts --network zkSync --config ./hardhat.ccip.zksync.config.ts",
     "coverage": "hardhat coverage",
     "prepare": "chmod +x .husky/prepare.sh && ./.husky/prepare.sh",
     "prepublishOnly": "pnpm compile && ./scripts/prepublish_generate_abi_folder",
