@@ -590,8 +590,8 @@ jobs:
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@aa8eea635029ab8d95abd3c206f56dae1e22e623 # v2.3.28
         env:
-          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
-          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
+          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }},${{ steps.set_override_config.outputs.base_64_override }}
+          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }},${{ steps.set_override_config.outputs.base_64_override }}
           DEBUG_RESTY: false
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 30m -count=1 -json -test.parallel=${{ matrix.product.nodes }} ${{ steps.build-go-test-command.outputs.run_command }} 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage -hidepassingtests=false -hidepassinglogs

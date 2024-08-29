@@ -2,9 +2,9 @@
 [CCIP.Env]
 Mockserver = 'http://mockserver:1080'
 [CCIP.Env.Network]
-selected_networks= ['source-chain', 'dest-chain']
+selected_networks= ['SIMULATED_1', 'SIMULATED_2']
 
-[CCIP.Env.Network.EVMNetworks.source-chain]
+[CCIP.Env.Network.EVMNetworks.SIMULATED_1]
 evm_name = 'source-chain'
 evm_chain_id = 1337
 evm_urls = ['ws://127.0.0.1:9546']
@@ -20,7 +20,7 @@ evm_supports_eip1559 = true
 evm_default_gas_limit = 6000000
 evm_finality_depth = 10
 
-[CCIP.Env.Network.EVMNetworks.dest-chain]
+[CCIP.Env.Network.EVMNetworks.SIMULATED_2]
 evm_name = 'dest-chain'
 evm_chain_id = 2337
 evm_urls = ['ws://127.0.0.1:7546']
