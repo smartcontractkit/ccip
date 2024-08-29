@@ -61,6 +61,10 @@ evm_default_gas_limit = 6000000
 
 
 [CCIP.Groups.smoke]
+# these are all the valid network pairs
+NetworkPairs = [
+    'chain1,chain2',
+]
 BiDirectionalLane = true
 PhaseTimeout = '2m'
 LocalCluster = true
