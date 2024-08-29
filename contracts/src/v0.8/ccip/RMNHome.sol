@@ -12,7 +12,6 @@ contract RMNHome is Ownable2Step, ITypeAndVersion {
   function test() public {}
 
   string public constant override typeAndVersion = "RMNHome 1.6.0-dev";
-  uint256 public constant CONFIG_RING_BUFFER_SIZE = 2;
 
   struct Node {
     string peerId; // used for p2p communication, base58 encoded
@@ -38,7 +37,9 @@ contract RMNHome is Ownable2Step, ITypeAndVersion {
     Config config;
   }
 
-  function _configDigest(VersionedConfig memory versionedConfig) internal view returns (bytes32) {
+  function _configDigest(
+    VersionedConfig memory versionedConfig
+  ) internal view returns (bytes32) {
     uint256 h = uint256(keccak256(abi.encode(bytes32("EVM"), block.chainid, address(this), versionedConfig)));
     uint256 prefixMask = type(uint256).max << (256 - 16); // 0xFFFF00..00
     uint256 prefix = 0x000b << (256 - 16); // 0x000b00..00
@@ -47,13 +48,16 @@ contract RMNHome is Ownable2Step, ITypeAndVersion {
 
   // if we were to have VersionedConfig instead of Config in the ring buffer, we couldn't assign directly to it in
   // setConfig without via-ir
-  uint32[CONFIG_RING_BUFFER_SIZE] s_configCounts; // s_configCounts[i] == 0 iff s_configs[i] is unusable
+  uint256 public constant CONFIG_RING_BUFFER_SIZE = 2;
+  uint32 s_configCount;
+  uint32[CONFIG_RING_BUFFER_SIZE] s_configVersions; // s_configVersions[i] == 0 iff s_configs[i] is unusable
+  bytes32[CONFIG_RING_BUFFER_SIZE] s_configDigests;
   Config[CONFIG_RING_BUFFER_SIZE] s_configs;
   uint256 s_latestConfigIndex;
-  bytes32 s_latestConfigDigest;
 
-  /// @param revokePastConfigs if one wants to revoke all past configs, because some past config is faulty
-  function setConfig(Config calldata newConfig, bool revokePastConfigs) external onlyOwner {
+  function setConfig(
+    Config calldata newConfig
+  ) external onlyOwner {
     // sanity checks
     {
       if (newConfig.nodes.length > 256) {
@@ -98,59 +102,127 @@ contract RMNHome is Ownable2Step, ITypeAndVersion {
     }
 
     uint256 oldConfigIndex = s_latestConfigIndex;
-    uint32 oldConfigCount = s_configCounts[oldConfigIndex];
     uint256 newConfigIndex = (oldConfigIndex + 1) % CONFIG_RING_BUFFER_SIZE;
 
-    for (uint256 i = 0; i < CONFIG_RING_BUFFER_SIZE; ++i) {
-      if ((i == newConfigIndex || revokePastConfigs) && s_configCounts[i] > 0) {
-        emit ConfigRevoked(_configDigest(VersionedConfig({version: s_configCounts[i], config: s_configs[i]})));
-        delete s_configCounts[i];
-      }
+    // are we going to overwrite a config?
+    if (s_configVersions[newConfigIndex] > 0) {
+      emit ConfigRevoked(s_configDigests[newConfigIndex]);
     }
 
-    uint32 newConfigCount = oldConfigCount + 1;
+    uint32 newConfigCount = ++s_configCount;
     VersionedConfig memory newVersionedConfig = VersionedConfig({version: newConfigCount, config: newConfig});
     bytes32 newConfigDigest = _configDigest(newVersionedConfig);
     s_configs[newConfigIndex] = newConfig;
-    s_configCounts[newConfigIndex] = newConfigCount;
+    s_configVersions[newConfigIndex] = newConfigCount;
+    s_configDigests[newConfigIndex] = newConfigDigest;
     s_latestConfigIndex = newConfigIndex;
-    s_latestConfigDigest = newConfigDigest;
     emit ConfigSet(newConfigDigest, newVersionedConfig);
   }
 
   /// @notice Revokes past configs, so that only the latest config remains. Call to promote staging to production.
-  function revokePastConfigs() external onlyOwner {
+  function revokeAllConfigsButLatest() external onlyOwner {
     for (uint256 i = 0; i < CONFIG_RING_BUFFER_SIZE; ++i) {
-      if (s_latestConfigIndex != i && s_configCounts[i] > 0) {
-        emit ConfigRevoked(_configDigest(VersionedConfig({version: s_configCounts[i], config: s_configs[i]})));
-        delete s_configCounts[i];
+      if (s_latestConfigIndex != i && s_configVersions[i] > 0) {
+        emit ConfigRevoked(_configDigest(VersionedConfig({version: s_configVersions[i], config: s_configs[i]})));
+        delete s_configVersions[i];
       }
     }
   }
 
-  /// @return configDigest will be zero in case no config has been set
-  function getLatestConfigDigestAndVersionedConfig()
-    external
-    view
-    returns (bytes32 configDigest, VersionedConfig memory)
-  {
-    return (
-      s_latestConfigDigest,
-      VersionedConfig({version: s_configCounts[s_latestConfigIndex], config: s_configs[s_latestConfigIndex]})
-    );
+  function revokeConfig(
+    bytes32 configDigest
+  ) external onlyOwner {
+    for (uint256 i = 0; i < CONFIG_RING_BUFFER_SIZE; ++i) {
+      if (s_configVersions[i] > 0 && s_configDigests[i] == configDigest) {
+        emit ConfigRevoked(configDigest);
+        delete s_configVersions[i];
+        break;
+      }
+    }
   }
 
-  /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes
-  /// @dev Only to be called by offchain code, efficiency is not a concern
-  function getConfig(bytes32 configDigest) external view returns (VersionedConfig memory versionedConfig, bool ok) {
-    for (uint256 i = 0; i < CONFIG_RING_BUFFER_SIZE; ++i) {
-      if (s_configCounts[i] == 0) {
-        // unset config
-        continue;
+  ///
+  /// Offchain getters
+  /// Only to be called by offchain code, efficiency is not a concern
+  ///
+
+  /// @return configDigests ordered from oldest to latest set
+  function getConfigDigests() external view returns (bytes32[] memory configDigests) {
+    uint256 len = 0;
+    for (uint256 act = 0; act <= 1; ++act) {
+      if (act == 1) {
+        configDigests = new bytes32[](len);
       }
-      VersionedConfig memory vc = VersionedConfig({version: s_configCounts[i], config: s_configs[i]});
-      if (_configDigest(vc) == configDigest) {
-        versionedConfig = vc;
+
+      uint256 i = s_latestConfigIndex;
+      do {
+        if (s_configVersions[i] > 0) {
+          if (act == 0) {
+            ++len;
+          } else if (act == 1) {
+            configDigests[--len] = s_configDigests[i];
+          }
+        }
+        i = i == 0 ? CONFIG_RING_BUFFER_SIZE - 1 : i - 1;
+      } while (i != s_latestConfigIndex);
+    }
+  }
+
+  struct VersionedConfigWithDigest {
+    bytes32 configDigest;
+    VersionedConfig versionedConfig;
+  }
+
+  /// @param offset setting to 0 will put the newest config in the last position of the returned array, setting to 1
+  /// will put the second newest config in the last position, and so on
+  /// @param limit len(versionedConfigsWithDigests) <= limit, set to 1 to get just the latest config,
+  /// set to CONFIG_RING_BUFFER_SIZE to ensure that all configs are returned
+  /// @return versionedConfigsWithDigests ordered from oldest to latest set
+  function getVersionedConfigsWithDigests(
+    uint256 offset,
+    uint256 limit
+  ) external view returns (VersionedConfigWithDigest[] memory versionedConfigsWithDigests) {
+    uint256[2] memory ignored;
+    uint256[2] memory accounted;
+    uint256 len; // clobbered by the end of the loop
+    for (uint256 act = 0; act <= 1; ++act) {
+      if (act == 1) {
+        len = accounted[0];
+        versionedConfigsWithDigests = new VersionedConfigWithDigest[](len);
+      }
+
+      uint256 i = s_latestConfigIndex;
+      do {
+        if (accounted[act] >= limit) {
+          break;
+        }
+
+        if (s_configVersions[i] > 0) {
+          if (ignored[act] < offset) {
+            ++ignored[act];
+          } else {
+            ++accounted[act];
+            if (act == 1) {
+              versionedConfigsWithDigests[--len] = VersionedConfigWithDigest({
+                configDigest: s_configDigests[i],
+                versionedConfig: VersionedConfig({version: s_configVersions[i], config: s_configs[i]})
+              });
+            }
+          }
+        }
+        i = i == 0 ? CONFIG_RING_BUFFER_SIZE - 1 : i - 1;
+      } while (i != s_latestConfigIndex);
+    }
+  }
+
+  /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes. Use
+  /// in case one of the configs is too large to be returnable by one of the other getters.
+  function getVersionedConfig(
+    bytes32 configDigest
+  ) external view returns (VersionedConfig memory versionedConfig, bool ok) {
+    for (uint256 i = 0; i < CONFIG_RING_BUFFER_SIZE; ++i) {
+      if (s_configVersions[i] > 0 && s_configDigests[i] == configDigest) {
+        versionedConfig = VersionedConfig({version: s_configVersions[i], config: s_configs[i]});
         ok = true;
         break;
       }
