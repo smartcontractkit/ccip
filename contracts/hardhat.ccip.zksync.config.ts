@@ -90,7 +90,7 @@ let config = {
         dockerImage: '',
         tag: '',
       },
-      contractsToCompile: ['RMN', 'ARMProxy'], // uncomment this to compile only specific contracts
+      // contractsToCompile: ['RMN', 'ARMProxy'], // uncomment this to compile only specific contracts
     },
   },
   warnings: !process.env.HIDE_WARNINGS,
