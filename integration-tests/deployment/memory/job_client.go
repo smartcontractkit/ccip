@@ -17,6 +17,26 @@ type JobClient struct {
 	Nodes map[string]Node
 }
 
+func (j JobClient) DisableNode(ctx context.Context, in *nodev1.DisableNodeRequest, opts ...grpc.CallOption) (*nodev1.DisableNodeResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (j JobClient) EnableNode(ctx context.Context, in *nodev1.EnableNodeRequest, opts ...grpc.CallOption) (*nodev1.EnableNodeResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (j JobClient) RegisterNode(ctx context.Context, in *nodev1.RegisterNodeRequest, opts ...grpc.CallOption) (*nodev1.RegisterNodeResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (j JobClient) UpdateNode(ctx context.Context, in *nodev1.UpdateNodeRequest, opts ...grpc.CallOption) (*nodev1.UpdateNodeResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (j JobClient) GetKeypair(ctx context.Context, in *v1.GetKeypairRequest, opts ...grpc.CallOption) (*v1.GetKeypairResponse, error) {
 	//TODO implement me
 	panic("implement me")
@@ -38,7 +58,7 @@ func (j JobClient) ListNodes(ctx context.Context, in *nodev1.ListNodesRequest, o
 }
 
 func (j JobClient) ListNodeChainConfigs(ctx context.Context, in *nodev1.ListNodeChainConfigsRequest, opts ...grpc.CallOption) (*nodev1.ListNodeChainConfigsResponse, error) {
-	n := j.Nodes[in.Filter.NodeId]
+	n := j.Nodes[in.Filter.NodeIds[0]]
 	offpk := n.Keys.OCRKeyBundle.OffchainPublicKey()
 	cpk := n.Keys.OCRKeyBundle.ConfigEncryptionPublicKey()
 	var chainConfigs []*nodev1.ChainConfig
@@ -65,7 +85,7 @@ func (j JobClient) ListNodeChainConfigs(ctx context.Context, in *nodev1.ListNode
 				},
 				Multiaddr:        n.Addr.String(),
 				Plugins:          nil,
-				ForwarderAddress: "",
+				ForwarderAddress: ptr(""),
 			},
 		})
 	}

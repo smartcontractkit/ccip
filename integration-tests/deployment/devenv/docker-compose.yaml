@@ -68,7 +68,7 @@ services:
     platform: "${CL_NODE_PLATFORM}"
     profiles: [ "chainlink-nodes", "node-1" ]
     command: >
-      --config /run/secrets/cl-node-config-1 
+      --config /run/secrets/cl-node-config 
       --secrets /run/secrets/cl-node-secrets 
       node start 
       --api /run/secrets/cl-node-api-credentials-file
@@ -80,7 +80,7 @@ services:
       CL_DATABASE_URL: "postgresql://${PG_USER}:${PG_PASSWORD}@cl-node-db:5432/cl-node-1?sslmode=disable"
     secrets:
       - cl-node-api-credentials-file
-      - cl-node-config-1
+      - cl-node-config
       - cl-node-secrets
     networks:
       - cl-backend
@@ -92,7 +92,7 @@ services:
     platform: "${CL_NODE_PLATFORM}"
     profiles: [ "chainlink-nodes", "node-2" ]
     command: >
-      --config /run/secrets/cl-node-config-2 
+      --config /run/secrets/cl-node-config
       --secrets /run/secrets/cl-node-secrets 
       node start 
       --api /run/secrets/cl-node-api-credentials-file
@@ -104,7 +104,7 @@ services:
       CL_DATABASE_URL: "postgresql://${PG_USER}:${PG_PASSWORD}@cl-node-db:5432/cl-node-2?sslmode=disable"
     secrets:
       - cl-node-api-credentials-file
-      - cl-node-config-2
+      - cl-node-config
       - cl-node-secrets
     networks:
       - cl-backend
@@ -116,7 +116,7 @@ services:
     platform: "${CL_NODE_PLATFORM}"
     profiles: [ "chainlink-nodes", "node-3" ]
     command: >
-      --config /run/secrets/cl-node-config-3 
+      --config /run/secrets/cl-node-config 
       --secrets /run/secrets/cl-node-secrets 
       node start 
       --api /run/secrets/cl-node-api-credentials-file
@@ -128,7 +128,7 @@ services:
       CL_DATABASE_URL: "postgresql://${PG_USER}:${PG_PASSWORD}@cl-node-db:5432/cl-node-3?sslmode=disable"
     secrets:
       - cl-node-api-credentials-file
-      - cl-node-config-3
+      - cl-node-config
       - cl-node-secrets
     networks:
       - cl-backend
@@ -140,7 +140,7 @@ services:
     platform: "${CL_NODE_PLATFORM}"
     profiles: [ "chainlink-nodes", "node-4" ]
     command: >
-      --config /run/secrets/cl-node-config-4 
+      --config /run/secrets/cl-node-config 
       --secrets /run/secrets/cl-node-secrets 
       node start 
       --api /run/secrets/cl-node-api-credentials-file
@@ -152,7 +152,7 @@ services:
       CL_DATABASE_URL: "postgresql://${PG_USER}:${PG_PASSWORD}@cl-node-db:5432/cl-node-4?sslmode=disable"
     secrets:
       - cl-node-api-credentials-file
-      - cl-node-config-4
+      - cl-node-config
       - cl-node-secrets
     networks:
       - cl-backend
@@ -164,7 +164,7 @@ services:
     platform: "${CL_NODE_PLATFORM}"
     profiles: [ "chainlink-nodes", "node-5" ]
     command: >
-      --config /run/secrets/cl-node-config-5 
+      --config /run/secrets/cl-node-config
       --secrets /run/secrets/cl-node-secrets 
       node start 
       --api /run/secrets/cl-node-api-credentials-file
@@ -176,7 +176,7 @@ services:
       CL_DATABASE_URL: "postgresql://${PG_USER}:${PG_PASSWORD}@cl-node-db:5432/cl-node-5?sslmode=disable"
     secrets:
       - cl-node-api-credentials-file
-      - cl-node-config-5
+      - cl-node-config
       - cl-node-secrets
     networks:
       - cl-backend
@@ -247,16 +247,8 @@ secrets:
     file: ./secrets/chainlink-node-api-credentials
 
   # TOML file containing the node's configuration
-  cl-node-config-1:
-    file: ./secrets/chainlink-node-config-1.toml
-  cl-node-config-2:
-    file: ./secrets/chainlink-node-config-2.toml
-  cl-node-config-3:
-    file: ./secrets/chainlink-node-config-3.toml
-  cl-node-config-4:
-    file: ./secrets/chainlink-node-config-4.toml
-  cl-node-config-5:
-    file: ./secrets/chainlink-node-config-5.toml
+  cl-node-config:
+    file: ./secrets/chainlink-node-config.toml
 
   # TOML file containing the node's secrets
   cl-node-secrets:

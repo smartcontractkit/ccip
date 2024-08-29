@@ -1,11 +1,13 @@
 package devenv
 
 import (
+	"context"
 	"fmt"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"k8s.io/utils/ptr"
 
 	"github.com/smartcontractkit/ccip/integration-tests/deployment"
 	csav1 "github.com/smartcontractkit/ccip/integration-tests/deployment/jd/csa/v1"
@@ -14,8 +16,8 @@ import (
 )
 
 type JDConfig struct {
-	Server string
-	Creds  credentials.TransportCredentials
+	URL   string
+	Creds credentials.TransportCredentials
 }
 
 func NewClientConnection(cfg JDConfig) (*grpc.ClientConn, error) {
@@ -28,7 +30,7 @@ func NewClientConnection(cfg JDConfig) (*grpc.ClientConn, error) {
 
 	}
 
-	conn, err := grpc.NewClient(cfg.Server, opts...)
+	conn, err := grpc.NewClient(cfg.URL, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect Job Distributor service. Err: %w", err)
 	}
@@ -36,7 +38,8 @@ func NewClientConnection(cfg JDConfig) (*grpc.ClientConn, error) {
 	return conn, nil
 }
 
-type JDClient struct {
+type JobDistributor struct {
+	URL string
 	nodev1.NodeServiceClient
 	jobv1.JobServiceClient
 	csav1.CSAServiceClient
@@ -47,9 +50,22 @@ func NewJDClient(cfg JDConfig) (deployment.OffchainClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect Job Distributor service. Err: %w", err)
 	}
-	return JDClient{
-		nodev1.NewNodeServiceClient(conn),
-		jobv1.NewJobServiceClient(conn),
-		csav1.NewCSAServiceClient(conn),
+	return JobDistributor{
+		URL:               cfg.URL,
+		NodeServiceClient: nodev1.NewNodeServiceClient(conn),
+		JobServiceClient:  jobv1.NewJobServiceClient(conn),
+		CSAServiceClient:  csav1.NewCSAServiceClient(conn),
 	}, err
+}
+
+func (jd JobDistributor) GetCSAPublicKey(ctx context.Context) (*string, error) {
+	keypairs, err := jd.ListKeypairs(ctx, &csav1.ListKeypairsRequest{})
+	if err != nil {
+		return nil, err
+	}
+	if len(keypairs.Keypairs) == 0 {
+		return nil, fmt.Errorf("no keypairs found")
+	}
+	csakey := keypairs.Keypairs[0].PublicKey
+	return ptr.To(csakey), nil
 }
