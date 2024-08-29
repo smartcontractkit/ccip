@@ -6,7 +6,7 @@ import '@typechain/hardhat'
 import 'hardhat-abi-exporter'
 import { subtask } from 'hardhat/config'
 import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from 'hardhat/builtin-tasks/task-names'
-import '@matterlabs/hardhat-zksync-verify';
+import '@matterlabs/hardhat-zksync-verify'
 
 const COMPILER_SETTINGS = {
   optimizer: {
@@ -65,14 +65,16 @@ let config = {
       url: 'https://sepolia.era.zksync.dev',
       ethNetwork: 'sepolia',
       zksync: true, // enables zksolc compiler
-      verifyURL: "https://explorer.sepolia.era.zksync.dev/contract_verification",
+      verifyURL:
+        'https://explorer.sepolia.era.zksync.dev/contract_verification',
     },
     zkSync: {
-      url: "https://mainnet.era.zksync.io", // The testnet RPC URL of ZKsync Era network.
-      ethNetwork: "mainnet", // The Ethereum Web3 RPC URL, or the identifier of the network (e.g. `mainnet` or `sepolia`)
+      url: 'https://mainnet.era.zksync.io', // The testnet RPC URL of ZKsync Era network.
+      ethNetwork: 'mainnet', // The Ethereum Web3 RPC URL, or the identifier of the network (e.g. `mainnet` or `sepolia`)
       zksync: true,
       // Verification endpoint for Sepolia
-      verifyURL: 'https://zksync2-mainnet-explorer.zksync.io/contract_verification'
+      verifyURL:
+        'https://zksync2-mainnet-explorer.zksync.io/contract_verification',
     },
   },
   solidity: {
