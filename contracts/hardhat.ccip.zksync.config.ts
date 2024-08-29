@@ -80,7 +80,7 @@ let config = {
   zksolc: {
     settings: {
       compilerPath: 'zksolc',
-      version: 'v1.4.1',
+      version: 'v1.5.3',
       optimizer: {
         enabled: true,
         mode: '3',
@@ -90,7 +90,7 @@ let config = {
         dockerImage: '',
         tag: '',
       },
-      //   contractsToCompile: ['RMN', 'ARMProxy'], // uncomment this to compile only specific contracts
+      contractsToCompile: ['RMN', 'ARMProxy'], // uncomment this to compile only specific contracts
     },
   },
   warnings: !process.env.HIDE_WARNINGS,
