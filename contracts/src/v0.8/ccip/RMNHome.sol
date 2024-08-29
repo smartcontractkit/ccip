@@ -30,6 +30,8 @@ contract RMNHome is Ownable2Step, ITypeAndVersion {
     Node[] nodes;
     // Should be in ascending order of chainSelector
     SourceChain[] sourceChains;
+    // Offchain configuration
+    bytes offchainConfig;
   }
 
   struct VersionedConfig {
