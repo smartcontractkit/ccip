@@ -3,15 +3,20 @@ package ccipdeployment
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/smartcontractkit/ccip/integration-tests/ccip-tests/testconfig"
 	ccipconfig "github.com/smartcontractkit/ccip/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/config"
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 	ctf_config_types "github.com/smartcontractkit/chainlink-testing-framework/config/types"
+	"github.com/smartcontractkit/chainlink-testing-framework/docker"
+	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment/memory"
@@ -42,6 +47,8 @@ func TestDeployCapReg_NewDevnet_Concurrent(t *testing.T) {
 	eth1 := ctf_config_types.EthereumVersion_Eth1
 
 	defaultSethConfig := seth.NewClientBuilder().WithGasPriceEstimations(false, 0, seth.Priority_Standard).BuildConfig()
+	dockerNetwork, err := docker.CreateNetwork(logging.GetLogger(nil, "CORE_DOCKER_ENV_LOG_LEVEL"))
+	require.NoError(t, err)
 
 	envConfig := persistent.EnvironmentConfig{
 		ChainConfig: persistent.ChainConfig{
@@ -50,11 +57,13 @@ func TestDeployCapReg_NewDevnet_Concurrent(t *testing.T) {
 					ExecutionLayer:      &geth,
 					EthereumVersion:     &eth1,
 					EthereumChainConfig: &firstNetworkConfig,
+					DockerNetworkNames:  []string{dockerNetwork.Name},
 				}, *defaultSethConfig),
 				persistent.CreateNewPrivateEVMChainConfig(ctf_config.EthereumNetworkConfig{
 					ExecutionLayer:      &geth,
 					EthereumVersion:     &eth1,
 					EthereumChainConfig: &secondNetworkConfig,
+					DockerNetworkNames:  []string{dockerNetwork.Name},
 				}, *defaultSethConfig),
 			},
 		},
@@ -86,7 +95,9 @@ func TestDeployCCIPContractsNewDevnet(t *testing.T) {
 	geth := ctf_config_types.ExecutionLayer_Geth
 	eth1 := ctf_config_types.EthereumVersion_Eth1
 
-	defaultSethConfig := seth.NewClientBuilder().BuildConfig()
+	defaultSethConfig := seth.NewClientBuilder().WithGasPriceEstimations(false, 0, "").BuildConfig()
+	dockerNetwork, err := docker.CreateNetwork(logging.GetLogger(nil, "CORE_DOCKER_ENV_LOG_LEVEL"))
+	require.NoError(t, err)
 
 	envConfig := persistent.EnvironmentConfig{
 		ChainConfig: persistent.ChainConfig{
@@ -95,12 +106,76 @@ func TestDeployCCIPContractsNewDevnet(t *testing.T) {
 					ExecutionLayer:      &geth,
 					EthereumVersion:     &eth1,
 					EthereumChainConfig: &firstNetworkConfig,
+					DockerNetworkNames:  []string{dockerNetwork.Name},
 				}, *defaultSethConfig),
 				persistent.CreateNewPrivateEVMChainConfig(ctf_config.EthereumNetworkConfig{
 					ExecutionLayer:      &geth,
 					EthereumVersion:     &eth1,
 					EthereumChainConfig: &secondNetworkConfig,
+					DockerNetworkNames:  []string{dockerNetwork.Name},
 				}, *defaultSethConfig),
+			},
+		},
+		DONConfig: persistent.DONConfig{
+			NewDON: &persistent.NewDONConfig{
+				ChainlinkDeployment: testconfig.ChainlinkDeployment{
+					Common: &testconfig.Node{
+						ChainlinkImage: &ctfconfig.ChainlinkImageConfig{
+							Image:   ptr.Ptr("public.ecr.aws/chainlink/chainlink"),
+							Version: ptr.Ptr("2.13.0"),
+						},
+						DBImage: "795953128386.dkr.ecr.us-west-2.amazonaws.com/postgres",
+						DBTag:   "15.6",
+						BaseConfigTOML: `
+[Feature]
+LogPoller = true
+
+[Log]
+Level = 'debug'
+JSONConsole = true
+
+[Log.File]
+MaxSize = '0b'
+
+[WebServer]
+AllowOrigins = '*'
+HTTPPort = 6688
+SecureCookies = false
+HTTPWriteTimeout = '1m'
+
+[WebServer.RateLimit]
+Authenticated = 2000
+Unauthenticated = 1000
+
+[WebServer.TLS]
+HTTPSPort = 0
+
+[Database]
+MaxIdleConns = 10
+MaxOpenConns = 20
+MigrateOnStartup = true
+
+[OCR2]
+Enabled = true
+DefaultTransactionQueueDepth = 0
+
+[OCR]
+Enabled = false
+DefaultTransactionQueueDepth = 0
+
+[P2P]
+[P2P.V2]
+Enabled = true
+ListenAddresses = ['0.0.0.0:6690']
+AnnounceAddresses = ['0.0.0.0:6690']
+DeltaDial = '500ms'
+DeltaReconcile = '5s'
+`},
+					NoOfNodes: ptr.Ptr(5),
+				},
+				DockerOptions: persistent.DockerOptions{
+					DockerNetworks: []string{dockerNetwork.Name},
+				},
 			},
 		},
 	}

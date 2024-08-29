@@ -232,8 +232,6 @@ func (b *CLTestEnvBuilder) Build() (*CLClusterTestEnv, error) {
 	}
 	b.te.TestConfig = b.testConfig
 
-	b.te.TestConfig = b.testConfig
-
 	var err error
 	if b.t != nil {
 		b.te.WithTestInstance(b.t)

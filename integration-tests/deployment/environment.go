@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+	ctfTestEnv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"math/big"
 	"strconv"
 
@@ -34,6 +36,7 @@ type OffchainClient interface {
 	nodev1.NodeServiceClient
 }
 
+// TODO: we should rename it EVM chain, as it's not generic at all
 type Chain struct {
 	// Selectors used as canonical chain identifier.
 	Selector uint64
@@ -41,9 +44,47 @@ type Chain struct {
 	// Note the Sign function can be abstract supporting a variety of key storage mechanisms (e.g. KMS etc).
 	DeployerKey  *bind.TransactOpts
 	DeployerKeys []*bind.TransactOpts
+	// we need that data to set up chainlink nodes, but this probably should be a generic, just like on-chain client
+	EVMNetwork EVMNetwork
 	// Function to execute if transaction submission fails.
 	RetrySubmit func(tx *types.Transaction, err error) (*types.Transaction, error)
 	Confirm     func(tx common.Hash) error
+}
+
+// a bit unfortunate, but we need to be able to pass "private" urls of chains to chainlink nodes
+// when running in Docker; that's unless we create a DNS/proxy that would allow to access private
+// chains using the same URL both from inside docker containers and from the machine where test code executes
+type EVMNetwork interface {
+	EVMNetworkData() blockchain.EVMNetwork
+	PrivateHttpUrls() []string
+	PrivateWsUrls() []string
+	PublicHttpUrls() []string
+	PublicWsUrls() []string
+}
+
+type EVMNetworkWithEndpoints struct {
+	blockchain.EVMNetwork
+	ctfTestEnv.RpcProvider
+}
+
+func (s *EVMNetworkWithEndpoints) EVMNetworkData() blockchain.EVMNetwork {
+	return s.EVMNetwork
+}
+
+func (s *EVMNetworkWithEndpoints) PrivateHttpUrls() []string {
+	return s.RpcProvider.PrivateHttpUrls()
+}
+
+func (s *EVMNetworkWithEndpoints) PrivateWsUrls() []string {
+	return s.RpcProvider.PrivateWsUrsl()
+}
+
+func (s *EVMNetworkWithEndpoints) PublicHttpUrls() []string {
+	return s.PublicHttpUrls()
+}
+
+func (s *EVMNetworkWithEndpoints) PublicWsUrls() []string {
+	return s.RpcProvider.PublicWsUrls()
 }
 
 // NoOpRetrySubmit is a retry submit function that does nothing.

@@ -8,17 +8,20 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-	"github.com/smartcontractkit/chainlink-testing-framework/networks"
-	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/utils/seth"
+	"github.com/smartcontractkit/chainlink-testing-framework/docker"
+	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"path/filepath"
+	"strings"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/config"
 	ctf_test_env "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
+	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/osutil"
+	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/utils/seth"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
@@ -31,9 +34,9 @@ type RegistryConfig struct {
 }
 
 type ChainConfig struct {
-	// ExistingEVMChains are chains that are already running in a separate process or machine.
+	// ExistingEVMChains are Chains that are already running in a separate process or machine.
 	ExistingEVMChains []ExistingEVMChainConfig
-	// NewEVMChains are chains that will be started by the test environment.
+	// NewEVMChains are Chains that will be started by the test environment.
 	NewEVMChains []NewEVMChainConfig
 }
 
@@ -55,12 +58,18 @@ func EVMChainConfigFromTestConfig(testCfg ccipconfig.Config, sethConfig seth.Con
 		return ctf_config.EthereumNetworkConfig{}, fmt.Errorf("chain id %d not found in test config", chainId)
 	}
 
+	dockerNetwork, err := docker.CreateNetwork(logging.GetLogger(nil, "CORE_DOCKER_ENV_LOG_LEVEL"))
+	if err != nil {
+		return evmChainConfig, err
+	}
+
 	for _, network := range networks.MustGetSelectedNetworkConfig(testCfg.CCIP.Env.Network) {
 		if network.Simulated {
 			chainCfg, err := getSimulatedNetworkFromTestConfig(testCfg, uint64(network.ChainID))
 			if err != nil {
 				return evmChainConfig, err
 			}
+			chainCfg.DockerNetworkNames = []string{dockerNetwork.Name}
 			evmChainConfig.NewEVMChains = append(evmChainConfig.NewEVMChains, CreateNewPrivateEVMChainConfig(chainCfg, sethConfig))
 		} else {
 			evmChainConfig.ExistingEVMChains = append(evmChainConfig.ExistingEVMChains, CreateExistingEVMChainConfigWithSeth(network, sethConfig))
@@ -73,6 +82,7 @@ func EVMChainConfigFromTestConfig(testCfg ccipconfig.Config, sethConfig seth.Con
 type NewEVMChainConfig interface {
 	ctf_config.PrivateEthereumNetworkConfig
 	SethConfig() seth.Config
+	DockerNetworks() []string
 }
 
 type NewEVMChainConfigWithSeth struct {
@@ -82,6 +92,23 @@ type NewEVMChainConfigWithSeth struct {
 
 func (n *NewEVMChainConfigWithSeth) SethConfig() seth.Config {
 	return n.sethConfig
+}
+
+func (n *NewEVMChainConfigWithSeth) DockerNetworks() []string {
+	var dockerNetworks []string
+	for _, network := range n.GetDockerNetworkNames() {
+		contains := false
+		for _, dockerNetwork := range dockerNetworks {
+			if strings.EqualFold(dockerNetwork, network) {
+				contains = true
+				break
+			}
+		}
+		if !contains {
+			dockerNetworks = append(dockerNetworks, network)
+		}
+	}
+	return dockerNetworks
 }
 
 func CreateNewPrivateEVMChainConfig(config ctf_config.EthereumNetworkConfig, sethConfig seth.Config) NewEVMChainConfig {
@@ -118,22 +145,22 @@ func CreateExistingEVMChainConfigWithSeth(evmNetwork blockchain.EVMNetwork, seth
 	}
 }
 
-// NewChains creates chains based on the provided configuration. It returns a map of chain id to chain.
-// You can mix existing and new chains in the configuration, meaning that you can have chains that are already running and chains that will be started by the test environment.
+// NewChains creates Chains based on the provided configuration. It returns a map of chain id to chain.
+// You can mix existing and new Chains in the configuration, meaning that you can have Chains that are already running and Chains that will be started by the test environment.
 func NewChains(lggr logger.Logger, config ChainConfig) (map[uint64]deployment.Chain, error) {
-	lggr.Info("Creating devenv chains")
+	lggr.Info("Creating devenv Chains")
 	existingChains, err := newExistingChains(config.ExistingEVMChains)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create existing chains")
+		return nil, errors.Wrapf(err, "failed to create existing Chains")
 	}
 	createdChains, err := newChains(config.NewEVMChains)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create new chains")
+		return nil, errors.Wrapf(err, "failed to create new Chains")
 	}
 	chains := make(map[uint64]deployment.Chain)
 	for k, v := range existingChains {
 		if _, ok := chains[k]; ok {
-			return nil, errors.Wrapf(err, "duplicate chain id %d used by new and existing chains", k)
+			return nil, errors.Wrapf(err, "duplicate chain id %d used by new and existing Chains", k)
 		}
 		chains[k] = v
 	}
@@ -165,12 +192,13 @@ func newExistingChains(configs []ExistingEVMChainConfig) (map[uint64]deployment.
 			return nil, fmt.Errorf("failed to create seth client: %w", err)
 		}
 
-		chainIdUint := uint64(evmNetwork.ChainID)
-		chain, err := buildChain(sethClient, chainIdUint)
+		rpcProvider := ctf_test_env.NewRPCProvider(evmNetwork.HTTPURLs, evmNetwork.URLs, evmNetwork.HTTPURLs, evmNetwork.URLs)
+
+		chain, err := buildChain(sethClient, evmNetwork, rpcProvider)
 		if err != nil {
 			return make(map[uint64]deployment.Chain), err
 		}
-		chains[chainIdUint] = chain
+		chains[uint64(evmNetwork.ChainID)] = chain
 	}
 	return chains, nil
 }
@@ -205,35 +233,36 @@ func newChains(configs []NewEVMChainConfig) (map[uint64]deployment.Chain, error)
 			return chains, err
 		}
 
-		net, _, err := network.Start()
+		evmNetwork, rpcProvider, err := network.Start()
 		if err != nil {
 			return nil, err
 		}
+
+		evmNetwork.Name = fmt.Sprintf("%s-%d", *config.GetExecutionLayer(), evmNetwork.ChainID)
 
 		sethConfig := config.SethConfig()
 		sethClient, err := seth.NewClientBuilderWithConfig(&sethConfig).
 			// we want to set it dynamically, because the path depends on the location of the file in the project
 			WithGethWrappersFolders([]string{fmt.Sprintf("%s/ccip", contractsRootFolder)}).
-			WithRpcUrl(net.URLs[0]).
-			WithPrivateKeys(net.PrivateKeys).
+			WithRpcUrl(evmNetwork.URLs[0]).
+			WithPrivateKeys(evmNetwork.PrivateKeys).
 			Build()
 
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create seth client")
 		}
 
-		chainIdUint := uint64(net.ChainID)
-		chain, err := buildChain(sethClient, chainIdUint)
+		chain, err := buildChain(sethClient, evmNetwork, rpcProvider)
 		if err != nil {
 			return make(map[uint64]deployment.Chain), err
 		}
-		chains[chainIdUint] = chain
+		chains[uint64(evmNetwork.ChainID)] = chain
 	}
 
 	return chains, nil
 }
 
-func buildChain(sethClient *seth.Client, chainId uint64) (deployment.Chain, error) {
+func buildChain(sethClient *seth.Client, evmNetwork blockchain.EVMNetwork, rpcProvider ctf_test_env.RpcProvider) (deployment.Chain, error) {
 	shouldRetryOnErrFn := func(err error) bool {
 		// some retry logic here
 		return true
@@ -245,7 +274,7 @@ func buildChain(sethClient *seth.Client, chainId uint64) (deployment.Chain, erro
 		return tx, nil
 	}
 
-	sel, err := chainselectors.SelectorFromChainId(chainId)
+	sel, err := chainselectors.SelectorFromChainId(uint64(evmNetwork.ChainID))
 	if err != nil {
 		return deployment.Chain{}, err
 	}
@@ -271,6 +300,10 @@ func buildChain(sethClient *seth.Client, chainId uint64) (deployment.Chain, erro
 
 			return keys
 		}(),
+		EVMNetwork: &deployment.EVMNetworkWithEndpoints{
+			EVMNetwork:  evmNetwork,
+			RpcProvider: rpcProvider,
+		},
 		Confirm: func(txHash common.Hash) error {
 			ctx, cancelFn := context.WithTimeout(context.Background(), sethClient.Cfg.Network.TxnTimeout.Duration())
 			tx, _, err := sethClient.Client.TransactionByHash(ctx, txHash)
