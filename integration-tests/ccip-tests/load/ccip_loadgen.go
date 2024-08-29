@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/ccip/integration-tests/ccip-tests/contracts"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/require"
@@ -189,7 +190,19 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 	if !msgDetails.IsTokenTransfer() {
 		msg.TokenAmounts = []router.ClientEVMTokenAmount{}
 	}
-	extraArgs, err := testhelpers.GetEVMExtraArgsV2(big.NewInt(gasLimit), false)
+
+	var (
+		extraArgs []byte
+		err       error
+	)
+	matchErr := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
+		contracts.OnRampContract: contracts.V1_5_0_dev,
+	})
+	if matchErr != nil {
+		extraArgs, err = testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)
+	} else {
+		extraArgs, err = testhelpers.GetEVMExtraArgsV2(big.NewInt(gasLimit), false)
+	}
 	if err != nil {
 		return router.ClientEVM2AnyMessage{}, stats, err
 	}
