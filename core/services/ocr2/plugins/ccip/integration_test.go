@@ -643,6 +643,8 @@ func TestIntegration_CCIP(t *testing.T) {
 // TestReorg is to ensure CCIP works even when there is below finality depth reorg happens.
 func TestReorg(t *testing.T) {
 	t.Run("Reorg test to simulate caching problem", func(t *testing.T) {
+		// We need higher finality depth on the destination to perform reorg deep enough to revert commit and execution reports
+		destinationFinalityDepth := uint32(50)
 		ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(
 			t,
 			testhelpers.SourceChainID,
@@ -650,25 +652,26 @@ func TestReorg(t *testing.T) {
 			testhelpers.DestChainID,
 			testhelpers.DestChainSelector,
 			ccip.DefaultSourceFinalityDepth,
-			uint32(50),
+			destinationFinalityDepth,
 		)
 		testPricePipeline, linkUSD, ethUSD := ccipTH.CreatePricesPipeline(t)
 		defer linkUSD.Close()
 		defer ethUSD.Close()
 		ccipTH.SetUpNodesAndJobs(t, testPricePipeline, "", "")
 
-		gasLimit := big.NewInt(200_003) // prime number
-		tokenAmount := big.NewInt(100)
+		gasLimit := big.NewInt(200_00)
+		tokenAmount := big.NewInt(1)
 
 		forkBlock, err := ccipTH.Dest.Chain.BlockByNumber(context.Background(), nil)
 		require.NoError(t, err)
 
+		// Adjust time to start next blocks with timestamps two hours after the fork block.
+		// This is critical to have two forks with different block_timestamps.
 		err = ccipTH.Dest.Chain.AdjustTime(2 * time.Hour)
 		require.NoError(t, err)
-
 		ccipTH.Dest.Chain.Commit()
 
-		// send a request
+		// Send request for the first time and make sure it's executed on the destination
 		ccipTH.SendMessage(t, gasLimit, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
 		ccipTH.Dest.User.GasLimit = 100000
 		ccipTH.EventuallySendRequested(t, uint64(1))
@@ -679,20 +682,25 @@ func TestReorg(t *testing.T) {
 		currentBlock, err := ccipTH.Dest.Chain.BlockByNumber(context.Background(), nil)
 		require.NoError(t, err)
 
-		// Apply fork
+		// Reorg back to the `forkBlock`. Next blocks in the fork will have block_timestamps right after the fork,
+		// but before the 2 hours interval defined above for the canonical chain
 		require.NoError(t, ccipTH.Dest.Chain.Fork(testutils.Context(t), forkBlock.Hash()))
-
+		// Make sure that fork is longer than the canonical chain to enforce switch
 		noOfBlocks := int(currentBlock.NumberU64() - forkBlock.NumberU64())
 		for i := 0; i < noOfBlocks+1; i++ {
 			ccipTH.Dest.Chain.Commit()
 		}
 
-		// Make sure first commit report is executed
+		// State of the chain (block_timestamps) after reorg:
+		//            / --> block1 (02:01) --> block2 (02:02) --> commit report (02:03) --> ...
+		// forkBlock (00:00) --> block1' (00:01) --> block2' (00:02) --> commit report' (00:03) --> ...
+
+		// CCIP should commit and executed messages that was reorged away
 		ccipTH.EventuallyReportCommitted(t, 1)
 		executionLog = ccipTH.AllNodesHaveExecutedSeqNums(t, 1, 1)
 		ccipTH.AssertExecState(t, executionLog[0], testhelpers.ExecutionStateSuccess)
 
-		// Send another message, it should work as well
+		// Sending another message and make sure it's executed on the destination
 		ccipTH.SendMessage(t, gasLimit, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
 		ccipTH.EventuallySendRequested(t, uint64(2))
 		ccipTH.EventuallyReportCommitted(t, 2)
