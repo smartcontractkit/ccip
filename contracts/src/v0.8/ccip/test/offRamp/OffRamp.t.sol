@@ -728,7 +728,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
   }
 
   function test_WithCurseOnAnotherSourceChain_Success() public {
-    s_mockRMN.setChainCursed(SOURCE_CHAIN_SELECTOR_2, true);
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_2, true);
     s_offRamp.executeSingleReport(
       _generateReportFromMessages(
         SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
@@ -769,6 +769,44 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
     vm.expectRevert(abi.encodeWithSelector(OffRamp.RootNotCommitted.selector, SOURCE_CHAIN_SELECTOR_1));
     s_offRamp.executeSingleReport(executionReport, new uint256[](0));
+  }
+
+  function test_Unhealthy_Revert() public {
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, true);
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR_1));
+    s_offRamp.executeSingleReport(
+      _generateReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new uint256[](0)
+    );
+    // Uncurse should succeed
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, false);
+    s_offRamp.executeSingleReport(
+      _generateReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new uint256[](0)
+    );
+  }
+
+  function test_UnhealthySingleChainCurse_Revert() public {
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, true);
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR_1));
+    s_offRamp.executeSingleReport(
+      _generateReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new uint256[](0)
+    );
+    // Uncurse should succeed
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, false);
+    s_offRamp.executeSingleReport(
+      _generateReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new uint256[](0)
+    );
   }
 
   function test_UnexpectedTokenData_Revert() public {
@@ -1225,6 +1263,25 @@ contract OffRamp_batchExecute is OffRampSetup {
   function test_ZeroReports_Revert() public {
     vm.expectRevert(OffRamp.EmptyReport.selector);
     s_offRamp.batchExecute(new Internal.ExecutionReportSingleChain[](0), new uint256[][](1));
+  }
+
+  function test_Unhealthy_Revert() public {
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, true);
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR_1));
+    s_offRamp.batchExecute(
+      _generateBatchReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new uint256[][](1)
+    );
+    // Uncurse should succeed
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, false);
+    s_offRamp.batchExecute(
+      _generateBatchReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new uint256[][](1)
+    );
   }
 
   function test_OutOfBoundsGasLimitsAccess_Revert() public {
@@ -3207,6 +3264,24 @@ contract OffRamp_commit is OffRampSetup {
 
     OffRamp.CommitReport memory commitReport = _constructCommitReport();
     vm.expectRevert();
+    _commit(commitReport, s_latestSequenceNumber);
+  }
+
+  function test_Unhealthy_Revert() public {
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, true);
+    MerkleRoot[] memory roots = new MerkleRoot[](1);
+    roots[0] = MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      minSeqNr: 1,
+      maxSeqNr: 2,
+      merkleRoot: "Only a single root",
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
+    });
+
+    OffRamp.CommitReport memory commitReport =
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
+
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.CursedByRMN.selector, roots[0].sourceChainSelector));
     _commit(commitReport, s_latestSequenceNumber);
   }
 

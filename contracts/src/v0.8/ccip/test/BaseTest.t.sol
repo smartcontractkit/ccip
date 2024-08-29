@@ -87,10 +87,25 @@ contract BaseTest is Test {
     // Set the block time to a constant known value
     vm.warp(BLOCK_TIME);
 
+    // setup mock RMN & RMNRemote
     s_mockRMN = new MockRMN();
     s_mockRMNRemote = IRMNRemote(makeAddr("MOCK RMN REMOTE"));
     vm.etch(address(s_mockRMNRemote), bytes("fake bytecode"));
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNRemote.verify.selector), bytes(""));
+    _setMockRMNGlobalCurse(false);
+    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(false)); // no curses by defaule
+  }
+
+  function _setMockRMNGlobalCurse(bool isCursed) internal {
+    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed()"), abi.encode(isCursed));
+  }
+
+  function _setMockRMNChainCurse(uint64 chainSelector, bool isCursed) internal {
+    vm.mockCall(
+      address(s_mockRMNRemote),
+      abi.encodeWithSignature("isCursed(bytes16)", bytes16(uint128(chainSelector))),
+      abi.encode(isCursed)
+    );
   }
 
   function _getOutboundRateLimiterConfig() internal pure returns (RateLimiter.Config memory) {
