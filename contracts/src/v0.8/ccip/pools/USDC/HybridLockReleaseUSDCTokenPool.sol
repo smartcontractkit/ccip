@@ -95,6 +95,12 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   {
     _validateReleaseOrMint(releaseOrMintIn);
 
+    // Circle requires a supply-lock to prevent incoming messages once the migration process begins.
+    // This prevents new outgoing messages once the migration has begun to ensure any the procedure runs as expected
+    if (s_proposedUSDCMigrationChain == releaseOrMintIn.remoteChainSelector) {
+      revert LanePausedForCCTPMigration(s_proposedUSDCMigrationChain);
+    }
+
     // Decrease internal tracking of locked tokens to ensure accurate accounting for burnLockedUSDC() migration
     s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.amount;
 
@@ -145,7 +151,10 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   /// @notice Adds liquidity to the pool for a specific chain. The tokens should be approved first.
   /// @dev Liquidity is expected to be added on a per chain basis. Parties are expected to provide liquidity for their
   /// own chain which implements non canonical USDC and liquidity is not shared across lanes.
-  /// @param amount The amount of liquidity to provide.
+  /// @dev Once liquidity is added, it is locked in the pool until it is removed by an incoming message on the
+  /// lock release mechanism. This is a hard requirement by Circle to ensure parity with the destination chain
+  /// supply is maintained.
+  /// @param amount The amount of tokens to provide as liquidity.
   /// @param remoteChainSelector The chain for which liquidity is provided to. Necessary to ensure there's accurate
   /// parity between locked USDC in this contract and the circulating supply on the remote chain
   function provideLiquidity(uint64 remoteChainSelector, uint256 amount) external {
@@ -156,40 +165,6 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     i_token.safeTransferFrom(msg.sender, address(this), amount);
 
     emit ILiquidityContainer.LiquidityAdded(msg.sender, amount);
-  }
-
-  /// @notice Removed liquidity to the pool. The tokens will be sent to msg.sender.
-  /// @param remoteChainSelector The chain where liquidity is being released.
-  /// @param amount The amount of liquidity to remove.
-  /// @dev The function should only be called if non canonical USDC on the remote chain has been burned and is not being
-  /// withdrawn on this chain, otherwise a mismatch may occur between locked token balance and remote circulating supply
-  /// which may block a potential future migration of the chain to CCTP.
-  function withdrawLiquidity(uint64 remoteChainSelector, uint256 amount) external {
-    if (s_liquidityProvider[remoteChainSelector] != msg.sender) revert TokenPool.Unauthorized(msg.sender);
-
-    s_lockedTokensByChainSelector[remoteChainSelector] -= amount;
-
-    i_token.safeTransfer(msg.sender, amount);
-    emit ILiquidityContainer.LiquidityRemoved(msg.sender, amount);
-  }
-
-  /// @notice This function can be used to transfer liquidity from an older version of the pool to this pool. To do so
-  /// this pool will have to be set as the liquidity provider in the older version of the pool. This allows it to transfer the
-  /// funds in the old pool to the new pool.
-  /// @dev When upgrading a LockRelease pool, this function can be called at the same time as the pool is changed in the
-  /// TokenAdminRegistry. This allows for a smooth transition of both liquidity and transactions to the new pool.
-  /// Alternatively, when no multicall is available, a portion of the funds can be transferred to the new pool before
-  /// changing which pool CCIP uses, to ensure both pools can operate. Then the pool should be changed in the
-  /// TokenAdminRegistry, which will activate the new pool. All new transactions will use the new pool and its
-  /// liquidity. Finally, the remaining liquidity can be transferred to the new pool using this function one more time.
-  /// @param from The address of the old pool.
-  /// @param amount The amount of liquidity to transfer.
-  function transferLiquidity(address from, uint64 remoteChainSelector, uint256 amount) external onlyOwner {
-    HybridLockReleaseUSDCTokenPool(from).withdrawLiquidity(remoteChainSelector, amount);
-
-    s_lockedTokensByChainSelector[remoteChainSelector] += amount;
-
-    emit LiquidityTransferred(from, remoteChainSelector, amount);
   }
 
   // ================================================================

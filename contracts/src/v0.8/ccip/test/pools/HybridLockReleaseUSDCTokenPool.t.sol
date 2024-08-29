@@ -329,7 +329,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     );
   }
 
-  function test_LockOrBurn_LocKReleaseMechanism_then_switchToPrimary_Success() public {
+  function test_LockOrBurn_LockReleaseMechanism_then_switchToPrimary_Success() public {
     // Test Enabling the LR mechanism and sending an outgoing message
     test_LockOrBurn_PrimaryMechanism_Success();
 
@@ -372,44 +372,6 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
     test_MintOrRelease_incomingMessageWithPrimaryMechanism();
   }
 
-  function test_withdrawLiquidity_Success() public {
-    uint256 liquidityAmount = 1e12;
-
-    vm.startPrank(OWNER);
-    s_token.approve(address(s_usdcTokenPool), type(uint256).max);
-
-    s_usdcTokenPool.setLiquidityProvider(SOURCE_CHAIN_SELECTOR, OWNER);
-    assertEq(s_usdcTokenPool.getLiquidityProvider(SOURCE_CHAIN_SELECTOR), OWNER, "Owner is not Rebalancer");
-
-    s_usdcTokenPool.provideLiquidity(SOURCE_CHAIN_SELECTOR, liquidityAmount);
-
-    assertEq(s_usdcTokenPool.getLockedTokensForChain(SOURCE_CHAIN_SELECTOR), liquidityAmount);
-
-    assertEq(
-      s_token.balanceOf(address(s_usdcTokenPool)),
-      liquidityAmount,
-      "Available tokens doesn't match provided liquidity amount"
-    );
-
-    uint256 withdrawalAmount = liquidityAmount / 2; // Withdraw half of the liquidity
-
-    vm.expectEmit();
-    emit ILiquidityContainer.LiquidityRemoved(OWNER, withdrawalAmount);
-
-    s_usdcTokenPool.withdrawLiquidity(SOURCE_CHAIN_SELECTOR, withdrawalAmount);
-
-    assertEq(
-      s_usdcTokenPool.getLockedTokensForChain(SOURCE_CHAIN_SELECTOR),
-      liquidityAmount - withdrawalAmount,
-      "Remaining liquidity incorrect"
-    );
-    assertEq(
-      s_token.balanceOf(address(s_usdcTokenPool)),
-      liquidityAmount - withdrawalAmount,
-      "Available tokens doesn't match provided liquidity amount"
-    );
-  }
-
   function test_LockOrBurn_WhileMigrationPause_Revert() public {
     // Create a fake migration proposal
     s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
@@ -447,6 +409,58 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
         amount: amount,
         remoteChainSelector: DEST_CHAIN_SELECTOR,
         localToken: address(s_token)
+      })
+    );
+  }
+
+  function test_ReleaseOrMint_WhileMigrationPause_Revert() public {
+    address recipient = address(1234);
+
+    // Designate the SOURCE_CHAIN as not using native-USDC, and so the L/R mechanism must be used instead
+    uint64[] memory destChainAdds = new uint64[](1);
+    destChainAdds[0] = SOURCE_CHAIN_SELECTOR;
+
+    s_usdcTokenPool.updateChainSelectorMechanisms(new uint64[](0), destChainAdds);
+
+    assertTrue(
+      s_usdcTokenPool.shouldUseLockRelease(SOURCE_CHAIN_SELECTOR),
+      "Lock/Release mech not configured for incoming message from SOURCE_CHAIN_SELECTOR"
+    );
+
+    vm.startPrank(OWNER);
+
+    vm.expectEmit();
+    emit USDCBridgeMigrator.CCTPMigrationProposed(SOURCE_CHAIN_SELECTOR);
+
+    // Propose the migration to CCTP
+    s_usdcTokenPool.proposeCCTPMigration(SOURCE_CHAIN_SELECTOR);
+
+    Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
+      sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
+      destTokenAddress: abi.encode(address(s_usdcTokenPool)),
+      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
+      destGasAmount: USDC_DEST_TOKEN_GAS
+    });
+
+    uint256 amount = 1e6;
+
+    vm.startPrank(s_routerAllowedOffRamp);
+
+    // Expect revert because the lane is paused and no incoming messages should be allowed
+    vm.expectRevert(
+      abi.encodeWithSelector(HybridLockReleaseUSDCTokenPool.LanePausedForCCTPMigration.selector, SOURCE_CHAIN_SELECTOR)
+    );
+
+    Pool.ReleaseOrMintOutV1 memory poolReturnDataV1 = s_usdcTokenPool.releaseOrMint(
+      Pool.ReleaseOrMintInV1({
+        originalSender: abi.encode(OWNER),
+        receiver: recipient,
+        amount: amount,
+        localToken: address(s_token),
+        remoteChainSelector: SOURCE_CHAIN_SELECTOR,
+        sourcePoolAddress: sourceTokenData.sourcePoolAddress,
+        sourcePoolData: "",
+        offchainTokenData: ""
       })
     );
   }
@@ -592,50 +606,6 @@ contract HybridUSDCTokenPoolMigrationTests is HybridUSDCTokenPoolTests {
     s_usdcTokenPool.burnLockedUSDC();
   }
 
-  function test_transferLiquidity_Success() public {
-    // Set as the OWNER so we can provide liquidity
-    vm.startPrank(OWNER);
-    s_usdcTokenPoolTransferLiquidity.setLiquidityProvider(DEST_CHAIN_SELECTOR, OWNER);
-
-    s_token.approve(address(s_usdcTokenPoolTransferLiquidity), type(uint256).max);
-
-    uint256 liquidityAmount = 1e9;
-
-    // Provide 1000 USDC as liquidity
-    s_usdcTokenPoolTransferLiquidity.provideLiquidity(DEST_CHAIN_SELECTOR, liquidityAmount);
-
-    // Set the new token pool as the rebalancer
-    s_usdcTokenPoolTransferLiquidity.setLiquidityProvider(DEST_CHAIN_SELECTOR, address(s_usdcTokenPool));
-
-    vm.expectEmit();
-    emit ILiquidityContainer.LiquidityRemoved(address(s_usdcTokenPool), liquidityAmount);
-
-    vm.expectEmit();
-    emit HybridLockReleaseUSDCTokenPool.LiquidityTransferred(
-      address(s_usdcTokenPoolTransferLiquidity), DEST_CHAIN_SELECTOR, liquidityAmount
-    );
-
-    s_usdcTokenPool.transferLiquidity(address(s_usdcTokenPoolTransferLiquidity), DEST_CHAIN_SELECTOR, liquidityAmount);
-
-    assertEq(
-      s_usdcTokenPool.getLockedTokensForChain(DEST_CHAIN_SELECTOR),
-      liquidityAmount,
-      "Tokens locked for dest chain doesn't match expected amount in storage"
-    );
-
-    assertEq(
-      s_usdcTokenPoolTransferLiquidity.getLockedTokensForChain(DEST_CHAIN_SELECTOR),
-      0,
-      "Tokens locked for dest chain in old token pool doesn't match expected amount in storage"
-    );
-
-    assertEq(
-      s_token.balanceOf(address(s_usdcTokenPool)),
-      liquidityAmount,
-      "Liquidity amount of tokens should be new in new pool, but aren't"
-    );
-  }
-
   function test_cannotModifyLiquidityWithoutPermissions_Revert() public {
     address randomAddr = makeAddr("RANDOM");
 
@@ -645,11 +615,6 @@ contract HybridUSDCTokenPoolMigrationTests is HybridUSDCTokenPoolTests {
 
     // Revert because there's insufficient permissions for the DEST_CHAIN_SELECTOR to provide liquidity
     s_usdcTokenPool.provideLiquidity(DEST_CHAIN_SELECTOR, 1e6);
-
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.Unauthorized.selector, randomAddr));
-
-    // Revert because there's insufficient permissions for the DEST_CHAIN_SELECTOR to withdraw liquidity
-    s_usdcTokenPool.withdrawLiquidity(DEST_CHAIN_SELECTOR, 1e6);
   }
 
   function test_cannotCancelANonExistentMigrationProposal() public {

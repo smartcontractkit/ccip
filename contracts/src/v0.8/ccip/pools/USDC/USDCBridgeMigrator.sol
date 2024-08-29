@@ -8,8 +8,7 @@ import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v4.8.3/contra
 import {Router} from "../../Router.sol";
 
 /// @notice Allows migration of a lane in a token pool from Lock/Release to CCTP supported Burn/Mint. Contract
-/// functionality is based on hard requirements defined by Circle to allow future CCTP compatibility
-/// @dev Once a migration for a lane has occured, it can never be reversed, and CCTP will be the mechanism forever. This makes the assumption that Circle will continue to support that lane indefinitely.
+/// functionality is based on hard requirements defined by Circle to allow for future CCTP compatibility
 abstract contract USDCBridgeMigrator is OwnerIsCreator {
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -31,7 +30,6 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   uint64 internal s_proposedUSDCMigrationChain;
 
   mapping(uint64 chainSelector => uint256 lockedBalance) internal s_lockedTokensByChainSelector;
-
   mapping(uint64 chainSelector => bool shouldUseLockRelease) internal s_shouldUseLockRelease;
 
   constructor(address token, address router) {
@@ -70,8 +68,8 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   /// @notice Propose a destination chain to migrate from lock/release mechanism to CCTP enabled burn/mint
   /// through a Circle controlled burn.
   /// @param remoteChainSelector the CCIP specific selector for the remote chain currently using a
-  /// non-canonical form of USDC which they wish to update to canonical. Function will revert if the chain
-  /// selector is zero, or if a migration has already occured for the specified selector.
+  /// non-canonical form of USDC which they wish to update to canonical. Function will revert if an existing migration
+  /// proposal is already in progress.
   /// @dev This function can only be called by the owner
   function proposeCCTPMigration(uint64 remoteChainSelector) external onlyOwner {
     // Prevent overwriting existing migration proposals until the current one is finished
@@ -83,6 +81,7 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   }
 
   /// @notice Cancel an existing proposal to migrate a lane to CCTP.
+  /// @notice This function will revert if no proposal is currently in progress.
   function cancelExistingCCTPMigrationProposal() external onlyOwner {
     if (s_proposedUSDCMigrationChain == 0) revert NoExistingMigrationProposal();
 
