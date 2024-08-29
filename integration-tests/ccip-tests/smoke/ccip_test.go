@@ -863,8 +863,6 @@ func TestSmokeCCIPReorgBelowFinality(t *testing.T) {
 	t.Parallel()
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
-	log.Info().Interface("EVM Networks", TestCfg.EnvInput.Network.EVMNetworks).
-		Msg("Config input on Env.network variable")
 	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
@@ -929,8 +927,6 @@ func performAboveFinalityReorgAndValidate(t *testing.T, network string) {
 
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
-	log.Info().Interface("EVM Networks", TestCfg.EnvInput.Network.EVMNetworks).
-		Msg("Config input on Env.network variable")
 	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
