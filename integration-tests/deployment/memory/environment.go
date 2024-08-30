@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
@@ -36,9 +37,10 @@ func NewMemoryChains(t *testing.T, numChains int) map[uint64]deployment.Chain {
 		sel, err := chainsel.SelectorFromChainId(cid)
 		require.NoError(t, err)
 		chains[sel] = deployment.Chain{
-			Selector:    sel,
-			Client:      chain.Backend,
-			DeployerKey: chain.DeployerKey,
+			Selector:     sel,
+			Client:       chain.Backend,
+			DeployerKey:  chain.DeployerKey,
+			DeployerKeys: []*bind.TransactOpts{chain.DeployerKey},
 			Confirm: func(tx common.Hash) error {
 				for {
 					chain.Backend.Commit()
