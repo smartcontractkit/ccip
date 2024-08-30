@@ -10,7 +10,7 @@ The test config is read in following order:
   - The config mentioned in this file will override the default config.
   - Example override file - [override.toml.example](./examples/override.toml.example)
 - If there are sensitive details like private keys, credentials in test config, they can be specified in a separate dotenv file as env vars
-  - The `~/.testsecrets` file in home directory is automatically loaded and should have all test secrets as env vars  
+  - The `~/.testsecrets` file in home directory is automatically loaded and should have all test secrets as env vars. Learn more about it [here](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md#test-secrets) 
   - Example secret file - [.testsecrets.example](./examples/.testsecrets.example)
 
 ## CCIP.ContractVersions
@@ -119,14 +119,7 @@ Mandatory fields are:
 - **NewCLCluster**: [CCIP.Env.NewCLCluster](#ccipenvnewclcluster) - This is mandatory if the test needs to deploy Chainlink nodes.
 - **ExistingCLCluster**: [CCIP.Env.ExistingCLCluster](#ccipenvexistingclcluster) - This is mandatory if the test needs to run on existing Chainlink nodes to deploy ccip jobs.
 
-Test needs network/chain details to be set through configuration. This configuration is mandatory for running the tests.
-you have option to set the network details in two ways:
-
-1. Using [CCIP.Env.Networks](#ccipenvnetworks)
-2. Using a separate network config file -
-   - refer to the example - [network_config.toml.example](./examples/network_config.toml.example)
-   - once all necessary values are set, encode the toml file content in base64 format,
-   - set the base64'ed string content in `BASE64_NETWORK_CONFIG` environment variable.
+Test needs network/chain details to be set through configuration. Set network urls in ~/.testsecrets [see docs](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md#test-secrets).
 
 ### CCIP.Env.Networks
 
