@@ -8,7 +8,7 @@ import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
-import {IRMNRemote, MerkleRoot} from "../interfaces/IRMNRemote.sol";
+import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
@@ -124,7 +124,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct CommitReport {
     Internal.PriceUpdates priceUpdates; // Collection of gas and price updates to commit
-    MerkleRoot[] merkleRoots; // Collection of merkle roots per source chain to commit
+    Internal.MerkleRoot[] merkleRoots; // Collection of merkle roots per source chain to commit
     IRMNRemote.Signature[] rmnSignatures; // RMN signatures on the merkle roots
   }
 
@@ -592,7 +592,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     }
 
     for (uint256 i = 0; i < commitReport.merkleRoots.length; ++i) {
-      MerkleRoot memory root = commitReport.merkleRoots[i];
+      Internal.MerkleRoot memory root = commitReport.merkleRoots[i];
       uint64 sourceChainSelector = root.sourceChainSelector;
 
       _whenNotCursed(sourceChainSelector);

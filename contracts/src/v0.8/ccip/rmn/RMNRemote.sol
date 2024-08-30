@@ -3,7 +3,8 @@ pragma solidity ^0.8.24;
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {IRMNRemote, MerkleRoot} from "../interfaces/IRMNRemote.sol";
+import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
+import {Internal} from "../libraries/Internal.sol";
 
 bytes32 constant RMN_V1_6_ANY2EVM_REPORT = keccak256("RMN_V1_6_ANY2EVM_REPORT");
 
@@ -92,7 +93,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNRemote {
     address rmnRemoteContractAddress;
     address offrampAddress;
     bytes32 rmnHomeContractConfigDigest;
-    MerkleRoot[] destLaneUpdates;
+    Internal.MerkleRoot[] destLaneUpdates;
   }
 
   /// @notice Verifies signatures of RMN nodes, on dest lane updates as provided in the CommitReport
@@ -100,7 +101,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNRemote {
   /// @param signatures must be sorted in ascending order by signer address
   /// @dev Will revert if verification fails. Needs to be called by the OffRamp for which the signatures are produced,
   /// otherwise verification will fail.
-  function verify(MerkleRoot[] memory destLaneUpdates, Signature[] memory signatures) external view {
+  function verify(Internal.MerkleRoot[] memory destLaneUpdates, Signature[] memory signatures) external view {
     return; // XXX temporary workaround to fix integration tests while we wait to productionize this contract
 
     if (s_configCount == 0) {

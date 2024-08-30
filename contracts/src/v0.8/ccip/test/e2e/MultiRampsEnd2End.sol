@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../NonceManager.sol";
-import {IRMNRemote, MerkleRoot} from "../../interfaces/IRMNRemote.sol";
+import {IRMNRemote} from "../../interfaces/IRMNRemote.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import "../helpers/MerkleHelper.sol";
@@ -150,15 +150,15 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
       // TODO make these real sigs :)
       IRMNRemote.Signature[] memory rmnSignatures = new IRMNRemote.Signature[](0);
 
-      MerkleRoot[] memory roots = new MerkleRoot[](2);
-      roots[0] = MerkleRoot({
+      Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](2);
+      roots[0] = Internal.MerkleRoot({
         sourceChainSelector: SOURCE_CHAIN_SELECTOR,
         minSeqNr: messages1[0].header.sequenceNumber,
         maxSeqNr: messages1[1].header.sequenceNumber,
         merkleRoot: merkleRoots[0],
         onRampAddress: abi.encode(address(s_onRamp))
       });
-      roots[1] = MerkleRoot({
+      roots[1] = Internal.MerkleRoot({
         sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
         minSeqNr: messages2[0].header.sequenceNumber,
         maxSeqNr: messages2[0].header.sequenceNumber,
