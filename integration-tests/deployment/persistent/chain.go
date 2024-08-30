@@ -2,16 +2,16 @@ package persistent
 
 import (
 	"github.com/pkg/errors"
-	persistent_types "github.com/smartcontractkit/ccip/integration-tests/deployment/persistent/types"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
+	persistent_types "github.com/smartcontractkit/chainlink/integration-tests/deployment/persistent/types"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 // NewChains creates Chains based on the provided configuration. It returns a map of chain id to chain.
 // You can mix existing and new Chains in the configuration, meaning that you can have Chains that are already running and Chains that will be started by the test environment.
 func NewChains(lggr logger.Logger, config persistent_types.ChainConfig) (map[uint64]deployment.Chain, error) {
-	lggr.Info("Creating devenv Chains")
+	lggr.Info("Creating persistent Chains")
 	existingChains, err := newExistingChains(config.ExistingEVMChains)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create existing Chains")

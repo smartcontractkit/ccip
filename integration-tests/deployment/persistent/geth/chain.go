@@ -7,12 +7,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/smartcontractkit/ccip/integration-tests/deployment"
-	persistent_types "github.com/smartcontractkit/ccip/integration-tests/deployment/persistent/types"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/config"
 	ctf_test_env "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
+	persistent_types "github.com/smartcontractkit/chainlink/integration-tests/deployment/persistent/types"
 	"time"
 )
 

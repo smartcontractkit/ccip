@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/logstream"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
+	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 )
 
 type ExistingDONConfig struct {
@@ -22,13 +23,16 @@ type ExistingDONConfig struct {
 }
 
 type NewDONHooks interface {
-	PostStartupHook([]*client.ChainlinkClient) error
+	// PreStartupHook is called before the DON is started. No containers are running yet. For example, you can use this hook to modify configuration of each node.
+	PreStartupHook([]*test_env.ClNode) error
+	// PostStartupHook is called after the DON is started. All containers are running. For example, you can use this hook to interact with them using the API.
+	PostStartupHook([]*test_env.ClNode) error
 }
 
 type NewDONConfig struct {
 	testconfig.ChainlinkDeployment
-	Chains        map[uint64]deployment.Chain
-	DockerOptions DockerOptions
+	DockerOptions    DockerOptions
+	ChainlinkConfigs []*chainlink.Config
 	NewDONHooks
 }
 
@@ -44,7 +48,6 @@ type DONConfig struct {
 
 type DON struct {
 	ClClients []*client.ChainlinkK8sClient
-	Keys      map[uint64][]client.NodeKeysBundle
 	// we use Mockserver in k8s
 	MockServer *ctfClient.MockserverClient
 	// we use Killgrave in Docker
@@ -111,7 +114,6 @@ func ExistingNodes(config ExistingDONConfig) (DON, error) {
 }
 
 //TODO how to support non-evm here? Solana, Cosmos, Aptos, Starknet? I guess by passing chainConfig as part of DON config?
-//TODO add some hooks, for example for performing other operations on nodes once they started, I see CCIP has shitloads of them
 //TODO do not forget about mockserver
 
 // for now we won't support starting a new k8s don, I am not sure we should even ever add it
@@ -128,35 +130,20 @@ func NewDON(newDonConfig NewDONConfig) (DON, error) {
 		newDonConfig.DockerOptions.DockerNetworks = []string{dockerNetwork.Name}
 	}
 
-	var evmNetworks []blockchain.EVMNetwork
-	for _, chain := range newDonConfig.Chains {
-		evmNetwork := chain.EVMNetwork.EVMNetworkData()
-		evmNetwork.HTTPURLs = chain.EVMNetwork.PrivateHttpUrls()
-		evmNetwork.URLs = chain.EVMNetwork.PrivateWsUrls()
-		evmNetworks = append(evmNetworks, evmNetwork)
-	}
-
 	clCluster := test_env.ClCluster{}
 	noOfNodes := pointer.GetInt(newDonConfig.NoOfNodes)
 	// if individual nodes are specified, then deploy them with specified configs
 	// TODO probably best to put it in a reusable method, use it here and also in integration-tests/ccip-tests/testsetups/test_env.go
 	if len(newDonConfig.Nodes) > 0 {
-		for _, clNode := range newDonConfig.Nodes {
-			toml, _, err := testsetups.SetNodeConfig(
-				evmNetworks,
-				clNode.BaseConfigTOML,
-				clNode.CommonChainConfigTOML,
-				clNode.ChainConfigTOMLByChain,
-			)
-			if err != nil {
-				return don, errors.Wrapf(err, "failed to create node config")
-			}
-
+		if len(newDonConfig.Nodes) != len(newDonConfig.ChainlinkConfigs) {
+			return don, fmt.Errorf("number of nodes %d does not match number of chainlink configs %d", noOfNodes, len(newDonConfig.ChainlinkConfigs))
+		}
+		for i, clNode := range newDonConfig.Nodes {
 			node, err := test_env.NewClNode(
 				newDonConfig.DockerOptions.DockerNetworks,
 				pointer.GetString(clNode.ChainlinkImage.Image),
 				pointer.GetString(clNode.ChainlinkImage.Version),
-				toml,
+				newDonConfig.ChainlinkConfigs[i],
 				newDonConfig.DockerOptions.LogStream,
 				test_env.WithPgDBOptions(
 					ctftestenv.WithPostgresImageName(clNode.DBImage),
@@ -170,22 +157,16 @@ func NewDON(newDonConfig NewDONConfig) (DON, error) {
 			clCluster.Nodes = append(clCluster.Nodes, node)
 		}
 	} else {
+		if noOfNodes != len(newDonConfig.ChainlinkConfigs) {
+			return don, fmt.Errorf("number of nodes %d does not match number of chainlink configs %d", noOfNodes, len(newDonConfig.ChainlinkConfigs))
+		}
 		// if no individual nodes are specified, then deploy the number of nodes specified in the env input with common config
 		for i := 0; i < noOfNodes; i++ {
-			toml, _, err := testsetups.SetNodeConfig(
-				evmNetworks,
-				newDonConfig.Common.BaseConfigTOML,
-				newDonConfig.Common.CommonChainConfigTOML,
-				newDonConfig.Common.ChainConfigTOMLByChain,
-			)
-			if err != nil {
-				return don, errors.Wrapf(err, "failed to create node config")
-			}
 			node, err := test_env.NewClNode(
 				newDonConfig.DockerOptions.DockerNetworks,
 				pointer.GetString(newDonConfig.Common.ChainlinkImage.Image),
 				pointer.GetString(newDonConfig.Common.ChainlinkImage.Version),
-				toml,
+				newDonConfig.ChainlinkConfigs[i],
 				newDonConfig.DockerOptions.LogStream,
 				test_env.WithPgDBOptions(
 					ctftestenv.WithPostgresImageName(newDonConfig.Common.DBImage),
@@ -200,7 +181,12 @@ func NewDON(newDonConfig NewDONConfig) (DON, error) {
 		}
 	}
 
-	//TODO maybe a pre-start hook here?
+	if newDonConfig.NewDONHooks != nil {
+		err := newDonConfig.NewDONHooks.PreStartupHook(clCluster.Nodes)
+		if err != nil {
+			return don, errors.Wrap(err, "failed to execute post setup hook")
+		}
+	}
 
 	startErr := clCluster.Start()
 	if startErr != nil {
@@ -212,21 +198,21 @@ func NewDON(newDonConfig NewDONConfig) (DON, error) {
 		chainlinkNodes = append(chainlinkNodes, node.API.WithRetryCount(3))
 	}
 
-	don.Keys = make(map[uint64][]client.NodeKeysBundle)
-
-	for chainId := range newDonConfig.Chains {
-		_, clNodes, err := client.CreateNodeKeysBundle(chainlinkNodes, "evm", fmt.Sprint(chainId))
-		if err != nil {
-			return don, errors.Wrapf(err, "failed to create node keys for chain %d", chainId)
-		}
-		don.Keys[chainId] = func() []client.NodeKeysBundle {
-			var keys []client.NodeKeysBundle
-			for _, clNode := range clNodes {
-				keys = append(keys, clNode.KeysBundle)
-			}
-			return keys
-		}()
-	}
+	//don.Keys = make(map[uint64][]client.NodeKeysBundle)
+	//
+	//for chainId := range newDonConfig.Chains {
+	//	_, clNodes, err := client.CreateNodeKeysBundle(chainlinkNodes, "evm", fmt.Sprint(chainId))
+	//	if err != nil {
+	//		return don, errors.Wrapf(err, "failed to create node keys for chain %d", chainId)
+	//	}
+	//	don.Keys[chainId] = func() []client.NodeKeysBundle {
+	//		var keys []client.NodeKeysBundle
+	//		for _, clNode := range clNodes {
+	//			keys = append(keys, clNode.KeysBundle)
+	//		}
+	//		return keys
+	//	}()
+	//}
 
 	for _, clClient := range chainlinkNodes {
 		don.ClClients = append(don.ClClients, &client.ChainlinkK8sClient{
@@ -235,7 +221,7 @@ func NewDON(newDonConfig NewDONConfig) (DON, error) {
 	}
 
 	if newDonConfig.NewDONHooks != nil {
-		err := newDonConfig.NewDONHooks.PostStartupHook(chainlinkNodes)
+		err := newDonConfig.NewDONHooks.PostStartupHook(clCluster.Nodes)
 		if err != nil {
 			return don, errors.Wrap(err, "failed to execute post setup hook")
 		}
@@ -244,4 +230,50 @@ func NewDON(newDonConfig NewDONConfig) (DON, error) {
 	don.KillGrave = ctftestenv.NewKillgrave(newDonConfig.DockerOptions.DockerNetworks, "", ctftestenv.WithLogStream(newDonConfig.DockerOptions.LogStream))
 
 	return don, nil
+}
+
+func NewEVMOnlyChainlinkConfigs(donConfig testconfig.ChainlinkDeployment, chains map[uint64]deployment.Chain) ([]*chainlink.Config, error) {
+	var evmNetworks []blockchain.EVMNetwork
+	for _, chain := range chains {
+		evmNetwork := chain.EVMNetwork.EVMNetworkData()
+		evmNetwork.HTTPURLs = chain.EVMNetwork.PrivateHttpUrls()
+		evmNetwork.URLs = chain.EVMNetwork.PrivateWsUrls()
+		evmNetworks = append(evmNetworks, evmNetwork)
+	}
+
+	var clNodeConfigs []*chainlink.Config
+
+	noOfNodes := pointer.GetInt(donConfig.NoOfNodes)
+	// if individual nodes are specified, then deploy them with specified configs
+	// TODO probably best to put it in a reusable method, use it here and also in integration-tests/ccip-tests/testsetups/test_env.go
+	if len(donConfig.Nodes) > 0 {
+		for range donConfig.Nodes {
+			toml, _, err := testsetups.SetNodeConfig(
+				evmNetworks,
+				donConfig.Common.BaseConfigTOML,
+				donConfig.Common.CommonChainConfigTOML,
+				donConfig.Common.ChainConfigTOMLByChain,
+			)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to create node config")
+			}
+			clNodeConfigs = append(clNodeConfigs, toml)
+		}
+	} else {
+		// if no individual nodes are specified, then deploy the number of nodes specified in the env input with common config
+		for i := 0; i < noOfNodes; i++ {
+			toml, _, err := testsetups.SetNodeConfig(
+				evmNetworks,
+				donConfig.Common.BaseConfigTOML,
+				donConfig.Common.CommonChainConfigTOML,
+				donConfig.Common.ChainConfigTOMLByChain,
+			)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to create node config")
+			}
+			clNodeConfigs = append(clNodeConfigs, toml)
+		}
+	}
+
+	return clNodeConfigs, nil
 }

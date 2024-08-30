@@ -1,8 +1,8 @@
 package types
 
 import (
-	"github.com/smartcontractkit/ccip/integration-tests/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 )
 
 type ChainConfig struct {

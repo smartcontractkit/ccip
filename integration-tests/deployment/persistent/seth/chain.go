@@ -8,8 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/ccip/integration-tests/deployment"
-	persistent_types "github.com/smartcontractkit/ccip/integration-tests/deployment/persistent/types"
+
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/config"
@@ -17,6 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/osutil"
 	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/utils/seth"
+	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
+	persistent_types "github.com/smartcontractkit/chainlink/integration-tests/deployment/persistent/types"
 	"path/filepath"
 	"strings"
 )

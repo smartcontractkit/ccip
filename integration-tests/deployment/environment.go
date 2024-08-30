@@ -96,8 +96,10 @@ type Environment struct {
 	Name     string
 	Chains   map[uint64]Chain
 	Offchain OffchainClient
-	NodeIDs  []string
-	Logger   logger.Logger
+	// I think this won't be enough as sometimes we might access to API of the node,
+	// so we should either return ChainlinkK8sClient or test_env.ClNode
+	NodeIDs []string
+	Logger  logger.Logger
 }
 
 func (e Environment) AllChainSelectors() []uint64 {

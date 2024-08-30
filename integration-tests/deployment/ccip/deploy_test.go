@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
+	seth_chain "github.com/smartcontractkit/chainlink/integration-tests/deployment/persistent/seth"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -21,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment/memory"
 	"github.com/smartcontractkit/chainlink/integration-tests/deployment/persistent"
+	persistent_types "github.com/smartcontractkit/chainlink/integration-tests/deployment/persistent/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
@@ -38,11 +40,6 @@ func TestDeployCapReg_InMemory_Concurrent(t *testing.T) {
 func TestDeployCapReg_NewDevnet_Concurrent(t *testing.T) {
 	lggr := logger.TestLogger(t)
 
-	firstNetworkConfig := ctf_config.MustGetDefaultChainConfig()
-	firstNetworkConfig.ChainID = 1337
-	secondNetworkConfig := ctf_config.MustGetDefaultChainConfig()
-	secondNetworkConfig.ChainID = 2337
-
 	geth := ctf_config_types.ExecutionLayer_Geth
 	eth1 := ctf_config_types.EthereumVersion_Eth1
 
@@ -50,22 +47,31 @@ func TestDeployCapReg_NewDevnet_Concurrent(t *testing.T) {
 	dockerNetwork, err := docker.CreateNetwork(logging.GetLogger(nil, "CORE_DOCKER_ENV_LOG_LEVEL"))
 	require.NoError(t, err)
 
+	firstNetworkConfig := ctf_config.MustGetDefaultChainConfig()
+	firstNetworkConfig.ChainID = 1337
+
+	firstChain, err := seth_chain.CreateNewEVMChainWithSeth(&ctf_config.EthereumNetworkConfig{
+		ExecutionLayer:      &geth,
+		EthereumVersion:     &eth1,
+		EthereumChainConfig: &firstNetworkConfig,
+		DockerNetworkNames:  []string{dockerNetwork.Name},
+	}, *defaultSethConfig)
+	require.NoError(t, err, "Error creating new EVM chain with Seth")
+
+	secondNetworkConfig := ctf_config.MustGetDefaultChainConfig()
+	secondNetworkConfig.ChainID = 2337
+
+	secondChain, err := seth_chain.CreateNewEVMChainWithSeth(&ctf_config.EthereumNetworkConfig{
+		ExecutionLayer:      &geth,
+		EthereumVersion:     &eth1,
+		EthereumChainConfig: &secondNetworkConfig,
+		DockerNetworkNames:  []string{dockerNetwork.Name},
+	}, *defaultSethConfig)
+	require.NoError(t, err, "Error creating new EVM chain with Seth")
+
 	envConfig := persistent.EnvironmentConfig{
-		ChainConfig: persistent.ChainConfig{
-			NewEVMChains: []persistent.NewEVMChainConfig{
-				persistent.CreateNewPrivateEVMChainConfig(ctf_config.EthereumNetworkConfig{
-					ExecutionLayer:      &geth,
-					EthereumVersion:     &eth1,
-					EthereumChainConfig: &firstNetworkConfig,
-					DockerNetworkNames:  []string{dockerNetwork.Name},
-				}, *defaultSethConfig),
-				persistent.CreateNewPrivateEVMChainConfig(ctf_config.EthereumNetworkConfig{
-					ExecutionLayer:      &geth,
-					EthereumVersion:     &eth1,
-					EthereumChainConfig: &secondNetworkConfig,
-					DockerNetworkNames:  []string{dockerNetwork.Name},
-				}, *defaultSethConfig),
-			},
+		ChainConfig: persistent_types.ChainConfig{
+			NewEVMChains: []persistent_types.NewEVMChainConfig{firstChain, secondChain},
 		},
 	}
 
@@ -87,11 +93,6 @@ func TestDeployCCIPContractsInMemory(t *testing.T) {
 func TestDeployCCIPContractsNewDevnet(t *testing.T) {
 	lggr := logger.TestLogger(t)
 
-	firstNetworkConfig := ctf_config.MustGetDefaultChainConfig()
-	firstNetworkConfig.ChainID = 1337
-	secondNetworkConfig := ctf_config.MustGetDefaultChainConfig()
-	secondNetworkConfig.ChainID = 2337
-
 	geth := ctf_config_types.ExecutionLayer_Geth
 	eth1 := ctf_config_types.EthereumVersion_Eth1
 
@@ -99,22 +100,31 @@ func TestDeployCCIPContractsNewDevnet(t *testing.T) {
 	dockerNetwork, err := docker.CreateNetwork(logging.GetLogger(nil, "CORE_DOCKER_ENV_LOG_LEVEL"))
 	require.NoError(t, err)
 
+	firstNetworkConfig := ctf_config.MustGetDefaultChainConfig()
+	firstNetworkConfig.ChainID = 1337
+
+	firstChain, err := seth_chain.CreateNewEVMChainWithSeth(&ctf_config.EthereumNetworkConfig{
+		ExecutionLayer:      &geth,
+		EthereumVersion:     &eth1,
+		EthereumChainConfig: &firstNetworkConfig,
+		DockerNetworkNames:  []string{dockerNetwork.Name},
+	}, *defaultSethConfig)
+	require.NoError(t, err, "Error creating new EVM chain with Seth")
+
+	secondNetworkConfig := ctf_config.MustGetDefaultChainConfig()
+	secondNetworkConfig.ChainID = 2337
+
+	secondChain, err := seth_chain.CreateNewEVMChainWithSeth(&ctf_config.EthereumNetworkConfig{
+		ExecutionLayer:      &geth,
+		EthereumVersion:     &eth1,
+		EthereumChainConfig: &secondNetworkConfig,
+		DockerNetworkNames:  []string{dockerNetwork.Name},
+	}, *defaultSethConfig)
+	require.NoError(t, err, "Error creating new EVM chain with Seth")
+
 	envConfig := persistent.EnvironmentConfig{
-		ChainConfig: persistent.ChainConfig{
-			NewEVMChains: []persistent.NewEVMChainConfig{
-				persistent.CreateNewPrivateEVMChainConfig(ctf_config.EthereumNetworkConfig{
-					ExecutionLayer:      &geth,
-					EthereumVersion:     &eth1,
-					EthereumChainConfig: &firstNetworkConfig,
-					DockerNetworkNames:  []string{dockerNetwork.Name},
-				}, *defaultSethConfig),
-				persistent.CreateNewPrivateEVMChainConfig(ctf_config.EthereumNetworkConfig{
-					ExecutionLayer:      &geth,
-					EthereumVersion:     &eth1,
-					EthereumChainConfig: &secondNetworkConfig,
-					DockerNetworkNames:  []string{dockerNetwork.Name},
-				}, *defaultSethConfig),
-			},
+		ChainConfig: persistent_types.ChainConfig{
+			NewEVMChains: []persistent_types.NewEVMChainConfig{firstChain, secondChain},
 		},
 		DONConfig: persistent.DONConfig{
 			NewDON: &persistent.NewDONConfig{
@@ -193,7 +203,7 @@ func TestDeployCCIPContractsNewDevnet_FromTestConfig(t *testing.T) {
 	// here we are creating Seth config, but we should read it from the test config
 	defaultSethConfig := seth.NewClientBuilder().BuildConfig()
 
-	chainCfg, err := persistent.EVMChainConfigFromTestConfig(*testCfg, *defaultSethConfig)
+	chainCfg, err := persistent.EVMChainConfigFromTestConfig(*testCfg, defaultSethConfig)
 	require.NoError(t, err, "Error creating chain config from test config")
 
 	envConfig := persistent.EnvironmentConfig{
@@ -209,30 +219,34 @@ func TestDeployCCIPContractsNewDevnet_FromTestConfig(t *testing.T) {
 func TestDeployCCIPContractsExistingDevnet(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	defaultSethConfig := seth.NewClientBuilder().BuildConfig()
+
+	firstChain, err := seth_chain.CreateExistingEVMChainWithSeth(
+		blockchain.EVMNetwork{
+			Name:        "SomeChain_1337",
+			ChainID:     1337,
+			URLs:        []string{"ws://127.0.0.1:57163"},
+			HTTPURLs:    []string{"ws://127.0.0.1:57162"},
+			PrivateKeys: []string{"ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"}, // default Geth PK
+		},
+		*defaultSethConfig,
+	)
+	require.NoError(t, err, "Error creating existing EVM chain with Seth")
+
+	secondChain, err := seth_chain.CreateExistingEVMChainWithSeth(
+		blockchain.EVMNetwork{
+			Name:        "SomeChain_2337",
+			ChainID:     2337,
+			URLs:        []string{"ws://127.0.0.1:57251"},
+			HTTPURLs:    []string{"ws://127.0.0.1:57161"},
+			PrivateKeys: []string{"ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"}, // default Geth PK
+		},
+		*defaultSethConfig,
+	)
+	require.NoError(t, err, "Error creating existing EVM chain with Seth")
+
 	envConfig := persistent.EnvironmentConfig{
-		ChainConfig: persistent.ChainConfig{
-			ExistingEVMChains: []persistent.ExistingEVMChainConfig{
-				persistent.CreateExistingEVMChainConfigWithSeth(
-					blockchain.EVMNetwork{
-						Name:        "SomeChain_1337",
-						ChainID:     1337,
-						URLs:        []string{"ws://127.0.0.1:57163"},
-						HTTPURLs:    []string{"ws://127.0.0.1:57162"},
-						PrivateKeys: []string{"ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"}, // default Geth PK
-					},
-					*defaultSethConfig,
-				),
-				persistent.CreateExistingEVMChainConfigWithSeth(
-					blockchain.EVMNetwork{
-						Name:        "SomeChain_2337",
-						ChainID:     2337,
-						URLs:        []string{"ws://127.0.0.1:57251"},
-						HTTPURLs:    []string{"ws://127.0.0.1:57161"},
-						PrivateKeys: []string{"ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"}, // default Geth PK
-					},
-					*defaultSethConfig,
-				),
-			},
+		ChainConfig: persistent_types.ChainConfig{
+			ExistingEVMChains: []persistent_types.ExistingEVMChainConfig{firstChain, secondChain},
 		},
 	}
 	e, err := persistent.NewEnvironment(lggr, envConfig)
