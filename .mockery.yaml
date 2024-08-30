@@ -476,10 +476,6 @@ packages:
       outpkg: mock_optimism_dispute_game_factory
     interfaces:
       OptimismDisputeGameFactoryInterface: 
-  github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types:
-    interfaces:
-      CCIPOracle:
-      OracleCreator:
   github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache:
     config:
       filename: chain_health_mock.go
