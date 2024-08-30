@@ -133,7 +133,6 @@ jobs:
               - '!contracts/src/v0.8/vendor/**'     
 
   tests:
-    if: ${{ needs.changes.outputs.non_src_changes == 'true' || needs.changes.outputs.sol_modified_added == 'true' }}
     strategy:
       fail-fast: false
       matrix:
