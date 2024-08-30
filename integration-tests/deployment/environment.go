@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	ctfTestEnv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"math/big"
 	"strconv"
@@ -34,6 +35,7 @@ type OffchainClient interface {
 	// The job distributor grpc interface can be used to abstract offchain read/writes
 	jobv1.JobServiceClient
 	nodev1.NodeServiceClient
+	// also add *resty.Client configured for each node? in case we want to interact with them directly to execute actions that are not supported by JD/FMS?
 }
 
 // TODO: we should rename it EVM chain, as it's not generic at all
@@ -44,8 +46,8 @@ type Chain struct {
 	// Note the Sign function can be abstract supporting a variety of key storage mechanisms (e.g. KMS etc).
 	DeployerKey  *bind.TransactOpts
 	DeployerKeys []*bind.TransactOpts
-	// we need that data to set up chainlink nodes, but this probably should be a generic, just like on-chain client
-	EVMNetwork EVMNetwork
+	// we need that data to set up chainlink nodes (we need the RPC URLs)
+	EVMNetworkWithRPCs RpcProvider
 	// Function to execute if transaction submission fails.
 	RetrySubmit func(tx *types.Transaction, err error) (*types.Transaction, error)
 	Confirm     func(tx common.Hash) error
@@ -54,42 +56,57 @@ type Chain struct {
 // a bit unfortunate, but we need to be able to pass "private" urls of chains to chainlink nodes
 // when running in Docker; that's unless we create a DNS/proxy that would allow to access private
 // chains using the same URL both from inside docker containers and from the machine where test code executes
-type EVMNetwork interface {
-	EVMNetworkData() blockchain.EVMNetwork
+type RpcProvider interface {
+	EVMNetwork() blockchain.EVMNetwork
 	PrivateHttpUrls() []string
 	PrivateWsUrls() []string
 	PublicHttpUrls() []string
 	PublicWsUrls() []string
 }
 
-type EVMNetworkWithEndpoints struct {
-	blockchain.EVMNetwork
+func NewEVMNetworkWithRPCs(evmNetwork blockchain.EVMNetwork, rpcProvider ctfTestEnv.RpcProvider) RpcProvider {
+	return &EVMNetworkWithRPCs{
+		evmNetwork,
+		rpcProvider,
+	}
+}
+
+type EVMNetworkWithRPCs struct {
+	evmNetwork blockchain.EVMNetwork
 	ctfTestEnv.RpcProvider
 }
 
-func (s *EVMNetworkWithEndpoints) EVMNetworkData() blockchain.EVMNetwork {
-	return s.EVMNetwork
+func (s *EVMNetworkWithRPCs) EVMNetwork() blockchain.EVMNetwork {
+	return s.evmNetwork
 }
 
-func (s *EVMNetworkWithEndpoints) PrivateHttpUrls() []string {
+func (s *EVMNetworkWithRPCs) PrivateHttpUrls() []string {
 	return s.RpcProvider.PrivateHttpUrls()
 }
 
-func (s *EVMNetworkWithEndpoints) PrivateWsUrls() []string {
+func (s *EVMNetworkWithRPCs) PrivateWsUrls() []string {
 	return s.RpcProvider.PrivateWsUrsl()
 }
 
-func (s *EVMNetworkWithEndpoints) PublicHttpUrls() []string {
+func (s *EVMNetworkWithRPCs) PublicHttpUrls() []string {
 	return s.PublicHttpUrls()
 }
 
-func (s *EVMNetworkWithEndpoints) PublicWsUrls() []string {
+func (s *EVMNetworkWithRPCs) PublicWsUrls() []string {
 	return s.RpcProvider.PublicWsUrls()
 }
 
 // NoOpRetrySubmit is a retry submit function that does nothing.
 func NoOpRetrySubmit(_ *types.Transaction, err error) (*types.Transaction, error) {
 	return nil, err
+}
+
+// we do need mocks for higher-level environments
+type Mocks struct {
+	// we use Mockserver in k8s
+	MockServer *ctfClient.MockserverClient
+	// we use Killgrave in Docker
+	KillGrave *ctfTestEnv.Killgrave
 }
 
 type Environment struct {
@@ -99,7 +116,9 @@ type Environment struct {
 	// I think this won't be enough as sometimes we might access to API of the node,
 	// so we should either return ChainlinkK8sClient or test_env.ClNode
 	NodeIDs []string
-	Logger  logger.Logger
+	// we will also need some way to communicate with mock servers
+	Logger logger.Logger
+	Mocks  Mocks
 }
 
 func (e Environment) AllChainSelectors() []uint64 {

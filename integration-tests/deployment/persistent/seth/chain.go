@@ -200,10 +200,7 @@ func (s *SethChainBuilder) Build(sethClient *seth.Client, evmNetwork blockchain.
 
 			return keys
 		}(),
-		EVMNetwork: &deployment.EVMNetworkWithEndpoints{
-			EVMNetwork:  evmNetwork,
-			RpcProvider: rpcProvider,
-		},
+		EVMNetworkWithRPCs: deployment.NewEVMNetworkWithRPCs(evmNetwork, rpcProvider),
 		Confirm: func(txHash common.Hash) error {
 			ctx, cancelFn := context.WithTimeout(context.Background(), sethClient.Cfg.Network.TxnTimeout.Duration())
 			tx, _, err := sethClient.Client.TransactionByHash(ctx, txHash)

@@ -31,14 +31,11 @@ func (s *GethChainBuilder) Build(evmNetwork blockchain.EVMNetwork, rpcProvider c
 	}
 
 	return deployment.Chain{
-		Selector:     sel,
-		Client:       client,
-		DeployerKey:  &bind.TransactOpts{},
-		DeployerKeys: []*bind.TransactOpts{{}},
-		EVMNetwork: &deployment.EVMNetworkWithEndpoints{
-			EVMNetwork:  evmNetwork,
-			RpcProvider: rpcProvider,
-		},
+		Selector:           sel,
+		Client:             client,
+		DeployerKey:        &bind.TransactOpts{},
+		DeployerKeys:       []*bind.TransactOpts{{}},
+		EVMNetworkWithRPCs: deployment.NewEVMNetworkWithRPCs(evmNetwork, rpcProvider),
 		Confirm: func(txHash common.Hash) error {
 			ctx, cancelFn := context.WithTimeout(context.Background(), 5*time.Minute)
 			receipt, err := client.TransactionReceipt(ctx, txHash)

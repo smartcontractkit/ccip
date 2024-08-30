@@ -8,7 +8,6 @@ import (
 	"github.com/smartcontractkit/ccip/integration-tests/ccip-tests/testsetups"
 	"github.com/smartcontractkit/ccip/integration-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/smartcontractkit/chainlink-testing-framework/docker"
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
@@ -20,6 +19,7 @@ import (
 
 type ExistingDONConfig struct {
 	testconfig.CLCluster
+	MockServerURL *string `toml:",omitempty"`
 }
 
 type NewDONHooks interface {
@@ -29,29 +29,26 @@ type NewDONHooks interface {
 	PostStartupHook([]*test_env.ClNode) error
 }
 
-type NewDONConfig struct {
+type NewDockerDONConfig struct {
 	testconfig.ChainlinkDeployment
-	DockerOptions    DockerOptions
+	Options          Options
 	ChainlinkConfigs []*chainlink.Config
 	NewDONHooks
 }
 
-type DockerOptions struct {
-	DockerNetworks []string
-	LogStream      *logstream.LogStream
+type Options struct {
+	Networks  []string
+	LogStream *logstream.LogStream
 }
 
 type DONConfig struct {
 	ExistingDON *ExistingDONConfig
-	NewDON      *NewDONConfig
+	NewDON      *NewDockerDONConfig
 }
 
 type DON struct {
 	ClClients []*client.ChainlinkK8sClient
-	// we use Mockserver in k8s
-	MockServer *ctfClient.MockserverClient
-	// we use Killgrave in Docker
-	KillGrave *ctftestenv.Killgrave
+	deployment.Mocks
 }
 
 func NewNodes(donConfig DONConfig) (DON, error) {
@@ -63,18 +60,20 @@ func NewNodes(donConfig DONConfig) (DON, error) {
 		return DON{}, fmt.Errorf("both new and existing DON config provided, you need to provide either an existing or new DON config")
 	}
 
-	//TODO I will need also chain config here
-
 	if donConfig.NewDON != nil {
-		return NewDON(*donConfig.NewDON)
+		return NewDockerDON(donConfig.NewDON)
 	}
 
-	return ExistingNodes(*donConfig.ExistingDON)
+	return ConnectToExistingNodes(*donConfig.ExistingDON)
 }
 
-func ExistingNodes(config ExistingDONConfig) (DON, error) {
+func ConnectToExistingNodes(config ExistingDONConfig) (DON, error) {
 	noOfNodes := pointer.GetInt(config.NoOfNodes)
 	namespace := pointer.GetString(config.Name)
+
+	if noOfNodes != len(config.NodeConfigs) {
+		return DON{}, fmt.Errorf("number of nodes %d does not match number of node configs %d", noOfNodes, len(config.NodeConfigs))
+	}
 
 	don := DON{}
 
@@ -89,45 +88,21 @@ func ExistingNodes(config ExistingDONConfig) (DON, error) {
 		}
 		clClient.ChainlinkClient.WithRetryCount(3)
 		don.ClClients = append(don.ClClients, clClient)
-
-		// TODO no idea if that's required for existing DON
-		//ocr2Keys, err := clClient.ChainlinkClient.MustReadOCR2Keys()
-		//if err != nil {
-		//	return don, errors.Wrapf(err, "failed to read OCR2 keys for node %d", i+1)
-		//}
-		//
-		//p2pKeys, err := clClient.ChainlinkClient.MustReadP2PKeys()
-		//if err != nil {
-		//	return don, errors.Wrapf(err, "failed to read P2P keys for node %d", i+1)
-		//}
-
-		// read peer id somehow
-
 	}
-
-	// per chain, if required
-	//txKeys, err := clClient.ChainlinkClient.ReadTxKeys()
-
-	//TODO add mockserver
 
 	return don, nil
 }
 
-//TODO how to support non-evm here? Solana, Cosmos, Aptos, Starknet? I guess by passing chainConfig as part of DON config?
-//TODO do not forget about mockserver
-
-// for now we won't support starting a new k8s don, I am not sure we should even ever add it
-func NewDON(newDonConfig NewDONConfig) (DON, error) {
+func NewDockerDON(newDonConfig *NewDockerDONConfig) (DON, error) {
 	don := DON{}
 
 	// maybe we should validate this and return err if not set instead of generating here
-	if len(newDonConfig.DockerOptions.DockerNetworks) == 0 {
+	if len(newDonConfig.Options.Networks) == 0 {
 		dockerNetwork, err := docker.CreateNetwork(logging.GetLogger(nil, "CORE_DOCKER_ENV_LOG_LEVEL"))
 		if err != nil {
 			return don, errors.Wrap(err, "failed to create docker network")
 		}
-		// TODO should we return it?
-		newDonConfig.DockerOptions.DockerNetworks = []string{dockerNetwork.Name}
+		newDonConfig.Options.Networks = []string{dockerNetwork.Name}
 	}
 
 	clCluster := test_env.ClCluster{}
@@ -140,11 +115,11 @@ func NewDON(newDonConfig NewDONConfig) (DON, error) {
 		}
 		for i, clNode := range newDonConfig.Nodes {
 			node, err := test_env.NewClNode(
-				newDonConfig.DockerOptions.DockerNetworks,
+				newDonConfig.Options.Networks,
 				pointer.GetString(clNode.ChainlinkImage.Image),
 				pointer.GetString(clNode.ChainlinkImage.Version),
 				newDonConfig.ChainlinkConfigs[i],
-				newDonConfig.DockerOptions.LogStream,
+				newDonConfig.Options.LogStream,
 				test_env.WithPgDBOptions(
 					ctftestenv.WithPostgresImageName(clNode.DBImage),
 					ctftestenv.WithPostgresImageVersion(clNode.DBTag),
@@ -163,11 +138,11 @@ func NewDON(newDonConfig NewDONConfig) (DON, error) {
 		// if no individual nodes are specified, then deploy the number of nodes specified in the env input with common config
 		for i := 0; i < noOfNodes; i++ {
 			node, err := test_env.NewClNode(
-				newDonConfig.DockerOptions.DockerNetworks,
+				newDonConfig.Options.Networks,
 				pointer.GetString(newDonConfig.Common.ChainlinkImage.Image),
 				pointer.GetString(newDonConfig.Common.ChainlinkImage.Version),
 				newDonConfig.ChainlinkConfigs[i],
-				newDonConfig.DockerOptions.LogStream,
+				newDonConfig.Options.LogStream,
 				test_env.WithPgDBOptions(
 					ctftestenv.WithPostgresImageName(newDonConfig.Common.DBImage),
 					ctftestenv.WithPostgresImageVersion(newDonConfig.Common.DBTag),
@@ -195,29 +170,10 @@ func NewDON(newDonConfig NewDONConfig) (DON, error) {
 
 	var chainlinkNodes []*client.ChainlinkClient
 	for _, node := range clCluster.Nodes {
-		chainlinkNodes = append(chainlinkNodes, node.API.WithRetryCount(3))
-	}
-
-	//don.Keys = make(map[uint64][]client.NodeKeysBundle)
-	//
-	//for chainId := range newDonConfig.Chains {
-	//	_, clNodes, err := client.CreateNodeKeysBundle(chainlinkNodes, "evm", fmt.Sprint(chainId))
-	//	if err != nil {
-	//		return don, errors.Wrapf(err, "failed to create node keys for chain %d", chainId)
-	//	}
-	//	don.Keys[chainId] = func() []client.NodeKeysBundle {
-	//		var keys []client.NodeKeysBundle
-	//		for _, clNode := range clNodes {
-	//			keys = append(keys, clNode.KeysBundle)
-	//		}
-	//		return keys
-	//	}()
-	//}
-
-	for _, clClient := range chainlinkNodes {
 		don.ClClients = append(don.ClClients, &client.ChainlinkK8sClient{
-			ChainlinkClient: clClient,
+			ChainlinkClient: node.API.WithRetryCount(3),
 		})
+		chainlinkNodes = append(chainlinkNodes)
 	}
 
 	if newDonConfig.NewDONHooks != nil {
@@ -227,17 +183,15 @@ func NewDON(newDonConfig NewDONConfig) (DON, error) {
 		}
 	}
 
-	don.KillGrave = ctftestenv.NewKillgrave(newDonConfig.DockerOptions.DockerNetworks, "", ctftestenv.WithLogStream(newDonConfig.DockerOptions.LogStream))
-
 	return don, nil
 }
 
 func NewEVMOnlyChainlinkConfigs(donConfig testconfig.ChainlinkDeployment, chains map[uint64]deployment.Chain) ([]*chainlink.Config, error) {
 	var evmNetworks []blockchain.EVMNetwork
 	for _, chain := range chains {
-		evmNetwork := chain.EVMNetwork.EVMNetworkData()
-		evmNetwork.HTTPURLs = chain.EVMNetwork.PrivateHttpUrls()
-		evmNetwork.URLs = chain.EVMNetwork.PrivateWsUrls()
+		evmNetwork := chain.EVMNetworkWithRPCs.EVMNetwork()
+		evmNetwork.HTTPURLs = chain.EVMNetworkWithRPCs.PrivateHttpUrls()
+		evmNetwork.URLs = chain.EVMNetworkWithRPCs.PrivateWsUrls()
 		evmNetworks = append(evmNetworks, evmNetwork)
 	}
 

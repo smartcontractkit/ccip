@@ -127,7 +127,7 @@ func TestDeployCCIPContractsNewDevnet(t *testing.T) {
 			NewEVMChains: []persistent_types.NewEVMChainConfig{firstChain, secondChain},
 		},
 		DONConfig: persistent.DONConfig{
-			NewDON: &persistent.NewDONConfig{
+			NewDON: &persistent.NewDockerDONConfig{
 				ChainlinkDeployment: testconfig.ChainlinkDeployment{
 					Common: &testconfig.Node{
 						ChainlinkImage: &ctfconfig.ChainlinkImageConfig{
@@ -183,8 +183,8 @@ DeltaReconcile = '5s'
 `},
 					NoOfNodes: ptr.Ptr(5),
 				},
-				DockerOptions: persistent.DockerOptions{
-					DockerNetworks: []string{dockerNetwork.Name},
+				Options: persistent.Options{
+					Networks: []string{dockerNetwork.Name},
 				},
 			},
 		},

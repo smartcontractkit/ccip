@@ -68,6 +68,15 @@ func NewEnvironment(lggr logger.Logger, config EnvironmentConfig) (*deployment.E
 		// peer ids are the same for all nodes, so we can iterate only once
 		break
 	}
+
+	mocks, err := NewMocks(config.DONConfig)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create mocks")
+	}
+
+	don.MockServer = mocks.MockServer
+	don.KillGrave = mocks.KillGrave
+
 	return &deployment.Environment{
 		Name: "persistent",
 		//Offchain: NewMemoryJobClient(nodes),
