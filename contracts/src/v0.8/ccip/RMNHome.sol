@@ -14,21 +14,21 @@ contract RMNHome is Ownable2Step, ITypeAndVersion {
   string public constant override typeAndVersion = "RMNHome 1.6.0-dev";
 
   struct Node {
-    string peerId; // used for p2p communication, base58 encoded
+    bytes32 peerId; // used for p2p communication
     bytes32 offchainPublicKey; // observations are signed with this public key, and are only verified offchain
   }
 
   struct SourceChain {
     uint64 chainSelector;
-    uint256 observerNodesBitmap; // observerNodesBitmap & (1<<i) == (1<<i) iff nodes[i] is an observer for this source chain
     uint64 minObservers; // required to agree on an observation for this source chain
+    uint256 observerNodesBitmap; // observerNodesBitmap & (1<<i) == (1<<i) iff nodes[i] is an observer for this source chain
   }
 
   struct Config {
     // No sorting requirement for nodes, but ensure that SourceChain.observerNodeIndices in the home chain config &
     // Signer.nodeIndex in the remote chain configs are appropriately updated when changing this field
     Node[] nodes;
-    // Should be in ascending order of chainSelector
+    // No sorting requirement for source chains, it is most gas efficient to append new source chains to the right.
     SourceChain[] sourceChains;
     // Offchain configuration
     bytes offchainConfig;
@@ -70,7 +70,7 @@ contract RMNHome is Ownable2Step, ITypeAndVersion {
       // no peerId or offchainPublicKey is duplicated
       for (uint256 i = 0; i < newConfig.nodes.length; ++i) {
         for (uint256 j = i + 1; j < newConfig.nodes.length; ++j) {
-          if (keccak256(abi.encode(newConfig.nodes[i].peerId)) == keccak256(abi.encode(newConfig.nodes[j].peerId))) {
+          if (newConfig.nodes[i].peerId == newConfig.nodes[j].peerId) {
             revert DuplicatePeerId();
           }
           if (newConfig.nodes[i].offchainPublicKey == newConfig.nodes[j].offchainPublicKey) {
@@ -80,9 +80,11 @@ contract RMNHome is Ownable2Step, ITypeAndVersion {
       }
 
       for (uint256 i = 0; i < newConfig.sourceChains.length; ++i) {
-        // source chains are in strictly increasing order of chain selectors
-        if (i > 0 && !(newConfig.sourceChains[i - 1].chainSelector < newConfig.sourceChains[i].chainSelector)) {
-          revert OutOfOrderSourceChains();
+        // the source chain is unique
+        for (uint256 j = i + 1; j < newConfig.sourceChains.length; ++j) {
+          if (newConfig.sourceChains[i].chainSelector == newConfig.sourceChains[j].chainSelector) {
+            revert DuplicateSourceChain();
+          }
         }
 
         // all observer node indices are valid
@@ -245,7 +247,7 @@ contract RMNHome is Ownable2Step, ITypeAndVersion {
   error OutOfBoundsNodesLength();
   error DuplicatePeerId();
   error DuplicateOffchainPublicKey();
-  error OutOfOrderSourceChains();
+  error DuplicateSourceChain();
   error OutOfBoundsObserverNodeIndex();
   error MinObserversTooHigh();
 }
