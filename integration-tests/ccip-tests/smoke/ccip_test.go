@@ -83,7 +83,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 				Msgf("Starting lane %s -> %s", tc.lane.SourceNetworkName, tc.lane.DestNetworkName)
 
 			tc.lane.RecordStateBeforeTransfer()
-			err := tc.lane.SendRequests(1, false, gasLimit)
+			err := tc.lane.SendRequests(1, true, gasLimit)
 			require.NoError(t, err)
 			tc.lane.ValidateRequests()
 		})
