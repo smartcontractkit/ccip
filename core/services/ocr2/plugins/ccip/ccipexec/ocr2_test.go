@@ -43,8 +43,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
-
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 )
 
 func TestExecutionReportingPlugin_Observation(t *testing.T) {
