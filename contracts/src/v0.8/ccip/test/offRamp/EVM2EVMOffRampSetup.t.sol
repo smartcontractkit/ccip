@@ -10,14 +10,15 @@ import {Internal} from "../../libraries/Internal.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
+
+import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {OCR2BaseSetup} from "../ocr/OCR2Base.t.sol";
-import {PriceRegistrySetup} from "../priceRegistry/PriceRegistrySetup.t.sol";
 
-contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
+contract EVM2EVMOffRampSetup is TokenSetup, FeeQuoterSetup, OCR2BaseSetup {
   MockCommitStore internal s_mockCommitStore;
   IAny2EVMMessageReceiver internal s_receiver;
   IAny2EVMMessageReceiver internal s_secondary_receiver;
@@ -28,9 +29,9 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
   EVM2EVMOffRampHelper internal s_offRamp;
   address internal s_sourceTokenPool = makeAddr("sourceTokenPool");
 
-  function setUp() public virtual override(TokenSetup, PriceRegistrySetup, OCR2BaseSetup) {
+  function setUp() public virtual override(TokenSetup, FeeQuoterSetup, OCR2BaseSetup) {
     TokenSetup.setUp();
-    PriceRegistrySetup.setUp();
+    FeeQuoterSetup.setUp();
     OCR2BaseSetup.setUp();
 
     s_mockCommitStore = new MockCommitStore();
@@ -60,7 +61,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       s_valid_signers,
       s_valid_transmitters,
       s_f,
-      abi.encode(generateDynamicOffRampConfig(address(router), address(s_priceRegistry))),
+      abi.encode(generateDynamicOffRampConfig(address(router), address(s_feeQuoter))),
       s_offchainConfigVersion,
       abi.encode("")
     );
@@ -90,11 +91,9 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     });
   }
 
-  function _convertToGeneralMessage(Internal.EVM2EVMMessage memory original)
-    internal
-    view
-    returns (Client.Any2EVMMessage memory message)
-  {
+  function _convertToGeneralMessage(
+    Internal.EVM2EVMMessage memory original
+  ) internal view returns (Client.Any2EVMMessage memory message) {
     uint256 numberOfTokens = original.tokenAmounts.length;
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](numberOfTokens);
 
@@ -117,11 +116,9 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     });
   }
 
-  function _generateAny2EVMMessageNoTokens(uint64 sequenceNumber)
-    internal
-    view
-    returns (Internal.EVM2EVMMessage memory)
-  {
+  function _generateAny2EVMMessageNoTokens(
+    uint64 sequenceNumber
+  ) internal view returns (Internal.EVM2EVMMessage memory) {
     return _generateAny2EVMMessage(sequenceNumber, new Client.EVMTokenAmount[](0), false);
   }
 
@@ -205,11 +202,9 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     return messages;
   }
 
-  function _generateReportFromMessages(Internal.EVM2EVMMessage[] memory messages)
-    internal
-    pure
-    returns (Internal.ExecutionReport memory)
-  {
+  function _generateReportFromMessages(
+    Internal.EVM2EVMMessage[] memory messages
+  ) internal pure returns (Internal.ExecutionReport memory) {
     bytes[][] memory offchainTokenData = new bytes[][](messages.length);
 
     for (uint256 i = 0; i < messages.length; ++i) {
@@ -224,11 +219,9 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     });
   }
 
-  function _getGasLimitsFromMessages(Internal.EVM2EVMMessage[] memory messages)
-    internal
-    pure
-    returns (EVM2EVMOffRamp.GasLimitOverride[] memory)
-  {
+  function _getGasLimitsFromMessages(
+    Internal.EVM2EVMMessage[] memory messages
+  ) internal pure returns (EVM2EVMOffRamp.GasLimitOverride[] memory) {
     EVM2EVMOffRamp.GasLimitOverride[] memory gasLimitOverrides = new EVM2EVMOffRamp.GasLimitOverride[](messages.length);
     for (uint256 i = 0; i < messages.length; ++i) {
       gasLimitOverrides[i].receiverExecutionGasLimit = messages[i].gasLimit;
@@ -250,11 +243,9 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     assertEq(a.maxDataBytes, b.maxDataBytes);
   }
 
-  function _getDefaultSourceTokenData(Client.EVMTokenAmount[] memory srcTokenAmounts)
-    internal
-    view
-    returns (bytes[] memory)
-  {
+  function _getDefaultSourceTokenData(
+    Client.EVMTokenAmount[] memory srcTokenAmounts
+  ) internal view returns (bytes[] memory) {
     bytes[] memory sourceTokenData = new bytes[](srcTokenAmounts.length);
     for (uint256 i = 0; i < srcTokenAmounts.length; ++i) {
       sourceTokenData[i] = abi.encode(

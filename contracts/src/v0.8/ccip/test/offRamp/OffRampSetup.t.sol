@@ -15,21 +15,22 @@ import {MultiOCR3Base} from "../../ocr/MultiOCR3Base.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
+
+import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import {OffRampHelper} from "../helpers/OffRampHelper.sol";
 import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import {MultiOCR3BaseSetup} from "../ocr/MultiOCR3BaseSetup.t.sol";
-import {PriceRegistrySetup} from "../priceRegistry/PriceRegistrySetup.t.sol";
 import {Vm} from "forge-std/Test.sol";
 
-contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
+contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
   uint64 internal constant SOURCE_CHAIN_SELECTOR_1 = SOURCE_CHAIN_SELECTOR;
   uint64 internal constant SOURCE_CHAIN_SELECTOR_2 = 6433500567565415381;
   uint64 internal constant SOURCE_CHAIN_SELECTOR_3 = 4051577828743386545;
   bytes32 internal constant EXECUTION_STATE_CHANGE_TOPIC_HASH =
-    keccak256("ExecutionStateChanged(uint64,uint64,bytes32,uint8,bytes,uint256)");
+    keccak256("ExecutionStateChanged(uint64,uint64,bytes32,bytes32,uint8,bytes,uint256)");
 
   bytes internal constant ON_RAMP_ADDRESS_1 = abi.encode(ON_RAMP_ADDRESS);
   bytes internal constant ON_RAMP_ADDRESS_2 = abi.encode(0xaA3f843Cf8E33B1F02dd28303b6bD87B1aBF8AE4);
@@ -56,8 +57,8 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
 
   uint64 internal s_latestSequenceNumber;
 
-  function setUp() public virtual override(PriceRegistrySetup, MultiOCR3BaseSetup) {
-    PriceRegistrySetup.setUp();
+  function setUp() public virtual override(FeeQuoterSetup, MultiOCR3BaseSetup) {
+    FeeQuoterSetup.setUp();
     MultiOCR3BaseSetup.setUp();
 
     s_inboundMessageValidator = new MessageInterceptorHelper();
@@ -81,7 +82,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(nonceManager)
       }),
-      _generateDynamicOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_feeQuoter)),
       sourceChainConfigs
     );
 
@@ -106,7 +107,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
       transmitters: s_validTransmitters
     });
 
-    s_offRamp.setDynamicConfig(_generateDynamicOffRampConfig(address(s_priceRegistry)));
+    s_offRamp.setDynamicConfig(_generateDynamicOffRampConfig(address(s_feeQuoter)));
     s_offRamp.setOCR3Configs(ocrConfigs);
 
     address[] memory authorizedCallers = new address[](1);
@@ -117,7 +118,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
 
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = address(s_offRamp);
-    s_priceRegistry.applyAuthorizedCallerUpdates(
+    s_feeQuoter.applyAuthorizedCallerUpdates(
       AuthorizedCallers.AuthorizedCallerArgs({addedCallers: priceUpdaters, removedCallers: new address[](0)})
     );
   }
@@ -146,7 +147,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
       s_validSigners,
       s_validTransmitters,
       s_F,
-      abi.encode(_generateDynamicOffRampConfig(address(router), address(s_priceRegistry))),
+      abi.encode(_generateDynamicOffRampConfig(address(router), address(s_feeQuoter))),
       s_offchainConfigVersion,
       abi.encode("")
     );
@@ -223,21 +224,19 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
   uint32 internal constant MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS = 200_000;
   uint32 internal constant MAX_TOKEN_POOL_TRANSFER_GAS = 50_000;
 
-  function _generateDynamicOffRampConfig(address priceRegistry) internal pure returns (OffRamp.DynamicConfig memory) {
+  function _generateDynamicOffRampConfig(address feeQuoter) internal pure returns (OffRamp.DynamicConfig memory) {
     return OffRamp.DynamicConfig({
       permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
-      priceRegistry: priceRegistry,
+      feeQuoter: feeQuoter,
       messageValidator: address(0),
       maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
       maxTokenTransferGas: MAX_TOKEN_POOL_TRANSFER_GAS
     });
   }
 
-  function _convertToGeneralMessage(Internal.Any2EVMRampMessage memory original)
-    internal
-    view
-    returns (Client.Any2EVMMessage memory message)
-  {
+  function _convertToGeneralMessage(
+    Internal.Any2EVMRampMessage memory original
+  ) internal view returns (Client.Any2EVMMessage memory message) {
     uint256 numberOfTokens = original.tokenAmounts.length;
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](numberOfTokens);
 
@@ -297,7 +296,8 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
         sourcePoolAddress: abi.encode(s_sourcePoolByToken[tokenAmounts[i].token]),
         destTokenAddress: abi.encode(s_destTokenBySourceToken[tokenAmounts[i].token]),
         extraData: "",
-        amount: tokenAmounts[i].amount
+        amount: tokenAmounts[i].amount,
+        destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
       });
     }
 
@@ -372,11 +372,9 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
     return reports;
   }
 
-  function _getGasLimitsFromMessages(Internal.Any2EVMRampMessage[] memory messages)
-    internal
-    pure
-    returns (uint256[] memory)
-  {
+  function _getGasLimitsFromMessages(
+    Internal.Any2EVMRampMessage[] memory messages
+  ) internal pure returns (uint256[] memory) {
     uint256[] memory gasLimits = new uint256[](messages.length);
     for (uint256 i = 0; i < messages.length; ++i) {
       gasLimits[i] = messages[i].gasLimit;
@@ -390,7 +388,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
     assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);
     assertEq(a.maxTokenTransferGas, b.maxTokenTransferGas);
     assertEq(a.messageValidator, b.messageValidator);
-    assertEq(a.priceRegistry, b.priceRegistry);
+    assertEq(a.feeQuoter, b.feeQuoter);
   }
 
   function _assertSourceChainConfigEquality(
@@ -403,18 +401,17 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
     assertEq(address(config1.router), address(config2.router));
   }
 
-  function _getDefaultSourceTokenData(Client.EVMTokenAmount[] memory srcTokenAmounts)
-    internal
-    view
-    returns (Internal.RampTokenAmount[] memory)
-  {
+  function _getDefaultSourceTokenData(
+    Client.EVMTokenAmount[] memory srcTokenAmounts
+  ) internal view returns (Internal.RampTokenAmount[] memory) {
     Internal.RampTokenAmount[] memory sourceTokenData = new Internal.RampTokenAmount[](srcTokenAmounts.length);
     for (uint256 i = 0; i < srcTokenAmounts.length; ++i) {
       sourceTokenData[i] = Internal.RampTokenAmount({
         sourcePoolAddress: abi.encode(s_sourcePoolByToken[srcTokenAmounts[i].token]),
         destTokenAddress: abi.encode(s_destTokenBySourceToken[srcTokenAmounts[i].token]),
         extraData: "",
-        amount: srcTokenAmounts[i].amount
+        amount: srcTokenAmounts[i].amount,
+        destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
       });
     }
     return sourceTokenData;
@@ -434,7 +431,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
-      _generateDynamicOffRampConfig(address(s_priceRegistry)),
+      _generateDynamicOffRampConfig(address(s_feeQuoter)),
       new OffRamp.SourceChainConfigArgs[](0)
     );
 
@@ -447,7 +444,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
 
     address[] memory priceUpdaters = new address[](1);
     priceUpdaters[0] = address(s_offRamp);
-    s_priceRegistry.applyAuthorizedCallerUpdates(
+    s_feeQuoter.applyAuthorizedCallerUpdates(
       AuthorizedCallers.AuthorizedCallerArgs({addedCallers: priceUpdaters, removedCallers: new address[](0)})
     );
   }
@@ -481,6 +478,7 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
     uint64 sourceChainSelector,
     uint64 sequenceNumber,
     bytes32 messageId,
+    bytes32 messageHash,
     Internal.MessageExecutionState state,
     bytes memory returnData
   ) public {
@@ -490,11 +488,13 @@ contract OffRampSetup is PriceRegistrySetup, MultiOCR3BaseSetup {
         uint64 logSourceChainSelector = uint64(uint256(logs[i].topics[1]));
         uint64 logSequenceNumber = uint64(uint256(logs[i].topics[2]));
         bytes32 logMessageId = bytes32(logs[i].topics[3]);
-        (uint8 logState, bytes memory logReturnData,) = abi.decode(logs[i].data, (uint8, bytes, uint256));
+        (bytes32 logMessageHash, uint8 logState, bytes memory logReturnData,) =
+          abi.decode(logs[i].data, (bytes32, uint8, bytes, uint256));
         if (logMessageId == messageId) {
           assertEq(logSourceChainSelector, sourceChainSelector);
           assertEq(logSequenceNumber, sequenceNumber);
           assertEq(logMessageId, messageId);
+          assertEq(logMessageHash, messageHash);
           assertEq(logState, uint8(state));
           assertEq(logReturnData, returnData);
         }

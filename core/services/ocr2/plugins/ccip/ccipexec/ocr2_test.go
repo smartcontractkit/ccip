@@ -16,17 +16,18 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2/types"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	lpMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
@@ -449,8 +450,10 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	p.metricsCollector = ccip.NoopMetricsCollector
 	p.commitStoreReader = commitStore
 
+	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
+
 	lp := lpMocks.NewLogPoller(t)
-	offRampReader, err := v1_0_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil, nil)
+	offRampReader, err := v1_0_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil, nil, feeEstimatorConfig)
 	assert.NoError(t, err)
 	p.offRampReader = offRampReader
 
@@ -1397,7 +1400,9 @@ func Test_prepareTokenExecData(t *testing.T) {
 }
 
 func encodeExecutionReport(t *testing.T, report cciptypes.ExecReport) []byte {
-	reader, err := v1_2_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, nil, nil, nil)
+	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
+
+	reader, err := v1_2_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, nil, nil, nil, feeEstimatorConfig)
 	require.NoError(t, err)
 	ctx := testutils.Context(t)
 	encodedReport, err := reader.EncodeExecutionReport(ctx, report)
