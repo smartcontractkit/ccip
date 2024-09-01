@@ -127,7 +127,7 @@ func (bs ZKOverflowBatchingStrategy) BuildBatch(
 		// Check if msg is inflight
 		if exists := inflightSeqNums.Contains(msg.SequenceNumber); exists {
 			// Message is inflight, skip it
-			msgLggr.Infow("Skipping message - already inflight", "message", msgId)
+			msgLggr.Infow("Skipping message - already inflight")
 			batchBuilder.skip(msg, SkippedInflight)
 			continue
 		}
@@ -143,13 +143,16 @@ func (bs ZKOverflowBatchingStrategy) BuildBatch(
 
 		if len(statuses) == 0 {
 			// No status found for message = first time we see it
-			msgLggr.Infow("No status found for message - proceeding with checks", "message", msgId)
+			msgLggr.Infow("No status found for message - proceeding with checks")
 		} else {
 			// Status(es) found for message = check if any of them is final to decide if we should add it to the batch
 			hasFatalStatus := false
 			for _, s := range statuses {
-				if s == types.Fatal {
-					msgLggr.Infow("Skipping message - found a fatal TXM status", "message", msgId)
+				if s.Status == types.Fatal || s.Status == types.Failed {
+					msgLggr.Warnw("TXM error status found", "status", s.Status, "error", s.Error)
+				}
+				if s.Status == types.Fatal {
+					msgLggr.Infow("Skipping message - found a fatal TXM status", "status", s.Status)
 					batchBuilder.skip(msg, TXMFatalStatus)
 					hasFatalStatus = true
 					break
@@ -158,7 +161,7 @@ func (bs ZKOverflowBatchingStrategy) BuildBatch(
 			if hasFatalStatus {
 				continue
 			}
-			msgLggr.Infow("No fatal status found for message - proceeding with checks", "message", msgId)
+			msgLggr.Infow("No fatal status found for message - proceeding with checks")
 		}
 
 		status, messageMaxGas, tokenData, msgValue, err := performCommonChecks(ctx, batchCtx, msg, msgLggr)
