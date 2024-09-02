@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/uuid"
@@ -528,18 +526,6 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			cfg.OCR2(),
 			cfg.Insecure(),
 			opts.RelayerChainInteroperators,
-		)
-		delegates[job.CCIP] = ccip.NewDelegate(
-			globalLogger,
-			loopRegistrarConfig,
-			pipelineRunner,
-			opts.RelayerChainInteroperators.LegacyEVMChains(),
-			capabilityRegistrySyncer,
-			opts.KeyStore,
-			opts.DS,
-			peerWrapper,
-			telemetryManager,
-			cfg.Capabilities(),
 		)
 	} else {
 		globalLogger.Debug("Off-chain reporting v2 disabled")
