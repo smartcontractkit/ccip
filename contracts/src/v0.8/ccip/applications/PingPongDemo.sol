@@ -37,7 +37,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
   }
 
   function typeAndVersion() external pure virtual returns (string memory) {
-    return "PingPongDemo 1.2.0";
+    return "PingPongDemo 1.5.0";
   }
 
   function setCounterpart(uint64 counterpartChainSelector, address counterpartAddress) external onlyOwner {
@@ -62,7 +62,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
       tokenAmounts: new Client.EVMTokenAmount[](0),
       extraArgs: Client._argsToBytes(
         Client.EVMExtraArgsV2({gasLimit: uint256(DEFAULT_GAS_LIMIT), allowOutOfOrderExecution: s_outOfOrderExecution})
-        ),
+      ),
       feeToken: address(s_feeToken)
     });
     IRouterClient(getRouter()).ccipSend(s_counterpartChainSelector, message);
