@@ -445,7 +445,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       }
 
       _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-
       (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
       _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
 
@@ -477,6 +476,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         hashedLeaves[i],
         newState,
         returnData,
+        // This emit covers not only the execution through the router, but also all of the overhead in executing the
+        // message. This gives the most accurate representation of the gas used in the execution.
         gasStart - gasleft()
       );
     }
@@ -586,12 +587,12 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     // Check if the report contains price updates
     if (commitReport.priceUpdates.tokenPriceUpdates.length > 0 || commitReport.priceUpdates.gasPriceUpdates.length > 0)
     {
-      uint64 sequenceNumber = uint64(uint256(reportContext[1]));
+      uint64 ocrSequenceNumber = uint64(uint256(reportContext[1]));
 
       // Check for price staleness based on the epoch and round
-      if (s_latestPriceSequenceNumber < sequenceNumber) {
+      if (s_latestPriceSequenceNumber < ocrSequenceNumber) {
         // If prices are not stale, update the latest epoch and round
-        s_latestPriceSequenceNumber = sequenceNumber;
+        s_latestPriceSequenceNumber = ocrSequenceNumber;
         // And update the prices in the fee quoter
         IFeeQuoter(s_dynamicConfig.feeQuoter).updatePrices(commitReport.priceUpdates);
       } else {
