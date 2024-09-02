@@ -1024,7 +1024,11 @@ func (lp *logPoller) latestBlocks(ctx context.Context) (*evmtypes.Head, int64, e
 	}
 
 	lp.lggr.Debugw("Latest blocks read from chain", "latest", latest.Number, "finalized", finalized.BlockNumber())
-	return latest, finalized.BlockNumber(), nil
+	finalizedBN := finalized.BlockNumber()
+	if finalizedBN <= 0 {
+		finalizedBN = 1 // dirty trick for CCIP loadtest
+	}
+	return latest, finalizedBN, nil
 }
 
 // Find the first place where our chain and their chain have the same block,
