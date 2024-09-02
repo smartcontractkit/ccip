@@ -337,7 +337,8 @@ func (c *CommitStore) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, 
 	}
 
 	reportsQuery, err := query.Where(
-		c.address.String(),
+		// no key needed as logpoller.NewAddressFilter is used
+		"",
 		logpoller.NewAddressFilter(c.address),
 		logpoller.NewEventSigFilter(c.reportAcceptedSig),
 		query.Timestamp(uint64(ts.Unix()), primitives.Gte),
@@ -349,7 +350,7 @@ func (c *CommitStore) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, 
 
 	logs, err := c.lp.FilteredLogs(
 		ctx,
-		reportsQuery,
+		reportsQuery.Expressions,
 		query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Asc)),
 		"GetAcceptedCommitReportsGteTimestamp",
 	)
