@@ -461,6 +461,8 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		LoopRegistry:               plugins.NewLoopRegistry(lggr, nil),
 		MercuryPool:                mercuryPool,
 		CapabilitiesRegistry:       capabilitiesRegistry,
+		CapabilitiesDispatcher:     dispatcher,
+		CapabilitiesPeerWrapper:    peerWrapper,
 	})
 
 	require.NoError(t, err)

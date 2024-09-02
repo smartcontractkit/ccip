@@ -258,14 +258,10 @@ packages:
       ORM:
       Runner:
       PipelineParamUnmarshaler:
-  github.com/smartcontractkit/chainlink/v2/core/services/headreporter:
+  github.com/smartcontractkit/chainlink/v2/core/services/promreporter:
     config:
-      dir: "{{ .InterfaceDir }}"
-      filename: "{{ .InterfaceName | snakecase }}_mock.go"
-      inpackage: true
-      mockname: "Mock{{ .InterfaceName | camelcase }}"
+      dir: core/internal/mocks
     interfaces:
-      HeadReporter:
       PrometheusBackend:
   github.com/smartcontractkit/libocr/commontypes:
     config:

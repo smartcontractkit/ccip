@@ -1413,8 +1413,6 @@ github.com/smartcontractkit/chainlink-testing-framework v1.34.5 h1:6itLSDW4NHDDN
 github.com/smartcontractkit/chainlink-testing-framework v1.34.5/go.mod h1:hRZEDh2+afO8MSZb9qYNscmWb+3mHZf01J5ACZuIdTQ=
 github.com/smartcontractkit/chainlink-testing-framework/grafana v0.0.0-20240405215812-5a72bc9af239 h1:Kk5OVlx/5g9q3Z3lhxytZS4/f8ds1MiNM8yaHgK3Oe8=
 github.com/smartcontractkit/chainlink-testing-framework/grafana v0.0.0-20240405215812-5a72bc9af239/go.mod h1:DC8sQMyTlI/44UCTL8QWFwb0bYNoXCfjwCv2hMivYZU=
-github.com/smartcontractkit/chainlink-testing-framework/seth v1.2.1 h1:GRAAvtn2+jhO/8Z3lig10eQXVcV4VuOI4UgCyoPdJBg=
-github.com/smartcontractkit/chainlink-testing-framework/seth v1.2.1/go.mod h1:afY3QmNgeR/VI1pRbGH8g3YXGy7C2RrFOwUzEFvL3L8=
 github.com/smartcontractkit/go-plugin v0.0.0-20240208201424-b3b91517de16 h1:TFe+FvzxClblt6qRfqEhUfa4kFQx5UobuoFGO2W4mMo=
 github.com/smartcontractkit/go-plugin v0.0.0-20240208201424-b3b91517de16/go.mod h1:lBS5MtSSBZk0SHc66KACcjjlU6WzEVP/8pwz68aMkCI=
 github.com/smartcontractkit/grpc-proxy v0.0.0-20230731113816-f1be6620749f h1:hgJif132UCdjo8u43i7iPN1/MFnu49hv7lFGFftCHKU=
