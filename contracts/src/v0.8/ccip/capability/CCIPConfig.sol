@@ -6,7 +6,6 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {ICapabilitiesRegistry} from "./interfaces/ICapabilitiesRegistry.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
-
 import {SortedSetValidationUtil} from "../../shared/util/SortedSetValidationUtil.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {CCIPConfigTypes} from "./libraries/CCIPConfigTypes.sol";
@@ -26,7 +25,6 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @param chainSelector The chain selector.
   /// @param chainConfig The chain configuration.
   event ChainConfigSet(uint64 chainSelector, CCIPConfigTypes.ChainConfig chainConfig);
-
   /// @notice Emitted when a chain's configuration is removed.
   /// @param chainSelector The chain selector.
   event ChainConfigRemoved(uint64 chainSelector);
@@ -172,9 +170,8 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
       revert OnlyCapabilitiesRegistryCanCall();
     }
 
-    CCIPConfigTypes.OCR3Config[] memory ocr3Configs = abi.decode(config, (CCIPConfigTypes.OCR3Config[]));
     (CCIPConfigTypes.OCR3Config[] memory commitConfigs, CCIPConfigTypes.OCR3Config[] memory execConfigs) =
-      _groupByPluginType(ocr3Configs);
+      _groupByPluginType(abi.decode(config, (CCIPConfigTypes.OCR3Config[])));
     if (commitConfigs.length > 0) {
       _updatePluginConfig(donId, Internal.OCRPluginType.Commit, commitConfigs);
     }
