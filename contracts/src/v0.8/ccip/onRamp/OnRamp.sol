@@ -422,8 +422,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
         }
       }
 
-      for (uint256 k = 0; k < allowListConfigArgs.removedAllowlistedSenders.length; ++k) {
-        destChainConfig.allowedSendersList.remove(allowListConfigArgs.removedAllowlistedSenders[k]);
+      for (uint256 j = 0; j < allowListConfigArgs.removedAllowlistedSenders.length; ++j) {
+        destChainConfig.allowedSendersList.remove(allowListConfigArgs.removedAllowlistedSenders[j]);
       }
 
       if (allowListConfigArgs.removedAllowlistedSenders.length > 0) {
