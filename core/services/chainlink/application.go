@@ -17,14 +17,13 @@ import (
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
 
-	pkgcapabilities "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	commonservices "github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
-	coretypes "github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/jsonserializable"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
+
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/services/standardcapabilities"
@@ -180,7 +179,7 @@ type ApplicationOpts struct {
 	LoopRegistry               *plugins.LoopRegistry
 	GRPCOpts                   loop.GRPCOpts
 	MercuryPool                wsrpc.Pool
-	CapabilitiesRegistry       coretypes.CapabilitiesRegistry
+	CapabilitiesRegistry       *capabilities.Registry
 }
 
 // NewApplication initializes a new store if one is not already
@@ -205,7 +204,6 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 	}
 
 	var externalPeerWrapper p2ptypes.PeerWrapper
-	var getLocalNode func(ctx context.Context) (pkgcapabilities.Node, error)
 	var capabilityRegistrySyncer registrysyncer.Syncer
 
 	if cfg.Capabilities().ExternalRegistry().Address() != "" {
@@ -217,6 +215,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		}
 		registrySyncer, err := registrysyncer.New(
 			globalLogger,
+			externalPeerWrapper,
 			relayer,
 			registryAddress,
 		)
@@ -248,7 +247,6 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		)
 
 		capabilityRegistrySyncer.AddLauncher(wfLauncher)
-		getLocalNode = wfLauncher.LocalNode
 		srvcs = append(srvcs, dispatcher, wfLauncher)
 	}
 
@@ -446,7 +444,6 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		globalLogger,
 		opts.CapabilitiesRegistry,
 		workflowORM,
-		getLocalNode,
 	)
 
 	// Flux monitor requires ethereum just to boot, silence errors with a null delegate
