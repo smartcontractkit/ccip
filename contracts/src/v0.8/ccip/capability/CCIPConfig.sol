@@ -363,8 +363,8 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     // access in the for loop below.
     commitConfigs = new CCIPConfigTypes.OCR3Config[](MAX_OCR3_CONFIGS_PER_PLUGIN);
     execConfigs = new CCIPConfigTypes.OCR3Config[](MAX_OCR3_CONFIGS_PER_PLUGIN);
-    uint256 commitCount;
-    uint256 execCount;
+    uint256 commitCount = 0;
+    uint256 execCount = 0;
     for (uint256 i = 0; i < ocr3Configs.length; ++i) {
       if (ocr3Configs[i].pluginType == Internal.OCRPluginType.Commit) {
         commitConfigs[commitCount] = ocr3Configs[i];
@@ -490,7 +490,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
       uint64 chainSelector = chainConfigAdds[i].chainSelector;
 
       // Verify that the provided readers are present in the capabilities registry.
-      for (uint256 j = 0; j < readers.length; j++) {
+      for (uint256 j = 0; j < readers.length; ++j) {
         _ensureInRegistry(readers[j]);
       }
 
@@ -509,8 +509,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @notice Helper function to ensure that a node is in the capabilities registry.
   /// @param p2pId The P2P ID of the node to check.
   function _ensureInRegistry(bytes32 p2pId) internal view {
-    ICapabilitiesRegistry.NodeInfo memory node = ICapabilitiesRegistry(i_capabilitiesRegistry).getNode(p2pId);
-    if (node.p2pId == bytes32("")) {
+    if (ICapabilitiesRegistry(i_capabilitiesRegistry).getNode(p2pId).p2pId == bytes32("")) {
       revert NodeNotInRegistry(p2pId);
     }
   }

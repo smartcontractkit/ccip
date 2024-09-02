@@ -146,10 +146,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     }
 
     address[] memory transmitters = ocrConfigArgs.transmitters;
-    // Transmitters are expected to never exceed 255 (since this is bounded by MAX_NUM_ORACLES)
-    uint8 newTransmittersLength = uint8(transmitters.length);
-
-    if (newTransmittersLength > MAX_NUM_ORACLES) revert InvalidConfig(InvalidConfigErrorType.TOO_MANY_TRANSMITTERS);
+    if (transmitters.length > MAX_NUM_ORACLES) revert InvalidConfig(InvalidConfigErrorType.TOO_MANY_TRANSMITTERS);
 
     _clearOracleRoles(ocrPluginType, ocrConfig.transmitters);
 
