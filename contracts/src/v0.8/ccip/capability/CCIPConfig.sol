@@ -415,9 +415,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     SortedSetValidationUtil._checkIsValidUniqueSubset(cfg.bootstrapP2PIds, cfg.p2pIds);
 
     // Check that the readers are in the capabilities registry.
-    for (uint256 i = 0; i < cfg.signers.length; ++i) {
-      _ensureInRegistry(cfg.p2pIds[i]);
-    }
+    _ensureInRegistry(cfg.p2pIds);
   }
 
   /// @notice Computes the digest of the provided configuration.
@@ -487,9 +485,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
       uint64 chainSelector = chainConfigAdds[i].chainSelector;
 
       // Verify that the provided readers are present in the capabilities registry.
-      for (uint256 j = 0; j < readers.length; ++j) {
-        _ensureInRegistry(readers[j]);
-      }
+      _ensureInRegistry(readers);
 
       // Verify that fChain is positive.
       if (chainConfig.fChain == 0) {
@@ -504,10 +500,13 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   }
 
   /// @notice Helper function to ensure that a node is in the capabilities registry.
-  /// @param p2pId The P2P ID of the node to check.
-  function _ensureInRegistry(bytes32 p2pId) internal view {
-    if (ICapabilitiesRegistry(i_capabilitiesRegistry).getNode(p2pId).p2pId == bytes32("")) {
-      revert NodeNotInRegistry(p2pId);
+  /// @param p2pIds The P2P IDs of the node to check.
+  function _ensureInRegistry(bytes32[] memory p2pIds) internal view {
+    for (uint256 i = 0; i < p2pIds.length; ++i) {
+      // TODO add a method that does the validation in the ICapabilitiesRegistry contract
+      if (ICapabilitiesRegistry(i_capabilitiesRegistry).getNode(p2pIds[i]).p2pId == bytes32("")) {
+        revert NodeNotInRegistry(p2pIds[i]);
+      }
     }
   }
 }
