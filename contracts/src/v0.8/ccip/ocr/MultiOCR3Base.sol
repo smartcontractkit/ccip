@@ -195,13 +195,13 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   /// @param oracleAddresses Oracle addresses to assign roles to.
   /// @param role Role to assign.
   function _assignOracleRoles(uint8 ocrPluginType, address[] memory oracleAddresses, Role role) internal {
-    for (uint8 i = 0; i < oracleAddresses.length; ++i) {
+    for (uint256 i = 0; i < oracleAddresses.length; ++i) {
       address oracle = oracleAddresses[i];
       if (s_oracles[ocrPluginType][oracle].role != Role.Unset) {
         revert InvalidConfig(InvalidConfigErrorType.REPEATED_ORACLE_ADDRESS);
       }
       if (oracle == address(0)) revert OracleCannotBeZeroAddress();
-      s_oracles[ocrPluginType][oracle] = Oracle(i, role);
+      s_oracles[ocrPluginType][oracle] = Oracle(uint8(i), role);
     }
   }
 
