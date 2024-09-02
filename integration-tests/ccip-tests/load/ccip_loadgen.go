@@ -199,9 +199,9 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 		contracts.OnRampContract: contracts.V1_5_0_dev,
 	})
 	if matchErr != nil {
-		extraArgs, err = testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)
+		extraArgs, err = testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), true)
 	} else {
-		extraArgs, err = testhelpers.GetEVMExtraArgsV2(big.NewInt(gasLimit), false)
+		extraArgs, err = testhelpers.GetEVMExtraArgsV2(big.NewInt(gasLimit), true)
 	}
 	if err != nil {
 		return router.ClientEVM2AnyMessage{}, stats, err
