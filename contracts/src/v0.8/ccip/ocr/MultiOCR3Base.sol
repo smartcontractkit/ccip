@@ -291,7 +291,7 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     bytes32 rawVs // signatures
   ) internal view {
     // Verify signatures attached to report
-    bool[MAX_NUM_ORACLES] memory signed;
+    uint256 signed = 0;
 
     uint256 numberOfSignatures = rs.length;
     for (uint256 i; i < numberOfSignatures; ++i) {
@@ -301,8 +301,8 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
       // never have a signer role.
       Oracle memory oracle = s_oracles[ocrPluginType][signer];
       if (oracle.role != Role.Signer) revert UnauthorizedSigner();
-      if (signed[oracle.index]) revert NonUniqueSignatures();
-      signed[oracle.index] = true;
+      if (signed & (0x1 << oracle.index) != 0) revert NonUniqueSignatures();
+      signed |= 0x1 << oracle.index;
     }
   }
 
