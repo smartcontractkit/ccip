@@ -7,8 +7,6 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
@@ -27,10 +25,19 @@ const decimalsMethodName = "decimals"
 const latestRoundDataMethodName = "latestRoundData"
 const OFFCHAIN_AGGREGATOR = "OffchainAggregator"
 
-type decimalsConfig struct {
-}
+// function decimals() external view
+// returns (uint8)
+type decimalsConfig uint8
 
+//nolint:lll
 type latestRoundDataConfig struct {
+	// function latestRoundData() external view
+	// returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);
+	RoundID         *big.Int
+	Answer          *big.Int
+	StartedAt       *big.Int
+	UpdatedAt       *big.Int
+	AnsweredInRound *big.Int
 }
 
 func init() {
@@ -174,7 +181,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	bindings := make([]types.BoundContract, 0)
 	for _, call := range batchCalls.decimalCalls { // only need decimalCalls as addresses are same for latestRoundData
 		bindings = append(bindings, types.BoundContract{
-			Address: string(ccip.EvmAddrToGeneric(call.ContractAddress())),
+			Address: string(ccipcalc.EvmAddrToGeneric(call.ContractAddress())),
 			Name:    OFFCHAIN_AGGREGATOR,
 		})
 	}
@@ -182,25 +189,41 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	contractReader.Bind(ctx, bindings)
 
 	// Perform call
+	var decimalsReq uint8
+	var latestRoundData latestRoundDataConfig
 	result, err := contractReader.BatchGetLatestValues(ctx, types.BatchGetLatestValuesRequest{
 		OFFCHAIN_AGGREGATOR: types.ContractBatch{
 			{
 				ReadName:  decimalsMethodName,
-				ReturnVal: &decimalsConfig{},
+				ReturnVal: &decimalsReq,
 			},
 			{
 				ReadName:  latestRoundDataMethodName,
-				ReturnVal: &latestRoundDataConfig{},
+				ReturnVal: latestRoundData,
 			},
 		},
 	})
 
 	// Extract results
-	for _, batchResult := range result {
-		for _, read := range batchResult {
-			read.GetResult()
+	// give result the method key and then you get slice of responses
+	decimalRespSlice := result[decimalsMethodName]
+	for _, read := range decimalRespSlice {
+		val, readErr := read.GetResult()
+		if readErr != nil {
+			panic(fmt.Sprintf("DynamicPriceGetter ChainReader Result: %v", readErr))
 		}
+		panic(fmt.Sprintf("DynamicPriceGetter ChainReader Result: %v", &val))
 	}
+
+	//for _, batchResult := range result {
+	//	for _, read := range batchResult {
+	//		val, readErr := read.GetResult()
+	//		if readErr != nil {
+	//			panic(fmt.Sprintf("DynamicPriceGetter ChainReader Result: %v", readErr))
+	//		}
+	//		panic(fmt.Sprintf("DynamicPriceGetter ChainReader Result: %v", &val))
+	//	}
+	//}
 
 	// Perform batched call (all decimals calls followed by latest round data calls).
 	calls := make([]rpclib.EvmCall, 0, nbDecimalCalls+nbLatestRoundDataCalls)
