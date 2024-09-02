@@ -3,7 +3,6 @@ pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
-
 import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
@@ -138,7 +137,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     MerkleRoot[] merkleRoots; // Collection of merkle roots per source chain to commit
   }
 
-  /// @dev Struct to hold a merkle root for a source chain so that an array of these can be passed in the resetUblessedRoots function.
+  /// @dev Struct to hold a merkle root for a source chain so that an array of these can be passed in the
+  /// resetUnblessedRoots function.
   struct UnblessedRoot {
     uint64 sourceChainSelector; // Remote source chain selector that the Merkle Root is scoped to
     bytes32 merkleRoot; // Merkle root of a single remote source chain
@@ -344,7 +344,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     uint64 sourceChainSelector = report.sourceChainSelector;
     _whenNotCursed(sourceChainSelector);
 
-    SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
+    bytes memory onRamp = _getEnabledSourceChainConfig(sourceChainSelector).onRamp;
 
     uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();
@@ -365,7 +365,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       // over the same data, which increases gas cost.
       // Hashing all of the message fields ensures that the message being executed is correct and not tampered with.
       // Including the known OnRamp ensures that the message originates from the correct on ramp version
-      hashedLeaves[i] = Internal._hash(message, sourceChainConfig.onRamp);
+      hashedLeaves[i] = Internal._hash(message, onRamp);
     }
 
     // SECURITY CRITICAL CHECK
