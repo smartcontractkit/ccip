@@ -481,11 +481,10 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     // Process additions next.
     for (uint256 i = 0; i < chainConfigAdds.length; ++i) {
       CCIPConfigTypes.ChainConfig memory chainConfig = chainConfigAdds[i].chainConfig;
-      bytes32[] memory readers = chainConfig.readers;
       uint64 chainSelector = chainConfigAdds[i].chainSelector;
 
       // Verify that the provided readers are present in the capabilities registry.
-      _ensureInRegistry(readers);
+      _ensureInRegistry(chainConfig.readers);
 
       // Verify that fChain is positive.
       if (chainConfig.fChain == 0) {
