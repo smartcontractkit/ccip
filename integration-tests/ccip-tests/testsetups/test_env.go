@@ -491,7 +491,6 @@ func DeployEnvironments(
 							"image": map[string]interface{}{
 								"repository": "ghcr.io/foundry-rs/foundry",
 								"tag":        "nightly-2442e7a5fc165d7d0b022aa8b9f09dcdf675157b",
-								//	"tag":        "nightly-ea2eff95b5c17edd3ffbdfc6daab5ce5cc80afc0",
 							},
 							"anvil": map[string]interface{}{
 								"chainId":                   fmt.Sprintf("%d", network.ChainID),

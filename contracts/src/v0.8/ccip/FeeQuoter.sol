@@ -28,6 +28,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   using KeystoneFeedDefaultMetadataLib for bytes;
 
   error TokenNotSupported(address token);
+  error FeeTokenNotSupported(address token);
   error ChainNotSupported(uint64 chain);
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
   error StaleKeystoneUpdate(address token, uint256 feedTimestamp, uint256 storedTimeStamp);
@@ -147,7 +148,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// applyPremiumMultiplierWeiPerEthUpdates to set the mapping
   struct PremiumMultiplierWeiPerEthArgs {
     address token; // // ───────────────────╮ Token address
-    uint64 premiumMultiplierWeiPerEth; // ──╯ Multiplier for destination chain specific premiums. Should never be 0 so can be used as an isEnabled flag
+    uint64 premiumMultiplierWeiPerEth; // ──╯ Multiplier for destination chain specific premiums.
   }
 
   string public constant override typeAndVersion = "FeeQuoter 1.6.0-dev";
@@ -174,7 +175,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   mapping(address token => IFeeQuoter.TokenPriceFeedConfig dataFeedAddress) private s_usdPriceFeedsPerToken;
 
   /// @dev The multiplier for destination chain specific premiums that can be set by the owner or fee admin
-  /// This should never be 0 once set, so it can be used as an isEnabled flag
   mapping(address token => uint64 premiumMultiplierWeiPerEth) internal s_premiumMultiplierWeiPerEth;
 
   /// @dev The destination chain specific fee configs
@@ -241,12 +241,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   }
 
   /// @inheritdoc IPriceRegistry
-  function getTokenPrices(address[] calldata tokens)
-    external
-    view
-    override
-    returns (Internal.TimestampedPackedUint224[] memory)
-  {
+  function getTokenPrices(
+    address[] calldata tokens
+  ) external view override returns (Internal.TimestampedPackedUint224[] memory) {
     uint256 length = tokens.length;
     Internal.TimestampedPackedUint224[] memory tokenPrices = new Internal.TimestampedPackedUint224[](length);
     for (uint256 i = 0; i < length; ++i) {
@@ -256,22 +253,16 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   }
 
   /// @inheritdoc IFeeQuoter
-  function getTokenPriceFeedConfig(address token)
-    external
-    view
-    override
-    returns (IFeeQuoter.TokenPriceFeedConfig memory)
-  {
+  function getTokenPriceFeedConfig(
+    address token
+  ) external view override returns (IFeeQuoter.TokenPriceFeedConfig memory) {
     return s_usdPriceFeedsPerToken[token];
   }
 
   /// @inheritdoc IPriceRegistry
-  function getDestinationChainGasPrice(uint64 destChainSelector)
-    external
-    view
-    override
-    returns (Internal.TimestampedPackedUint224 memory)
-  {
+  function getDestinationChainGasPrice(
+    uint64 destChainSelector
+  ) external view override returns (Internal.TimestampedPackedUint224 memory) {
     return s_usdPerUnitGasByDestChainSelector[destChainSelector];
   }
 
@@ -319,11 +310,9 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @notice Gets the token price from a data feed address, rebased to the same units as s_usdPerToken
   /// @param priceFeedConfig token data feed configuration with valid data feed address (used to retrieve price & timestamp)
   /// @return tokenPrice data feed price answer rebased to s_usdPerToken units, with latest block timestamp
-  function _getTokenPriceFromDataFeed(IFeeQuoter.TokenPriceFeedConfig memory priceFeedConfig)
-    internal
-    view
-    returns (Internal.TimestampedPackedUint224 memory tokenPrice)
-  {
+  function _getTokenPriceFromDataFeed(
+    IFeeQuoter.TokenPriceFeedConfig memory priceFeedConfig
+  ) internal view returns (Internal.TimestampedPackedUint224 memory tokenPrice) {
     AggregatorV3Interface dataFeedContract = AggregatorV3Interface(priceFeedConfig.dataFeedAddress);
     (
       /* uint80 roundID */
@@ -473,11 +462,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   ) external view returns (uint256 feeTokenAmount) {
     DestChainConfig memory destChainConfig = s_destChainConfigs[destChainSelector];
     if (!destChainConfig.isEnabled) revert DestinationChainNotEnabled(destChainSelector);
+    if (!s_feeTokens.contains(message.feeToken)) revert FeeTokenNotSupported(message.feeToken);
 
     uint256 numberOfTokens = message.tokenAmounts.length;
     _validateMessage(destChainConfig, message.data.length, numberOfTokens, message.receiver);
-
-    uint64 premiumMultiplierWeiPerEth = s_premiumMultiplierWeiPerEth[message.feeToken];
 
     // The below call asserts that feeToken is a supported token
     (uint224 feeTokenPrice, uint224 packedGasPrice) = getTokenAndGasPrices(message.feeToken, destChainSelector);
@@ -521,7 +509,6 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
 
     // NOTE: when supporting non-EVM chains, revisit how generic this fee logic can be
     // NOTE: revisit parsing non-EVM args
-
     uint256 executionCost = uint112(packedGasPrice)
       * (
         destChainConfig.destGasOverhead + (message.data.length * destChainConfig.destGasPerPayloadByte) + tokenTransferGas
@@ -531,7 +518,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     // Calculate number of fee tokens to charge.
     // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
     // Result of the division is the number of smallest token denominations.
-    return ((premiumFee * premiumMultiplierWeiPerEth) + executionCost + dataAvailabilityCost) / feeTokenPrice;
+    return ((premiumFee * s_premiumMultiplierWeiPerEth[message.feeToken]) + executionCost + dataAvailabilityCost)
+      / feeTokenPrice;
   }
 
   /// @notice Sets the fee configuration for a token.

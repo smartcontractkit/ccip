@@ -725,9 +725,9 @@ contract FeeQuoter_updateTokenPriceFeeds is FeeQuoterSetup {
 }
 
 contract FeeQuoter_applyDestChainConfigUpdates is FeeQuoterSetup {
-  function test_Fuzz_applyDestChainConfigUpdates_Success(FeeQuoter.DestChainConfigArgs memory destChainConfigArgs)
-    public
-  {
+  function test_Fuzz_applyDestChainConfigUpdates_Success(
+    FeeQuoter.DestChainConfigArgs memory destChainConfigArgs
+  ) public {
     vm.assume(destChainConfigArgs.destChainSelector != 0);
     vm.assume(destChainConfigArgs.destChainConfig.maxPerMsgGasLimit != 0);
     destChainConfigArgs.destChainConfig.defaultTxGasLimit = uint32(
@@ -1706,7 +1706,7 @@ contract FeeQuoter_getValidatedFee is FeeQuoterFeeSetup {
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(notAFeeToken, 1);
     message.feeToken = notAFeeToken;
 
-    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.TokenNotSupported.selector, notAFeeToken));
+    vm.expectRevert(abi.encodeWithSelector(FeeQuoter.FeeTokenNotSupported.selector, notAFeeToken));
 
     s_feeQuoter.getValidatedFee(DEST_CHAIN_SELECTOR, message);
   }
