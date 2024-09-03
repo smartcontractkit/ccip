@@ -50,6 +50,9 @@ core/services/relay/evm/functions @smartcontractkit/functions
 core/scripts/functions @smartcontractkit/functions
 core/scripts/gateway @smartcontractkit/functions
 
+# Contracts
+/contracts/ @RensR @matYang @RayXpub @elatoskinas
+
 # First we match on project names to catch files like the compilation scripts,
 # gas snapshots and other files not places in the project directories.
 # This could give some false positives, so afterwards we match on the project directories
@@ -76,8 +79,8 @@ core/scripts/gateway @smartcontractkit/functions
 /contracts/src/v0.8/l2ep @chris-de-leon-cll
 /contracts/src/v0.8/llo-feeds @smartcontractkit/mercury-team
 # TODO: mocks folder, folder should be removed and files moved to the correct folders
-/contracts/src/v0.8/operatorforwarder @austinborn
-/contracts/src/v0.8/shared @RensR
+/contracts/src/v0.8/operatorforwarder @smartcontractkit/data-feeds-engineers
+/contracts/src/v0.8/shared @RensR @matYang @RayXpub @elatoskinas
 # TODO: tests folder, folder should be removed and files moved to the correct folders
 # TODO: transmission folder, owner should be found
 /contracts/src/v0.8/vrf @smartcontractkit/vrf-team
@@ -157,3 +160,6 @@ integration-tests/go.sum @smartcontractkit/ccip @smartcontractkit/prodsec-public
 /contracts/src/v0.8/ccip/ARMProxy.sol @smartcontractkit/rmn
 /contracts/src/v0.8/ccip/interfaces/IRMN.sol @smartcontractkit/rmn
 /contracts/src/v0.8/ccip/test/arm @smartcontractkit/rmn
+
+# CCIP Capabilities
+/core/capabilities/ccip @smartcontractkit/ccip-offchain
