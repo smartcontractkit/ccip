@@ -55,7 +55,7 @@ func NewGasSuite(t *testing.T, l zerolog.Logger, cfg *GasSuiteConfig) (*GasSuite
 		t:             t,
 		Cfg:           cfg,
 		Logger:        l,
-		RPCClient:     client.NewRPCClient(cfg.GethHTTPURL),
+		RPCClient:     client.NewRPCClient(cfg.GethHTTPURL, nil),
 		EVMClient:     dstEVMClient,
 		GrafanaClient: grafana.NewGrafanaClient(cfg.GrafanaURL, cfg.GrafanaToken),
 	}, nil
