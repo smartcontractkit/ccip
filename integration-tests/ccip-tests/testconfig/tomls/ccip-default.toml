@@ -244,6 +244,8 @@ version = "ccip-develop"
 KeepEnvAlive = false             # if true, the test will not tear down the test environment after the test is finished
 CommitAndExecuteOnSameDON = true # if true, and the test is building the env from scratch, same chainlink nodes will be used for Commit and Execution jobs.
 # Otherwise Commit and execution jobs will be set up in different nodes based on the number of nodes specified in NoOfCommitNodes and CCIP.Env.NewCLCluster.NoOfNodes
+AllowOutOfOrder = true           # if true, all the lanes will allow out of order execution and it
+# overrides settings from lane_config. To allow out of order execution per lane, then send "allow_out_of_order":true, similar to is_native_fee_token variable.
 BiDirectionalLane = true   # True uses both the lanes. If bidirectional is false only one way lane is set up.
 NoOfCommitNodes = 5        # no of chainlink nodes with Commit job
 PhaseTimeout = '10m'       # Duration to wait for the each phase validation(SendRequested, Commit, RMN Blessing, Execution) to time-out.
@@ -297,6 +299,7 @@ CCIPOwnerTokens = false # if true, the test will use deploy the tokens by the CC
 
 KeepEnvAlive = false             # same as above
 CommitAndExecuteOnSameDON = true # same as above
+AllowOutOfOrder = true           # same as above
 BiDirectionalLane = true         # same as above
 NoOfCommitNodes = 5              # same as above
 PhaseTimeout = '10m'             # same as above
@@ -407,6 +410,7 @@ CCIPOwnerTokens = false # if true, the test will use deploy the tokens by the CC
 #NetworkPairs =  ['SEPOLIA,OPTIMISM_GOERLI','SEPOLIA,POLYGON_MUMBAI','AVALANCHE_FUJI,SEPOLIA','SEPOLIA,BASE_GOERLI','SEPOLIA,BSC_TESTNET','SEPOLIA,WEMIX_TESTNET','AVALANCHE_FUJI,OPTIMISM_GOERLI','AVALANCHE_FUJI,POLYGON_MUMBAI','AVALANCHE_FUJI,BSC_TESTNET','AVALANCHE_FUJI,BASE_GOERLI','OPTIMISM_GOERLI,BASE_GOERLI','OPTIMISM_GOERLI,POLYGON_MUMBAI','BSC_TESTNET,POLYGON_MUMBAI','BSC_TESTNET,BASE_GOERLI','WEMIX_TESTNET,KROMA_SEPOLIA']
 KeepEnvAlive = false
 CommitAndExecuteOnSameDON = false
+AllowOutOfOrder = true
 BiDirectionalLane = true
 NoOfCommitNodes = 5
 PhaseTimeout = '50m'

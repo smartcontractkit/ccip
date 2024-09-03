@@ -3503,6 +3503,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		srcConf                = lane.SrcNetworkLaneCfg
 		destConf               = lane.DstNetworkLaneCfg
 		commitAndExecOnSameDON = pointer.GetBool(testConf.CommitAndExecuteOnSameDON)
+		allowOutOfOrder        = pointer.GetBool(testConf.AllowOutOfOrder)
 		withPipeline           = pointer.GetBool(testConf.TokenConfig.WithPipeline)
 		configureCLNodes       = !pointer.GetBool(testConf.ExistingDeployment)
 	)
@@ -3516,6 +3517,13 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create source module: %w", err)
+	}
+
+	// If AllowOutOfOrder is set globally in test config, then assumption is to set it for every lane.
+	//However, if this is set as false, and set as true for specific chain in lane_configs then apply it
+	//only for a lane where source network is of that chain.
+	if allowOutOfOrder {
+		lane.Source.Common.AllowOutOfOrder = true
 	}
 	lane.Dest, err = DefaultDestinationCCIPModule(
 		lane.Logger, testConf,
