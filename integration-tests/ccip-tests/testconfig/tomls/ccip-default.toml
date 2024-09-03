@@ -244,7 +244,7 @@ version = "ccip-develop"
 KeepEnvAlive = false             # if true, the test will not tear down the test environment after the test is finished
 CommitAndExecuteOnSameDON = true # if true, and the test is building the env from scratch, same chainlink nodes will be used for Commit and Execution jobs.
 # Otherwise Commit and execution jobs will be set up in different nodes based on the number of nodes specified in NoOfCommitNodes and CCIP.Env.NewCLCluster.NoOfNodes
-AllowOutOfOrder = true           # if true, all the lanes will allow out of order execution and it
+AllowOutOfOrder = false          # if true, all the lanes will allow out of order execution and it
 # overrides settings from lane_config. To allow out of order execution per lane, then send "allow_out_of_order":true, similar to is_native_fee_token variable.
 BiDirectionalLane = true   # True uses both the lanes. If bidirectional is false only one way lane is set up.
 NoOfCommitNodes = 5        # no of chainlink nodes with Commit job
