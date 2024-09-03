@@ -412,6 +412,14 @@ contract CCIPConfig_validateConfig is CCIPConfigSetup {
     s_ccipCC.validateConfig(config);
   }
 
+  function test__validateConfig_TooManySigners_Reverts() public {
+    CCIPConfigTypes.OCR3Config memory config = _getCorrectOCR3Config();
+    config.signers = new bytes[](257);
+
+    vm.expectRevert(CCIPConfig.TooManySigners.selector);
+    s_ccipCC.validateConfig(config);
+  }
+
   function test__validateConfig_FMustBePositive_Reverts() public {
     CCIPConfigTypes.OCR3Config memory config = _getCorrectOCR3Config();
     config.F = 0; // not positive

@@ -65,6 +65,8 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @dev must be equal to libocr multi role: https://github.com/smartcontractkit/libocr/blob/ae747ca5b81236ffdbf1714318c652e923a5ff4d/offchainreporting2plus/types/config_digest.go#L28
   uint256 internal constant CONFIG_DIGEST_PREFIX = 0x000a << (256 - 16); // 0x000a00..00
   bytes32 internal constant EMPTY_ENCODED_ADDRESS_HASH = keccak256(abi.encode(address(0)));
+  /// @dev 256 is the hard limit due to the bit encoding of their indexes into a uint256.
+  uint256 internal constant MAX_NUM_ORACLES = 256;
 
   /// @notice chain configuration for each chain that CCIP is deployed on.
   mapping(uint64 chainSelector => CCIPConfigTypes.ChainConfig chainConfig) internal s_chainConfigurations;
@@ -398,6 +400,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
       revert NotEnoughTransmitters(cfg.transmitters.length, minTransmittersLength);
     }
     uint256 numberOfSigners = cfg.signers.length;
+    if (numberOfSigners > MAX_NUM_ORACLES) revert TooManySigners();
     if (numberOfSigners != cfg.p2pIds.length || numberOfSigners != cfg.transmitters.length) {
       revert P2PIdsLengthNotMatching(cfg.p2pIds.length, cfg.signers.length, cfg.transmitters.length);
     }
