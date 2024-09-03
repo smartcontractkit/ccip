@@ -73,5 +73,5 @@ build_ccip_image:
 # tag: the tag for the chainlink image being built, example: tag=latest
 # example usage: make build_ccip_image image=chainlink-ccip tag=latest
 .PHONY: build_ccip_debug_image
-build_ccip_image:
+build_ccip_debug_image:
 	docker build -f ../../core/chainlink.debug.Dockerfile --build-arg COMMIT_SHA=$(git rev-parse HEAD) --build-arg CHAINLINK_USER=chainlink -t $(image):$(tag) ../../
