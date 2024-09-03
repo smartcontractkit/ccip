@@ -23,6 +23,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/docker"
 	"github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
+	ctf_test_env "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/logstream"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
@@ -446,7 +447,7 @@ func (n *ClNode) getContainerRequest(secrets string) (
 		Name:            n.ContainerName,
 		AlwaysPullImage: n.AlwaysPullImage,
 		Image:           fmt.Sprintf("%s:%s", n.ContainerImage, n.ContainerVersion),
-		ExposedPorts:    []string{"6688/tcp"},
+		ExposedPorts:    []string{"6688/tcp", ctf_test_env.NatPortFormat("40000")},
 		Env:             n.ContainerEnvs,
 		Entrypoint: []string{"chainlink",
 			"-c", configPath,
