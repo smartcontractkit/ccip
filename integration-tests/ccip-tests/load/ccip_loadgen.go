@@ -201,7 +201,7 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 	if matchErr != nil {
 		extraArgs, err = testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)
 	} else {
-		extraArgs, err = testhelpers.GetEVMExtraArgsV2(big.NewInt(gasLimit), false)
+		extraArgs, err = testhelpers.GetEVMExtraArgsV2(big.NewInt(gasLimit), c.Lane.Source.Common.AllowOutOfOrder)
 	}
 	if err != nil {
 		return router.ClientEVM2AnyMessage{}, stats, err
