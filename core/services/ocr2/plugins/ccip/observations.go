@@ -21,7 +21,8 @@ import (
 // know what you are doing.
 //
 // IMPORTANT: Both CommitObservation and ExecutionObservation are streamed and processed by Atlas.
-// Any change to that struct must be tested with Atlas before releasing.
+// Any change to that struct must be reflected in the Atlas codebase.
+// Additionally, you must test if OTI telemetry ingestion works with the new struct on staging environment.
 type CommitObservation struct {
 	Interval                  cciptypes.CommitStoreInterval  `json:"interval"`
 	TokenPricesUSD            map[cciptypes.Address]*big.Int `json:"tokensPerFeeCoin"`
@@ -52,7 +53,8 @@ func (o CommitObservation) Marshal() ([]byte, error) {
 // know what you are doing.
 //
 // IMPORTANT: Both CommitObservation and ExecutionObservation are streamed and processed by Atlas.
-// Any change to that struct must be tested with Atlas before releasing.
+// Any change to that struct must be reflected in the Atlas codebase.
+// Additionally, you must test if OTI telemetry ingestion works with the new struct on staging environment.
 type ExecutionObservation struct {
 	Messages map[uint64]MsgData `json:"messages"`
 }
