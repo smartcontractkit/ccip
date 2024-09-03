@@ -30,9 +30,6 @@ RUN if [ "$GO_COVER_FLAG" = "true" ]; then \
 RUN go list -m -f "{{.Dir}}" github.com/smartcontractkit/chainlink-feeds | xargs -I % ln -s % /chainlink-feeds
 RUN go list -m -f "{{.Dir}}" github.com/smartcontractkit/chainlink-solana | xargs -I % ln -s % /chainlink-solana
 
-# Install dlv
-RUN go install github.com/go-delve/delve/cmd/dlv@latest
-
 # Build image: Plugins
 FROM golang:1.22-bullseye as buildplugins
 RUN go version
@@ -51,6 +48,17 @@ FROM ubuntu:20.04
 ARG CHAINLINK_USER=root
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get install -y ca-certificates gnupg lsb-release curl
+
+# Install go
+RUN curl -LO https://go.dev/dl/go1.22.6.linux-amd64.tar.gz
+RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go1.22.6.linux-amd64.tar.gz
+ENV PATH=$PATH:/usr/local/go/bin
+
+# ENV GOPATH=$HOME/go
+# ENV PATH=$PATH:$GOPATH/bin
+
+# Install dlv
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
 # Install Postgres for CLI tools, needed specifically for DB backups
 RUN curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
