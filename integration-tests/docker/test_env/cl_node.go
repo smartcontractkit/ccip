@@ -449,7 +449,7 @@ func (n *ClNode) getContainerRequest(secrets string) (
 		Image:           fmt.Sprintf("%s:%s", n.ContainerImage, n.ContainerVersion),
 		ExposedPorts:    []string{"6688/tcp", ctf_test_env.NatPortFormat("40000")},
 		Env:             n.ContainerEnvs,
-		Entrypoint: []string{"dlv",
+		Entrypoint: []string{"/$HOME/go/bin/dlv",
 			"exec",
 			"/usr/local/bin/chainlink",
 			"--accept-multiclient",
