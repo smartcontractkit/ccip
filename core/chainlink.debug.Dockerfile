@@ -50,15 +50,9 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get install -y ca-certificates gnupg lsb-release curl
 
 # Install go
-RUN curl -LO https://go.dev/dl/go1.22.6.linux-amd64.tar.gz
-RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go1.22.6.linux-amd64.tar.gz
+RUN curl -LO https://go.dev/dl/go1.22.5.linux-amd64.tar.gz
+RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go1.22.5.linux-amd64.tar.gz
 ENV PATH=$PATH:/usr/local/go/bin
-
-# ENV GOPATH=$HOME/go
-# ENV PATH=$PATH:$GOPATH/bin
-
-# Install dlv
-RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
 # Install Postgres for CLI tools, needed specifically for DB backups
 RUN curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
@@ -82,6 +76,7 @@ RUN if [ ${CHAINLINK_USER} != root ]; then \
   fi
 USER ${CHAINLINK_USER}
 WORKDIR /home/${CHAINLINK_USER}
+RUN mkdir -p go
 # explicit set the cache dir. needed so both root and non-root user has an explicit location
 ENV XDG_CACHE_HOME /home/${CHAINLINK_USER}/.cache
 RUN mkdir -p ${XDG_CACHE_HOME}
@@ -90,6 +85,11 @@ RUN mkdir -p ${XDG_CACHE_HOME}
 ARG GO_COVER_DIR="/var/tmp/go-coverage"
 ENV GOCOVERDIR=${GO_COVER_DIR}
 RUN mkdir -p $GO_COVER_DIR
+
+# Install dlv
+ENV GOPATH=/home/${CHAINLINK_USER}/go
+ENV PATH=$PATH:$GOPATH/bin
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
 EXPOSE 6688
 ENTRYPOINT ["chainlink"]
