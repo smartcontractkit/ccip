@@ -314,12 +314,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
           if (tokenGasOverride != 0) {
             uint32 destGasAmount = abi.decode(message.tokenAmounts[tokenIndex].destExecData, (uint32));
             if (tokenGasOverride < destGasAmount) {
-              revert InvalidTokenGasOverride(
-                message.header.messageId,
-                tokenIndex,
-                destGasAmount,
-                tokenGasOverride
-              );
+              revert InvalidTokenGasOverride(message.header.messageId, tokenIndex, destGasAmount, tokenGasOverride);
             }
           }
         }
