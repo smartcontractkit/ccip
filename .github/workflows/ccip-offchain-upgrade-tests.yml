@@ -19,6 +19,21 @@ env:
   INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
   MOD_CACHE_VERSION: 2
   AWS_ECR_REPO_PUBLIC_REGISTRY: public.ecr.aws
+  # Default private key test secret loaded from Github Secret as only security team has access to it.
+  # this key secrets.QA_SHARED_803C_KEY has a story behind it. To know more, see CCIP-2875 and SECHD-16575 tickets.
+  E2E_TEST_ETHEREUM_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_ARBITRUM_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_BASE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_WEMIX_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_AVALANCHE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_ZKSYNC_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_MODE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_METIS_ANDROMEDA_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_OPTIMISM_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_KROMA_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_GNOSIS_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_POLYGON_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_BSC_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
 
 jobs:
   # Build Test Dependencies
@@ -221,24 +236,19 @@ jobs:
           fi
       - name: Prepare Base64 TOML override for CCIP secrets
         uses: ./.github/actions/setup-create-base64-config-ccip
+        id: setup_create_base64_config_ccip
         with:
           runId: ${{ github.run_id }}
           testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
-          selectedNetworks: SIMULATED_1,SIMULATED_2
-          chainlinkImage: ${{ env.AWS_ECR_REPO_PUBLIC_REGISTRY }}/w0i8p0z9/chainlink-ccip
           chainlinkVersion: ${{ env.RELEASE_TAG }}
-          lokiEndpoint: ${{ secrets.LOKI_URL_CI }}
-          lokiTenantId: ${{ vars.LOKI_TENANT_ID }}
-          lokiBasicAuth: ${{ secrets.LOKI_BASIC_AUTH }}
           logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
-          grafanaUrl: ${{ vars.GRAFANA_URL }}
-          grafanaDashboardUrl: "/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
+          selectedNetworks: SIMULATED_1,SIMULATED_2
       - name: Run Tests
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@94cb11f4bd545607a2f221c6685052b3abee723d # v2.3.32
         env:
-          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }}
-          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }}
+          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
+          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
           ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:${{ github.sha }}
           TEST_SUITE: smoke
           TEST_ARGS: -test.timeout 30m
@@ -246,10 +256,17 @@ jobs:
           DATABASE_URL: postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable
           RR_MEM: 8Gi
           RR_CPU: 4
-          BASE64_NETWORK_CONFIG: ${{ secrets.BASE64_NETWORK_CONFIG }}
+          E2E_TEST_CHAINLINK_IMAGE: ${{ env.AWS_ECR_REPO_PUBLIC_REGISTRY }}/w0i8p0z9/chainlink-ccip
+          E2E_TEST_LOKI_TENANT_ID: ${{ vars.LOKI_TENANT_ID }}
+          E2E_TEST_LOKI_ENDPOINT: ${{ secrets.LOKI_URL_CI }}
+          E2E_TEST_LOKI_BASIC_AUTH: ${{ secrets.LOKI_BASIC_AUTH }}
+          E2E_TEST_GRAFANA_BASE_URL: ${{ vars.GRAFANA_URL }}
+          E2E_TEST_GRAFANA_DASHBOARD_URL: "/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
         with:
           test_command_to_run: cd ./integration-tests/ccip-tests && go test -timeout 30m -count=1 -json -run ${{ matrix.product.run }} ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          # Load default test secrets
+          test_secrets_defaults_base64: ${{ secrets.CCIP_DEFAULT_TEST_SECRETS }}
           cl_repo: ${{ env.AWS_ECR_REPO_PUBLIC_REGISTRY }}/w0i8p0z9/chainlink-ccip # releases are published to public registry
           cl_image_tag: ${{ env.RELEASE_TAG }}
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
@@ -342,34 +359,38 @@ jobs:
           fi
       - name: Prepare Base64 TOML override for CCIP secrets
         uses: ./.github/actions/setup-create-base64-config-ccip
+        id: setup_create_base64_config_ccip
         with:
           runId: ${{ github.run_id }}
-          existingNamespace: ${{ needs.run-test-with-last-release.outputs.existing_namespace }}
           testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
-          chainlinkImage: ${{ env.CHAINLINK_IMAGE }}
           chainlinkVersion: ${{ github.sha }}
-          upgradeImage: ${{ env.CHAINLINK_IMAGE }}
           upgradeVersion: ${{ github.sha }}
-          lokiEndpoint: ${{ secrets.LOKI_URL }}
-          lokiTenantId: ${{ vars.LOKI_TENANT_ID }}
           logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
-          grafanaUrl: ${{ vars.GRAFANA_URL }}
-          grafanaDashboardUrl: "/d/6vjVx-1V8/ccip-long-running-tests"
+          existingNamespace: ${{ needs.run-test-with-last-release.outputs.existing_namespace }}
       - name: Run Tests
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@b49a9d04744b0237908831730f8553f26d73a94b # v2.3.17
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@94cb11f4bd545607a2f221c6685052b3abee723d # v2.3.32
         env:
-          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }}
-          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }}
+          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
+          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
           ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:${{ github.sha }}
           TEST_SUITE: load
           TEST_ARGS: -test.timeout 1h
           DATABASE_URL: postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable
           RR_MEM: 8Gi
           RR_CPU: 4
+          E2E_TEST_GRAFANA_DASHBOARD_URL: "/d/6vjVx-1V8/ccip-long-running-tests"
+          E2E_TEST_CHAINLINK_IMAGE: ${{ env.CHAINLINK_IMAGE }}
+          E2E_TEST_CHAINLINK_UPGRADE_IMAGE: ${{ env.CHAINLINK_IMAGE }}
+          E2E_TEST_LOKI_TENANT_ID: ${{ vars.LOKI_TENANT_ID }}
+          E2E_TEST_LOKI_ENDPOINT: ${{ secrets.LOKI_URL }}
+          E2E_TEST_LOKI_BASIC_AUTH: ${{ secrets.LOKI_BASIC_AUTH }}
+          E2E_TEST_GRAFANA_BASE_URL: ${{ vars.GRAFANA_URL }}
         with:
           test_command_to_run: cd ./integration-tests/ccip-tests && go test -timeout 1h -count=1 -json -run ${{ matrix.product.run }} ./load 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
+          # Load default test secrets
+          test_secrets_defaults_base64: ${{ secrets.CCIP_DEFAULT_TEST_SECRETS }}
           cl_repo: ${{ env.CHAINLINK_IMAGE }}
           cl_image_tag: ${{ github.sha }}
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
