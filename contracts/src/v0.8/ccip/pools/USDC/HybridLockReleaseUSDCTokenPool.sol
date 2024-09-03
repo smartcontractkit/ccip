@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {ILiquidityContainer} from "../../../liquiditymanager/interfaces/ILiquidityContainer.sol";
 import {ITokenMessenger} from "../USDC/ITokenMessenger.sol";
 
+import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../TokenPool.sol";
 import {USDCTokenPool} from "../USDC/USDCTokenPool.sol";
@@ -29,9 +30,14 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
   event LockReleaseEnabled(uint64 indexed remoteChainSelector);
   event LockReleaseDisabled(uint64 indexed remoteChainSelector);
+  event TokensExcludedFromBurn(uint64 indexed remoteChainSelector, uint256 amount, uint256 lockedTokensAfterExclusion);
 
   error LanePausedForCCTPMigration(uint64 remoteChainSelector);
   error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
+
+  bytes public constant LOCK_RELEASE_FLAG = "NO_CTTP_USE_LOCK_RELEASE";
+
+  mapping(uint64 remoteChainSelector => uint256 excludedTokens) internal s_tokensExcludedFromBurn;
 
   /// @notice The address of the liquidity provider for a specific chain.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
@@ -81,9 +87,20 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     override
     returns (Pool.ReleaseOrMintOutV1 memory)
   {
-    if (!shouldUseLockRelease(releaseOrMintIn.remoteChainSelector)) {
+    // Use CCTP Burn/Mint mechanism for chains which have it enabled. The LOCK_RELEASE_FLAG is used in the event of a
+    // stuck message after a migration has occured, where shouldUseLockRelease would return false, but the message
+    // was not executed properly before the migration began, and locked tokens were not released until now, meaning
+    // the message should be executed as a release, instead of a Burn/Mint with CCTP. All new messages after the
+    // migration will have sourcePooLData include an attestation, and thus CTTP will be invoked instead.
+
+    // TODO: SourcePoolData vs. OffChainTokenData
+    if (
+      !shouldUseLockRelease(releaseOrMintIn.remoteChainSelector)
+        && keccak256(releaseOrMintIn.sourcePoolData) != keccak256(LOCK_RELEASE_FLAG)
+    ) {
       return super.releaseOrMint(releaseOrMintIn);
     }
+
     return _lockReleaseIncomingMessage(releaseOrMintIn);
   }
 
@@ -102,7 +119,14 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     }
 
     // Decrease internal tracking of locked tokens to ensure accurate accounting for burnLockedUSDC() migration
-    s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.amount;
+    // If the chain has already been migrated, then this mapping would be zero, and the operation would underflow.
+    // This branch ensures that we're subtracting from the correct mapping. It is also safe to subtract from the
+    // excluded tokens mapping, as this function would only be invoked in the event of a stuck tx after a migration
+    if (s_migratedChains.contains(releaseOrMintIn.remoteChainSelector)) {
+      s_tokensExcludedFromBurn[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.amount;
+    } else {
+      s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.amount;
+    }
 
     // Release to the offRamp, which forwards it to the recipient
     getToken().safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.amount);
@@ -125,7 +149,10 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
     emit Locked(msg.sender, lockOrBurnIn.amount);
 
-    return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+    return Pool.LockOrBurnOutV1({
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: LOCK_RELEASE_FLAG
+    });
   }
 
   // ================================================================
@@ -165,6 +192,70 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     i_token.safeTransferFrom(msg.sender, address(this), amount);
 
     emit ILiquidityContainer.LiquidityAdded(msg.sender, amount);
+  }
+
+  /// @notice Removed liquidity to the pool. The tokens will be sent to msg.sender.
+  /// @param remoteChainSelector The chain where liquidity is being released.
+  /// @param amount The amount of liquidity to remove.
+  /// @dev The function should only be called if non canonical USDC on the remote chain has been burned and is not being
+  /// withdrawn on this chain, otherwise a mismatch may occur between locked token balance and remote circulating supply
+  /// which may block a potential future migration of the chain to CCTP.
+  function withdrawLiquidity(uint64 remoteChainSelector, uint256 amount) external onlyOwner {
+    s_lockedTokensByChainSelector[remoteChainSelector] -= amount;
+
+    i_token.safeTransfer(msg.sender, amount);
+
+    emit ILiquidityContainer.LiquidityRemoved(msg.sender, amount);
+  }
+
+  /// @notice Exclude tokens to be burned in a CCTP-migration because the amount are locked in an undelivered message.
+  /// @dev When a message is sitting in manual execution from the L/R chain, those tokens need to be excluded from
+  /// being burned in a CCTP-migration otherwise the message will never be able to be delivered due to it not having
+  /// an attestation on the source-chain to mint. In that instance it should use provided liquidity that was designated
+  /// @dev This function should ONLY be called on the home chain, where tokens are locked, NOT on the remote chain
+  /// and strict scrutiny should be applied to ensure that the amount of tokens excluded is accurate.
+  function excludeTokensFromBurn(uint64 remoteChainSelector, uint256 amount) external onlyOwner {
+    uint256 lockedTokensBeforeExclusion = s_lockedTokensByChainSelector[remoteChainSelector];
+
+    s_lockedTokensByChainSelector[remoteChainSelector] -= amount;
+
+    s_tokensExcludedFromBurn[remoteChainSelector] += amount;
+
+    emit TokensExcludedFromBurn(remoteChainSelector, amount, lockedTokensBeforeExclusion);
+  }
+
+  /// @notice Get the amount of tokens excluded from being burned in a CCTP-migration
+  /// @dev The sum of locked tokens and excluded tokens should equal the supply of the token on the remote chain
+  /// @param remoteChainSelector The chain for which the excluded tokens are being queried
+  /// @return uint256 amount of tokens excluded from being burned in a CCTP-migration
+  function getExcludedTokensByChain(uint64 remoteChainSelector) public view returns (uint256) {
+    return s_tokensExcludedFromBurn[remoteChainSelector];
+  }
+
+  /// @notice This function can be used to transfer liquidity from an older version of the pool to this pool. To do so
+  /// this pool must be the owner of the old pool. Since the pool uses two-step ownership transfer, the old pool must
+  /// first propose the ownership transfer, and then this pool must accept it. This function can only be called after
+  /// the ownership transfer has been proposed, as it will accept it and then make the call to withdrawLiquidity
+  /// @dev When upgrading a LockRelease pool, this function can be called at the same time as the pool is changed in the
+  /// TokenAdminRegistry. This allows for a smooth transition of both liquidity and transactions to the new pool.
+  /// Alternatively, when no multicall is available, a portion of the funds can be transferred to the new pool before
+  /// changing which pool CCIP uses, to ensure both pools can operate. Then the pool should be changed in the
+  /// TokenAdminRegistry, which will activate the new pool. All new transactions will use the new pool and its
+  /// liquidity.
+  /// @param from The address of the old pool.
+  /// @param amount The amount of liquidity to transfer.
+  function transferLiquidity(address from, uint64 remoteChainSelector, uint256 amount) external onlyOwner {
+    // TODO: Because tokens are not tracked as locked OR excluded, figure out how to balance the withdrawal of both.
+    // Theoretically, excluded tokens should always be zero when this function is called but that invariant cannot be
+    // guaranteed just yet.
+
+    OwnerIsCreator(from).acceptOwnership();
+
+    HybridLockReleaseUSDCTokenPool(from).withdrawLiquidity(remoteChainSelector, amount);
+
+    s_lockedTokensByChainSelector[remoteChainSelector] += amount;
+
+    emit LiquidityTransferred(from, remoteChainSelector, amount);
   }
 
   // ================================================================

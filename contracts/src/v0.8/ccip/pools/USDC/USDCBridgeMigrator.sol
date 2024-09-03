@@ -9,6 +9,7 @@ import {Router} from "../../Router.sol";
 
 /// @notice Allows migration of a lane in a token pool from Lock/Release to CCTP supported Burn/Mint. Contract
 /// functionality is based on hard requirements defined by Circle to allow for future CCTP compatibility
+/// https://github.com/circlefin/stablecoin-evm/blob/master/doc/bridged_USDC_standard.md
 abstract contract USDCBridgeMigrator is OwnerIsCreator {
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -32,6 +33,8 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   mapping(uint64 chainSelector => uint256 lockedBalance) internal s_lockedTokensByChainSelector;
   mapping(uint64 chainSelector => bool shouldUseLockRelease) internal s_shouldUseLockRelease;
 
+  EnumerableSet.UintSet internal s_migratedChains;
+
   constructor(address token, address router) {
     i_USDC = IBurnMintERC20(token);
     i_router = Router(router);
@@ -53,6 +56,9 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
     // Even though USDC is a trusted call, ensure CEI by updating state first
     delete s_lockedTokensByChainSelector[burnChainSelector];
     delete s_proposedUSDCMigrationChain;
+
+    // Add the chain to the migrated chains set to handle edge cases of stuck transactions.
+    s_migratedChains.add(burnChainSelector);
 
     // This should only be called after this contract has been granted a "zero allowance minter role" on USDC by Circle,
     // otherwise the call will revert. Executing this burn will functionally convert all USDC on the destination chain
