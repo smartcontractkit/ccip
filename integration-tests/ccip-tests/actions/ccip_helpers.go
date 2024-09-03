@@ -185,6 +185,7 @@ type CCIPCommon struct {
 	gasUpdateWatcherMu        *sync.Mutex
 	gasUpdateWatcher          map[uint64]*big.Int // key - destchain id; value - timestamp of update
 	GasUpdateEvents           []contracts.GasUpdateEvent
+	AllowOutOfOrder           bool
 }
 
 // FreeUpUnusedSpace sets nil to various elements of ccipModule which are only used
@@ -273,6 +274,9 @@ func (ccipModule *CCIPCommon) CurseARM() (*types.Transaction, error) {
 
 func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig, noOfTokens *int) {
 	if conf != nil {
+		if conf.AllowOutOfOrder {
+			ccipModule.AllowOutOfOrder = true
+		}
 		if common.IsHexAddress(conf.FeeToken) {
 			ccipModule.FeeToken = &contracts.LinkToken{
 				EthAddress: common.HexToAddress(conf.FeeToken),
@@ -725,17 +729,16 @@ func (ccipModule *CCIPCommon) WriteLaneConfig(conf *laneconfig.LaneConfig) {
 	for k, v := range ccipModule.PriceAggregators {
 		priceAggrs[k.Hex()] = v.ContractAddress.Hex()
 	}
-	conf.CommonContracts = laneconfig.CommonContracts{
-		FeeToken:         ccipModule.FeeToken.Address(),
-		BridgeTokens:     btAddresses,
-		BridgeTokenPools: btpAddresses,
-		ARM:              ccipModule.RMNContract.Hex(),
-		Router:           ccipModule.Router.Address(),
-		PriceRegistry:    ccipModule.PriceRegistry.Address(),
-		PriceAggregators: priceAggrs,
-		WrappedNative:    ccipModule.WrappedNative.Hex(),
-		Multicall:        ccipModule.MulticallContract.Hex(),
-	}
+	conf.CommonContracts.FeeToken = ccipModule.FeeToken.Address()
+	conf.CommonContracts.BridgeTokens = btAddresses
+	conf.CommonContracts.BridgeTokenPools = btpAddresses
+	conf.CommonContracts.ARM = ccipModule.RMNContract.Hex()
+	conf.CommonContracts.Router = ccipModule.Router.Address()
+	conf.CommonContracts.PriceRegistry = ccipModule.PriceRegistry.Address()
+	conf.CommonContracts.PriceAggregators = priceAggrs
+	conf.CommonContracts.WrappedNative = ccipModule.WrappedNative.Hex()
+	conf.CommonContracts.Multicall = ccipModule.MulticallContract.Hex()
+
 	if ccipModule.TokenAdminRegistry != nil {
 		conf.CommonContracts.TokenAdminRegistry = ccipModule.TokenAdminRegistry.Address()
 	}
@@ -1753,10 +1756,10 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 
 	var extraArgs []byte
 	matchErr := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
-		contracts.OnRampContract: contracts.V1_5_0_dev,
+		contracts.OnRampContract: contracts.V1_5_0,
 	})
 	if matchErr != nil {
-		extraArgs, err = testhelpers.GetEVMExtraArgsV1(gasLimit, allowOutOfOrder)
+		extraArgs, err = testhelpers.GetEVMExtraArgsV1(gasLimit, false)
 	} else {
 		extraArgs, err = testhelpers.GetEVMExtraArgsV2(gasLimit, allowOutOfOrder)
 	}
@@ -1774,18 +1777,14 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 }
 
 // SendRequest sends a CCIP request to the source chain's router contract
-func (sourceCCIP *SourceCCIPModule) SendRequest(
-	receiver common.Address,
-	allowOutOfOrder bool,
-	gasLimit *big.Int,
-) (common.Hash, time.Duration, *big.Int, error) {
+func (sourceCCIP *SourceCCIPModule) SendRequest(receiver common.Address, gasLimit *big.Int) (common.Hash, time.Duration, *big.Int, error) {
 	var d time.Duration
 	destChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed getting the chain selector: %w", err)
 	}
 	// form the message for transfer
-	msg, err := sourceCCIP.CCIPMsg(receiver, allowOutOfOrder, gasLimit)
+	msg, err := sourceCCIP.CCIPMsg(receiver, sourceCCIP.Common.AllowOutOfOrder, gasLimit)
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed forming the ccip msg: %w", err)
 	}
@@ -2896,14 +2895,10 @@ func (lane *CCIPLane) Multicall(
 
 // SendRequests sends individual ccip-send requests in different transactions
 // It will create noOfRequests transactions
-func (lane *CCIPLane) SendRequests(noOfRequests int, allowOutOfOrder bool, gasLimit *big.Int) error {
+func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
 	for i := 1; i <= noOfRequests; i++ {
 		stat := testreporters.NewCCIPRequestStats(int64(lane.NumberOfReq+i), lane.SourceNetworkName, lane.DestNetworkName)
-		txHash, txConfirmationDur, fee, err := lane.Source.SendRequest(
-			lane.Dest.ReceiverDapp.EthAddress,
-			allowOutOfOrder,
-			gasLimit,
-		)
+		txHash, txConfirmationDur, fee, err := lane.Source.SendRequest(lane.Dest.ReceiverDapp.EthAddress, gasLimit)
 		if err != nil {
 			stat.UpdateState(lane.Logger, 0, testreporters.TX, txConfirmationDur, testreporters.Failure, nil)
 			return fmt.Errorf("could not send request: %w", err)

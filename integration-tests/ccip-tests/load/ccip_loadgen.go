@@ -196,7 +196,7 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 		err       error
 	)
 	matchErr := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
-		contracts.OnRampContract: contracts.V1_5_0_dev,
+		contracts.OnRampContract: contracts.V1_5_0,
 	})
 	if matchErr != nil {
 		extraArgs, err = testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)

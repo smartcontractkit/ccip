@@ -77,7 +77,7 @@ func MatchContractVersionsOrAbove(requiredContractVersions map[Name]Version) err
 // if the version is less than 1.5.0, then token admin registry is not needed
 func NeedTokenAdminRegistry() bool {
 	return MatchContractVersionsOrAbove(map[Name]Version{
-		TokenPoolContract: V1_5_0_dev,
+		TokenPoolContract: V1_5_0,
 	}) == nil
 }
 

@@ -112,9 +112,9 @@ const (
 var (
 	V1_2_0            = MustVersion("1.2.0")
 	V1_4_0            = MustVersion("1.4.0")
-	V1_5_0_dev        = MustVersion("1.5.0")
-	LatestPoolVersion = V1_5_0_dev
-	Latest            = V1_5_0_dev
+	V1_5_0            = MustVersion("1.5.0")
+	LatestPoolVersion = V1_5_0
+	Latest            = V1_5_0
 	VersionMap        = map[Name]Version{
 		PriceRegistryContract: V1_2_0,
 		OffRampContract:       Latest,
