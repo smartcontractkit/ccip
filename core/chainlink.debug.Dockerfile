@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y jq
 RUN if [ "$GO_COVER_FLAG" = "true" ]; then \
         make install-chainlink-cover; \
     else \
-        make install-chainlink; \
+        make install-chainlink-delve; \
     fi
 
 # Link LOOP Plugin source dirs with simple names
