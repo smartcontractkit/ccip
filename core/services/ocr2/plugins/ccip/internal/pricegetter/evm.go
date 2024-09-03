@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"strings"
 
+	"go.uber.org/multierr"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
@@ -24,10 +26,6 @@ import (
 const decimalsMethodName = "decimals"
 const latestRoundDataMethodName = "latestRoundData"
 const OFFCHAIN_AGGREGATOR = "OffchainAggregator"
-
-// function decimals() external view
-// returns (uint8)
-type decimalsConfig uint8
 
 //nolint:lll
 type latestRoundDataConfig struct {
@@ -163,7 +161,7 @@ func (d *DynamicPriceGetter) performBatchCalls(ctx context.Context, batchCallsPe
 }
 
 // performBatchCall performs a batch call on a given chain to retrieve token prices.
-func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint64, batchCalls *batchCallsForChain, prices map[cciptypes.Address]*big.Int) error {
+func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint64, batchCalls *batchCallsForChain, prices map[cciptypes.Address]*big.Int) (err error) {
 	// Retrieve the EVM caller for the chain.
 	client, exists := d.evmClients[chainID]
 	if !exists {
@@ -186,12 +184,15 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 		})
 	}
 
-	contractReader.Bind(ctx, bindings)
+	err = contractReader.Bind(ctx, bindings)
+	if err != nil {
+		return fmt.Errorf("binding contracts failed: %w", err)
+	}
 
 	// Perform call
 	var decimalsReq uint8
 	var latestRoundData latestRoundDataConfig
-	result, err := contractReader.BatchGetLatestValues(ctx, types.BatchGetLatestValuesRequest{
+	result, err2 := contractReader.BatchGetLatestValues(ctx, types.BatchGetLatestValuesRequest{
 		OFFCHAIN_AGGREGATOR: types.ContractBatch{
 			{
 				ReadName:  decimalsMethodName,
@@ -203,27 +204,28 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 			},
 		},
 	})
+	if err2 != nil {
+		return fmt.Errorf("BatchGetLatestValues failed %w", err2)
+	}
 
 	// Extract results
 	// give result the method key and then you get slice of responses
 	decimalRespSlice := result[decimalsMethodName]
-	for _, read := range decimalRespSlice {
+	decimalsCR := make([]uint8, 0, nbDecimalCalls)
+	var respErr error
+	for i, read := range decimalRespSlice {
 		val, readErr := read.GetResult()
 		if readErr != nil {
-			panic(fmt.Sprintf("DynamicPriceGetter ChainReader Result: %v", readErr))
+			respErr = multierr.Append(respErr, fmt.Errorf("error with method call %v: %w", batchCalls.decimalCalls[i].MethodName(), readErr))
+			continue
 		}
-		panic(fmt.Sprintf("DynamicPriceGetter ChainReader Result: %v", &val))
-	}
+		decimal, ok := val.(uint8)
+		if !ok {
+			return fmt.Errorf("expected type uint8 for method call %v on contract %v: %w", batchCalls.decimalCalls[i].MethodName(), batchCalls.decimalCalls[i].ContractAddress(), readErr)
+		}
 
-	//for _, batchResult := range result {
-	//	for _, read := range batchResult {
-	//		val, readErr := read.GetResult()
-	//		if readErr != nil {
-	//			panic(fmt.Sprintf("DynamicPriceGetter ChainReader Result: %v", readErr))
-	//		}
-	//		panic(fmt.Sprintf("DynamicPriceGetter ChainReader Result: %v", &val))
-	//	}
-	//}
+		decimalsCR = append(decimalsCR, decimal)
+	}
 
 	// Perform batched call (all decimals calls followed by latest round data calls).
 	calls := make([]rpclib.EvmCall, 0, nbDecimalCalls+nbLatestRoundDataCalls)
@@ -248,6 +250,12 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 		decimals = append(decimals, v)
 	}
 
+	for i := range nbDecimalCalls {
+		if decimals[i] != decimalsCR[i] {
+			panic(fmt.Sprintf("decimalsCR != decimals, at index %v", i))
+		}
+	}
+
 	for i, res := range results[nbDecimalCalls : nbDecimalCalls+nbLatestRoundDataCalls] {
 		// latestRoundData function has multiple outputs (roundId,answer,startedAt,updatedAt,answeredInRound).
 		// we want the second one (answer, at idx=1).
@@ -262,10 +270,10 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	// Normalize and store prices.
 	for i := range batchCalls.tokenOrder {
 		// Normalize to 1e18.
-		if decimals[i] < 18 {
-			latestRounds[i].Mul(latestRounds[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(decimals[i])), nil))
-		} else if decimals[i] > 18 {
-			latestRounds[i].Div(latestRounds[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals[i])-18), nil))
+		if decimalsCR[i] < 18 {
+			latestRounds[i].Mul(latestRounds[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(decimalsCR[i])), nil))
+		} else if decimalsCR[i] > 18 {
+			latestRounds[i].Div(latestRounds[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimalsCR[i])-18), nil))
 		}
 		prices[ccipcalc.EvmAddrToGeneric(batchCalls.tokenOrder[i])] = latestRounds[i]
 	}
