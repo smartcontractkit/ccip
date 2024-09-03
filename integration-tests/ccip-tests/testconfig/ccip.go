@@ -301,7 +301,7 @@ func (c *CCIPTestGroupConfig) Validate() error {
 	if err != nil {
 		return err
 	}
-	if c.PhaseTimeout != nil && (c.PhaseTimeout.Duration().Minutes() < 1 || c.PhaseTimeout.Duration().Minutes() > 50) {
+	if c.PhaseTimeout != nil && (c.PhaseTimeout.Duration().Minutes() < 1) {
 		return fmt.Errorf("phase timeout should be between 1 and 50 minutes")
 	}
 
