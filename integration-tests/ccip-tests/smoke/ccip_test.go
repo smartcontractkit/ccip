@@ -243,7 +243,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err := tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
-				big.NewInt(actions.DefaultDestinationGasLimit), 
+				big.NewInt(actions.DefaultDestinationGasLimit),
 			)
 			require.NoError(t, err)
 			require.Error(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
@@ -778,7 +778,7 @@ func TestSmokeCCIPMulticall(t *testing.T) {
 				Msgf("Starting lane %s -> %s", tc.lane.SourceNetworkName, tc.lane.DestNetworkName)
 
 			tc.lane.RecordStateBeforeTransfer()
-			err := tc.lane.Multicall(TestCfg.TestGroupInput.NoOfSendsInMulticall, false, tc.lane.Source.Common.MulticallContract)
+			err := tc.lane.Multicall(TestCfg.TestGroupInput.NoOfSendsInMulticall, tc.lane.Source.Common.MulticallContract)
 			require.NoError(t, err)
 			tc.lane.ValidateRequests()
 		})

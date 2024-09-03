@@ -2799,14 +2799,11 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporter
 
 // Multicall sends multiple ccip-send requests in a single transaction
 // It will create one transaction for all the requests and will wait for the confirmation
-func (lane *CCIPLane) Multicall(
-	noOfRequests int,
-	allowOutOfOrder bool,
-	multiSendAddr common.Address,
-) error {
+func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) error {
 	var ccipMultipleMsg []contracts.CCIPMsgData
 	feeToken := common.HexToAddress(lane.Source.Common.FeeToken.Address())
-	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, allowOutOfOrder, big.NewInt(DefaultDestinationGasLimit))
+	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, lane.Source.Common.AllowOutOfOrder,
+		big.NewInt(DefaultDestinationGasLimit))
 	if err != nil {
 		return fmt.Errorf("failed to form the ccip message: %w", err)
 	}
