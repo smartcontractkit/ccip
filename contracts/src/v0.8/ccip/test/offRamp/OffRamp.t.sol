@@ -2649,6 +2649,46 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
     assertEq(startingBalance + amount1, dstToken1.balanceOf(OWNER));
   }
 
+  function test_releaseOrMintTokens_WithGasOverride_Success() public {
+    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
+    IERC20 dstToken1 = IERC20(s_destFeeToken);
+    uint256 startingBalance = dstToken1.balanceOf(OWNER);
+    uint256 amount1 = 100;
+    srcTokenAmounts[0].amount = amount1;
+
+    bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
+    offchainTokenData[0] = abi.encode(0x12345678);
+
+    Internal.RampTokenAmount[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
+
+    vm.expectCall(
+      s_destPoolBySourceToken[srcTokenAmounts[0].token],
+      abi.encodeWithSelector(
+        LockReleaseTokenPool.releaseOrMint.selector,
+        Pool.ReleaseOrMintInV1({
+          originalSender: abi.encode(OWNER),
+          receiver: OWNER,
+          amount: srcTokenAmounts[0].amount,
+          localToken: s_destTokenBySourceToken[srcTokenAmounts[0].token],
+          remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
+          sourcePoolAddress: sourceTokenAmounts[0].sourcePoolAddress,
+          sourcePoolData: sourceTokenAmounts[0].extraData,
+          offchainTokenData: offchainTokenData[0]
+        })
+      )
+    );
+
+    uint32[] memory gasOverrides = new uint32[](sourceTokenAmounts.length);
+    for (uint256 i = 0; i < gasOverrides.length; i++) {
+      gasOverrides[i] = DEFAULT_TOKEN_DEST_GAS_OVERHEAD + 1;
+    }
+    s_offRamp.releaseOrMintTokens(
+      sourceTokenAmounts, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR_1, offchainTokenData, gasOverrides
+    );
+
+    assertEq(startingBalance + amount1, dstToken1.balanceOf(OWNER));
+  }
+
   function test_releaseOrMintTokens_destDenominatedDecimals_Success() public {
     Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
     uint256 amount = 100;

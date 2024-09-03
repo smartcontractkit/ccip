@@ -145,11 +145,9 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   }
 
   struct GasLimitOverride {
-    /// @notice Overrides EVM2EVMMessage.gasLimit. A value of zero indicates no override and is valid.
-    uint256 receiverExecutionGasLimit;
-    /// @notice Overrides EVM2EVMMessage.sourceTokenData.destGasAmount. Must be same length as tokenAmounts. A value
-    /// of zero indicates no override and is valid.
-    uint32[] tokenGasOverrides;
+    // A value of zero in both fields signifies no override and allows the corresponding field to be overridden as valid
+    uint256 receiverExecutionGasLimit; // Overrides EVM2EVMMessage.gasLimit.
+    uint32[] tokenGasOverrides; // Overrides EVM2EVMMessage.sourceTokenData.destGasAmount, length must be same as tokenAmounts.
   }
 
   // STATIC CONFIG
@@ -312,14 +310,15 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         // lower gas limit than the DON would have used. This results in the message being marked FAILURE and the DON
         // would not attempt it with the correct gas limit.
         for (uint256 tokenIndex = 0; tokenIndex < message.tokenAmounts.length; ++tokenIndex) {
-          if (msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex] != 0) {
+          uint256 tokenGasOverride = msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex];
+          if (tokenGasOverride != 0) {
             uint32 destGasAmount = abi.decode(message.tokenAmounts[tokenIndex].destExecData, (uint32));
-            if (msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex] < destGasAmount) {
+            if (tokenGasOverride < destGasAmount) {
               revert InvalidTokenGasOverride(
                 message.header.messageId,
                 tokenIndex,
                 destGasAmount,
-                msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex]
+                tokenGasOverride
               );
             }
           }
@@ -984,8 +983,10 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     bool isTokenGasOverridesEmpty = tokenGasOverrides.length == 0;
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
-      if (!isTokenGasOverridesEmpty && tokenGasOverrides[i] != 0) {
-        sourceTokenAmounts[i].destExecData = abi.encode(tokenGasOverrides[i]);
+      if (!isTokenGasOverridesEmpty) {
+        if (tokenGasOverrides[i] != 0) {
+          sourceTokenAmounts[i].destExecData = abi.encode(tokenGasOverrides[i]);
+        }
       }
       destTokenAmounts[i] = _releaseOrMintSingleToken(
         sourceTokenAmounts[i], originalSender, receiver, sourceChainSelector, offchainTokenData[i]
