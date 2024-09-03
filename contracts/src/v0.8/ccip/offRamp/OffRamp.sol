@@ -77,7 +77,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   event SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
   event AlreadyAttempted(uint64 sourceChainSelector, uint64 sequenceNumber);
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
-  event CommitReportAccepted(CommitReport report);
+  event CommitReportAccepted(MerkleRoot[] merkleRoots, Internal.PriceUpdates priceUpdates);
   event RootRemoved(bytes32 root);
 
   /// @notice Struct that contains the static configuration
