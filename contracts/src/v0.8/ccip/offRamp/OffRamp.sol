@@ -3,7 +3,6 @@ pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
-
 import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
@@ -139,7 +138,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     MerkleRoot[] merkleRoots; // Collection of merkle roots per source chain to commit
   }
 
-  /// @dev Struct to hold a merkle root for a source chain so that an array of these can be passed in the resetUblessedRoots function.
+  /// @dev Struct to hold a merkle root for a source chain so that an array of these can be passed in the
+  /// resetUnblessedRoots function.
   struct UnblessedRoot {
     uint64 sourceChainSelector; // Remote source chain selector that the Merkle Root is scoped to
     bytes32 merkleRoot; // Merkle root of a single remote source chain
@@ -355,7 +355,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       }
     }
 
-    SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
+    bytes memory onRamp = _getEnabledSourceChainConfig(sourceChainSelector).onRamp;
 
     uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();
@@ -376,7 +376,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       // over the same data, which increases gas cost.
       // Hashing all of the message fields ensures that the message being executed is correct and not tampered with.
       // Including the known OnRamp ensures that the message originates from the correct on ramp version
-      hashedLeaves[i] = Internal._hash(message, sourceChainConfig.onRamp);
+      hashedLeaves[i] = Internal._hash(message, onRamp);
     }
 
     // SECURITY CRITICAL CHECK
@@ -455,7 +455,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       }
 
       _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-
       (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
       _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
 
@@ -487,6 +486,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         hashedLeaves[i],
         newState,
         returnData,
+        // This emit covers not only the execution through the router, but also all of the overhead in executing the
+        // message. This gives the most accurate representation of the gas used in the execution.
         gasStart - gasleft()
       );
     }
@@ -596,12 +597,12 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     // Check if the report contains price updates
     if (commitReport.priceUpdates.tokenPriceUpdates.length > 0 || commitReport.priceUpdates.gasPriceUpdates.length > 0)
     {
-      uint64 sequenceNumber = uint64(uint256(reportContext[1]));
+      uint64 ocrSequenceNumber = uint64(uint256(reportContext[1]));
 
       // Check for price staleness based on the epoch and round
-      if (s_latestPriceSequenceNumber < sequenceNumber) {
+      if (s_latestPriceSequenceNumber < ocrSequenceNumber) {
         // If prices are not stale, update the latest epoch and round
-        s_latestPriceSequenceNumber = sequenceNumber;
+        s_latestPriceSequenceNumber = ocrSequenceNumber;
         // And update the prices in the fee quoter
         IFeeQuoter(s_dynamicConfig.feeQuoter).updatePrices(commitReport.priceUpdates);
       } else {
