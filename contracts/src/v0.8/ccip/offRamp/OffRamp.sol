@@ -628,7 +628,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       s_roots[root.sourceChainSelector][merkleRoot] = block.timestamp;
     }
 
-    emit CommitReportAccepted(commitReport);
+    emit CommitReportAccepted(commitReport.merkleRoots, commitReport.priceUpdates);
 
     _transmit(uint8(Internal.OCRPluginType.Commit), reportContext, report, rs, ss, rawVs);
   }
