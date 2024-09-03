@@ -288,17 +288,16 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
     bytes32 hashedReport,
     bytes32[] memory rs,
     bytes32[] memory ss,
-    bytes32 rawVs // signatures
+    bytes32 rawVs
   ) internal view {
-    // Verify signatures attached to report
+    // Verify signatures attached to report. Using a uint256 means we can only verify up to 256 oracles.
     uint256 signed = 0;
 
     uint256 numberOfSignatures = rs.length;
     for (uint256 i; i < numberOfSignatures; ++i) {
       // Safe from ECDSA malleability here since we check for duplicate signers.
       address signer = ecrecover(hashedReport, uint8(rawVs[i]) + 27, rs[i], ss[i]);
-      // Since we disallow address(0) as a valid signer address, it can
-      // never have a signer role.
+      // Since we disallow address(0) as a valid signer address, it can never have a signer role.
       Oracle memory oracle = s_oracles[ocrPluginType][signer];
       if (oracle.role != Role.Signer) revert UnauthorizedSigner();
       if (signed & (0x1 << oracle.index) != 0) revert NonUniqueSignatures();
