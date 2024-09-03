@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/smartcontractkit/seth"
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/utils/seth"
 
