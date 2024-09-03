@@ -8,7 +8,7 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 ///         with multiple OCR plugin support.
 abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
   // Maximum number of oracles the offchain reporting protocol is designed for
-  uint256 internal constant MAX_NUM_ORACLES = 31;
+  uint256 internal constant MAX_NUM_ORACLES = 256;
 
   /// @notice Triggers a new run of the offchain reporting protocol
   /// @param ocrPluginType OCR plugin type for which the config was set
@@ -154,13 +154,12 @@ abstract contract MultiOCR3Base is ITypeAndVersion, OwnerIsCreator {
       _clearOracleRoles(ocrPluginType, ocrConfig.signers);
 
       address[] memory signers = ocrConfigArgs.signers;
+
+      if (signers.length > MAX_NUM_ORACLES) revert InvalidConfig(InvalidConfigErrorType.TOO_MANY_SIGNERS);
+      if (signers.length <= 3 * ocrConfigArgs.F) revert InvalidConfig(InvalidConfigErrorType.F_TOO_HIGH);
+
+      configInfo.n = uint8(signers.length);
       ocrConfig.signers = signers;
-
-      uint8 signersLength = uint8(signers.length);
-      configInfo.n = signersLength;
-
-      if (signersLength > MAX_NUM_ORACLES) revert InvalidConfig(InvalidConfigErrorType.TOO_MANY_SIGNERS);
-      if (signersLength <= 3 * ocrConfigArgs.F) revert InvalidConfig(InvalidConfigErrorType.F_TOO_HIGH);
 
       _assignOracleRoles(ocrPluginType, signers, Role.Signer);
     }
