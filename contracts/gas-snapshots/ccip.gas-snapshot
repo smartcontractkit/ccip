@@ -629,7 +629,7 @@ OffRamp_applySourceChainConfigUpdates:test_ReplaceExistingChain_Success() (gas: 
 OffRamp_applySourceChainConfigUpdates:test_RouterAddress_Revert() (gas: 13263)
 OffRamp_applySourceChainConfigUpdates:test_ZeroOnRampAddress_Revert() (gas: 17988)
 OffRamp_applySourceChainConfigUpdates:test_ZeroSourceChainSelector_Revert() (gas: 15343)
-OffRamp_batchExecute:test_MultipleReportsDifferentChainsSkipCursedChain_Success() (gas: 202310)
+OffRamp_batchExecute:test_MultipleReportsDifferentChainsSkipCursedChain_Success() (gas: 202302)
 OffRamp_batchExecute:test_MultipleReportsDifferentChains_Success() (gas: 335775)
 OffRamp_batchExecute:test_MultipleReportsSameChain_Success() (gas: 277143)
 OffRamp_batchExecute:test_MultipleReportsSkipDuplicate_Success() (gas: 169155)
