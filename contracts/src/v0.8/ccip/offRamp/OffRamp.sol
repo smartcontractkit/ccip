@@ -664,9 +664,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @notice Returns if a root is blessed or not.
   /// @param root The merkle root to check the blessing status for.
   /// @return blessed Whether the root is blessed or not.
-  function isBlessed(
-    bytes32 root
-  ) public view returns (bool) {
+  function isBlessed(bytes32 root) public view returns (bool) {
     // TODO: update RMN to also consider the source chain selector for blessing
     return IRMN(i_rmnProxy).isBlessed(IRMN.TaggedRoot({commitStore: address(this), root: root}));
   }
@@ -675,9 +673,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// posted and needs to be removed. The interval in the report is trusted.
   /// @param rootToReset The roots that will be reset. This function will only
   /// reset roots that are not blessed.
-  function resetUnblessedRoots(
-    UnblessedRoot[] calldata rootToReset
-  ) external onlyOwner {
+  function resetUnblessedRoots(UnblessedRoot[] calldata rootToReset) external onlyOwner {
     for (uint256 i = 0; i < rootToReset.length; ++i) {
       UnblessedRoot memory root = rootToReset[i];
       if (!isBlessed(root.merkleRoot)) {
@@ -707,9 +703,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   }
 
   /// @inheritdoc MultiOCR3Base
-  function _afterOCR3ConfigSet(
-    uint8 ocrPluginType
-  ) internal override {
+  function _afterOCR3ConfigSet(uint8 ocrPluginType) internal override {
     if (ocrPluginType == uint8(Internal.OCRPluginType.Commit)) {
       // When the OCR config changes, we reset the sequence number
       // since it is scoped per config digest.
@@ -745,25 +739,19 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @notice Returns the source chain config for the provided source chain selector
   /// @param sourceChainSelector chain to retrieve configuration for
   /// @return sourceChainConfig The config for the source chain
-  function getSourceChainConfig(
-    uint64 sourceChainSelector
-  ) external view returns (SourceChainConfig memory) {
+  function getSourceChainConfig(uint64 sourceChainSelector) external view returns (SourceChainConfig memory) {
     return s_sourceChainConfigs[sourceChainSelector];
   }
 
   /// @notice Updates source configs
   /// @param sourceChainConfigUpdates Source chain configs
-  function applySourceChainConfigUpdates(
-    SourceChainConfigArgs[] memory sourceChainConfigUpdates
-  ) external onlyOwner {
+  function applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigUpdates) external onlyOwner {
     _applySourceChainConfigUpdates(sourceChainConfigUpdates);
   }
 
   /// @notice Updates source configs
   /// @param sourceChainConfigUpdates Source chain configs
-  function _applySourceChainConfigUpdates(
-    SourceChainConfigArgs[] memory sourceChainConfigUpdates
-  ) internal {
+  function _applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigUpdates) internal {
     for (uint256 i = 0; i < sourceChainConfigUpdates.length; ++i) {
       SourceChainConfigArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
       uint64 sourceChainSelector = sourceConfigUpdate.sourceChainSelector;
@@ -801,17 +789,13 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice Sets the dynamic config.
   /// @param dynamicConfig The new dynamic config.
-  function setDynamicConfig(
-    DynamicConfig memory dynamicConfig
-  ) external onlyOwner {
+  function setDynamicConfig(DynamicConfig memory dynamicConfig) external onlyOwner {
     _setDynamicConfig(dynamicConfig);
   }
 
   /// @notice Sets the dynamic config.
   /// @param dynamicConfig The dynamic config.
-  function _setDynamicConfig(
-    DynamicConfig memory dynamicConfig
-  ) internal {
+  function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
     if (dynamicConfig.feeQuoter == address(0)) {
       revert ZeroAddressNotAllowed();
     }
@@ -824,9 +808,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @notice Returns a source chain config with a check that the config is enabled
   /// @param sourceChainSelector Source chain selector to check for cursing
   /// @return sourceChainConfig The source chain config storage pointer
-  function _getEnabledSourceChainConfig(
-    uint64 sourceChainSelector
-  ) internal view returns (SourceChainConfig storage) {
+  function _getEnabledSourceChainConfig(uint64 sourceChainSelector) internal view returns (SourceChainConfig storage) {
     SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
     if (!sourceChainConfig.isEnabled) {
       revert SourceChainNotEnabled(sourceChainSelector);
@@ -985,9 +967,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   // ================================================================
 
   /// @notice Reverts as this contract should not access CCIP messages
-  function ccipReceive(
-    Client.Any2EVMMessage calldata
-  ) external pure {
+  function ccipReceive(Client.Any2EVMMessage calldata) external pure {
     // solhint-disable-next-line
     revert();
   }
