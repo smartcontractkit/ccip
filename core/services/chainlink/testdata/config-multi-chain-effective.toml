@@ -319,6 +319,9 @@ CheckInclusionBlocks = 12
 CheckInclusionPercentile = 90
 TransactionPercentile = 50
 
+[EVM.GasEstimator.FeeHistory]
+CacheTimeout = '10s'
+
 [EVM.HeadTracker]
 HistoryDepth = 100
 MaxBufferSize = 3
@@ -420,6 +423,9 @@ CheckInclusionBlocks = 12
 CheckInclusionPercentile = 90
 TransactionPercentile = 50
 
+[EVM.GasEstimator.FeeHistory]
+CacheTimeout = '10s'
+
 [EVM.HeadTracker]
 HistoryDepth = 100
 MaxBufferSize = 3
@@ -514,6 +520,9 @@ BlockHistorySize = 24
 CheckInclusionBlocks = 12
 CheckInclusionPercentile = 90
 TransactionPercentile = 60
+
+[EVM.GasEstimator.FeeHistory]
+CacheTimeout = '10s'
 
 [EVM.HeadTracker]
 HistoryDepth = 2000
