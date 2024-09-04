@@ -1949,7 +1949,6 @@ contract OffRamp_execute is OffRampSetup {
 
   function test_NoConfigWithOtherConfigPresent_Revert() public {
     _redeployOffRampWithNoOCRConfigs();
-    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, 1);
 
     MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
     ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
@@ -1966,6 +1965,8 @@ contract OffRamp_execute is OffRampSetup {
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     Internal.ExecutionReportSingleChain[] memory reports =
       _generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
+
+    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, reports, 1);
 
     bytes32[3] memory reportContext = [bytes32(""), s_configDigestExec, s_configDigestExec];
 
