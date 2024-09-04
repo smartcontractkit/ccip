@@ -43,16 +43,11 @@ COPY --from=buildgo /chainlink-solana .
 RUN go install ./pkg/solana/cmd/chainlink-solana
 
 # Final image: ubuntu with chainlink binary
-FROM ubuntu:20.04
+FROM golang:1.22-bullseye
 
 ARG CHAINLINK_USER=root
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get install -y ca-certificates gnupg lsb-release curl
-
-# Install go
-RUN curl -LO https://go.dev/dl/go1.22.5.linux-amd64.tar.gz
-RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go1.22.5.linux-amd64.tar.gz
-ENV PATH=$PATH:/usr/local/go/bin
 
 # Install Postgres for CLI tools, needed specifically for DB backups
 RUN curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
