@@ -665,7 +665,9 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     assertEq(uint64(2), s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, abi.encode(OWNER)));
   }
 
-  function test_Fuzz_InterleavingOrderedAndUnorderedMessages_Success(bool[7] memory orderings) public {
+  function test_Fuzz_InterleavingOrderedAndUnorderedMessages_Success(
+    bool[7] memory orderings
+  ) public {
     Internal.Any2EVMRampMessage[] memory messages = new Internal.Any2EVMRampMessage[](orderings.length);
     // number of tokens needs to be capped otherwise we hit UnsupportedNumberOfTokens.
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](3);
@@ -967,7 +969,9 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     s_offRamp.executeSingleReport(_generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new uint256[](0));
   }
 
-  function _constructCommitReport(bytes32 merkleRoot) internal view returns (OffRamp.CommitReport memory) {
+  function _constructCommitReport(
+    bytes32 merkleRoot
+  ) internal view returns (OffRamp.CommitReport memory) {
     OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
     roots[0] = OffRamp.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
@@ -1277,6 +1281,9 @@ contract OffRamp_batchExecute is OffRampSetup {
     reports[1] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_3, messages2);
 
     vm.recordLogs();
+
+    vm.expectEmit();
+    emit OffRamp.SkippedReportExecution(SOURCE_CHAIN_SELECTOR_1);
 
     s_offRamp.batchExecute(reports, new uint256[][](2));
 
@@ -2825,7 +2832,9 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
   /// forge-config: default.fuzz.runs = 32
   /// forge-config: ccip.fuzz.runs = 1024
   // Uint256 gives a good range of values to test, both inside and outside of the eth address space.
-  function test_Fuzz__releaseOrMintTokens_AnyRevertIsCaught_Success(uint256 destPool) public {
+  function test_Fuzz__releaseOrMintTokens_AnyRevertIsCaught_Success(
+    uint256 destPool
+  ) public {
     // Input 447301751254033913445893214690834296930546521452, which is 0x4E59B44847B379578588920CA78FBF26C0B4956C
     // triggers some Create2Deployer and causes it to fail
     vm.assume(destPool != 447301751254033913445893214690834296930546521452);
