@@ -258,14 +258,10 @@ packages:
       ORM:
       Runner:
       PipelineParamUnmarshaler:
-  github.com/smartcontractkit/chainlink/v2/core/services/headreporter:
+  github.com/smartcontractkit/chainlink/v2/core/services/promreporter:
     config:
-      dir: "{{ .InterfaceDir }}"
-      filename: "{{ .InterfaceName | snakecase }}_mock.go"
-      inpackage: true
-      mockname: "Mock{{ .InterfaceName | camelcase }}"
+      dir: core/internal/mocks
     interfaces:
-      HeadReporter:
       PrometheusBackend:
   github.com/smartcontractkit/libocr/commontypes:
     config:
@@ -476,10 +472,6 @@ packages:
       outpkg: mock_optimism_dispute_game_factory
     interfaces:
       OptimismDisputeGameFactoryInterface: 
-  github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types:
-    interfaces:
-      CCIPOracle:
-      OracleCreator:
   github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache:
     config:
       filename: chain_health_mock.go

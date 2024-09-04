@@ -42,6 +42,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
 )
 
 func TestExecutionReportingPlugin_Observation(t *testing.T) {
@@ -232,25 +233,42 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 
 func TestExecutionReportingPlugin_Report(t *testing.T) {
 	testCases := []struct {
-		name            string
-		f               int
-		committedSeqNum uint64
-		observations    []ccip.ExecutionObservation
+		name               string
+		f                  int
+		batchingStrategyId uint32
+		committedSeqNum    uint64
+		observations       []ccip.ExecutionObservation
 
 		expectingSomeReport bool
 		expectedReport      cciptypes.ExecReport
 		expectingSomeErr    bool
 	}{
 		{
-			name:            "not enough observations to form consensus",
-			f:               5,
-			committedSeqNum: 5,
+			name:               "not enough observations to form consensus - best effort batching",
+			f:                  5,
+			batchingStrategyId: 0,
+			committedSeqNum:    5,
 			observations: []ccip.ExecutionObservation{
 				{Messages: map[uint64]ccip.MsgData{3: {}, 4: {}}},
 				{Messages: map[uint64]ccip.MsgData{3: {}, 4: {}}},
 			},
 			expectingSomeErr:    false,
 			expectingSomeReport: false,
+		},
+		{
+			name:               "not enough observaitons to form consensus - zk batching",
+			f:                  5,
+			batchingStrategyId: 1,
+			committedSeqNum:    5,
+			observations: []ccip.ExecutionObservation{
+				{Messages: map[uint64]ccip.MsgData{3: {}, 4: {}}},
+				{Messages: map[uint64]ccip.MsgData{3: {}, 4: {}}},
+				{Messages: map[uint64]ccip.MsgData{3: {}, 4: {}}},
+				{Messages: map[uint64]ccip.MsgData{3: {}, 4: {}}},
+				{Messages: map[uint64]ccip.MsgData{3: {}, 4: {}}},
+				{Messages: map[uint64]ccip.MsgData{3: {}, 4: {}}},
+				{Messages: map[uint64]ccip.MsgData{3: {}, 4: {}}},
+			},
 		},
 		{
 			name:                "zero observations",
@@ -268,6 +286,9 @@ func TestExecutionReportingPlugin_Report(t *testing.T) {
 			p := ExecutionReportingPlugin{}
 			p.lggr = logger.TestLogger(t)
 			p.F = tc.f
+			bs, err := NewBatchingStrategy(tc.batchingStrategyId, &statuschecker.TxmStatusChecker{})
+			assert.NoError(t, err)
+			p.batchingStrategy = bs
 
 			p.commitStoreReader = ccipdatamocks.NewCommitStoreReader(t)
 			chainHealthcheck := ccipcachemocks.NewChainHealthcheck(t)
@@ -281,12 +302,12 @@ func TestExecutionReportingPlugin_Report(t *testing.T) {
 				observations[i] = types.AttributedObservation{Observation: b, Observer: commontypes.OracleID(i + 1)}
 			}
 
-			_, _, err := p.Report(ctx, types.ReportTimestamp{}, types.Query{}, observations)
+			_, _, err2 := p.Report(ctx, types.ReportTimestamp{}, types.Query{}, observations)
 			if tc.expectingSomeErr {
-				assert.Error(t, err)
+				assert.Error(t, err2)
 				return
 			}
-			assert.NoError(t, err)
+			assert.NoError(t, err2)
 		})
 	}
 }
@@ -1421,4 +1442,38 @@ func TestExecutionReportingPlugin_ensurePriceRegistrySynchronization(t *testing.
 	err = p.ensurePriceRegistrySynchronization(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, mockPriceRegistryReader2, p.sourcePriceRegistry)
+}
+
+func TestExecutionReportingPlugin_getConsensusThreshold(t *testing.T) {
+	tests := []struct {
+		name                       string
+		batchingStrategyID         uint32
+		F                          int
+		expectedConsensusThreshold int
+	}{
+		{
+			name:                       "zk batching strategy",
+			batchingStrategyID:         uint32(1),
+			F:                          5,
+			expectedConsensusThreshold: 11,
+		},
+		{
+			name:                       "default batching strategy",
+			batchingStrategyID:         uint32(0),
+			F:                          5,
+			expectedConsensusThreshold: 6,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &ExecutionReportingPlugin{}
+			p.F = tc.F
+			bs, err := NewBatchingStrategy(tc.batchingStrategyID, &statuschecker.TxmStatusChecker{})
+			assert.NoError(t, err)
+			p.batchingStrategy = bs
+
+			require.Equal(t, tc.expectedConsensusThreshold, p.getConsensusThreshold())
+		})
+	}
 }
