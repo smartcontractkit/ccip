@@ -3,6 +3,7 @@ module github.com/smartcontractkit/chainlink/v2
 go 1.22.5
 
 require (
+	github.com/AlekSi/pointer v1.1.0
 	github.com/Depado/ginprom v1.8.0
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/Masterminds/sprig/v3 v3.2.3
