@@ -26,7 +26,7 @@ var _ headtracker.HeadSaver[*evmtypes.Head, common.Hash] = (*headSaver)(nil)
 
 func NewHeadSaver(lggr logger.Logger, orm ORM, config commontypes.Config, htConfig commontypes.HeadTrackerConfig) httypes.HeadSaver {
 	return &headSaver{
-		orm:      orm,
+		orm:      &noopORM{},
 		config:   config,
 		htConfig: htConfig,
 		logger:   logger.Named(lggr, "HeadSaver"),
