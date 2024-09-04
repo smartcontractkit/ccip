@@ -1,5 +1,5 @@
-const hre = require('hardhat')
-const { BigNumber } = require('ethers')
+import hre from 'hardhat'
+//import big from 'ethers'
 // pass in the correct constrcutor arguments for the contract &
 // run with `npx hardhat run zksync-verify.ts --config ./hardhat.ccip.zksync.config.ts` & remember to change the appropriate `default network` in the config file or pass as argument
 async function main() {
