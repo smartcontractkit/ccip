@@ -1294,8 +1294,7 @@ contract OffRamp_batchExecute is OffRampSetup {
         uint64 logSourceChainSelector = uint64(uint256(logs[i].topics[1]));
         uint64 logSequenceNumber = uint64(uint256(logs[i].topics[2]));
         bytes32 logMessageId = bytes32(logs[i].topics[3]);
-        (bytes32 logMessageHash, uint8 logState, bytes memory logReturnData,) =
-          abi.decode(logs[i].data, (bytes32, uint8, bytes, uint256));
+        (bytes32 logMessageHash, uint8 logState,,) = abi.decode(logs[i].data, (bytes32, uint8, bytes, uint256));
         assertEq(logMessageId, messages2[0].header.messageId);
         assertEq(logSourceChainSelector, messages2[0].header.sourceChainSelector);
         assertEq(logSequenceNumber, messages2[0].header.sequenceNumber);
