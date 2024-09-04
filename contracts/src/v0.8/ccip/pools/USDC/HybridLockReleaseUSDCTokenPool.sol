@@ -59,12 +59,9 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
   /// @notice Locks the token in the pool
   /// @dev The _validateLockOrBurn check is an essential security check
-  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
-    public
-    virtual
-    override
-    returns (Pool.LockOrBurnOutV1 memory)
-  {
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
     // // If the alternative mechanism (L/R) for chains which have it enabled
     if (!shouldUseLockRelease(lockOrBurnIn.remoteChainSelector)) {
       return super.lockOrBurn(lockOrBurnIn);
@@ -105,11 +102,9 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   }
 
   /// @notice Contains the alternative mechanism for incoming tokens, in this implementation is "Release" incoming tokens
-  function _lockReleaseIncomingMessage(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
-    internal
-    virtual
-    returns (Pool.ReleaseOrMintOutV1 memory)
-  {
+  function _lockReleaseIncomingMessage(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+  ) internal virtual returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn);
 
     // Circle requires a supply-lock to prevent incoming messages once the migration process begins.
@@ -137,11 +132,9 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   }
 
   /// @notice Contains the alternative mechanism, in this implementation is "Lock" on outgoing tokens
-  function _lockReleaseOutgoingMessage(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
-    internal
-    virtual
-    returns (Pool.LockOrBurnOutV1 memory)
-  {
+  function _lockReleaseOutgoingMessage(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) internal virtual returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(lockOrBurnIn);
 
     // Increase internal accounting of locked tokens for burnLockedUSDC() migration
