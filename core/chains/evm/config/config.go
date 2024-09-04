@@ -117,6 +117,7 @@ type AutoPurgeConfig interface {
 
 type GasEstimator interface {
 	BlockHistory() BlockHistory
+	FeeHistory() FeeHistory
 	LimitJobType() LimitJobType
 
 	EIP1559DynamicFees() bool
@@ -156,6 +157,10 @@ type BlockHistory interface {
 	CheckInclusionPercentile() uint16
 	EIP1559FeeCapBufferBlocks() uint16
 	TransactionPercentile() uint16
+}
+
+type FeeHistory interface {
+	CacheTimeout() time.Duration
 }
 
 type Workflow interface {
