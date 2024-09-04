@@ -1789,6 +1789,123 @@ func (_OffRamp *OffRampFilterer) ParseSkippedAlreadyExecutedMessage(log types.Lo
 	return event, nil
 }
 
+type OffRampSkippedReportExecutionIterator struct {
+	Event *OffRampSkippedReportExecution
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *OffRampSkippedReportExecutionIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(OffRampSkippedReportExecution)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(OffRampSkippedReportExecution)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *OffRampSkippedReportExecutionIterator) Error() error {
+	return it.fail
+}
+
+func (it *OffRampSkippedReportExecutionIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type OffRampSkippedReportExecution struct {
+	SourceChainSelector uint64
+	Raw                 types.Log
+}
+
+func (_OffRamp *OffRampFilterer) FilterSkippedReportExecution(opts *bind.FilterOpts) (*OffRampSkippedReportExecutionIterator, error) {
+
+	logs, sub, err := _OffRamp.contract.FilterLogs(opts, "SkippedReportExecution")
+	if err != nil {
+		return nil, err
+	}
+	return &OffRampSkippedReportExecutionIterator{contract: _OffRamp.contract, event: "SkippedReportExecution", logs: logs, sub: sub}, nil
+}
+
+func (_OffRamp *OffRampFilterer) WatchSkippedReportExecution(opts *bind.WatchOpts, sink chan<- *OffRampSkippedReportExecution) (event.Subscription, error) {
+
+	logs, sub, err := _OffRamp.contract.WatchLogs(opts, "SkippedReportExecution")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(OffRampSkippedReportExecution)
+				if err := _OffRamp.contract.UnpackLog(event, "SkippedReportExecution", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_OffRamp *OffRampFilterer) ParseSkippedReportExecution(log types.Log) (*OffRampSkippedReportExecution, error) {
+	event := new(OffRampSkippedReportExecution)
+	if err := _OffRamp.contract.UnpackLog(event, "SkippedReportExecution", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
 type OffRampSourceChainConfigSetIterator struct {
 	Event *OffRampSourceChainConfigSet
 
@@ -2300,6 +2417,8 @@ func (_OffRamp *OffRamp) ParseLog(log types.Log) (generated.AbigenLog, error) {
 		return _OffRamp.ParseRootRemoved(log)
 	case _OffRamp.abi.Events["SkippedAlreadyExecutedMessage"].ID:
 		return _OffRamp.ParseSkippedAlreadyExecutedMessage(log)
+	case _OffRamp.abi.Events["SkippedReportExecution"].ID:
+		return _OffRamp.ParseSkippedReportExecution(log)
 	case _OffRamp.abi.Events["SourceChainConfigSet"].ID:
 		return _OffRamp.ParseSourceChainConfigSet(log)
 	case _OffRamp.abi.Events["SourceChainSelectorAdded"].ID:
@@ -2348,6 +2467,10 @@ func (OffRampRootRemoved) Topic() common.Hash {
 
 func (OffRampSkippedAlreadyExecutedMessage) Topic() common.Hash {
 	return common.HexToHash("0x3b575419319662b2a6f5e2467d84521517a3382b908eb3d557bb3fdb0c50e23c")
+}
+
+func (OffRampSkippedReportExecution) Topic() common.Hash {
+	return common.HexToHash("0xaab522ed53d887e56ed53dd37398a01aeef6a58e0fa77c2173beb9512d894933")
 }
 
 func (OffRampSourceChainConfigSet) Topic() common.Hash {
@@ -2466,6 +2589,12 @@ type OffRampInterface interface {
 	WatchSkippedAlreadyExecutedMessage(opts *bind.WatchOpts, sink chan<- *OffRampSkippedAlreadyExecutedMessage) (event.Subscription, error)
 
 	ParseSkippedAlreadyExecutedMessage(log types.Log) (*OffRampSkippedAlreadyExecutedMessage, error)
+
+	FilterSkippedReportExecution(opts *bind.FilterOpts) (*OffRampSkippedReportExecutionIterator, error)
+
+	WatchSkippedReportExecution(opts *bind.WatchOpts, sink chan<- *OffRampSkippedReportExecution) (event.Subscription, error)
+
+	ParseSkippedReportExecution(log types.Log) (*OffRampSkippedReportExecution, error)
 
 	FilterSourceChainConfigSet(opts *bind.FilterOpts, sourceChainSelector []uint64) (*OffRampSourceChainConfigSetIterator, error)
 
