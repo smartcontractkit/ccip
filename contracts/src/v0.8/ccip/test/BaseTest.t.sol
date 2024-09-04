@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 // Imports to any non-library are not allowed due to the significant cascading
 // compile time increase they cause when imported into this base test.
 
-import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
+import {IRMNV2} from "../interfaces/IRMNV2.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {MockRMN} from "./mocks/MockRMN.sol";
@@ -71,7 +71,7 @@ contract BaseTest is Test {
   address internal constant ADMIN = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
 
   MockRMN internal s_mockRMN;
-  IRMNRemote internal s_mockRMNRemote;
+  IRMNV2 internal s_mockRMNRemote;
 
   function setUp() public virtual {
     // BaseTest.setUp is often called multiple times from tests' setUp due to inheritance.
@@ -89,9 +89,9 @@ contract BaseTest is Test {
 
     // setup mock RMN & RMNRemote
     s_mockRMN = new MockRMN();
-    s_mockRMNRemote = IRMNRemote(makeAddr("MOCK RMN REMOTE"));
+    s_mockRMNRemote = IRMNV2(makeAddr("MOCK RMN REMOTE"));
     vm.etch(address(s_mockRMNRemote), bytes("fake bytecode"));
-    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNRemote.verify.selector), bytes(""));
+    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNV2.verify.selector), bytes(""));
     _setMockRMNGlobalCurse(false);
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(false)); // no curses by defaule
   }

@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Internal} from "../libraries/Internal.sol";
 
 /// @notice This interface contains the only RMN-related functions that might be used on-chain by other CCIP contracts.
-interface IRMNRemote {
+interface IRMNV2 {
   /// @notice signature components from RMN nodes
   struct Signature {
     bytes32 r;

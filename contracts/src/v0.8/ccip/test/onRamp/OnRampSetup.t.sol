@@ -117,7 +117,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
     OnRampHelper onRamp = new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: sourceChainSelector,
-        rmnRemote: s_mockRMNRemote,
+        rmn: s_mockRMNRemote,
         nonceManager: nonceManager,
         tokenAdminRegistry: tokenAdminRegistry
       }),
@@ -161,7 +161,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
 
   function _assertStaticConfigsEqual(OnRamp.StaticConfig memory a, OnRamp.StaticConfig memory b) internal pure {
     assertEq(a.chainSelector, b.chainSelector);
-    assertEq(address(a.rmnRemote), address(b.rmnRemote));
+    assertEq(address(a.rmn), address(b.rmn));
     assertEq(a.tokenAdminRegistry, b.tokenAdminRegistry);
   }
 

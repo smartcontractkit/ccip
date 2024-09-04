@@ -7,7 +7,7 @@ import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
-import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
+import {IRMNV2} from "../interfaces/IRMNV2.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
@@ -88,7 +88,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
     uint64 chainSelector; // ───╮  Destination chainSelector
-    IRMNRemote rmnRemote; // ───╯  RMN Verification Contract
+    IRMNV2 rmn; // ─────────────╯  RMN Verification Contract
     address tokenAdminRegistry; // Token admin registry address
     address nonceManager; // Nonce manager address
   }
@@ -125,7 +125,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   struct CommitReport {
     Internal.PriceUpdates priceUpdates; // Collection of gas and price updates to commit
     Internal.MerkleRoot[] merkleRoots; // Collection of merkle roots per source chain to commit
-    IRMNRemote.Signature[] rmnSignatures; // RMN signatures on the merkle roots
+    IRMNV2.Signature[] rmnSignatures; // RMN signatures on the merkle roots
   }
 
   // STATIC CONFIG
@@ -133,7 +133,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev ChainSelector of this chain
   uint64 internal immutable i_chainSelector;
   /// @dev The RMN verification contract
-  IRMNRemote internal immutable i_rmnRemote;
+  IRMNV2 internal immutable i_rmn;
   /// @dev The address of the token admin registry
   address internal immutable i_tokenAdminRegistry;
   /// @dev The address of the nonce manager
@@ -164,7 +164,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     SourceChainConfigArgs[] memory sourceChainConfigs
   ) MultiOCR3Base() {
     if (
-      address(staticConfig.rmnRemote) == address(0) || staticConfig.tokenAdminRegistry == address(0)
+      address(staticConfig.rmn) == address(0) || staticConfig.tokenAdminRegistry == address(0)
         || staticConfig.nonceManager == address(0)
     ) {
       revert ZeroAddressNotAllowed();
@@ -175,7 +175,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     }
 
     i_chainSelector = staticConfig.chainSelector;
-    i_rmnRemote = staticConfig.rmnRemote;
+    i_rmn = staticConfig.rmn;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
     i_nonceManager = staticConfig.nonceManager;
     emit StaticConfigSet(staticConfig);
@@ -327,7 +327,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   ) internal {
     uint64 sourceChainSelector = report.sourceChainSelector;
     bool manualExecution = manualExecGasLimits.length != 0;
-    if (i_rmnRemote.isCursed(bytes16(uint128(sourceChainSelector)))) {
+    if (i_rmn.isCursed(bytes16(uint128(sourceChainSelector)))) {
       if (manualExecution) {
         // For manual execution we don't want to silently fail so we revert
         revert CursedByRMN(sourceChainSelector);
@@ -578,7 +578,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
     // Verify RMN signatures
     if (commitReport.merkleRoots.length > 0) {
-      i_rmnRemote.verify(commitReport.merkleRoots, commitReport.rmnSignatures);
+      i_rmn.verify(commitReport.merkleRoots, commitReport.rmnSignatures);
     }
 
     // Check if the report contains price updates
@@ -604,7 +604,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       Internal.MerkleRoot memory root = commitReport.merkleRoots[i];
       uint64 sourceChainSelector = root.sourceChainSelector;
 
-      if (i_rmnRemote.isCursed(bytes16(uint128(sourceChainSelector)))) {
+      if (i_rmn.isCursed(bytes16(uint128(sourceChainSelector)))) {
         revert CursedByRMN(sourceChainSelector);
       }
 
@@ -685,7 +685,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   function getStaticConfig() external view returns (StaticConfig memory) {
     return StaticConfig({
       chainSelector: i_chainSelector,
-      rmnRemote: i_rmnRemote,
+      rmn: i_rmn,
       tokenAdminRegistry: i_tokenAdminRegistry,
       nonceManager: i_nonceManager
     });

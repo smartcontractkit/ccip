@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../NonceManager.sol";
-import {IRMNRemote} from "../../interfaces/IRMNRemote.sol";
+import {IRMNV2} from "../../interfaces/IRMNV2.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import "../helpers/MerkleHelper.sol";
@@ -148,7 +148,7 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
       merkleRoots[1] = MerkleHelper.getMerkleRoot(hashedMessages2);
 
       // TODO make these real sigs :)
-      IRMNRemote.Signature[] memory rmnSignatures = new IRMNRemote.Signature[](0);
+      IRMNV2.Signature[] memory rmnSignatures = new IRMNV2.Signature[](0);
 
       Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](2);
       roots[0] = Internal.MerkleRoot({

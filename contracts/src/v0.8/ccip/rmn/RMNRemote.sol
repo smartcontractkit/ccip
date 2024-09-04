@@ -3,14 +3,14 @@ pragma solidity ^0.8.24;
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
+import {IRMNV2} from "../interfaces/IRMNV2.sol";
 import {Internal} from "../libraries/Internal.sol";
 
 bytes32 constant RMN_V1_6_ANY2EVM_REPORT = keccak256("RMN_V1_6_ANY2EVM_REPORT");
 
 /// @dev XXX DO NOT USE THIS CONTRACT, NOT PRODUCTION READY XXX
 /// @notice This contract supports verification of RMN reports for any Any2EVM OffRamp.
-contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNRemote {
+contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   /// @dev temp placeholder to exclude this contract from coverage
   function test() public {}
 
