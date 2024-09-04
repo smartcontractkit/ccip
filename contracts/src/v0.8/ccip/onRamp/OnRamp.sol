@@ -48,7 +48,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   event FeePaid(address indexed feeToken, uint256 feeValueJuels);
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
-  event CCIPSendRequested(uint64 indexed destChainSelector, Internal.EVM2AnyRampMessage message);
+  event CCIPMessageSent(uint64 indexed destChainSelector, Internal.EVM2AnyRampMessage message);
   event AllowListAdminSet(address indexed allowListAdmin);
   event AllowListSendersAdded(uint64 indexed destChainSelector, address[] senders);
   event AllowListSendersRemoved(uint64 indexed destChainSelector, address[] senders);
@@ -99,7 +99,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   //solhint-disable gas-struct-packing
   struct AllowListConfigArgs {
     uint64 destChainSelector; // ─────────────╮ Destination chain selector
-      //                                      │ destChainSelector and allowListEnabled are packed in the same slot
+    //                                        │ destChainSelector and allowListEnabled are packed in the same slot
     bool allowListEnabled; // ────────────────╯ boolean indicator to specify if allowList check is enabled.
     address[] addedAllowlistedSenders; // list of senders to be added to the allowedSendersList
     address[] removedAllowlistedSenders; // list of senders to be removed from the allowedSendersList
@@ -208,7 +208,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
       }),
       sender: originalSender,
       data: message.data,
-      extraArgs: message.extraArgs,
+      extraArgs: convertedExtraArgs,
       receiver: message.receiver,
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
@@ -232,9 +232,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
       newMessage.tokenAmounts[i].destExecData = destExecDataPerToken[i];
     }
 
-    // Override extraArgs with latest version
-    newMessage.extraArgs = convertedExtraArgs;
-
     // Hash only after all fields have been set
     newMessage.header.messageId = Internal._hash(
       newMessage,
@@ -246,7 +243,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     // Emit message request
     // This must happen after any pool events as some tokens (e.g. USDC) emit events that we expect to precede this
     // event in the offchain code.
-    emit CCIPSendRequested(destChainSelector, newMessage);
+    emit CCIPMessageSent(destChainSelector, newMessage);
     return newMessage.header.messageId;
   }
 
@@ -425,8 +422,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
         }
       }
 
-      for (uint256 k = 0; k < allowListConfigArgs.removedAllowlistedSenders.length; ++k) {
-        destChainConfig.allowedSendersList.remove(allowListConfigArgs.removedAllowlistedSenders[k]);
+      for (uint256 j = 0; j < allowListConfigArgs.removedAllowlistedSenders.length; ++j) {
+        destChainConfig.allowedSendersList.remove(allowListConfigArgs.removedAllowlistedSenders[j]);
       }
 
       if (allowListConfigArgs.removedAllowlistedSenders.length > 0) {
