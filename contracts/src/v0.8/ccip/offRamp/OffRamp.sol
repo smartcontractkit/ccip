@@ -353,7 +353,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
     // SECURITY CRITICAL CHECK
     // NOTE: This check also verifies that all messages match the report's sourceChainSelector
-    uint256 timestampCommitted = _verify(sourceChainSelector, hashedLeaves, report.proofs, report.proofFlagBits);
+    uint256 timestampCommitted =
+      s_roots[sourceChainSelector][MerkleMultiProof.merkleRoot(hashedLeaves, report.proofs, report.proofFlagBits)];
     if (timestampCommitted == 0) revert RootNotCommitted(sourceChainSelector);
 
     // Execute messages
@@ -633,21 +634,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @return timestamp The timestamp of the committed root or zero in the case that it was never
   /// committed.
   function getMerkleRoot(uint64 sourceChainSelector, bytes32 root) external view returns (uint256) {
-    return s_roots[sourceChainSelector][root];
-  }
-
-  /// @notice Returns timestamp of when root was accepted or 0 if verification fails.
-  /// @dev This method uses a merkle tree within a merkle tree, with the hashedLeaves,
-  /// proofs and proofFlagBits being used to get the root of the inner tree.
-  /// This root is then used as the singular leaf of the outer tree.
-  /// @return timestamp The commit timestamp of the root
-  function _verify(
-    uint64 sourceChainSelector,
-    bytes32[] memory hashedLeaves,
-    bytes32[] memory proofs,
-    uint256 proofFlagBits
-  ) internal view virtual returns (uint256 timestamp) {
-    bytes32 root = MerkleMultiProof.merkleRoot(hashedLeaves, proofs, proofFlagBits);
     return s_roots[sourceChainSelector][root];
   }
 

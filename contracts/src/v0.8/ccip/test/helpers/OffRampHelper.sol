@@ -3,12 +3,11 @@ pragma solidity 0.8.24;
 
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
+import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {IgnoreContractSize} from "./IgnoreContractSize.sol";
 
 contract OffRampHelper is OffRamp, IgnoreContractSize {
-  mapping(uint64 sourceChainSelector => uint256 overrideTimestamp) private s_sourceChainVerificationOverride;
-
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
@@ -75,26 +74,37 @@ contract OffRampHelper is OffRamp, IgnoreContractSize {
     bytes32[] memory proofs,
     uint256 proofFlagBits
   ) external view returns (uint256 timestamp) {
-    return super._verify(sourceChainSelector, hashedLeaves, proofs, proofFlagBits);
-  }
-
-  function _verify(
-    uint64 sourceChainSelector,
-    bytes32[] memory hashedLeaves,
-    bytes32[] memory proofs,
-    uint256 proofFlagBits
-  ) internal view override returns (uint256 timestamp) {
-    uint256 overrideTimestamp = s_sourceChainVerificationOverride[sourceChainSelector];
-
-    return overrideTimestamp == 0
-      ? super._verify(sourceChainSelector, hashedLeaves, proofs, proofFlagBits)
-      : overrideTimestamp;
+    return s_roots[sourceChainSelector][MerkleMultiProof.merkleRoot(hashedLeaves, proofs, proofFlagBits)];
   }
 
   /// @dev Test helper to override _verify result for easier exec testing
-  function setVerifyOverrideResult(uint64 sourceChainSelector, uint256 overrideTimestamp) external {
-    s_sourceChainVerificationOverride[sourceChainSelector] = overrideTimestamp;
+  function setVerifyOverrideResult(
+    uint64 sourceChainSelector,
+    Internal.ExecutionReportSingleChain[] memory reports,
+    uint256 overrideTimestamp
+  ) external {
+    for (uint256 i = 0; i < reports.length; ++i) {
+      setVerifyOverrideResult(sourceChainSelector, reports[i], overrideTimestamp);
+    }
   }
+
+  /// @dev Test helper to override _verify result for easier exec testing
+  function setVerifyOverrideResult(
+    uint64 sourceChainSelector,
+    Internal.ExecutionReportSingleChain memory report,
+    uint256 overrideTimestamp
+  ) public {
+    bytes32[] memory hashedLeaves = new bytes32[](report.messages.length);
+    for (uint256 i = 0; i < report.messages.length; ++i) {
+      hashedLeaves[i] = Internal._hash(report.messages[i], _getEnabledSourceChainConfig(sourceChainSelector).onRamp);
+    }
+
+    s_roots[sourceChainSelector][MerkleMultiProof.merkleRoot(hashedLeaves, report.proofs, report.proofFlagBits)] =
+      overrideTimestamp;
+  }
+
+  /// @dev Test helper to override _verify result for easier exec testing
+  function setVerifyOverrideResult(uint64 sourceChainSelector, uint256 overrideTimestamp) external {}
 
   /// @dev Test helper to directly set a root's timestamp
   function setRootTimestamp(uint64 sourceChainSelector, bytes32 root, uint256 timestamp) external {
