@@ -25,6 +25,7 @@ go run scripts/zksyncverify/main.go --abiFilePath=<path-to-abi-file> --encodedCo
 
 This will generate the constructor arguments which you can use to in [zksync-verify.ts](zksync-verify.ts) script.
 Replace the constructor arguments and contract address in the script and run the following command from [contracts](../../) dir to verify the contract:
+Please note : the generated constructor arguments may not be in the right order, Cross-check the order of the constructor arguments, structs & its fields against the constructor in the respective solidity file.
 
 ```bash
 pnpm run zksync:verify
