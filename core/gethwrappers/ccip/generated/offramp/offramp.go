@@ -43,6 +43,11 @@ type ClientEVMTokenAmount struct {
 	Amount *big.Int
 }
 
+type IRMNV2Signature struct {
+	R [32]byte
+	S [32]byte
+}
+
 type InternalAny2EVMRampMessage struct {
 	Header       InternalRampMessageHeader
 	Sender       []byte
@@ -63,6 +68,14 @@ type InternalExecutionReportSingleChain struct {
 type InternalGasPriceUpdate struct {
 	DestChainSelector uint64
 	UsdPerUnitGas     *big.Int
+}
+
+type InternalMerkleRoot struct {
+	SourceChainSelector uint64
+	MinSeqNr            uint64
+	MaxSeqNr            uint64
+	MerkleRoot          [32]byte
+	OnRampAddress       []byte
 }
 
 type InternalPriceUpdates struct {
@@ -113,23 +126,18 @@ type MultiOCR3BaseOCRConfigArgs struct {
 	Transmitters                   []common.Address
 }
 
+type OffRampCommitReport struct {
+	PriceUpdates  InternalPriceUpdates
+	MerkleRoots   []InternalMerkleRoot
+	RmnSignatures []IRMNV2Signature
+}
+
 type OffRampDynamicConfig struct {
 	FeeQuoter                               common.Address
 	PermissionLessExecutionThresholdSeconds uint32
 	MaxTokenTransferGas                     uint32
 	MaxPoolReleaseOrMintGas                 uint32
 	MessageValidator                        common.Address
-}
-
-type OffRampInterval struct {
-	Min uint64
-	Max uint64
-}
-
-type OffRampMerkleRoot struct {
-	SourceChainSelector uint64
-	Interval            OffRampInterval
-	MerkleRoot          [32]byte
 }
 
 type OffRampSourceChainConfig struct {
@@ -148,14 +156,9 @@ type OffRampSourceChainConfigArgs struct {
 
 type OffRampStaticConfig struct {
 	ChainSelector      uint64
-	RmnProxy           common.Address
+	Rmn                common.Address
 	TokenAdminRegistry common.Address
 	NonceManager       common.Address
-}
-
-type OffRampUnblessedRoot struct {
-	SourceChainSelector uint64
-	MerkleRoot          [32]byte
 }
 
 var OffRampMetaData = &bind.MetaData{
@@ -451,28 +454,6 @@ func (_OffRamp *OffRampCallerSession) GetStaticConfig() (OffRampStaticConfig, er
 	return _OffRamp.Contract.GetStaticConfig(&_OffRamp.CallOpts)
 }
 
-func (_OffRamp *OffRampCaller) IsBlessed(opts *bind.CallOpts, root [32]byte) (bool, error) {
-	var out []interface{}
-	err := _OffRamp.contract.Call(opts, &out, "isBlessed", root)
-
-	if err != nil {
-		return *new(bool), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
-
-	return out0, err
-
-}
-
-func (_OffRamp *OffRampSession) IsBlessed(root [32]byte) (bool, error) {
-	return _OffRamp.Contract.IsBlessed(&_OffRamp.CallOpts, root)
-}
-
-func (_OffRamp *OffRampCallerSession) IsBlessed(root [32]byte) (bool, error) {
-	return _OffRamp.Contract.IsBlessed(&_OffRamp.CallOpts, root)
-}
-
 func (_OffRamp *OffRampCaller) LatestConfigDetails(opts *bind.CallOpts, ocrPluginType uint8) (MultiOCR3BaseOCRConfig, error) {
 	var out []interface{}
 	err := _OffRamp.contract.Call(opts, &out, "latestConfigDetails", ocrPluginType)
@@ -609,18 +590,6 @@ func (_OffRamp *OffRampSession) ManuallyExecute(reports []InternalExecutionRepor
 
 func (_OffRamp *OffRampTransactorSession) ManuallyExecute(reports []InternalExecutionReportSingleChain, gasLimitOverrides [][]*big.Int) (*types.Transaction, error) {
 	return _OffRamp.Contract.ManuallyExecute(&_OffRamp.TransactOpts, reports, gasLimitOverrides)
-}
-
-func (_OffRamp *OffRampTransactor) ResetUnblessedRoots(opts *bind.TransactOpts, rootToReset []OffRampUnblessedRoot) (*types.Transaction, error) {
-	return _OffRamp.contract.Transact(opts, "resetUnblessedRoots", rootToReset)
-}
-
-func (_OffRamp *OffRampSession) ResetUnblessedRoots(rootToReset []OffRampUnblessedRoot) (*types.Transaction, error) {
-	return _OffRamp.Contract.ResetUnblessedRoots(&_OffRamp.TransactOpts, rootToReset)
-}
-
-func (_OffRamp *OffRampTransactorSession) ResetUnblessedRoots(rootToReset []OffRampUnblessedRoot) (*types.Transaction, error) {
-	return _OffRamp.Contract.ResetUnblessedRoots(&_OffRamp.TransactOpts, rootToReset)
 }
 
 func (_OffRamp *OffRampTransactor) SetDynamicConfig(opts *bind.TransactOpts, dynamicConfig OffRampDynamicConfig) (*types.Transaction, error) {
@@ -2508,8 +2477,6 @@ type OffRampInterface interface {
 
 	GetStaticConfig(opts *bind.CallOpts) (OffRampStaticConfig, error)
 
-	IsBlessed(opts *bind.CallOpts, root [32]byte) (bool, error)
-
 	LatestConfigDetails(opts *bind.CallOpts, ocrPluginType uint8) (MultiOCR3BaseOCRConfig, error)
 
 	Owner(opts *bind.CallOpts) (common.Address, error)
@@ -2527,8 +2494,6 @@ type OffRampInterface interface {
 	ExecuteSingleMessage(opts *bind.TransactOpts, message InternalAny2EVMRampMessage, offchainTokenData [][]byte) (*types.Transaction, error)
 
 	ManuallyExecute(opts *bind.TransactOpts, reports []InternalExecutionReportSingleChain, gasLimitOverrides [][]*big.Int) (*types.Transaction, error)
-
-	ResetUnblessedRoots(opts *bind.TransactOpts, rootToReset []OffRampUnblessedRoot) (*types.Transaction, error)
 
 	SetDynamicConfig(opts *bind.TransactOpts, dynamicConfig OffRampDynamicConfig) (*types.Transaction, error)
 
