@@ -10,7 +10,7 @@ library DeterministicContractDeployer {
   /// @param salt A value to modify the deployment address.
   /// @param initCode The bytecode of the contract to deploy.
   /// @return contractAddress The address of the deployed contract.
-  function deploy(bytes memory initCode, bytes32 salt) internal returns (address contractAddress) {
+  function _deploy(bytes memory initCode, bytes32 salt) internal returns (address contractAddress) {
     assembly {
       // create2(value, memoryAddress, size, salt)
       contractAddress := create2(0, add(initCode, 0x20), mload(initCode), salt)
@@ -19,9 +19,11 @@ library DeterministicContractDeployer {
     if(contractAddress == address(0)) {
       revert DeploymentFailed();
     }
+
+    return contractAddress;
   }
 
-    function predictAddressOfUndeployedContract(
+    function _predictAddressOfUndeployedContract(
     bytes calldata initCode,
     bytes32 salt,
     address deployer

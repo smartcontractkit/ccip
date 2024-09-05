@@ -3,8 +3,6 @@ pragma solidity ^0.8.24;
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {DeterministicContractDeployer} from "../../shared/util/DeterministicDeployer.sol";
 
-import {TokenAdminRegistry} from "./TokenAdminRegistry.sol";
-
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {TokenPool} from "../pools/TokenPool.sol";
 
@@ -17,6 +15,10 @@ contract TokenPoolFactory is OwnerIsCreator {
   using DeterministicContractDeployer for bytes;
 
   ITokenAdminRegistry internal immutable i_tokenAdminRegistry;
+
+  event RemotePoolFactoryUpdated(
+    uint64 indexed remoteChainSelector, address existingFactory, address remotePoolFactory
+  );
 
   error InvalidZeroAddress();
 
@@ -47,11 +49,11 @@ contract TokenPoolFactory is OwnerIsCreator {
     /// @notice: init code and token args have been combined into one to prevent a stack too deep error
     bytes calldata tokenPoolInitCode,
     bytes calldata tokenInitCode,
-    bytes32 salt //TODO: Check that this is allowed for omni-chain deployments
+    bytes32 salt
   ) public returns (address tokenAddress, address poolAddress) {
     // If there is no existing ERC20-token, deploy a new one, else return the existing address
     if (existingToken == address(0)) {
-      tokenAddress = tokenInitCode.deploy(salt);
+      tokenAddress = tokenInitCode._deploy(salt);
     } else {
       tokenAddress = existingToken;
     }
@@ -60,7 +62,7 @@ contract TokenPoolFactory is OwnerIsCreator {
     salt = keccak256(abi.encodePacked(salt, msg.sender));
 
     // Deploy a new token pool locally
-    poolAddress = tokenPoolInitCode.deploy(salt);
+    poolAddress = tokenPoolInitCode._deploy(salt);
 
     // Setup token roles
     BurnMintERC677(tokenAddress).grantMintAndBurnRoles(poolAddress);
@@ -76,16 +78,13 @@ contract TokenPoolFactory is OwnerIsCreator {
         chainUpdates[i] = TokenPool.ChainUpdate({
           remoteChainSelector: remoteTokenPools[i].remoteChainSelector,
           allowed: true,
-
           // If an address is not passed, predict the address using the remote factory address.
           remotePoolAddress: remoteTokenPools[i].remotePoolAddress.length == 0
-            ? abi.encode(tokenPoolInitCode.predictAddressOfUndeployedContract(salt, remoteFactoryAddress))
+            ? abi.encode(tokenPoolInitCode._predictAddressOfUndeployedContract(salt, remoteFactoryAddress))
             : remoteTokenPools[i].remotePoolAddress,
-
           remoteTokenAddress: remoteTokenPools[i].remoteTokenAddress.length == 0
-            ? abi.encode(tokenInitCode.predictAddressOfUndeployedContract(salt, remoteFactoryAddress))
+            ? abi.encode(tokenInitCode._predictAddressOfUndeployedContract(salt, remoteFactoryAddress))
             : remoteTokenPools[i].remoteTokenAddress,
-
           outboundRateLimiterConfig: remoteTokenPools[i].outboundRateLimiterConfig,
           inboundRateLimiterConfig: remoteTokenPools[i].inboundRateLimiterConfig
         });
@@ -95,9 +94,12 @@ contract TokenPoolFactory is OwnerIsCreator {
     }
 
     _releaseOwnership(tokenAddress, poolAddress);
-  }
 
-  function _setTokenPool(address token, address pool) public {
+    return (tokenAddress, poolAddress);
+  }
+  
+
+  function setTokenPool(address token, address pool) public {
     // propose this factory as the admin for the token in the token admin registry
     i_tokenAdminRegistry.proposeAdministrator(token, address(this));
 
@@ -108,7 +110,7 @@ contract TokenPoolFactory is OwnerIsCreator {
     i_tokenAdminRegistry.setPool(token, pool);
   }
 
-  function _releaseOwnership(address token, address pool) public {
+  function _releaseOwnership(address token, address pool) internal {
     i_tokenAdminRegistry.transferAdminRole(token, msg.sender);
 
     OwnerIsCreator(token).transferOwnership(address(msg.sender)); // 1 step ownership transfer
@@ -117,10 +119,14 @@ contract TokenPoolFactory is OwnerIsCreator {
 
   // TODO: Update with struct and arrays and shit. PoC for now
   function updateRemotePoolFactory(uint64 remoteChainSelector, address remotePoolFactory) public onlyOwner {
+    address existingFactory = s_remotePoolFactories[remoteChainSelector];
+
     s_remotePoolFactories[remoteChainSelector] = remotePoolFactory;
+
+    emit RemotePoolFactoryUpdated(remoteChainSelector, existingFactory, remotePoolFactory);
   }
 
-  function getRemotePoolFactory(uint64 remoteChainSelector) public view returns (address) {
+  function getRemotePoolFactory(uint64 remoteChainSelector) public view returns (address remoteFactory) {
     return s_remotePoolFactories[remoteChainSelector];
   }
 }
