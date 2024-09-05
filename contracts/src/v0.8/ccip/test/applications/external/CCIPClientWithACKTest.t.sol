@@ -107,7 +107,8 @@ contract CCIPClientWithACKTest is EVM2EVMOnRampSetup {
 
     uint256 receiverBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(address(s_sender));
 
-    vm.expectEmit(true, true, false, false);
+    // Check the messageId since we can control that, but not ackMessageId since its generated at execution time
+    vm.expectEmit(true, false, true, false, address(s_sender));
     emit MessageSent(messageId, ackMessageId);
 
     s_sender.ccipReceive(

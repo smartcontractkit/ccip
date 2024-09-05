@@ -4,12 +4,17 @@ pragma solidity ^0.8.0;
 import {Client} from "../../libraries/Client.sol";
 import {CCIPClient} from "../external/CCIPClient.sol";
 
+import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
+import {IRouter} from "../../interfaces/IRouter.sol";
+
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 /// @title PingPongDemo - A simple ping-pong contract for demonstrating cross-chain communication
 contract PingPongDemo is CCIPClient {
+
   event Ping(uint256 pingPongCount);
   event Pong(uint256 pingPongCount);
+  event OutOfOrderExecutionChange(bool isOutOfOrder);
 
   // The chain ID of the counterpart ping pong contract
   uint64 internal s_counterpartChainSelector;
@@ -19,6 +24,8 @@ contract PingPongDemo is CCIPClient {
 
   // Pause ping-ponging
   bool private s_isPaused;
+
+  bool private s_allowOutOfOrderExecution;
 
   // CCIPClient will handle the token approval so there's no need to do it here
   constructor(address router, IERC20 feeToken) CCIPClient(router, feeToken, true) {}
@@ -98,4 +105,27 @@ contract PingPongDemo is CCIPClient {
   function isPaused() external view returns (bool) {
     return s_isPaused;
   }
+
+  function getOutOfOrderExecution() external view returns (bool) {
+    return s_allowOutOfOrderExecution;
+  }
+
+  function setOutOfOrderExecution(bool outOfOrderExecution) external onlyOwner {
+    // It adds gas having the extra storage slot, but the alternative is a bunch of very messy assembly code
+    // to slice it out of the extra args.
+    s_allowOutOfOrderExecution = outOfOrderExecution;
+
+    address onRamp = IRouter(s_ccipRouter).getOnRamp(s_counterpartChainSelector);
+    EVM2EVMOnRamp.StaticConfig memory staticConfig = EVM2EVMOnRamp(onRamp).getStaticConfig();
+    
+    // Enabling out of order execution also requires setting a manual gas limit, therefore the on-ramp default
+    // gas limit is used to ensure consistency, but can be overwritten manually by the contract owner using 
+    // the applyChainUpdates function.
+    s_chainConfigs[s_counterpartChainSelector].extraArgsBytes = Client._argsToBytes(
+      Client.EVMExtraArgsV2({gasLimit: staticConfig.defaultTxGasLimit, allowOutOfOrderExecution: outOfOrderExecution})
+    );
+
+    emit OutOfOrderExecutionChange(outOfOrderExecution);
+  }
+
 }

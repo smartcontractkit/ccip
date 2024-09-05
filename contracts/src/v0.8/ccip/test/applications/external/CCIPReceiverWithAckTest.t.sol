@@ -72,7 +72,7 @@ contract CCIPReceiverWithAckTest is EVM2EVMOnRampSetup {
 
     uint256 receiverBalanceBefore = IERC20(s_sourceFeeToken).balanceOf(address(s_receiver));
 
-    vm.expectEmit(false, true, false, false);
+    vm.expectEmit(true, false, true, false);
     emit MessageSent(messageId, ackMessageId);
 
     s_receiver.ccipReceive(

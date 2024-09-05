@@ -29,9 +29,45 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
 }
 
 contract PingPong_example_startPingPong is PingPongDappSetup {
-  function test_StartPingPong_Success() public {
     uint256 pingPongNumber = 1;
-    bytes memory data = abi.encode(pingPongNumber);
+    bytes data = abi.encode(pingPongNumber);
+
+   function test_StartPingPong_Success() public {
+    Client.EVM2AnyMessage memory sentMessage = Client.EVM2AnyMessage({
+      receiver: abi.encode(i_pongContract),
+      data: data,
+      tokenAmounts: new Client.EVMTokenAmount[](0),
+      feeToken: s_sourceFeeToken,
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}))
+    });
+
+    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, sentMessage);
+
+    Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
+      sequenceNumber: 1,
+      feeTokenAmount: expectedFee,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      sender: address(s_pingPong),
+      receiver: i_pongContract,
+      nonce: 1,
+      data: data,
+      tokenAmounts: sentMessage.tokenAmounts,
+      sourceTokenData: new bytes[](sentMessage.tokenAmounts.length),
+      gasLimit: 2e5,
+      feeToken: sentMessage.feeToken,
+      strict: false,
+      messageId: ""
+    });
+    message.messageId = Internal._hash(message, s_metadataHash);
+
+    vm.expectEmit();
+    emit PingPongDemo.Ping(pingPongNumber);
+
+    vm.expectEmit();
+    emit EVM2EVMOnRamp.CCIPSendRequested(message);
+
+    s_pingPong.startPingPong();
+  }
 
   function test_StartPingPong_With_Sequenced_Ordered_Success() public {
     Client.EVM2AnyMessage memory sentMessage = Client.EVM2AnyMessage({
@@ -86,7 +122,7 @@ contract PingPong_example_startPingPong is PingPongDappSetup {
       data: abi.encode(pingPongNumber),
       tokenAmounts: sentMessage.tokenAmounts,
       sourceTokenData: new bytes[](sentMessage.tokenAmounts.length),
-      gasLimit: 200_000,
+      gasLimit: GAS_LIMIT,
       feeToken: sentMessage.feeToken,
       strict: false,
       messageId: ""
@@ -133,19 +169,24 @@ contract PingPong_example_ccipReceive is PingPongDappSetup {
 
 contract PingPong_plumbing is PingPongDappSetup {
   function test_Fuzz_CounterPartChainSelector_Success(uint64 chainSelector) public {
-    s_pingPong.setCounterpartChainSelector(chainSelector);
+    vm.assume(chainSelector != 0);
+    
+    s_pingPong.setCounterpart(chainSelector, address(0x1234));
 
     assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
   }
 
   function test_Fuzz_CounterPartAddress_Success(address counterpartAddress) public {
-    s_pingPong.setCounterpartAddress(counterpartAddress);
+    vm.assume(counterpartAddress != address(0));
+
+    s_pingPong.setCounterpart(1, counterpartAddress);
 
     assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
   }
 
   function test_Fuzz_CounterPartAddress_Success(uint64 chainSelector, address counterpartAddress) public {
-    s_pingPong.setCounterpartChainSelector(chainSelector);
+    vm.assume(chainSelector != 0);
+    vm.assume(counterpartAddress != address(0));
 
     s_pingPong.setCounterpart(chainSelector, counterpartAddress);
 
