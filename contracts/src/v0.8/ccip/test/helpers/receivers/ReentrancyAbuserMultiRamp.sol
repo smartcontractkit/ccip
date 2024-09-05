@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.19;
 
-import {CCIPReceiver} from "../../../applications/CCIPReceiver.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
+import {EVM2EVMOffRamp} from "../../../offRamp/EVM2EVMOffRamp.sol";
+import {CCIPReceiverBasic} from "./CCIPReceiverBasic.sol";
 import {OffRamp} from "../../../offRamp/OffRamp.sol";
 
-contract ReentrancyAbuserMultiRamp is CCIPReceiver {
+contract ReentrancyAbuserMultiRamp is CCIPReceiverBasic {
   event ReentrancySucceeded();
 
   bool internal s_ReentrancyDone = false;
   Internal.ExecutionReportSingleChain internal s_payload;
   OffRamp internal s_offRamp;
 
-  constructor(address router, OffRamp offRamp) CCIPReceiver(router) {
+  constructor(address router, OffRamp offRamp) CCIPReceiverBasic(router) {
     s_offRamp = offRamp;
   }
 

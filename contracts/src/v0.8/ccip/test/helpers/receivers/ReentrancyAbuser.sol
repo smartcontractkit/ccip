@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {CCIPReceiver} from "../../../applications/CCIPReceiver.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {EVM2EVMOffRamp} from "../../../offRamp/EVM2EVMOffRamp.sol";
+import {CCIPReceiverBasic} from "./CCIPReceiverBasic.sol";
 
-contract ReentrancyAbuser is CCIPReceiver {
+contract ReentrancyAbuser is CCIPReceiverBasic {
   event ReentrancySucceeded();
 
   uint32 internal constant DEFAULT_TOKEN_DEST_GAS_OVERHEAD = 144_000;
@@ -15,7 +15,7 @@ contract ReentrancyAbuser is CCIPReceiver {
   Internal.ExecutionReport internal s_payload;
   EVM2EVMOffRamp internal s_offRamp;
 
-  constructor(address router, EVM2EVMOffRamp offRamp) CCIPReceiver(router) {
+  constructor(address router, EVM2EVMOffRamp offRamp) CCIPReceiverBasic(router) {
     s_offRamp = offRamp;
   }
 

@@ -3,14 +3,14 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 
-import {CCIPRouter} from "../../applications/EtherSenderReceiver.sol";
+import {CCIPRouter} from "../../../applications/internal/EtherSenderReceiver.sol";
 
-import {IRouterClient} from "../../interfaces/IRouterClient.sol";
-import {Client} from "../../libraries/Client.sol";
-import {WETH9} from "../WETH9.sol";
-import {EtherSenderReceiverHelper} from "./../helpers/EtherSenderReceiverHelper.sol";
+import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
+import {Client} from "../../../libraries/Client.sol";
+import {WETH9} from "../../WETH9.sol";
+import {EtherSenderReceiverHelper} from "./../../helpers/EtherSenderReceiverHelper.sol";
 
-import {ERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
+import {ERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
 
 contract EtherSenderReceiverTest is Test {
   EtherSenderReceiverHelper internal s_etherSenderReceiver;

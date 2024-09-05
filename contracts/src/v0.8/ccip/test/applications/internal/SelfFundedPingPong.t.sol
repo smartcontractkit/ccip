@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {SelfFundedPingPong} from "../../applications/SelfFundedPingPong.sol";
-import {Client} from "../../libraries/Client.sol";
-import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
-import {EVM2EVMOnRampSetup} from "../onRamp/EVM2EVMOnRampSetup.t.sol";
+import {CCIPReceiver} from "../../../applications/external/CCIPReceiver.sol";
+import {SelfFundedPingPong} from "../../../applications/internal/SelfFundedPingPong.sol";
 
-import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {Client} from "../../../libraries/Client.sol";
+import {EVM2EVMOnRamp} from "../../../onRamp/EVM2EVMOnRamp.sol";
+import {EVM2EVMOnRampSetup} from "../../onRamp/EVM2EVMOnRampSetup.t.sol";
+
+import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract SelfFundedPingPongDappSetup is EVM2EVMOnRampSetup {
   SelfFundedPingPong internal s_pingPong;
@@ -79,8 +81,16 @@ contract SelfFundedPingPong_ccipReceive is SelfFundedPingPongDappSetup {
       destTokenAmounts: new Client.EVMTokenAmount[](0)
     });
 
-    // because pingPong is not set as a nop
-    vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrAdminOrNop.selector);
+    // Because pingPong is not set as a nop expect call to occur, but the tx will not revert since it occurs inside a try-catch
+    vm.expectCall(address(s_onRamp), abi.encodePacked(EVM2EVMOnRamp.payNops.selector));
+
+    // Check that the revert occured as expected by watching for MessageFailed
+    // We don't care what the messageId was, only that the call failed for the right reason, so we check the revert string on the third topic
+    vm.expectEmit(false, false, true, false);
+    emit CCIPReceiver.MessageFailed(
+      bytes32(0), abi.encodePacked(EVM2EVMOnRamp.OnlyCallableByOwnerOrAdminOrNop.selector)
+    );
+
     s_pingPong.ccipReceive(message);
   }
 }
