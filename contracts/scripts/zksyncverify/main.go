@@ -57,7 +57,7 @@ func main() {
 		ABI              json.RawMessage `json:"abi"`
 		DeployedBytecode string          `json:"deployedBytecode"`
 	}
-	if err := json.Unmarshal(abiFileContent, &compiledFile); err != nil {
+	if err = json.Unmarshal(abiFileContent, &compiledFile); err != nil {
 		log.Fatalf("Failed to unmarshal ABI file content: %v", err)
 	}
 
