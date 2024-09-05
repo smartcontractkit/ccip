@@ -22,7 +22,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
   event LiquidityTransferred(address indexed from, uint256 amount);
 
-  string public constant override typeAndVersion = "LockReleaseTokenPool 1.5.0-dev";
+  string public constant override typeAndVersion = "LockReleaseTokenPool 1.5.0";
 
   /// @dev Whether or not the pool accepts liquidity.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
@@ -44,12 +44,9 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
   /// @notice Locks the token in the pool
   /// @dev The _validateLockOrBurn check is an essential security check
-  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
-    external
-    virtual
-    override
-    returns (Pool.LockOrBurnOutV1 memory)
-  {
+  function lockOrBurn(
+    Pool.LockOrBurnInV1 calldata lockOrBurnIn
+  ) external virtual override returns (Pool.LockOrBurnOutV1 memory) {
     _validateLockOrBurn(lockOrBurnIn);
 
     emit Locked(msg.sender, lockOrBurnIn.amount);
@@ -59,16 +56,13 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
   /// @notice Release tokens from the pool to the recipient
   /// @dev The _validateReleaseOrMint check is an essential security check
-  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
-    external
-    virtual
-    override
-    returns (Pool.ReleaseOrMintOutV1 memory)
-  {
+  function releaseOrMint(
+    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
+  ) external virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn);
 
-    // Release to the offRamp, which forwards it to the recipient
-    getToken().safeTransfer(msg.sender, releaseOrMintIn.amount);
+    // Release to the recipient
+    getToken().safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
     emit Released(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
 

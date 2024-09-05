@@ -2,25 +2,35 @@
 pragma solidity 0.8.24;
 
 import {Internal} from "../../libraries/Internal.sol";
-import {EVM2EVMMultiOffRamp} from "../../offRamp/EVM2EVMMultiOffRamp.sol";
+import {OffRamp} from "../../offRamp/OffRamp.sol";
 
 contract CCIPReaderTester {
   event CCIPSendRequested(uint64 indexed destChainSelector, Internal.EVM2AnyRampMessage message);
 
-  mapping(uint64 sourceChainSelector => EVM2EVMMultiOffRamp.SourceChainConfig sourceChainConfig) internal
-    s_sourceChainConfigs;
+  mapping(uint64 sourceChainSelector => OffRamp.SourceChainConfig sourceChainConfig) internal s_sourceChainConfigs;
+  mapping(uint64 destChainSelector => uint64 sequenceNumber) internal s_destChainSeqNrs;
 
-  function getSourceChainConfig(uint64 sourceChainSelector)
-    external
-    view
-    returns (EVM2EVMMultiOffRamp.SourceChainConfig memory)
-  {
+  /// @notice Gets the next sequence number to be used in the onRamp
+  /// @param destChainSelector The destination chain selector
+  /// @return nextSequenceNumber The next sequence number to be used
+  function getExpectedNextSequenceNumber(uint64 destChainSelector) external view returns (uint64) {
+    return s_destChainSeqNrs[destChainSelector] + 1;
+  }
+
+  /// @notice Sets the sequence number in the onRamp
+  /// @param destChainSelector The destination chain selector
+  /// @param sequenceNumber The sequence number
+  function setDestChainSeqNr(uint64 destChainSelector, uint64 sequenceNumber) external {
+    s_destChainSeqNrs[destChainSelector] = sequenceNumber;
+  }
+
+  function getSourceChainConfig(uint64 sourceChainSelector) external view returns (OffRamp.SourceChainConfig memory) {
     return s_sourceChainConfigs[sourceChainSelector];
   }
 
   function setSourceChainConfig(
     uint64 sourceChainSelector,
-    EVM2EVMMultiOffRamp.SourceChainConfig memory sourceChainConfig
+    OffRamp.SourceChainConfig memory sourceChainConfig
   ) external {
     s_sourceChainConfigs[sourceChainSelector] = sourceChainConfig;
   }
@@ -47,9 +57,9 @@ contract CCIPReaderTester {
     emit ExecutionStateChanged(sourceChainSelector, sequenceNumber, messageId, state, returnData);
   }
 
-  event CommitReportAccepted(EVM2EVMMultiOffRamp.CommitReport report);
+  event CommitReportAccepted(OffRamp.CommitReport report);
 
-  function emitCommitReportAccepted(EVM2EVMMultiOffRamp.CommitReport memory report) external {
+  function emitCommitReportAccepted(OffRamp.CommitReport memory report) external {
     emit CommitReportAccepted(report);
   }
 }

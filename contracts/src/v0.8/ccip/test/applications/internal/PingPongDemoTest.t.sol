@@ -33,12 +33,13 @@ contract PingPong_example_startPingPong is PingPongDappSetup {
     uint256 pingPongNumber = 1;
     bytes memory data = abi.encode(pingPongNumber);
 
+  function test_StartPingPong_With_Sequenced_Ordered_Success() public {
     Client.EVM2AnyMessage memory sentMessage = Client.EVM2AnyMessage({
       receiver: abi.encode(i_pongContract),
-      data: data,
+      data: abi.encode(pingPongNumber),
       tokenAmounts: new Client.EVMTokenAmount[](0),
       feeToken: s_sourceFeeToken,
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}))
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000}))
     });
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, sentMessage);
@@ -50,14 +51,51 @@ contract PingPong_example_startPingPong is PingPongDappSetup {
       sender: address(s_pingPong),
       receiver: i_pongContract,
       nonce: 1,
-      data: data,
+      data: abi.encode(pingPongNumber),
       tokenAmounts: sentMessage.tokenAmounts,
       sourceTokenData: new bytes[](sentMessage.tokenAmounts.length),
-      gasLimit: 2e5,
+      gasLimit: 200_000,
       feeToken: sentMessage.feeToken,
       strict: false,
       messageId: ""
     });
+
+    _assertPingPongSuccess(message);
+  }
+
+  function test_StartPingPong_With_OOO_Success() public {
+    s_pingPong.setOutOfOrderExecution(true);
+
+    Client.EVM2AnyMessage memory sentMessage = Client.EVM2AnyMessage({
+      receiver: abi.encode(i_pongContract),
+      data: abi.encode(pingPongNumber),
+      tokenAmounts: new Client.EVMTokenAmount[](0),
+      feeToken: s_sourceFeeToken,
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 200_000, allowOutOfOrderExecution: true}))
+    });
+
+    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, sentMessage);
+
+    Internal.EVM2EVMMessage memory message = Internal.EVM2EVMMessage({
+      sequenceNumber: 1,
+      feeTokenAmount: expectedFee,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+      sender: address(s_pingPong),
+      receiver: i_pongContract,
+      nonce: 0,
+      data: abi.encode(pingPongNumber),
+      tokenAmounts: sentMessage.tokenAmounts,
+      sourceTokenData: new bytes[](sentMessage.tokenAmounts.length),
+      gasLimit: 200_000,
+      feeToken: sentMessage.feeToken,
+      strict: false,
+      messageId: ""
+    });
+
+    _assertPingPongSuccess(message);
+  }
+
+  function _assertPingPongSuccess(Internal.EVM2EVMMessage memory message) internal {
     message.messageId = Internal._hash(message, s_metadataHash);
 
     vm.expectEmit();
@@ -93,7 +131,28 @@ contract PingPong_example_ccipReceive is PingPongDappSetup {
   }
 }
 
-contract PingPong_example_plumbing is PingPongDappSetup {
+contract PingPong_plumbing is PingPongDappSetup {
+  function test_Fuzz_CounterPartChainSelector_Success(uint64 chainSelector) public {
+    s_pingPong.setCounterpartChainSelector(chainSelector);
+
+    assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
+  }
+
+  function test_Fuzz_CounterPartAddress_Success(address counterpartAddress) public {
+    s_pingPong.setCounterpartAddress(counterpartAddress);
+
+    assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
+  }
+
+  function test_Fuzz_CounterPartAddress_Success(uint64 chainSelector, address counterpartAddress) public {
+    s_pingPong.setCounterpartChainSelector(chainSelector);
+
+    s_pingPong.setCounterpart(chainSelector, counterpartAddress);
+
+    assertEq(s_pingPong.getCounterpartAddress(), counterpartAddress);
+    assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
+  }
+
   function test_Pausing_Success() public {
     assertFalse(s_pingPong.isPaused());
 
@@ -104,5 +163,16 @@ contract PingPong_example_plumbing is PingPongDappSetup {
 
   function test_typeAndVersion() public view {
     assertEq(s_pingPong.typeAndVersion(), "PingPongDemo 1.6.0-dev");
+  }
+  
+  function test_OutOfOrderExecution_Success() public {
+    assertFalse(s_pingPong.getOutOfOrderExecution());
+
+    vm.expectEmit();
+    emit PingPongDemo.OutOfOrderExecutionChange(true);
+
+    s_pingPong.setOutOfOrderExecution(true);
+
+    assertTrue(s_pingPong.getOutOfOrderExecution());
   }
 }

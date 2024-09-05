@@ -5,23 +5,21 @@ import {IPoolV1} from "../../interfaces/IPool.sol";
 import {IPoolPriorTo1_5} from "../../interfaces/IPoolPriorTo1_5.sol";
 
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
-import {PriceRegistry} from "../../PriceRegistry.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {BurnMintTokenPoolAndProxy} from "../../pools/BurnMintTokenPoolAndProxy.sol";
+import {BurnWithFromMintTokenPoolAndProxy} from "../../pools/BurnWithFromMintTokenPoolAndProxy.sol";
 import {LockReleaseTokenPoolAndProxy} from "../../pools/LockReleaseTokenPoolAndProxy.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
-import {TokenSetup} from "../TokenSetup.t.sol";
-import {EVM2EVMOnRampHelper} from "../helpers/EVM2EVMOnRampHelper.sol";
 import {EVM2EVMOnRampSetup} from "../onRamp/EVM2EVMOnRampSetup.t.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
 import {BurnMintTokenPool1_2, TokenPool1_2} from "./BurnMintTokenPool1_2.sol";
 import {BurnMintTokenPool1_4, TokenPool1_4} from "./BurnMintTokenPool1_4.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
   BurnMintTokenPoolAndProxy internal s_newPool;
@@ -259,13 +257,13 @@ contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
     onRampUpdates[0] = TokenPool1_2.RampUpdate({
       ramp: address(s_onRamp),
       allowed: true,
-      rateLimiterConfig: getInboundRateLimiterConfig()
+      rateLimiterConfig: _getInboundRateLimiterConfig()
     });
     TokenPool1_2.RampUpdate[] memory offRampUpdates = new TokenPool1_2.RampUpdate[](1);
     offRampUpdates[0] = TokenPool1_2.RampUpdate({
       ramp: address(s_offRamp),
       allowed: true,
-      rateLimiterConfig: getInboundRateLimiterConfig()
+      rateLimiterConfig: _getInboundRateLimiterConfig()
     });
     BurnMintTokenPool1_2(address(s_legacyPool)).applyRampUpdates(onRampUpdates, offRampUpdates);
   }
@@ -279,14 +277,14 @@ contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
     legacyChainUpdates[0] = TokenPool1_4.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     legacyChainUpdates[1] = TokenPool1_4.ChainUpdate({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     BurnMintTokenPool1_4(address(s_legacyPool)).applyChainUpdates(legacyChainUpdates);
   }
@@ -305,16 +303,16 @@ contract TokenPoolAndProxyMigration is EVM2EVMOnRampSetup {
       remotePoolAddress: abi.encode(s_destTokenPool),
       remoteTokenAddress: abi.encode(s_destToken),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     chainUpdates[1] = TokenPool.ChainUpdate({
       remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       remotePoolAddress: abi.encode(s_sourcePool),
       remoteTokenAddress: abi.encode(s_sourceToken),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
     s_newPool.applyChainUpdates(chainUpdates);
 
@@ -362,6 +360,19 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
     _assertReleaseOrMintCorrect();
   }
 
+  function test_lockOrBurn_burnWithFromMint_Success() public {
+    s_pool =
+      new BurnWithFromMintTokenPoolAndProxy(s_token, new address[](0), address(s_mockRMN), address(s_sourceRouter));
+    _configurePool();
+    _deployOldPool();
+    _assertLockOrBurnCorrect();
+
+    vm.startPrank(OWNER);
+    BurnMintTokenPoolAndProxy(address(s_pool)).setPreviousPool(IPoolPriorTo1_5(address(0)));
+
+    _assertReleaseOrMintCorrect();
+  }
+
   function test_lockOrBurn_lockRelease_Success() public {
     s_pool =
       new LockReleaseTokenPoolAndProxy(s_token, new address[](0), address(s_mockRMN), false, address(s_sourceRouter));
@@ -381,10 +392,10 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
 
     TokenPool1_2.RampUpdate[] memory onRampUpdates = new TokenPool1_2.RampUpdate[](1);
     onRampUpdates[0] =
-      TokenPool1_2.RampUpdate({ramp: address(s_pool), allowed: true, rateLimiterConfig: getInboundRateLimiterConfig()});
+      TokenPool1_2.RampUpdate({ramp: address(s_pool), allowed: true, rateLimiterConfig: _getInboundRateLimiterConfig()});
     TokenPool1_2.RampUpdate[] memory offRampUpdates = new TokenPool1_2.RampUpdate[](1);
     offRampUpdates[0] =
-      TokenPool1_2.RampUpdate({ramp: address(s_pool), allowed: true, rateLimiterConfig: getInboundRateLimiterConfig()});
+      TokenPool1_2.RampUpdate({ramp: address(s_pool), allowed: true, rateLimiterConfig: _getInboundRateLimiterConfig()});
     BurnMintTokenPool1_2(address(s_legacyPool)).applyRampUpdates(onRampUpdates, offRampUpdates);
   }
 
@@ -395,8 +406,8 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
       remotePoolAddress: abi.encode(s_destPool),
       remoteTokenAddress: abi.encode(s_destToken),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
 
     BurnMintTokenPoolAndProxy(address(s_pool)).applyChainUpdates(chains);
@@ -478,7 +489,7 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
     vm.startPrank(address(s_fakeOffRamp));
 
     vm.expectEmit(address(s_legacyPool));
-    emit Minted(address(s_pool), s_fakeOffRamp, amount);
+    emit Minted(address(s_pool), address(OWNER), amount);
 
     s_pool.releaseOrMint(
       Pool.ReleaseOrMintInV1({
@@ -492,6 +503,19 @@ contract TokenPoolAndProxy is EVM2EVMOnRampSetup {
         offchainTokenData: ""
       })
     );
+  }
+
+  function test_setPreviousPool_Success() public {
+    LockReleaseTokenPoolAndProxy pool =
+      new LockReleaseTokenPoolAndProxy(s_token, new address[](0), address(s_mockRMN), true, address(s_sourceRouter));
+
+    assertEq(pool.getPreviousPool(), address(0));
+
+    address newLegacyPool = makeAddr("new_legacy_pool");
+
+    vm.startPrank(OWNER);
+    pool.setPreviousPool(IPoolPriorTo1_5(newLegacyPool));
+    assertEq(pool.getPreviousPool(), address(newLegacyPool));
   }
 }
 
@@ -529,8 +553,8 @@ contract LockReleaseTokenPoolAndProxySetup is RouterSetup {
       remotePoolAddress: abi.encode(s_destPoolAddress),
       remoteTokenAddress: abi.encode(address(s_token)),
       allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
 
     s_lockReleaseTokenPoolAndProxy.applyChainUpdates(chainUpdate);

@@ -5,13 +5,14 @@ import {Client} from "../../../libraries/Client.sol";
 import {Internal} from "../../../libraries/Internal.sol";
 import {EVM2EVMMultiOffRamp} from "../../../offRamp/EVM2EVMMultiOffRamp.sol";
 import {CCIPReceiverBasic} from "./CCIPReceiverBasic.sol";
+import {OffRamp} from "../../../offRamp/OffRamp.sol";
 
 contract ReentrancyAbuserMultiRamp is CCIPReceiverBasic {
   event ReentrancySucceeded();
 
   bool internal s_ReentrancyDone = false;
   Internal.ExecutionReportSingleChain internal s_payload;
-  EVM2EVMMultiOffRamp internal s_offRamp;
+  OffRamp internal s_offRamp;
 
   constructor(address router, EVM2EVMMultiOffRamp offRamp) CCIPReceiverBasic(router) {
     s_offRamp = offRamp;

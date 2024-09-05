@@ -44,7 +44,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/reorg"
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
-
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
@@ -53,13 +52,13 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_2_0"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -166,7 +165,7 @@ type CCIPCommon struct {
 	NoOfTokensNeedingDynamicPrice int
 	BridgeTokenPools              []*contracts.TokenPool
 	RateLimiterConfig             contracts.RateLimiterConfig
-	ARMContract                   *common.Address
+	RMNContract                   *common.Address
 	ARM                           *contracts.ARM // populate only if the ARM contracts is not a mock and can be used to verify various ARM events; keep this nil for mock ARM
 	Router                        *contracts.Router
 	PriceRegistry                 *contracts.PriceRegistry
@@ -185,6 +184,7 @@ type CCIPCommon struct {
 	tokenPriceUpdateWatcher   map[common.Address]*big.Int // key - token; value - timestamp of update
 	gasUpdateWatcherMu        *sync.Mutex
 	gasUpdateWatcher          map[uint64]*big.Int // key - destchain id; value - timestamp of update
+	GasUpdateEvents           []contracts.GasUpdateEvent
 }
 
 // FreeUpUnusedSpace sets nil to various elements of ccipModule which are only used
@@ -202,10 +202,10 @@ func (ccipModule *CCIPCommon) UnvoteToCurseARM() error {
 	if ccipModule.ARM != nil {
 		return fmt.Errorf("real ARM deployed. cannot curse through test")
 	}
-	if ccipModule.ARMContract == nil {
+	if ccipModule.RMNContract == nil {
 		return fmt.Errorf("no ARM contract is set")
 	}
-	arm, err := mock_arm_contract.NewMockARMContract(*ccipModule.ARMContract, ccipModule.ChainClient.Backend())
+	arm, err := mock_rmn_contract.NewMockRMNContract(*ccipModule.RMNContract, ccipModule.ChainClient.Backend())
 	if err != nil {
 		return fmt.Errorf("error instantiating arm %w", err)
 	}
@@ -213,7 +213,7 @@ func (ccipModule *CCIPCommon) UnvoteToCurseARM() error {
 	if err != nil {
 		return fmt.Errorf("error getting owners for ARM OwnerUnvoteToCurse %w", err)
 	}
-	tx, err := arm.OwnerUnvoteToCurse0(opts, []mock_arm_contract.RMNUnvoteToCurseRecord{})
+	tx, err := arm.OwnerUnvoteToCurse0(opts, []mock_rmn_contract.RMNUnvoteToCurseRecord{})
 	if err != nil {
 		return fmt.Errorf("error in calling OwnerUnvoteToCurse %w", err)
 	}
@@ -231,10 +231,10 @@ func (ccipModule *CCIPCommon) IsCursed() (bool, error) {
 	if ccipModule.ARM != nil {
 		return false, fmt.Errorf("real ARM deployed. cannot validate cursing")
 	}
-	if ccipModule.ARMContract == nil {
+	if ccipModule.RMNContract == nil {
 		return false, fmt.Errorf("no ARM contract is set")
 	}
-	arm, err := mock_arm_contract.NewMockARMContract(*ccipModule.ARMContract, ccipModule.ChainClient.Backend())
+	arm, err := mock_rmn_contract.NewMockRMNContract(*ccipModule.RMNContract, ccipModule.ChainClient.Backend())
 	if err != nil {
 		return false, fmt.Errorf("error instantiating arm %w", err)
 	}
@@ -245,10 +245,10 @@ func (ccipModule *CCIPCommon) CurseARM() (*types.Transaction, error) {
 	if ccipModule.ARM != nil {
 		return nil, fmt.Errorf("real ARM deployed. cannot curse through test")
 	}
-	if ccipModule.ARMContract == nil {
+	if ccipModule.RMNContract == nil {
 		return nil, fmt.Errorf("no ARM contract is set")
 	}
-	arm, err := mock_arm_contract.NewMockARMContract(*ccipModule.ARMContract, ccipModule.ChainClient.Backend())
+	arm, err := mock_rmn_contract.NewMockRMNContract(*ccipModule.RMNContract, ccipModule.ChainClient.Backend())
 	if err != nil {
 		return nil, fmt.Errorf("error instantiating arm %w", err)
 	}
@@ -291,7 +291,7 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig,
 		}
 		if common.IsHexAddress(conf.ARM) {
 			addr := common.HexToAddress(conf.ARM)
-			ccipModule.ARMContract = &addr
+			ccipModule.RMNContract = &addr
 			if !conf.IsMockARM {
 				ccipModule.ARM = &contracts.ARM{
 					EthAddress: addr,
@@ -524,9 +524,12 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	}
 }
 
+// WatchForPriceUpdates helps to ensure the price updates are happening in price registry by subscribing to a couple
+// of price update events and add the event details to watchers. It subscribes to 'UsdPerUnitGasUpdated'
+// and 'UsdPerTokenUpdated' event.
 func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr *zerolog.Logger) error {
-	gasUpdateEventLatest := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
-	tokenUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerTokenUpdated)
+	gasUpdateEventLatest := make(chan *fee_quoter.FeeQuoterUsdPerUnitGasUpdated)
+	tokenUpdateEvent := make(chan *fee_quoter.FeeQuoterUsdPerTokenUpdated)
 	sub := event.Resubscribe(DefaultResubscriptionTimeout, func(_ context.Context) (event.Subscription, error) {
 		lggr.Info().Msg("Subscribing to UsdPerUnitGasUpdated event")
 		eventSub, err := ccipModule.PriceRegistry.WatchUsdPerUnitGasUpdated(nil, gasUpdateEventLatest, nil)
@@ -549,20 +552,28 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr *ze
 	if tokenUpdateSub == nil {
 		return fmt.Errorf("no event subscription found")
 	}
-	processEvent := func(timestamp *big.Int, destChainSelector uint64) error {
+	processEvent := func(value, timestamp *big.Int, destChainSelector uint64, raw types.Log) error {
 		destChain, err := chainselectors.ChainIdFromSelector(destChainSelector)
 		if err != nil {
 			return err
 		}
 		ccipModule.gasUpdateWatcherMu.Lock()
 		ccipModule.gasUpdateWatcher[destChain] = timestamp
+
+		ccipModule.GasUpdateEvents = append(ccipModule.GasUpdateEvents, contracts.GasUpdateEvent{
+			Sender:    raw.Address.Hex(),
+			Tx:        raw.TxHash.Hex(),
+			Value:     value,
+			DestChain: destChain,
+			Source:    ccipModule.ChainClient.GetNetworkName(),
+		})
 		ccipModule.gasUpdateWatcherMu.Unlock()
 		lggr.Info().
 			Uint64("chainSelector", destChainSelector).
-			Str("source_chain", ccipModule.ChainClient.GetNetworkName()).
 			Uint64("dest_chain", destChain).
 			Str("price_registry", ccipModule.PriceRegistry.Address()).
-			Msgf("UsdPerUnitGasUpdated event received for dest chain %d source chain %s",
+			Str("tx hash", raw.TxHash.Hex()).
+			Msgf("UsdPerUnitGasUpdated event received for dest chain: %d, source chain: %s",
 				destChain, ccipModule.ChainClient.GetNetworkName())
 		return nil
 	}
@@ -572,13 +583,14 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr *ze
 			tokenUpdateSub.Unsubscribe()
 			ccipModule.gasUpdateWatcher = nil
 			ccipModule.gasUpdateWatcherMu = nil
+			ccipModule.GasUpdateEvents = nil
 			ccipModule.tokenPriceUpdateWatcher = nil
 			ccipModule.tokenPriceUpdateWatcherMu = nil
 		}()
 		for {
 			select {
 			case e := <-gasUpdateEventLatest:
-				err := processEvent(e.Timestamp, e.DestChain)
+				err := processEvent(e.Value, e.Timestamp, e.DestChain, e.Raw)
 				if err != nil {
 					continue
 				}
@@ -717,7 +729,7 @@ func (ccipModule *CCIPCommon) WriteLaneConfig(conf *laneconfig.LaneConfig) {
 		FeeToken:         ccipModule.FeeToken.Address(),
 		BridgeTokens:     btAddresses,
 		BridgeTokenPools: btpAddresses,
-		ARM:              ccipModule.ARMContract.Hex(),
+		ARM:              ccipModule.RMNContract.Hex(),
 		Router:           ccipModule.Router.Address(),
 		PriceRegistry:    ccipModule.PriceRegistry.Address(),
 		PriceAggregators: priceAggrs,
@@ -771,18 +783,18 @@ func (ccipModule *CCIPCommon) DeployContracts(
 
 	ccipModule.LoadContractAddresses(conf, &noOfTokens)
 	if ccipModule.ARM != nil {
-		arm, err := cd.NewARMContract(ccipModule.ARM.EthAddress)
+		arm, err := cd.NewRMNContract(ccipModule.ARM.EthAddress)
 		if err != nil {
 			return fmt.Errorf("getting new ARM contract shouldn't fail %w", err)
 		}
 		ccipModule.ARM = arm
 	} else {
 		// deploy a mock ARM contract
-		if ccipModule.ARMContract == nil {
+		if ccipModule.RMNContract == nil {
 			if ccipModule.ExistingDeployment {
 				return fmt.Errorf("ARM contract address is not provided in lane config")
 			}
-			ccipModule.ARMContract, err = cd.DeployMockARMContract()
+			ccipModule.RMNContract, err = cd.DeployMockRMNContract()
 			if err != nil {
 				return fmt.Errorf("deploying mock ARM contract shouldn't fail %w", err)
 			}
@@ -815,7 +827,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 		if ccipModule.ExistingDeployment {
 			return fmt.Errorf("router contract address is not provided in lane config")
 		}
-		ccipModule.Router, err = cd.DeployRouter(ccipModule.WrappedNative, *ccipModule.ARMContract)
+		ccipModule.Router, err = cd.DeployRouter(ccipModule.WrappedNative, *ccipModule.RMNContract)
 		if err != nil {
 			return fmt.Errorf("deploying router shouldn't fail %w", err)
 		}
@@ -967,7 +979,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 				if ccipModule.TokenTransmitter == nil {
 					return fmt.Errorf("TokenTransmitter contract address is not provided")
 				}
-				usdcPool, err := ccipModule.tokenDeployer.DeployUSDCTokenPoolContract(token.Address(), *ccipModule.TokenMessenger, *ccipModule.ARMContract, ccipModule.Router.Instance.Address())
+				usdcPool, err := ccipModule.tokenDeployer.DeployUSDCTokenPoolContract(token.Address(), *ccipModule.TokenMessenger, *ccipModule.RMNContract, ccipModule.Router.Instance.Address())
 				if err != nil {
 					return fmt.Errorf("deploying bridge Token pool(usdc) shouldn't fail %w", err)
 				}
@@ -975,7 +987,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, usdcPool)
 			} else {
 				// deploy lock release token pool in case of non-usdc deployment
-				btp, err := ccipModule.tokenDeployer.DeployLockReleaseTokenPoolContract(token.Address(), *ccipModule.ARMContract, ccipModule.Router.Instance.Address())
+				btp, err := ccipModule.tokenDeployer.DeployLockReleaseTokenPoolContract(token.Address(), *ccipModule.RMNContract, ccipModule.Router.Instance.Address())
 				if err != nil {
 					return fmt.Errorf("deploying bridge Token pool(lock&release) shouldn't fail %w", err)
 				}
@@ -1166,7 +1178,7 @@ func NewCCIPCommonFromConfig(
 	}
 	var arm *contracts.ARM
 	if newCCIPModule.ARM != nil {
-		arm, err = newCD.NewARMContract(*newCCIPModule.ARMContract)
+		arm, err = newCD.NewRMNContract(*newCCIPModule.RMNContract)
 		if err != nil {
 			return nil, err
 		}
@@ -1402,7 +1414,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 			sourceChainSelector,
 			sourceCCIP.DestChainSelector,
 			tokensAndPools,
-			*sourceCCIP.Common.ARMContract,
+			*sourceCCIP.Common.RMNContract,
 			sourceCCIP.Common.Router.EthAddress,
 			sourceCCIP.Common.PriceRegistry.EthAddress,
 			tokenAdminReg,
@@ -2013,7 +2025,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 			destCCIP.SourceChainSelector,
 			destChainSelector,
 			sourceCCIP.OnRamp.EthAddress,
-			*destCCIP.Common.ARMContract,
+			*destCCIP.Common.RMNContract,
 		)
 		if err != nil {
 			return fmt.Errorf("deploying commitstore shouldn't fail %w", err)
@@ -2058,7 +2070,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 			destCCIP.Common.RateLimiterConfig,
 			[]common.Address{},
 			[]common.Address{},
-			*destCCIP.Common.ARMContract,
+			*destCCIP.Common.RMNContract,
 			tokenAdminReg,
 		)
 		if err != nil {
@@ -2623,23 +2635,24 @@ func CCIPRequestFromTxHash(txHash common.Hash, chainClient blockchain.EVMClient)
 }
 
 type CCIPLane struct {
-	Test              *testing.T
-	Logger            *zerolog.Logger
-	SourceNetworkName string
-	DestNetworkName   string
-	SourceChain       blockchain.EVMClient
-	DestChain         blockchain.EVMClient
-	Source            *SourceCCIPModule
-	Dest              *DestCCIPModule
-	NumberOfReq       int
-	Reports           *testreporters.CCIPLaneStats
-	Balance           *BalanceSheet
-	SentReqs          map[common.Hash][]CCIPRequest
-	TotalFee          *big.Int // total fee for all the requests. Used for balance validation.
-	ValidationTimeout time.Duration
-	Context           context.Context
-	SrcNetworkLaneCfg *laneconfig.LaneConfig
-	DstNetworkLaneCfg *laneconfig.LaneConfig
+	Test                   *testing.T
+	Logger                 *zerolog.Logger
+	SourceNetworkName      string
+	DestNetworkName        string
+	SourceChain            blockchain.EVMClient
+	DestChain              blockchain.EVMClient
+	Source                 *SourceCCIPModule
+	Dest                   *DestCCIPModule
+	NumberOfReq            int
+	Reports                *testreporters.CCIPLaneStats
+	Balance                *BalanceSheet
+	SentReqs               map[common.Hash][]CCIPRequest
+	TotalFee               *big.Int // total fee for all the requests. Used for balance validation.
+	ValidationTimeout      time.Duration
+	Context                context.Context
+	SrcNetworkLaneCfg      *laneconfig.LaneConfig
+	DstNetworkLaneCfg      *laneconfig.LaneConfig
+	PriceReportingDisabled bool
 }
 
 func (lane *CCIPLane) TokenPricesConfig() (string, error) {
@@ -3381,7 +3394,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 	}(reportAccSub)
 
 	if lane.Dest.Common.ARM != nil {
-		reportBlessedEvent := make(chan *arm_contract.ARMContractTaggedRootBlessed)
+		reportBlessedEvent := make(chan *rmn_contract.RMNContractTaggedRootBlessed)
 		blessedSub := event.Resubscribe(DefaultResubscriptionTimeout, func(_ context.Context) (event.Subscription, error) {
 			sub, err := lane.Dest.Common.ARM.Instance.WatchTaggedRootBlessed(nil, reportBlessedEvent, nil)
 			if err != nil {
@@ -3645,7 +3658,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 
 	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersCommit.P2PV2Bootstrapper()}
 
-	err = SetOCR2Config(lane.Context, lane.Logger, *testConf, commitNodes, execNodes, *lane.Dest)
+	err = SetOCR2Config(lane.Context, lane.Logger, *testConf, commitNodes, execNodes, *lane.Dest, lane.PriceReportingDisabled)
 	if err != nil {
 		return fmt.Errorf("failed to set ocr2 config: %w", err)
 	}
@@ -3683,6 +3696,7 @@ func SetOCR2Config(
 	commitNodes,
 	execNodes []*client.CLNodesWithKeys,
 	destCCIP DestCCIPModule,
+	priceReportingDisabled bool,
 ) error {
 	inflightExpiryExec := commonconfig.MustNewDuration(InflightExpiryExec)
 	inflightExpiryCommit := commonconfig.MustNewDuration(InflightExpiryCommit)
@@ -3719,6 +3733,7 @@ func SetOCR2Config(
 		*commonconfig.MustNewDuration(5 * time.Second),
 		1e6,
 		*inflightExpiryCommit,
+		priceReportingDisabled,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create commit offchain config: %w", err)
@@ -4041,11 +4056,7 @@ func (c *CCIPTestEnv) ConnectToDeployedNodes() error {
 		}
 		c.CLNodes = chainlinkK8sNodes
 		if _, exists := c.K8Env.URLs[mockserver.InternalURLsKey]; exists {
-			mockServer, err := ctfClient.ConnectMockServer(c.K8Env)
-			if err != nil {
-				return fmt.Errorf("failed to connect to mock server: %w", err)
-			}
-			c.MockServer = mockServer
+			c.MockServer = ctfClient.ConnectMockServer(c.K8Env)
 		}
 	}
 	return nil
