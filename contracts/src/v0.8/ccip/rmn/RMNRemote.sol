@@ -152,4 +152,10 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   function isCursed(bytes16 subject) external view returns (bool) {
     return false; // XXX temporary workaround
   }
+
+  /// @notice Returns the chain selector configured at deployment time
+  /// @return chainSelector the chain selector (not the chain ID)
+  function getChainSelector() external view returns (uint64 chainSelector) {
+    return i_chainSelector;
+  }
 }
