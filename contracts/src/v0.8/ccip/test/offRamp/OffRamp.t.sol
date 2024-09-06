@@ -29,8 +29,6 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 contract OffRamp_constructor is OffRampSetup {
   function test_Constructor_Success() public {
     OffRamp.StaticConfig memory staticConfig = OffRamp.StaticConfig({
