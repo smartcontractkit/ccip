@@ -224,7 +224,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
-        sourcePoolData: "",
+        sourcePoolData: abi.encode(s_usdcTokenPool.LOCK_RELEASE_FLAG()),
         offchainTokenData: ""
       })
     );
@@ -442,6 +442,8 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
+    bytes memory sourcePoolDataLockRelease = abi.encode(s_usdcTokenPool.LOCK_RELEASE_FLAG());
+
     uint256 amount = 1e6;
 
     vm.startPrank(s_routerAllowedOffRamp);
@@ -459,7 +461,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
-        sourcePoolData: "",
+        sourcePoolData: sourcePoolDataLockRelease,
         offchainTokenData: ""
       })
     );
@@ -488,7 +490,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
       address(s_usdcTokenPool), DEST_CHAIN_SELECTOR, liquidityAmount
     );
 
-    s_usdcTokenPoolTransferLiquidity.transferLiquidity(address(s_usdcTokenPool), DEST_CHAIN_SELECTOR, liquidityAmount);
+    s_usdcTokenPoolTransferLiquidity.transferLiquidity(address(s_usdcTokenPool), DEST_CHAIN_SELECTOR);
 
     assertEq(
       s_usdcTokenPool.owner(),
@@ -719,7 +721,7 @@ contract HybridUSDCTokenPoolMigrationTests is HybridUSDCTokenPoolTests {
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
-        sourcePoolData: s_usdcTokenPool.LOCK_RELEASE_FLAG(),
+        sourcePoolData: abi.encode(s_usdcTokenPool.LOCK_RELEASE_FLAG()),
         offchainTokenData: ""
       })
     );
@@ -781,13 +783,13 @@ contract HybridUSDCTokenPoolMigrationTests is HybridUSDCTokenPoolTests {
 
     // Exclude the tokens from being burned and check for the event
     vm.expectEmit();
-    emit HybridLockReleaseUSDCTokenPool.TokensExcludedFromBurn(SOURCE_CHAIN_SELECTOR, amount, amount * 3);
+    emit USDCBridgeMigrator.TokensExcludedFromBurn(SOURCE_CHAIN_SELECTOR, amount, (amount * 3) - amount);
 
     s_usdcTokenPool.excludeTokensFromBurn(SOURCE_CHAIN_SELECTOR, amount);
 
     assertEq(
       s_usdcTokenPool.getLockedTokensForChain(SOURCE_CHAIN_SELECTOR),
-      amount * 2,
+      (amount * 3),
       "Tokens locked minus ones excluded from the burn should be 2e6"
     );
 
@@ -838,7 +840,7 @@ contract HybridUSDCTokenPoolMigrationTests is HybridUSDCTokenPoolTests {
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
-        sourcePoolData: s_usdcTokenPool.LOCK_RELEASE_FLAG(),
+        sourcePoolData: abi.encode(s_usdcTokenPool.LOCK_RELEASE_FLAG()),
         offchainTokenData: ""
       })
     );

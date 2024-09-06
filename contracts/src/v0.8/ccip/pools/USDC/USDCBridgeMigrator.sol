@@ -17,6 +17,9 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   event CCTPMigrationExecuted(uint64 remoteChainSelector, uint256 USDCBurned);
   event CCTPMigrationCancelled(uint64 existingProposalSelector);
   event CircleMigratorAddressSet(address migratorAddress);
+  event TokensExcludedFromBurn(
+    uint64 indexed remoteChainSelector, uint256 amount, uint256 burnableAmountAfterExclusion
+  );
 
   error onlyCircle();
   error ExistingMigrationProposal();
@@ -31,9 +34,9 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   uint64 internal s_proposedUSDCMigrationChain;
 
   mapping(uint64 chainSelector => uint256 lockedBalance) internal s_lockedTokensByChainSelector;
-  mapping(uint64 chainSelector => bool shouldUseLockRelease) internal s_shouldUseLockRelease;
+  mapping(uint64 remoteChainSelector => uint256 excludedTokens) internal s_tokensExcludedFromBurn;
 
-  EnumerableSet.UintSet internal s_migratedChains;
+  mapping(uint64 chainSelector => bool shouldUseLockRelease) internal s_shouldUseLockRelease;
 
   constructor(address token, address router) {
     i_USDC = IBurnMintERC20(token);
@@ -51,14 +54,14 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
     if (s_proposedUSDCMigrationChain == 0) revert ExistingMigrationProposal();
 
     uint64 burnChainSelector = s_proposedUSDCMigrationChain;
-    uint256 tokensToBurn = s_lockedTokensByChainSelector[burnChainSelector];
+
+    // Burnable tokens is the total locked minus the amount excluded from burn
+    uint256 tokensToBurn =
+      s_lockedTokensByChainSelector[burnChainSelector] - s_tokensExcludedFromBurn[burnChainSelector];
 
     // Even though USDC is a trusted call, ensure CEI by updating state first
     delete s_lockedTokensByChainSelector[burnChainSelector];
     delete s_proposedUSDCMigrationChain;
-
-    // Add the chain to the migrated chains set to handle edge cases of stuck transactions.
-    s_migratedChains.add(burnChainSelector);
 
     // This should only be called after this contract has been granted a "zero allowance minter role" on USDC by Circle,
     // otherwise the call will revert. Executing this burn will functionally convert all USDC on the destination chain
@@ -120,5 +123,28 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   /// should match the current circulating supply of USDC on the destination chain
   function getLockedTokensForChain(uint64 remoteChainSelector) public view returns (uint256) {
     return s_lockedTokensByChainSelector[remoteChainSelector];
+  }
+
+  /// @notice Exclude tokens to be burned in a CCTP-migration because the amount are locked in an undelivered message.
+  /// @dev When a message is sitting in manual execution from the L/R chain, those tokens need to be excluded from
+  /// being burned in a CCTP-migration otherwise the message will never be able to be delivered due to it not having
+  /// an attestation on the source-chain to mint. In that instance it should use provided liquidity that was designated
+  /// @dev This function should ONLY be called on the home chain, where tokens are locked, NOT on the remote chain
+  /// and strict scrutiny should be applied to ensure that the amount of tokens excluded is accurate.
+  function excludeTokensFromBurn(uint64 remoteChainSelector, uint256 amount) external onlyOwner {
+    s_tokensExcludedFromBurn[remoteChainSelector] += amount;
+
+    uint256 burnableAmountAfterExclusion =
+      s_lockedTokensByChainSelector[remoteChainSelector] - s_tokensExcludedFromBurn[remoteChainSelector];
+
+    emit TokensExcludedFromBurn(remoteChainSelector, amount, burnableAmountAfterExclusion);
+  }
+
+  /// @notice Get the amount of tokens excluded from being burned in a CCTP-migration
+  /// @dev The sum of locked tokens and excluded tokens should equal the supply of the token on the remote chain
+  /// @param remoteChainSelector The chain for which the excluded tokens are being queried
+  /// @return uint256 amount of tokens excluded from being burned in a CCTP-migration
+  function getExcludedTokensByChain(uint64 remoteChainSelector) public view returns (uint256) {
+    return s_tokensExcludedFromBurn[remoteChainSelector];
   }
 }
