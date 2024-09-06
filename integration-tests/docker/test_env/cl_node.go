@@ -323,7 +323,7 @@ func (n *ClNode) containerStartOrRestart(restartDb bool) error {
 		return fmt.Errorf("%s err: %w", ErrStartCLNodeContainer, err)
 	}
 
-	clEndpoint, err := test_env.GetEndpoint(testcontext.Get(n.t), container, "http")
+	clEndpoint, err := test_env.GetEndpointFromPort(testcontext.Get(n.t), container, "http", "6688")
 	if err != nil {
 		return err
 	}
