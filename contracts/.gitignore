@@ -11,5 +11,7 @@ typechain
 # Foundry
 foundry-cache
 foundry-artifacts
+artifacts-zk
+cache-zk
 
 .openzeppelin
