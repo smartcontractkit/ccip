@@ -371,7 +371,7 @@ func setupNodeCCIP(
 	sourceChainID *big.Int, destChainID *big.Int,
 	bootstrapPeerID string,
 	bootstrapPort int64,
-	sourceFD, destFD uint32,
+	sourceFinalityDepth, destFinalityDepth uint32,
 ) (chainlink.Application, string, common.Address, ocr2key.KeyBundle) {
 	trueRef, falseRef := true, false
 
@@ -406,7 +406,7 @@ func setupNodeCCIP(
 		c.P2P.V2.ListenAddresses = &p2pAddresses
 		c.P2P.V2.AnnounceAddresses = &p2pAddresses
 
-		c.EVM = []*v2.EVMConfig{createConfigV2Chain(sourceChainID, sourceFD), createConfigV2Chain(destChainID, destFD)}
+		c.EVM = []*v2.EVMConfig{createConfigV2Chain(sourceChainID, sourceFinalityDepth), createConfigV2Chain(destChainID, destFinalityDepth)}
 
 		if bootstrapPeerID != "" {
 			// Supply the bootstrap IP and port as a V2 peer address
@@ -528,7 +528,7 @@ func setupNodeCCIP(
 	return app, peerID.Raw(), transmitter, kb
 }
 
-func createConfigV2Chain(chainId *big.Int, fd uint32) *v2.EVMConfig {
+func createConfigV2Chain(chainId *big.Int, finalityDepth uint32) *v2.EVMConfig {
 	// NOTE: For the executor jobs, the default of 500k is insufficient for a 3 message batch
 	defaultGasLimit := uint64(5000000)
 	tr := true
@@ -539,7 +539,7 @@ func createConfigV2Chain(chainId *big.Int, fd uint32) *v2.EVMConfig {
 	sourceC.GasEstimator.Mode = &fixedPrice
 	d, _ := config.NewDuration(100 * time.Millisecond)
 	sourceC.LogPollInterval = &d
-	sourceC.FinalityDepth = &fd
+	sourceC.FinalityDepth = &finalityDepth
 	return &v2.EVMConfig{
 		ChainID: (*evmUtils.Big)(chainId),
 		Enabled: &tr,

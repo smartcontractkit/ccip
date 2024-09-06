@@ -54,8 +54,8 @@ func NewReorgSuite(t *testing.T, lggr *zerolog.Logger, cfg *ReorgConfig) (*Reorg
 		t:         t,
 		Cfg:       cfg,
 		Logger:    lggr,
-		SrcClient: client.NewRPCClient(cfg.SrcGethHTTPURL),
-		DstClient: client.NewRPCClient(cfg.DstGethHTTPURL),
+		SrcClient: client.NewRPCClient(cfg.SrcGethHTTPURL, nil),
+		DstClient: client.NewRPCClient(cfg.DstGethHTTPURL, nil),
 	}, nil
 }
 
@@ -69,19 +69,18 @@ func (r *ReorgSuite) RunReorg(client *client.RPCClient, blocksBack int, network 
 			Int("BlocksBack", blocksBack).
 			Msg(fmt.Sprintf("Rewinding blocks on %s chain", network))
 		blockNumber, err := client.BlockNumber()
-		assert.NoError(r.t, err)
+		assert.NoError(r.t, err, "error getting block number")
 		r.Logger.Info().
 			Int64("Number", blockNumber).
 			Str("Network", network).
 			Msg("Block number before rewinding")
 		err = client.GethSetHead(blocksBack)
-		assert.NoError(r.t, err)
+		assert.NoError(r.t, err, "error setting block head")
 		blockNumber, err = client.BlockNumber()
-		assert.NoError(r.t, err)
+		assert.NoError(r.t, err, "error getting block number")
 		r.Logger.Info().
 			Int64("Number", blockNumber).
 			Str("Network", network).
 			Msg("Block number after rewinding")
-		assert.NoError(r.t, err)
 	}()
 }

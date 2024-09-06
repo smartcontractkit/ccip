@@ -3232,7 +3232,7 @@ func isPhaseValid(
 ) (shouldComplete bool, validationError error) {
 	if opts.expectAnyPhaseToFail && err != nil {
 		logmsg := logger.Info().Str("Failed with Error", err.Error()).Str("Phase", string(currentPhase))
-		logmsg.Msg("As expected, it got failed in one of the phases")
+		logmsg.Msg("Phase failed, as expected")
 		return true, nil
 	}
 	// If no phase is expected to fail or the current phase is not the one expected to fail, we just return what we were given
@@ -3250,7 +3250,7 @@ func isPhaseValid(
 		}
 		logmsg.Str("Expected Error Message", opts.expectedErrorMessage)
 	}
-	logmsg.Msg("Expected phase to fail and it did")
+	logmsg.Msg("Phase failed, as expected")
 	return true, nil
 }
 

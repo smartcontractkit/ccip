@@ -34,7 +34,6 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	t.Parallel()
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
-	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
@@ -863,14 +862,9 @@ func TestSmokeCCIPReorgBelowFinality(t *testing.T) {
 	t.Parallel()
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
-	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
-	if len(setUpOutput.Lanes) == 0 {
-		log.Info().Msg("No lanes found")
-		return
-	}
-
+	require.False(t, len(setUpOutput.Lanes) == 0, "No lanes found.")
 	t.Cleanup(func() {
 		require.NoError(t, setUpOutput.TearDown())
 	})
@@ -887,7 +881,7 @@ func TestSmokeCCIPReorgBelowFinality(t *testing.T) {
 		lane.RecordStateBeforeTransfer()
 		// sending multiple request and expect all should go through though there is below finality reorg
 		err := lane.SendRequests(5, gasLimit)
-		require.NoError(t, err)
+		require.NoError(t, err, "Send requests failed")
 		rs := SetupReorgSuite(t, &log, setUpOutput)
 		// run below finality reorg in both source and destination chain
 		blocksBackSrc := int(rs.Cfg.SrcFinalityDepth) - rs.Cfg.FinalityDelta
@@ -927,13 +921,9 @@ func performAboveFinalityReorgAndValidate(t *testing.T, network string) {
 
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
-	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
-	if len(setUpOutput.Lanes) == 0 {
-		log.Info().Msg("No lanes found")
-		return
-	}
+	require.False(t, len(setUpOutput.Lanes) == 0, "No lanes found.")
 	t.Cleanup(func() {
 		require.NoError(t, setUpOutput.TearDown())
 	})
@@ -946,7 +936,7 @@ func performAboveFinalityReorgAndValidate(t *testing.T, network string) {
 	lane.Test = t
 	lane.RecordStateBeforeTransfer()
 	err := lane.SendRequests(1, gasLimit)
-	require.NoError(t, err)
+	require.NoError(t, err, "Send requests failed")
 	logPollerName := ""
 	if network == "Destination" {
 		logPollerName = fmt.Sprintf("EVM.%d.LogPoller", lane.DestChain.GetChainID())
@@ -956,29 +946,36 @@ func performAboveFinalityReorgAndValidate(t *testing.T, network string) {
 		rs.RunReorg(rs.SrcClient, int(rs.Cfg.SrcFinalityDepth)+rs.Cfg.FinalityDelta, network, 2*time.Second)
 	}
 	clNodes := setUpOutput.Env.CLNodes
-	// assert every node is detecting the reorg (LogPollInterval is set as 1s for faster detection in the test)
+	// assert every node is detecting the reorg (LogPollInterval is set as 1s for faster detection)
+	nodesDetectedViolation := make(map[string]bool)
 	assert.Eventually(t, func() bool {
-		violationDetectedByNodeCount := 0
 		for _, node := range clNodes {
+			if _, ok := nodesDetectedViolation[node.ChainlinkClient.URL()]; ok {
+				continue
+			}
 			resp, _, err := node.Health()
 			require.NoError(t, err)
 			for _, d := range resp.Data {
 				if d.Attributes.Name == logPollerName && d.Attributes.Output == "finality violated" && d.Attributes.Status == "failing" {
 					log.Debug().Msg("Finality violated is detected by node")
-					violationDetectedByNodeCount++
+					nodesDetectedViolation[node.ChainlinkClient.URL()] = true
 				}
 			}
 		}
-		return violationDetectedByNodeCount == len(clNodes)
-	}, 3*time.Minute, 20*time.Second, "Reorg above finality depth is not detected by node")
+		return len(nodesDetectedViolation) == len(clNodes)
+	}, 3*time.Minute, 20*time.Second, "Reorg above finality depth is not detected by every node")
+	log.Debug().Interface("Nodes", nodesDetectedViolation).Msg("Violation detection details")
 	// send another request and verify it fails
 	err = lane.SendRequests(1, gasLimit)
 	if network == "Source" {
 		// if it is source chain reorg, the transaction will not even be initiated
-		require.Error(t, err)
+		require.Error(t, err,
+			"CCIP send transaction shouldn't be initiated as there is above finality depth reorg in source"+
+				" chain")
 	} else {
 		// if it is destination chain reorg, the transaction will be initiated and will fail in the process
-		require.NoError(t, err)
+		require.NoError(t, err,
+			"CCIP send transaction should be initiated even when there above finality reorg in dest chain")
 	}
 
 	lane.ValidateRequests(actions.ExpectAnyPhaseToFail(actions.WithTimeout(time.Minute)))
