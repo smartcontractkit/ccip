@@ -11,13 +11,16 @@ bytes32 constant RMN_V1_6_ANY2EVM_REPORT = keccak256("RMN_V1_6_ANY2EVM_REPORT");
 
 /// @notice This contract supports verification of RMN reports for any Any2EVM OffRamp.
 contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
-  string public constant override typeAndVersion = "RMNRemote 1.6.0-dev";
+  error InvalidSignature();
+  error OutOfOrderSignatures();
+  error UnexpectedSigner();
+  error ThresholdNotMet();
+  error ConfigNotSet();
+  error InvalidSignerOrder();
+  error MinSignersTooHigh();
+  error DuplicateOnchainPublicKey();
 
-  uint64 internal immutable i_chainSelector;
-
-  constructor(uint64 chainSelector) {
-    i_chainSelector = chainSelector;
-  }
+  event ConfigSet(VersionedConfig versionedConfig);
 
   struct Signer {
     address onchainPublicKey; // for signing reports
@@ -38,7 +41,13 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   Config s_config;
   uint32 s_configCount;
 
+  string public constant override typeAndVersion = "RMNRemote 1.6.0-dev";
+  uint64 internal immutable i_chainSelector;
   mapping(address signer => bool exists) s_signers; // for more gas efficient verify
+
+  constructor(uint64 chainSelector) {
+    i_chainSelector = chainSelector;
+  }
 
   function setConfig(Config calldata newConfig) external onlyOwner {
     // sanity checks
@@ -143,23 +152,4 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   function isCursed(bytes16 subject) external view returns (bool) {
     return false; // XXX temporary workaround
   }
-
-  ///
-  /// Events
-  ///
-
-  event ConfigSet(VersionedConfig versionedConfig);
-
-  ///
-  /// Errors
-  ///
-
-  error InvalidSignature();
-  error OutOfOrderSignatures();
-  error UnexpectedSigner();
-  error ThresholdNotMet();
-  error ConfigNotSet();
-  error InvalidSignerOrder();
-  error MinSignersTooHigh();
-  error DuplicateOnchainPublicKey();
 }
