@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 
 /// @notice Stores the home configuration for RMN, that is referenced by CCIP oracles, RMN nodes, and the RMNRemote
 /// contracts.
-contract RMNHome is Ownable2Step, ITypeAndVersion {
+contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   /// @dev temp placeholder to exclude this contract from coverage
   function test() public {}
 
