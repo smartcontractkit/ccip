@@ -599,6 +599,7 @@ func TestConfig_Marshal(t *testing.T) {
 					FinalizedBlockPollInterval: &second,
 					EnforceRepeatableRead:      ptr(true),
 					DeathDeclarationDelay:      &minute,
+					NewHeadsPollInterval:       &second,
 					Errors: evmcfg.ClientErrors{
 						NonceTooLow:                       ptr[string]("(: |^)nonce too low"),
 						NonceTooHigh:                      ptr[string]("(: |^)nonce too high"),
