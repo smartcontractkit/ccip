@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {IFeeQuoter} from "../../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
-import {IRMN} from "../../interfaces/IRMN.sol";
+import {IRMNV2} from "../../interfaces/IRMNV2.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
@@ -12,7 +12,6 @@ import {FeeQuoter} from "../../FeeQuoter.sol";
 import {NonceManager} from "../../NonceManager.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
-import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
 import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {MultiOCR3Base} from "../../ocr/MultiOCR3Base.sol";
@@ -34,7 +33,7 @@ contract OffRamp_constructor is OffRampSetup {
   function test_Constructor_Success() public {
     OffRamp.StaticConfig memory staticConfig = OffRamp.StaticConfig({
       chainSelector: DEST_CHAIN_SELECTOR,
-      rmnProxy: address(s_mockRMN),
+      rmn: s_mockRMNRemote,
       tokenAdminRegistry: address(s_tokenAdminRegistry),
       nonceManager: address(s_inboundNonceManager)
     });
@@ -103,7 +102,7 @@ contract OffRamp_constructor is OffRampSetup {
     // Static config
     OffRamp.StaticConfig memory gotStaticConfig = s_offRamp.getStaticConfig();
     assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
-    assertEq(staticConfig.rmnProxy, gotStaticConfig.rmnProxy);
+    assertEq(address(staticConfig.rmn), address(gotStaticConfig.rmn));
     assertEq(staticConfig.tokenAdminRegistry, gotStaticConfig.tokenAdminRegistry);
 
     // Dynamic config
@@ -155,7 +154,7 @@ contract OffRamp_constructor is OffRampSetup {
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN),
+        rmn: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
@@ -181,7 +180,7 @@ contract OffRamp_constructor is OffRampSetup {
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN),
+        rmn: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
@@ -190,7 +189,7 @@ contract OffRamp_constructor is OffRampSetup {
     );
   }
 
-  function test_ZeroRMNProxy_Revert() public {
+  function test_ZeroRMNRemote_Revert() public {
     uint64[] memory sourceChainSelectors = new uint64[](1);
     sourceChainSelectors[0] = SOURCE_CHAIN_SELECTOR_1;
 
@@ -201,7 +200,7 @@ contract OffRamp_constructor is OffRampSetup {
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: ZERO_ADDRESS,
+        rmn: IRMNV2(ZERO_ADDRESS),
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
@@ -221,7 +220,7 @@ contract OffRamp_constructor is OffRampSetup {
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: 0,
-        rmnProxy: address(s_mockRMN),
+        rmn: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
@@ -241,7 +240,7 @@ contract OffRamp_constructor is OffRampSetup {
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN),
+        rmn: s_mockRMNRemote,
         tokenAdminRegistry: ZERO_ADDRESS,
         nonceManager: address(s_inboundNonceManager)
       }),
@@ -261,7 +260,7 @@ contract OffRamp_constructor is OffRampSetup {
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN),
+        rmn: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: ZERO_ADDRESS
       }),
@@ -628,7 +627,10 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     vm.resumeGasMetering();
     vm.recordLogs();
     s_offRamp.executeSingleReport(report, new OffRamp.GasLimitOverride[](0));
+
+    Vm.Log[] memory logs = vm.getRecordedLogs();
     assertExecutionStateChangedEventLogs(
+      logs,
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
@@ -638,6 +640,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     );
 
     assertExecutionStateChangedEventLogs(
+      logs,
       SOURCE_CHAIN_SELECTOR_1,
       messages[1].header.sequenceNumber,
       messages[1].header.messageId,
@@ -660,7 +663,11 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     s_offRamp.executeSingleReport(
       _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), _getGasLimitsFromMessages(messages)
     );
+
+    Vm.Log[] memory logs = vm.getRecordedLogs();
+
     assertExecutionStateChangedEventLogs(
+      logs,
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
@@ -669,6 +676,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       ""
     );
     assertExecutionStateChangedEventLogs(
+      logs,
       SOURCE_CHAIN_SELECTOR_1,
       messages[1].header.sequenceNumber,
       messages[1].header.messageId,
@@ -703,6 +711,9 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     s_offRamp.executeSingleReport(
       _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), _getGasLimitsFromMessages(messages)
     );
+
+    Vm.Log[] memory logs = vm.getRecordedLogs();
+
     // all executions should succeed.
     for (uint256 i = 0; i < orderings.length; ++i) {
       assertEq(
@@ -711,6 +722,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       );
 
       assertExecutionStateChangedEventLogs(
+        logs,
         SOURCE_CHAIN_SELECTOR_1,
         messages[i].header.sequenceNumber,
         messages[i].header.messageId,
@@ -753,13 +765,37 @@ contract OffRamp_executeSingleReport is OffRampSetup {
   }
 
   function test_WithCurseOnAnotherSourceChain_Success() public {
-    s_mockRMN.setChainCursed(SOURCE_CHAIN_SELECTOR_2, true);
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_2, true);
+    s_offRamp.executeSingleReport(
+      _generateReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new uint256[](0)
+    );
+  }
+
+  function test_Unhealthy_Success() public {
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, true);
+
+    vm.expectEmit();
+    emit OffRamp.SkippedReportExecution(SOURCE_CHAIN_SELECTOR_1);
+    s_offRamp.executeSingleReport(
+      _generateReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new uint256[](0)
+    );
+
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, false);
+    vm.recordLogs();
     s_offRamp.executeSingleReport(
       _generateReportFromMessages(
         SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
       ),
       new OffRamp.GasLimitOverride[](0)
     );
+
+    _assertNoEmit(OffRamp.SkippedReportExecution.selector);
   }
 
   // Reverts
@@ -796,42 +832,26 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     s_offRamp.executeSingleReport(executionReport, new OffRamp.GasLimitOverride[](0));
   }
 
-  function test_Unhealthy_Revert() public {
-    s_mockRMN.setGlobalCursed(true);
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR_1));
-    s_offRamp.executeSingleReport(
-      _generateReportFromMessages(
-        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
-      ),
-      new OffRamp.GasLimitOverride[](0)
-    );
-    // Uncurse should succeed
-    s_mockRMN.setGlobalCursed(false);
-    s_offRamp.executeSingleReport(
-      _generateReportFromMessages(
-        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
-      ),
-      new OffRamp.GasLimitOverride[](0)
-    );
-  }
-
   function test_UnhealthySingleChainCurse_Revert() public {
-    s_mockRMN.setChainCursed(SOURCE_CHAIN_SELECTOR_1, true);
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR_1));
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, true);
+    vm.expectEmit();
+    emit OffRamp.SkippedReportExecution(SOURCE_CHAIN_SELECTOR_1);
     s_offRamp.executeSingleReport(
       _generateReportFromMessages(
         SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
       ),
       new OffRamp.GasLimitOverride[](0)
     );
+    vm.recordLogs();
     // Uncurse should succeed
-    s_mockRMN.setChainCursed(SOURCE_CHAIN_SELECTOR_1, false);
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, false);
     s_offRamp.executeSingleReport(
       _generateReportFromMessages(
         SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
       ),
       new OffRamp.GasLimitOverride[](0)
     );
+    _assertNoEmit(OffRamp.SkippedReportExecution.selector);
   }
 
   function test_UnexpectedTokenData_Revert() public {
@@ -981,15 +1001,20 @@ contract OffRamp_executeSingleReport is OffRampSetup {
   }
 
   function _constructCommitReport(bytes32 merkleRoot) internal view returns (OffRamp.CommitReport memory) {
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
+    roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, 2),
-      merkleRoot: merkleRoot
+      minSeqNr: 1,
+      maxSeqNr: 2,
+      merkleRoot: merkleRoot,
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
     });
 
-    return
-      OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
+    return OffRamp.CommitReport({
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures
+    });
   }
 }
 
@@ -1185,7 +1210,10 @@ contract OffRamp_batchExecute is OffRampSetup {
     uint64 nonceBefore = s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages1[0].sender);
     vm.recordLogs();
     s_offRamp.batchExecute(reports, new OffRamp.GasLimitOverride[][](2));
+
+    Vm.Log[] memory logs = vm.getRecordedLogs();
     assertExecutionStateChangedEventLogs(
+      logs,
       messages1[0].header.sourceChainSelector,
       messages1[0].header.sequenceNumber,
       messages1[0].header.messageId,
@@ -1195,6 +1223,7 @@ contract OffRamp_batchExecute is OffRampSetup {
     );
 
     assertExecutionStateChangedEventLogs(
+      logs,
       messages1[1].header.sourceChainSelector,
       messages1[1].header.sequenceNumber,
       messages1[1].header.messageId,
@@ -1204,6 +1233,7 @@ contract OffRamp_batchExecute is OffRampSetup {
     );
 
     assertExecutionStateChangedEventLogs(
+      logs,
       messages2[0].header.sourceChainSelector,
       messages2[0].header.sequenceNumber,
       messages2[0].header.messageId,
@@ -1231,7 +1261,10 @@ contract OffRamp_batchExecute is OffRampSetup {
 
     s_offRamp.batchExecute(reports, new OffRamp.GasLimitOverride[][](2));
 
+    Vm.Log[] memory logs = vm.getRecordedLogs();
+
     assertExecutionStateChangedEventLogs(
+      logs,
       messages1[0].header.sourceChainSelector,
       messages1[0].header.sequenceNumber,
       messages1[0].header.messageId,
@@ -1241,6 +1274,7 @@ contract OffRamp_batchExecute is OffRampSetup {
     );
 
     assertExecutionStateChangedEventLogs(
+      logs,
       messages1[1].header.sourceChainSelector,
       messages1[1].header.sequenceNumber,
       messages1[1].header.messageId,
@@ -1250,10 +1284,11 @@ contract OffRamp_batchExecute is OffRampSetup {
     );
 
     assertExecutionStateChangedEventLogs(
+      logs,
       messages2[0].header.sourceChainSelector,
       messages2[0].header.sequenceNumber,
       messages2[0].header.messageId,
-      Internal._hash(messages2[0], ON_RAMP_ADDRESS_1),
+      Internal._hash(messages2[0], ON_RAMP_ADDRESS_3),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1264,6 +1299,45 @@ contract OffRamp_batchExecute is OffRampSetup {
     assertTrue(nonceChain1 != nonceChain3);
     assertGt(nonceChain1, 0);
     assertGt(nonceChain3, 0);
+  }
+
+  function test_MultipleReportsDifferentChainsSkipCursedChain_Success() public {
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, true);
+
+    Internal.Any2EVMRampMessage[] memory messages1 = new Internal.Any2EVMRampMessage[](2);
+    Internal.Any2EVMRampMessage[] memory messages2 = new Internal.Any2EVMRampMessage[](1);
+
+    messages1[0] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1);
+    messages1[1] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 2);
+    messages2[0] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_3, ON_RAMP_ADDRESS_3, 1);
+
+    Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](2);
+    reports[0] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages1);
+    reports[1] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_3, messages2);
+
+    vm.recordLogs();
+
+    vm.expectEmit();
+    emit OffRamp.SkippedReportExecution(SOURCE_CHAIN_SELECTOR_1);
+
+    s_offRamp.batchExecute(reports, new uint256[][](2));
+
+    Vm.Log[] memory logs = vm.getRecordedLogs();
+
+    for (uint256 i = 0; i < logs.length; ++i) {
+      if (logs[i].topics[0] == OffRamp.ExecutionStateChanged.selector) {
+        uint64 logSourceChainSelector = uint64(uint256(logs[i].topics[1]));
+        uint64 logSequenceNumber = uint64(uint256(logs[i].topics[2]));
+        bytes32 logMessageId = bytes32(logs[i].topics[3]);
+        (bytes32 logMessageHash, uint8 logState,,) = abi.decode(logs[i].data, (bytes32, uint8, bytes, uint256));
+        assertEq(logMessageId, messages2[0].header.messageId);
+        assertEq(logSourceChainSelector, messages2[0].header.sourceChainSelector);
+        assertEq(logSequenceNumber, messages2[0].header.sequenceNumber);
+        assertEq(logMessageId, messages2[0].header.messageId);
+        assertEq(logMessageHash, Internal._hash(messages2[0], ON_RAMP_ADDRESS_3));
+        assertEq(logState, uint8(Internal.MessageExecutionState.SUCCESS));
+      }
+    }
   }
 
   function test_MultipleReportsSkipDuplicate_Success() public {
@@ -1289,29 +1363,34 @@ contract OffRamp_batchExecute is OffRampSetup {
     );
   }
 
+  function test_Unhealthy_Success() public {
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, true);
+    vm.expectEmit();
+    emit OffRamp.SkippedReportExecution(SOURCE_CHAIN_SELECTOR_1);
+    s_offRamp.batchExecute(
+      _generateBatchReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new OffRamp.GasLimitOverride[][](1)
+    );
+
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, false);
+
+    vm.recordLogs();
+    s_offRamp.batchExecute(
+      _generateBatchReportFromMessages(
+        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
+      ),
+      new OffRamp.GasLimitOverride[][](1)
+    );
+
+    _assertNoEmit(OffRamp.SkippedReportExecution.selector);
+  }
+
   // Reverts
   function test_ZeroReports_Revert() public {
     vm.expectRevert(OffRamp.EmptyReport.selector);
-    s_offRamp.batchExecute(new Internal.ExecutionReportSingleChain[](0), new OffRamp.GasLimitOverride[][](1));
-  }
-
-  function test_Unhealthy_Revert() public {
-    s_mockRMN.setGlobalCursed(true);
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR_1));
-    s_offRamp.batchExecute(
-      _generateBatchReportFromMessages(
-        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
-      ),
-      new OffRamp.GasLimitOverride[][](1)
-    );
-    // Uncurse should succeed
-    s_mockRMN.setGlobalCursed(false);
-    s_offRamp.batchExecute(
-      _generateBatchReportFromMessages(
-        SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
-      ),
-      new OffRamp.GasLimitOverride[][](1)
-    );
+    s_offRamp.batchExecute(new Internal.ExecutionReportSingleChain[](0), new uint256[][](1));
   }
 
   function test_OutOfBoundsGasLimitsAccess_Revert() public {
@@ -1353,6 +1432,8 @@ contract OffRamp_manuallyExecute is OffRampSetup {
 
     OffRamp.GasLimitOverride[][] memory gasLimitOverrides = new OffRamp.GasLimitOverride[][](1);
     gasLimitOverrides[0] = new OffRamp.GasLimitOverride[](messages.length);
+
+    vm.recordLogs();
     s_offRamp.manuallyExecute(_generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), gasLimitOverrides);
     assertExecutionStateChangedEventLogs(
       SOURCE_CHAIN_SELECTOR_1,
@@ -1459,10 +1540,14 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       gasLimitOverrides[1][i].receiverExecutionGasLimit += 1;
     }
 
+    vm.recordLogs();
     s_offRamp.manuallyExecute(reports, gasLimitOverrides);
+
+    Vm.Log[] memory logs = vm.getRecordedLogs();
 
     for (uint256 j = 0; j < 3; ++j) {
       assertExecutionStateChangedEventLogs(
+        logs,
         SOURCE_CHAIN_SELECTOR_1,
         messages1[j].header.sequenceNumber,
         messages1[j].header.messageId,
@@ -1474,10 +1559,11 @@ contract OffRamp_manuallyExecute is OffRampSetup {
 
     for (uint256 k = 0; k < 2; ++k) {
       assertExecutionStateChangedEventLogs(
-        SOURCE_CHAIN_SELECTOR_1,
+        logs,
+        SOURCE_CHAIN_SELECTOR_3,
         messages2[k].header.sequenceNumber,
         messages2[k].header.messageId,
-        Internal._hash(messages2[k], ON_RAMP_ADDRESS_1),
+        Internal._hash(messages2[k], ON_RAMP_ADDRESS_3),
         Internal.MessageExecutionState.SUCCESS,
         ""
       );
@@ -1499,7 +1585,10 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       _generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new OffRamp.GasLimitOverride[][](1)
     );
 
+    Vm.Log[] memory logs = vm.getRecordedLogs();
+
     assertExecutionStateChangedEventLogs(
+      logs,
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
@@ -1509,6 +1598,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     );
 
     assertExecutionStateChangedEventLogs(
+      logs,
       SOURCE_CHAIN_SELECTOR_1,
       messages[1].header.sequenceNumber,
       messages[1].header.messageId,
@@ -1521,6 +1611,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     );
 
     assertExecutionStateChangedEventLogs(
+      logs,
       SOURCE_CHAIN_SELECTOR_1,
       messages[2].header.sequenceNumber,
       messages[2].header.messageId,
@@ -1837,6 +1928,59 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     // Since the tx failed we don't release the tokens
     assertEq(tokenToAbuse.balanceOf(address(receiver)), balancePre + tokenAmount);
   }
+
+  function test_manuallyExecute_MultipleReportsWithSingleCursedLane_Revert() public {
+    Internal.Any2EVMRampMessage[] memory messages1 = new Internal.Any2EVMRampMessage[](3);
+    Internal.Any2EVMRampMessage[] memory messages2 = new Internal.Any2EVMRampMessage[](2);
+
+    for (uint64 i = 0; i < 3; ++i) {
+      messages1[i] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, i + 1);
+      messages1[i].receiver = address(s_reverting_receiver);
+      messages1[i].header.messageId = Internal._hash(messages1[i], ON_RAMP_ADDRESS_1);
+    }
+
+    for (uint64 i = 0; i < 2; ++i) {
+      messages2[i] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_3, ON_RAMP_ADDRESS_3, i + 1);
+      messages2[i].receiver = address(s_reverting_receiver);
+      messages2[i].header.messageId = Internal._hash(messages2[i], ON_RAMP_ADDRESS_3);
+    }
+
+    Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](2);
+    reports[0] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages1);
+    reports[1] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_3, messages2);
+
+    uint256[][] memory gasLimitOverrides = new uint256[][](2);
+    gasLimitOverrides[0] = _getGasLimitsFromMessages(messages1);
+    gasLimitOverrides[1] = _getGasLimitsFromMessages(messages2);
+
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_3, true);
+
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.CursedByRMN.selector, SOURCE_CHAIN_SELECTOR_3));
+
+    s_offRamp.manuallyExecute(reports, gasLimitOverrides);
+  }
+
+  function test_manuallyExecute_SourceChainSelectorMismatch_Revert() public {
+    Internal.Any2EVMRampMessage[] memory messages1 = new Internal.Any2EVMRampMessage[](1);
+    Internal.Any2EVMRampMessage[] memory messages2 = new Internal.Any2EVMRampMessage[](1);
+    messages1[0] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1);
+    messages2[0] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, 1);
+
+    Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](2);
+    reports[0] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages1);
+    reports[1] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_3, messages2);
+
+    uint256[][] memory gasLimitOverrides = new uint256[][](2);
+    gasLimitOverrides[0] = _getGasLimitsFromMessages(messages1);
+    gasLimitOverrides[1] = _getGasLimitsFromMessages(messages2);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        OffRamp.SourceChainSelectorMismatch.selector, SOURCE_CHAIN_SELECTOR_3, SOURCE_CHAIN_SELECTOR_1
+      )
+    );
+    s_offRamp.manuallyExecute(reports, gasLimitOverrides);
+  }
 }
 
 contract OffRamp_execute is OffRampSetup {
@@ -1891,7 +2035,11 @@ contract OffRamp_execute is OffRampSetup {
 
     vm.recordLogs();
     _execute(reports);
+
+    Vm.Log[] memory logs = vm.getRecordedLogs();
+
     assertExecutionStateChangedEventLogs(
+      logs,
       messages1[0].header.sourceChainSelector,
       messages1[0].header.sequenceNumber,
       messages1[0].header.messageId,
@@ -1901,6 +2049,7 @@ contract OffRamp_execute is OffRampSetup {
     );
 
     assertExecutionStateChangedEventLogs(
+      logs,
       messages1[1].header.sourceChainSelector,
       messages1[1].header.sequenceNumber,
       messages1[1].header.messageId,
@@ -1910,6 +2059,7 @@ contract OffRamp_execute is OffRampSetup {
     );
 
     assertExecutionStateChangedEventLogs(
+      logs,
       messages2[0].header.sourceChainSelector,
       messages2[0].header.sequenceNumber,
       messages2[0].header.messageId,
@@ -1938,9 +2088,12 @@ contract OffRamp_execute is OffRampSetup {
     vm.recordLogs();
     _execute(reports);
 
+    Vm.Log[] memory logs = vm.getRecordedLogs();
+
     for (uint64 i = 0; i < reports.length; ++i) {
       for (uint64 j = 0; j < reports[i].messages.length; ++j) {
         assertExecutionStateChangedEventLogs(
+          logs,
           reports[i].messages[j].header.sourceChainSelector,
           reports[i].messages[j].header.sequenceNumber,
           reports[i].messages[j].header.messageId,
@@ -1976,7 +2129,11 @@ contract OffRamp_execute is OffRampSetup {
 
     vm.recordLogs();
     _execute(reports);
+
+    Vm.Log[] memory logs = vm.getRecordedLogs();
+
     assertExecutionStateChangedEventLogs(
+      logs,
       messages1[0].header.sourceChainSelector,
       messages1[0].header.sequenceNumber,
       messages1[0].header.messageId,
@@ -1989,6 +2146,7 @@ contract OffRamp_execute is OffRampSetup {
     );
 
     assertExecutionStateChangedEventLogs(
+      logs,
       messages1[1].header.sourceChainSelector,
       messages1[1].header.sequenceNumber,
       messages1[1].header.messageId,
@@ -1998,6 +2156,7 @@ contract OffRamp_execute is OffRampSetup {
     );
 
     assertExecutionStateChangedEventLogs(
+      logs,
       messages2[0].header.sourceChainSelector,
       messages2[0].header.sequenceNumber,
       messages2[0].header.messageId,
@@ -2049,8 +2208,8 @@ contract OffRamp_execute is OffRampSetup {
       ocrPluginType: uint8(Internal.OCRPluginType.Commit),
       configDigest: s_configDigestCommit,
       F: s_F,
-      isSignatureVerificationEnabled: false,
-      signers: s_emptySigners,
+      isSignatureVerificationEnabled: true,
+      signers: s_validSigners,
       transmitters: s_validTransmitters
     });
     s_offRamp.setOCR3Configs(ocrConfigs);
@@ -2393,7 +2552,7 @@ contract OffRamp_trialExecute is OffRampSetup {
   }
 }
 
-contract OffRamp__releaseOrMintSingleToken is OffRampSetup {
+contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
   function setUp() public virtual override {
     super.setUp();
     _setupMultipleOffRamps();
@@ -3116,15 +3275,17 @@ contract OffRamp_commit is OffRampSetup {
     uint64 max1 = 931;
     bytes32 root = "Only a single root";
 
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
+    roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, max1),
-      merkleRoot: root
+      minSeqNr: 1,
+      maxSeqNr: max1,
+      merkleRoot: root,
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
     });
 
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
 
     vm.expectEmit();
     emit OffRamp.CommitReportAccepted(commitReport);
@@ -3143,14 +3304,16 @@ contract OffRamp_commit is OffRampSetup {
     uint64 maxSeq = 12;
     uint224 tokenStartPrice = IFeeQuoter(s_offRamp.getDynamicConfig().feeQuoter).getTokenPrice(s_sourceFeeToken).value;
 
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
+    roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, maxSeq),
-      merkleRoot: "stale report 1"
+      minSeqNr: 1,
+      maxSeqNr: maxSeq,
+      merkleRoot: "stale report 1",
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
     });
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
 
     vm.expectEmit();
     emit OffRamp.CommitReportAccepted(commitReport);
@@ -3163,7 +3326,8 @@ contract OffRamp_commit is OffRampSetup {
     assertEq(maxSeq + 1, s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR).minSeqNr);
     assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
 
-    commitReport.merkleRoots[0].interval = OffRamp.Interval(maxSeq + 1, maxSeq * 2);
+    commitReport.merkleRoots[0].minSeqNr = maxSeq + 1;
+    commitReport.merkleRoots[0].maxSeqNr = maxSeq * 2;
     commitReport.merkleRoots[0].merkleRoot = "stale report 2";
 
     vm.expectEmit();
@@ -3180,9 +3344,15 @@ contract OffRamp_commit is OffRampSetup {
   }
 
   function test_OnlyTokenPriceUpdates_Success() public {
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](0);
-    OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
+    // force RMN verification to fail
+    vm.mockCallRevert(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNV2.verify.selector), bytes(""));
+
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](0);
+    OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures
+    });
 
     vm.expectEmit();
     emit FeeQuoter.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
@@ -3196,9 +3366,15 @@ contract OffRamp_commit is OffRampSetup {
   }
 
   function test_OnlyGasPriceUpdates_Success() public {
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](0);
-    OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
+    // force RMN verification to fail
+    vm.mockCallRevert(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNV2.verify.selector), bytes(""));
+
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](0);
+    OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures
+    });
 
     vm.expectEmit();
     emit FeeQuoter.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
@@ -3211,9 +3387,12 @@ contract OffRamp_commit is OffRampSetup {
   }
 
   function test_PriceSequenceNumberCleared_Success() public {
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](0);
-    OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](0);
+    OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures
+    });
 
     vm.expectEmit();
     emit FeeQuoter.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
@@ -3260,10 +3439,11 @@ contract OffRamp_commit is OffRampSetup {
     uint64 maxSeq = 12;
     uint224 tokenPrice1 = 4e18;
     uint224 tokenPrice2 = 5e18;
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](0);
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](0);
     OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice1),
-      merkleRoots: roots
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures
     });
 
     vm.expectEmit();
@@ -3275,11 +3455,13 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, s_latestSequenceNumber);
     assertEq(s_latestSequenceNumber, s_offRamp.getLatestPriceSequenceNumber());
 
-    roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
+    roots = new Internal.MerkleRoot[](1);
+    roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, maxSeq),
-      merkleRoot: "stale report"
+      minSeqNr: 1,
+      maxSeqNr: maxSeq,
+      merkleRoot: "stale report",
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
     });
     commitReport.priceUpdates = _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice2);
     commitReport.merkleRoots = roots;
@@ -3351,94 +3533,109 @@ contract OffRamp_commit is OffRampSetup {
     s_offRamp.commit(reportContext, abi.encode(commitReport), rs, ss, rawVs);
   }
 
-  function test_WrongConfigWithoutSigners_Revert() public {
-    _redeployOffRampWithNoOCRConfigs();
+  function test_FailedRMNVerification_Reverts() public {
+    // force RMN verification to fail
+    vm.mockCallRevert(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNV2.verify.selector), bytes(""));
 
     OffRamp.CommitReport memory commitReport = _constructCommitReport();
-
-    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
-    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
-      ocrPluginType: uint8(Internal.OCRPluginType.Commit),
-      configDigest: s_configDigestCommit,
-      F: s_F,
-      isSignatureVerificationEnabled: false,
-      signers: s_emptySigners,
-      transmitters: s_validTransmitters
-    });
-    s_offRamp.setOCR3Configs(ocrConfigs);
-
     vm.expectRevert();
     _commit(commitReport, s_latestSequenceNumber);
   }
 
   function test_Unhealthy_Revert() public {
-    s_mockRMN.setGlobalCursed(true);
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
+    _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, true);
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
+    roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, 2),
-      merkleRoot: "Only a single root"
+      minSeqNr: 1,
+      maxSeqNr: 2,
+      merkleRoot: "Only a single root",
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
     });
 
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.CursedByRMN.selector, roots[0].sourceChainSelector));
     _commit(commitReport, s_latestSequenceNumber);
   }
 
   function test_InvalidRootRevert() public {
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
+    roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, 4),
-      merkleRoot: bytes32(0)
+      minSeqNr: 1,
+      maxSeqNr: 4,
+      merkleRoot: bytes32(0),
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
     });
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
 
     vm.expectRevert(OffRamp.InvalidRoot.selector);
     _commit(commitReport, s_latestSequenceNumber);
   }
 
   function test_InvalidInterval_Revert() public {
-    OffRamp.Interval memory interval = OffRamp.Interval(2, 2);
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] =
-      OffRamp.MerkleRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR_1, interval: interval, merkleRoot: bytes32(0)});
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
+    roots[0] = Internal.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      minSeqNr: 2,
+      maxSeqNr: 2,
+      merkleRoot: bytes32(0),
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
+    });
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
 
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidInterval.selector, roots[0].sourceChainSelector, interval));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        OffRamp.InvalidInterval.selector, roots[0].sourceChainSelector, roots[0].minSeqNr, roots[0].maxSeqNr
+      )
+    );
     _commit(commitReport, s_latestSequenceNumber);
   }
 
   function test_InvalidIntervalMinLargerThanMax_Revert() public {
     s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR);
-    OffRamp.Interval memory interval = OffRamp.Interval(1, 0);
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] =
-      OffRamp.MerkleRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR_1, interval: interval, merkleRoot: bytes32(0)});
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
+    roots[0] = Internal.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      minSeqNr: 1,
+      maxSeqNr: 0,
+      merkleRoot: bytes32(0),
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
+    });
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
 
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidInterval.selector, roots[0].sourceChainSelector, interval));
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        OffRamp.InvalidInterval.selector, roots[0].sourceChainSelector, roots[0].minSeqNr, roots[0].maxSeqNr
+      )
+    );
     _commit(commitReport, s_latestSequenceNumber);
   }
 
   function test_ZeroEpochAndRound_Revert() public {
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](0);
-    OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](0);
+    OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures
+    });
 
     vm.expectRevert(OffRamp.StaleCommitReport.selector);
     _commit(commitReport, 0);
   }
 
   function test_OnlyPriceUpdateStaleReport_Revert() public {
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](0);
-    OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](0);
+    OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures
+    });
 
     vm.expectEmit();
     emit FeeQuoter.UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
@@ -3449,29 +3646,37 @@ contract OffRamp_commit is OffRampSetup {
   }
 
   function test_SourceChainNotEnabled_Revert() public {
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] =
-      OffRamp.MerkleRoot({sourceChainSelector: 0, interval: OffRamp.Interval(1, 2), merkleRoot: "Only a single root"});
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
+    roots[0] = Internal.MerkleRoot({
+      sourceChainSelector: 0,
+      minSeqNr: 1,
+      maxSeqNr: 2,
+      merkleRoot: "Only a single root",
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
+    });
 
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.SourceChainNotEnabled.selector, 0));
     _commit(commitReport, s_latestSequenceNumber);
   }
 
   function test_RootAlreadyCommitted_Revert() public {
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
+    roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, 2),
-      merkleRoot: "Only a single root"
+      minSeqNr: 1,
+      maxSeqNr: 2,
+      merkleRoot: "Only a single root",
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
     });
     OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
+      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
 
     _commit(commitReport, s_latestSequenceNumber);
-    commitReport.merkleRoots[0].interval = OffRamp.Interval(3, 3);
+    commitReport.merkleRoots[0].minSeqNr = 3;
+    commitReport.merkleRoots[0].maxSeqNr = 3;
 
     vm.expectRevert(
       abi.encodeWithSelector(OffRamp.RootAlreadyCommitted.selector, roots[0].sourceChainSelector, roots[0].merkleRoot)
@@ -3480,164 +3685,47 @@ contract OffRamp_commit is OffRampSetup {
   }
 
   function _constructCommitReport() internal view returns (OffRamp.CommitReport memory) {
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
+    roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      interval: OffRamp.Interval(1, s_maxInterval),
-      merkleRoot: "test #2"
+      minSeqNr: 1,
+      maxSeqNr: s_maxInterval,
+      merkleRoot: "test #2",
+      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
     });
 
-    return
-      OffRamp.CommitReport({priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18), merkleRoots: roots});
+    return OffRamp.CommitReport({
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures
+    });
   }
 }
 
-contract OffRamp_resetUnblessedRoots is OffRampSetup {
-  function setUp() public virtual override {
-    super.setUp();
-    _setupRealRMN();
-    _deployOffRamp(s_realRMN, s_inboundNonceManager);
-    _setupMultipleOffRamps();
-  }
+contract OffRamp_afterOC3ConfigSet is OffRampSetup {
+  function test_afterOCR3ConfigSet_SignatureVerificationDisabled_Revert() public {
+    s_offRamp = new OffRampHelper(
+      OffRamp.StaticConfig({
+        chainSelector: DEST_CHAIN_SELECTOR,
+        rmn: s_mockRMNRemote,
+        tokenAdminRegistry: address(s_tokenAdminRegistry),
+        nonceManager: address(s_inboundNonceManager)
+      }),
+      _generateDynamicOffRampConfig(address(s_feeQuoter)),
+      new OffRamp.SourceChainConfigArgs[](0)
+    );
 
-  function test_ResetUnblessedRoots_Success() public {
-    OffRamp.UnblessedRoot[] memory rootsToReset = new OffRamp.UnblessedRoot[](3);
-    rootsToReset[0] = OffRamp.UnblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "1"});
-    rootsToReset[1] = OffRamp.UnblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "2"});
-    rootsToReset[2] = OffRamp.UnblessedRoot({sourceChainSelector: SOURCE_CHAIN_SELECTOR, merkleRoot: "3"});
-
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](3);
-    roots[0] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: OffRamp.Interval(1, 2),
-      merkleRoot: rootsToReset[0].merkleRoot
-    });
-    roots[1] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: OffRamp.Interval(3, 4),
-      merkleRoot: rootsToReset[1].merkleRoot
-    });
-    roots[2] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: OffRamp.Interval(5, 5),
-      merkleRoot: rootsToReset[2].merkleRoot
+    MultiOCR3Base.OCRConfigArgs[] memory ocrConfigs = new MultiOCR3Base.OCRConfigArgs[](1);
+    ocrConfigs[0] = MultiOCR3Base.OCRConfigArgs({
+      ocrPluginType: uint8(Internal.OCRPluginType.Commit),
+      configDigest: s_configDigestCommit,
+      F: s_F,
+      isSignatureVerificationEnabled: false,
+      signers: s_validSigners,
+      transmitters: s_validTransmitters
     });
 
-    OffRamp.CommitReport memory report =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
-
-    _commit(report, ++s_latestSequenceNumber);
-
-    IRMN.TaggedRoot[] memory blessedTaggedRoots = new IRMN.TaggedRoot[](1);
-    blessedTaggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_offRamp), root: rootsToReset[1].merkleRoot});
-
-    vm.startPrank(BLESS_VOTE_ADDR);
-    s_realRMN.voteToBless(blessedTaggedRoots);
-
-    vm.expectEmit(false, false, false, true);
-    emit OffRamp.RootRemoved(rootsToReset[0].merkleRoot);
-
-    vm.expectEmit(false, false, false, true);
-    emit OffRamp.RootRemoved(rootsToReset[2].merkleRoot);
-
-    vm.startPrank(OWNER);
-    s_offRamp.resetUnblessedRoots(rootsToReset);
-
-    assertEq(0, s_offRamp.getMerkleRoot(SOURCE_CHAIN_SELECTOR, rootsToReset[0].merkleRoot));
-    assertEq(BLOCK_TIME, s_offRamp.getMerkleRoot(SOURCE_CHAIN_SELECTOR, rootsToReset[1].merkleRoot));
-    assertEq(0, s_offRamp.getMerkleRoot(SOURCE_CHAIN_SELECTOR, rootsToReset[2].merkleRoot));
-  }
-
-  // Reverts
-
-  function test_OnlyOwner_Revert() public {
-    vm.stopPrank();
-    vm.expectRevert("Only callable by owner");
-    OffRamp.UnblessedRoot[] memory rootsToReset = new OffRamp.UnblessedRoot[](0);
-    s_offRamp.resetUnblessedRoots(rootsToReset);
-  }
-}
-
-contract OffRamp_verify is OffRampSetup {
-  function setUp() public virtual override {
-    super.setUp();
-    _setupRealRMN();
-    _deployOffRamp(s_realRMN, s_inboundNonceManager);
-    _setupMultipleOffRamps();
-  }
-
-  function test_NotBlessed_Success() public {
-    bytes32[] memory leaves = new bytes32[](1);
-    leaves[0] = "root";
-
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: OffRamp.Interval(1, 2),
-      merkleRoot: leaves[0]
-    });
-    OffRamp.CommitReport memory report =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
-    _commit(report, ++s_latestSequenceNumber);
-    bytes32[] memory proofs = new bytes32[](0);
-    // We have not blessed this root, should return 0.
-    uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
-    assertEq(uint256(0), timestamp);
-  }
-
-  function test_Blessed_Success() public {
-    bytes32[] memory leaves = new bytes32[](1);
-    leaves[0] = "root";
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: OffRamp.Interval(1, 2),
-      merkleRoot: leaves[0]
-    });
-    OffRamp.CommitReport memory report =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
-    _commit(report, ++s_latestSequenceNumber);
-    // Bless that root.
-    IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
-    taggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_offRamp), root: leaves[0]});
-    vm.startPrank(BLESS_VOTE_ADDR);
-    s_realRMN.voteToBless(taggedRoots);
-    bytes32[] memory proofs = new bytes32[](0);
-    uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
-    assertEq(BLOCK_TIME, timestamp);
-  }
-
-  function test_NotBlessedWrongChainSelector_Success() public {
-    bytes32[] memory leaves = new bytes32[](1);
-    leaves[0] = "root";
-    OffRamp.MerkleRoot[] memory roots = new OffRamp.MerkleRoot[](1);
-    roots[0] = OffRamp.MerkleRoot({
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
-      interval: OffRamp.Interval(1, 2),
-      merkleRoot: leaves[0]
-    });
-
-    OffRamp.CommitReport memory report =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots});
-    _commit(report, ++s_latestSequenceNumber);
-
-    // Bless that root.
-    IRMN.TaggedRoot[] memory taggedRoots = new IRMN.TaggedRoot[](1);
-    taggedRoots[0] = IRMN.TaggedRoot({commitStore: address(s_offRamp), root: leaves[0]});
-    vm.startPrank(BLESS_VOTE_ADDR);
-    s_realRMN.voteToBless(taggedRoots);
-
-    bytes32[] memory proofs = new bytes32[](0);
-    uint256 timestamp = s_offRamp.verify(SOURCE_CHAIN_SELECTOR + 1, leaves, proofs, 0);
-    assertEq(uint256(0), timestamp);
-  }
-
-  // Reverts
-
-  function test_TooManyLeaves_Revert() public {
-    bytes32[] memory leaves = new bytes32[](258);
-    bytes32[] memory proofs = new bytes32[](0);
-    vm.expectRevert(MerkleMultiProof.InvalidProof.selector);
-    s_offRamp.verify(SOURCE_CHAIN_SELECTOR, leaves, proofs, 0);
+    vm.expectRevert(OffRamp.SignatureVerificationDisabled.selector);
+    s_offRamp.setOCR3Configs(ocrConfigs);
   }
 }
