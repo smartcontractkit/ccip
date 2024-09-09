@@ -38,6 +38,15 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     Config config;
   }
 
+  struct Report {
+    uint256 destChainId; // to guard against chain selector misconfiguration
+    uint64 destChainSelector;
+    address rmnRemoteContractAddress;
+    address offrampAddress;
+    bytes32 rmnHomeContractConfigDigest;
+    Internal.MerkleRoot[] destLaneUpdates;
+  }
+
   Config s_config;
   uint32 s_configCount;
 
@@ -93,23 +102,12 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     return VersionedConfig({version: s_configCount, config: s_config});
   }
 
-  struct Report {
-    uint256 destChainId; // to guard against chain selector misconfiguration
-    uint64 destChainSelector;
-    address rmnRemoteContractAddress;
-    address offrampAddress;
-    bytes32 rmnHomeContractConfigDigest;
-    Internal.MerkleRoot[] destLaneUpdates;
-  }
-
   /// @notice Verifies signatures of RMN nodes, on dest lane updates as provided in the CommitReport
   /// @param destLaneUpdates must be well formed, and is a representation of the CommitReport received from the oracles
   /// @param signatures must be sorted in ascending order by signer address
   /// @dev Will revert if verification fails. Needs to be called by the OffRamp for which the signatures are produced,
   /// otherwise verification will fail.
   function verify(Internal.MerkleRoot[] memory destLaneUpdates, Signature[] memory signatures) external view {
-    return; // XXX temporary workaround to fix integration tests while we wait to productionize this contract
-
     if (s_configCount == 0) {
       revert ConfigNotSet();
     }
