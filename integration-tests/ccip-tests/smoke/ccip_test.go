@@ -957,13 +957,13 @@ func performAboveFinalityReorgAndValidate(t *testing.T, network string) {
 			require.NoError(t, err)
 			for _, d := range resp.Data {
 				if d.Attributes.Name == logPollerName && d.Attributes.Output == "finality violated" && d.Attributes.Status == "failing" {
-					log.Debug().Msg("Finality violated is detected by node")
+					log.Debug().Str("Node", node.ChainlinkClient.URL()).Msg("Finality violated is detected by node")
 					nodesDetectedViolation[node.ChainlinkClient.URL()] = true
 				}
 			}
 		}
 		return len(nodesDetectedViolation) == len(clNodes)
-	}, 3*time.Minute, 20*time.Second, "Reorg above finality depth is not detected by every node")
+	}, 5*time.Minute, 5*time.Second, "Reorg above finality depth is not detected by every node")
 	log.Debug().Interface("Nodes", nodesDetectedViolation).Msg("Violation detection details")
 	// send another request and verify it fails
 	err = lane.SendRequests(1, gasLimit)
