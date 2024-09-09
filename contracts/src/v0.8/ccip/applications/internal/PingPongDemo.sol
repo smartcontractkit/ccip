@@ -4,14 +4,13 @@ pragma solidity ^0.8.0;
 import {Client} from "../../libraries/Client.sol";
 import {CCIPClient} from "../external/CCIPClient.sol";
 
-import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
+import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 /// @title PingPongDemo - A simple ping-pong contract for demonstrating cross-chain communication
 contract PingPongDemo is CCIPClient {
-
   event Ping(uint256 pingPongCount);
   event Pong(uint256 pingPongCount);
   event OutOfOrderExecutionChange(bool isOutOfOrder);
@@ -58,12 +57,9 @@ contract PingPongDemo is CCIPClient {
   /// @dev This example just sends the tokens to the owner of this contracts. More
   /// interesting functions could be implemented.
   /// @dev It has to be external because of the try/catch.
-  function processMessage(Client.Any2EVMMessage calldata message)
-    external
-    override
-    onlySelf
-    isValidSender(message.sourceChainSelector, message.sender)
-  {
+  function processMessage(
+    Client.Any2EVMMessage calldata message
+  ) external override onlySelf isValidSender(message.sourceChainSelector, message.sender) {
     if (!s_isPaused) {
       _respond(abi.decode(message.data, (uint256)) + 1);
     }
@@ -106,20 +102,21 @@ contract PingPongDemo is CCIPClient {
     return s_isPaused;
   }
 
-  function getOutOfOrderExecution() external view returns (bool) {
+  function getOutOfOrderExecution() external view virtual returns (bool) {
     return s_allowOutOfOrderExecution;
   }
 
-  function setOutOfOrderExecution(bool outOfOrderExecution) external onlyOwner {
-    // It adds gas having the extra storage slot, but the alternative is a bunch of very messy assembly code
-    // to slice it out of the extra args.
+  function setOutOfOrderExecution(bool outOfOrderExecution) external virtual onlyOwner {
+    // An additional storage slot is used for code simplicity. The current storage value can be
+    // retrieved by parsing the extraArgsBytes field of the chain configuration, but this is not recommended
+    // as it is more expensive and error-prone by requiring additional parsing logic in raw assembly.
     s_allowOutOfOrderExecution = outOfOrderExecution;
 
     address onRamp = IRouter(s_ccipRouter).getOnRamp(s_counterpartChainSelector);
     EVM2EVMOnRamp.StaticConfig memory staticConfig = EVM2EVMOnRamp(onRamp).getStaticConfig();
-    
+
     // Enabling out of order execution also requires setting a manual gas limit, therefore the on-ramp default
-    // gas limit is used to ensure consistency, but can be overwritten manually by the contract owner using 
+    // gas limit is used to ensure consistency, but can be overwritten manually by the contract owner using
     // the applyChainUpdates function.
     s_chainConfigs[s_counterpartChainSelector].extraArgsBytes = Client._argsToBytes(
       Client.EVMExtraArgsV2({gasLimit: staticConfig.defaultTxGasLimit, allowOutOfOrderExecution: outOfOrderExecution})
@@ -127,5 +124,4 @@ contract PingPongDemo is CCIPClient {
 
     emit OutOfOrderExecutionChange(outOfOrderExecution);
   }
-
 }

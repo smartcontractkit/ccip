@@ -16,13 +16,9 @@ contract CCIPReceiverReverting is CCIPReceiver {
   /// @dev This example just sends the tokens to the owner of this contracts. More
   /// interesting functions could be implemented.
   /// @dev It has to be external because of the try/catch.
-  function processMessage(Client.Any2EVMMessage calldata message)
-    external
-    view
-    override
-    onlySelf
-    isValidSender(message.sourceChainSelector, message.sender)
-  {
+  function processMessage(
+    Client.Any2EVMMessage calldata message
+  ) external view override onlySelf isValidSender(message.sourceChainSelector, message.sender) {
     // Meant to help simulate a failed-message
     if (s_simRevert) revert ErrorCase();
   }

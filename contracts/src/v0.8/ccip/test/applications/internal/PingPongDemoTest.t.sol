@@ -29,10 +29,10 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
 }
 
 contract PingPong_example_startPingPong is PingPongDappSetup {
-    uint256 pingPongNumber = 1;
-    bytes data = abi.encode(pingPongNumber);
+  uint256 pingPongNumber = 1;
+  bytes data = abi.encode(pingPongNumber);
 
-   function test_StartPingPong_Success() public {
+  function test_StartPingPong_Success() public {
     Client.EVM2AnyMessage memory sentMessage = Client.EVM2AnyMessage({
       receiver: abi.encode(i_pongContract),
       data: data,
@@ -170,7 +170,7 @@ contract PingPong_example_ccipReceive is PingPongDappSetup {
 contract PingPong_plumbing is PingPongDappSetup {
   function test_Fuzz_CounterPartChainSelector_Success(uint64 chainSelector) public {
     vm.assume(chainSelector != 0);
-    
+
     s_pingPong.setCounterpart(chainSelector, address(0x1234));
 
     assertEq(s_pingPong.getCounterpartChainSelector(), chainSelector);
@@ -205,7 +205,7 @@ contract PingPong_plumbing is PingPongDappSetup {
   function test_typeAndVersion() public view {
     assertEq(s_pingPong.typeAndVersion(), "PingPongDemo 1.6.0-dev");
   }
-  
+
   function test_OutOfOrderExecution_Success() public {
     assertFalse(s_pingPong.getOutOfOrderExecution());
 

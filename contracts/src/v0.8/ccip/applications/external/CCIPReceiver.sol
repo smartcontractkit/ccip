@@ -40,12 +40,9 @@ contract CCIPReceiver is CCIPBase {
   /// not revert, all errors should be handled internally in this contract.
   /// @param message The message to process.
   /// @dev Extremely important to ensure only router calls this.
-  function ccipReceive(Client.Any2EVMMessage calldata message)
-    external
-    virtual
-    onlyRouter
-    isValidChain(message.sourceChainSelector)
-  {
+  function ccipReceive(
+    Client.Any2EVMMessage calldata message
+  ) external virtual onlyRouter isValidChain(message.sourceChainSelector) {
     try this.processMessage(message) {}
     catch (bytes memory err) {
       // If custom retry logic is desired, plus granting the owner the ability to extract tokens as a last resort for
@@ -68,12 +65,9 @@ contract CCIPReceiver is CCIPBase {
 
   /// @notice Contains arbitrary application-logic for incoming CCIP messages.
   /// @dev It has to be external because of the try/catch of ccipReceive() which invokes it
-  function processMessage(Client.Any2EVMMessage calldata message)
-    external
-    virtual
-    onlySelf
-    isValidSender(message.sourceChainSelector, message.sender)
-  {}
+  function processMessage(
+    Client.Any2EVMMessage calldata message
+  ) external virtual onlySelf isValidSender(message.sourceChainSelector, message.sender) {}
 
   // ================================================================
   // │                  Failed Message Processing                   |

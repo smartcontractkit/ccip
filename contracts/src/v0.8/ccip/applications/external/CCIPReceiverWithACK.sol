@@ -86,13 +86,9 @@ contract CCIPReceiverWithACK is CCIPReceiver {
   /// @notice Application-specific logic for incoming ccip messages.
   /// @dev Function does NOT require the status of an incoming ACK be "sent" because this implementation does not send, only receives
   /// Any MessageType encoding is implemented by the sender contract, and is not natively part of CCIP messages.
-  function processMessage(Client.Any2EVMMessage calldata message)
-    external
-    virtual
-    override
-    onlySelf
-    isValidSender(message.sourceChainSelector, message.sender)
-  {
+  function processMessage(
+    Client.Any2EVMMessage calldata message
+  ) external virtual override onlySelf isValidSender(message.sourceChainSelector, message.sender) {
     (MessagePayload memory payload) = abi.decode(message.data, (MessagePayload));
 
     // message type is a concept with ClientWithACK
