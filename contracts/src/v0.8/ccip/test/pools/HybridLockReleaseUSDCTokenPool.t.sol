@@ -522,6 +522,30 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
       "Liquidity amount of tokens should be zero in old pool, but aren't"
     );
   }
+
+  function test_cannotTransferLiquidityDuringPendingMigration_Revert() public {
+    // Set as the OWNER so we can provide liquidity
+    vm.startPrank(OWNER);
+
+    s_usdcTokenPool.setLiquidityProvider(DEST_CHAIN_SELECTOR, OWNER);
+    s_token.approve(address(s_usdcTokenPool), type(uint256).max);
+
+    uint256 liquidityAmount = 1e9;
+
+    // Provide some liquidity to the pool
+    s_usdcTokenPool.provideLiquidity(DEST_CHAIN_SELECTOR, liquidityAmount);
+
+    // Set the new token pool as the rebalancer
+    s_usdcTokenPool.transferOwnership(address(s_usdcTokenPoolTransferLiquidity));
+
+    s_usdcTokenPool.proposeCCTPMigration(DEST_CHAIN_SELECTOR);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(HybridLockReleaseUSDCTokenPool.LanePausedForCCTPMigration.selector, DEST_CHAIN_SELECTOR)
+    );
+
+    s_usdcTokenPoolTransferLiquidity.transferLiquidity(address(s_usdcTokenPool), DEST_CHAIN_SELECTOR);
+  }
 }
 
 contract HybridUSDCTokenPoolMigrationTests is HybridUSDCTokenPoolTests {

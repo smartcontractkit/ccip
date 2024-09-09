@@ -97,6 +97,10 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
     uint64 currentProposalChainSelector = s_proposedUSDCMigrationChain;
     delete s_proposedUSDCMigrationChain;
 
+    // If a migration is cancelled, the tokens excluded from burn should be reset, and must be manually
+    // re-excluded if the proposal is re-proposed in the future
+    delete s_tokensExcludedFromBurn[currentProposalChainSelector];
+
     emit CCTPMigrationCancelled(currentProposalChainSelector);
   }
 
