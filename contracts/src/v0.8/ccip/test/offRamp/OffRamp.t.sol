@@ -1713,14 +1713,14 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     gasLimitOverrides[0] = _getGasLimitsFromMessages(messages);
     // empty tokenGasOverride array provided
     vm.expectRevert(
-      abi.encodeWithSelector(OffRamp.DestinationGasAmountCountMismatch.selector, messages[0].header.messageId, 1)
+      abi.encodeWithSelector(OffRamp.ManualExecutionGasAmountCountMismatch.selector, messages[0].header.messageId, 1)
     );
     s_offRamp.manuallyExecute(_generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), gasLimitOverrides);
 
     //trying with excesss elements tokenGasOverride array provided
     gasLimitOverrides[0][0].tokenGasOverrides = new uint32[](3);
     vm.expectRevert(
-      abi.encodeWithSelector(OffRamp.DestinationGasAmountCountMismatch.selector, messages[0].header.messageId, 1)
+      abi.encodeWithSelector(OffRamp.ManualExecutionGasAmountCountMismatch.selector, messages[0].header.messageId, 1)
     );
     s_offRamp.manuallyExecute(_generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), gasLimitOverrides);
   }
@@ -1741,7 +1741,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        OffRamp.InvalidTokenGasOverride.selector,
+        OffRamp.InvalidManualExecutionTokenGasOverride.selector,
         messages[0].header.messageId,
         1,
         DEFAULT_TOKEN_DEST_GAS_OVERHEAD,

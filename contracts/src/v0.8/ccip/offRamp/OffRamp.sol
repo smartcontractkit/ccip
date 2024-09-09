@@ -41,8 +41,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error ManualExecutionNotYetEnabled(uint64 sourceChainSelector);
   error ManualExecutionGasLimitMismatch();
   error InvalidManualExecutionGasLimit(uint64 sourceChainSelector, uint256 index, uint256 newLimit);
-  error InvalidTokenGasOverride(bytes32 messageId, uint256 tokenIndex, uint256 oldLimit, uint256 tokenGasOverride);
-  error DestinationGasAmountCountMismatch(bytes32 messageId, uint64 sequenceNumber);
+  error InvalidManualExecutionTokenGasOverride(bytes32 messageId, uint256 tokenIndex, uint256 oldLimit, uint256 tokenGasOverride);
+  error ManualExecutionGasAmountCountMismatch(bytes32 messageId, uint64 sequenceNumber);
   error RootNotCommitted(uint64 sourceChainSelector);
   error RootAlreadyCommitted(uint64 sourceChainSelector, bytes32 merkleRoot);
   error InvalidRoot();
@@ -112,8 +112,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev Since DynamicConfig is part of DynamicConfigSet event, if changing it, we should update the ABI on Atlas
   struct DynamicConfig {
     address feeQuoter; // ──────────────────────────────╮ FeeQuoter address on the local chain
-    uint32 permissionLessExecutionThresholdSeconds; //  │ Waiting time before manual execution is enabled
-    address messageValidator; //────────────────────────╯ Optional message validator to validate incoming messages (zero address = no validator)
+    uint32 permissionLessExecutionThresholdSeconds; //──╯ Waiting time before manual execution is enabled
+    address messageValidator; // Optional message validator to validate incoming messages (zero address = no validator)
   }
 
   /// @notice a sequenceNumber interval
@@ -302,7 +302,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         }
         Internal.Any2EVMRampMessage memory message = report.messages[msgIndex];
         if (message.tokenAmounts.length != msgGasLimitOverrides[msgIndex].tokenGasOverrides.length) {
-          revert DestinationGasAmountCountMismatch(message.header.messageId, message.header.sequenceNumber);
+          revert ManualExecutionGasAmountCountMismatch(message.header.messageId, message.header.sequenceNumber);
         }
 
         // The gas limit can not be lowered as that could cause the message to fail. If manual execution is done
@@ -314,7 +314,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
           if (tokenGasOverride != 0) {
             uint32 destGasAmount = abi.decode(message.tokenAmounts[tokenIndex].destExecData, (uint32));
             if (tokenGasOverride < destGasAmount) {
-              revert InvalidTokenGasOverride(message.header.messageId, tokenIndex, destGasAmount, tokenGasOverride);
+              revert InvalidManualExecutionTokenGasOverride(message.header.messageId, tokenIndex, destGasAmount, tokenGasOverride);
             }
           }
         }
