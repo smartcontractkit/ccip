@@ -420,6 +420,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
         if (allowListConfigArgs.addedAllowlistedSenders.length > 0) {
           emit AllowListSendersAdded(allowListConfigArgs.destChainSelector, allowListConfigArgs.addedAllowlistedSenders);
         }
+      } else if (allowListConfigArgs.addedAllowlistedSenders.length > 0) {
+        revert InvalidAllowListRequest(allowListConfigArgs.destChainSelector);
       }
 
       for (uint256 j = 0; j < allowListConfigArgs.removedAllowlistedSenders.length; ++j) {
