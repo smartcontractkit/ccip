@@ -102,7 +102,10 @@ contract CCIPConfigSetup is Test {
     return (p2pIds, signers, transmitters);
   }
 
-  function _assertOCR3ConfigWithMetaEqual(CCIPConfigTypes.OCR3ConfigWithMeta[] memory a, CCIPConfigTypes.OCR3ConfigWithMeta[] memory b) internal pure {
+  function _assertOCR3ConfigWithMetaEqual(
+    CCIPConfigTypes.OCR3ConfigWithMeta[] memory a,
+    CCIPConfigTypes.OCR3ConfigWithMeta[] memory b
+  ) internal pure {
     assertEq(a.length, b.length, "OCR3ConfigWithMeta lengths do no match");
     for (uint256 i = 0; i < a.length; ++i) {
       _assertOCR3ConfigEqual(a[i].config, b[i].config);
@@ -111,7 +114,10 @@ contract CCIPConfigSetup is Test {
     }
   }
 
-  function _assertOCR3ConfigEqual(CCIPConfigTypes.OCR3Config memory a, CCIPConfigTypes.OCR3Config memory b) internal pure {
+  function _assertOCR3ConfigEqual(
+    CCIPConfigTypes.OCR3Config memory a,
+    CCIPConfigTypes.OCR3Config memory b
+  ) internal pure {
     assertEq(uint8(a.pluginType), uint8(b.pluginType), "pluginType must match");
     assertEq(a.chainSelector, b.chainSelector, "chainSelector must match");
     assertEq(a.F, b.F, "F must match");
@@ -126,7 +132,7 @@ contract CCIPConfigSetup is Test {
     for (uint256 i = 0; i < a.signers.length; ++i) {
       assertEq(a.signers[i], b.signers[i], "signer must match");
     }
-    for (uint i = 0; i < a.transmitters.length; ++i) {
+    for (uint256 i = 0; i < a.transmitters.length; ++i) {
       assertEq(a.transmitters[i], b.transmitters[i], "transmitter must match");
     }
   }
