@@ -73,6 +73,9 @@ contract BaseTest is Test {
   MockRMN internal s_mockRMN;
   IRMNV2 internal s_mockRMNRemote;
 
+  // nonce for pseudo-random number generation, not to be exposed to test suites
+  uint256 private randNonce;
+
   function setUp() public virtual {
     // BaseTest.setUp is often called multiple times from tests' setUp due to inheritance.
     if (s_baseTestInitialized) return;
@@ -127,5 +130,10 @@ contract BaseTest is Test {
       Internal.PriceUpdates({tokenPriceUpdates: tokenPriceUpdates, gasPriceUpdates: new Internal.GasPriceUpdate[](0)});
 
     return priceUpdates;
+  }
+
+  /// @dev returns a pseudo-random 32 bytes
+  function _randomBytes32() internal returns (bytes32) {
+    return keccak256(abi.encodePacked(++randNonce));
   }
 }
