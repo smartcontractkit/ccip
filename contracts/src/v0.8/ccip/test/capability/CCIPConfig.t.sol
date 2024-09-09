@@ -163,7 +163,7 @@ contract CCIPConfig_chainConfig is CCIPConfigSetup {
     assertEq(configs.length, 2, "chain configs length must be 2");
     assertEq(configs[0].chainSelector, 1, "chain selector must match");
     assertEq(configs[1].chainSelector, 2, "chain selector must match");
-    assertEq(s_ccipCC.getTotalChainConfigurations(), 2, "total chain configs must be 2");
+    assertEq(s_ccipCC.getNumChainConfigurations(), 2, "total chain configs must be 2");
   }
 
   function test_getPaginatedCCIPConfigs_Success() public {
@@ -252,7 +252,7 @@ contract CCIPConfig_chainConfig is CCIPConfigSetup {
     emit CCIPConfig.ChainConfigSet(2, adds[1].chainConfig);
     s_ccipCC.applyChainConfigUpdates(new uint64[](0), adds);
 
-    assertEq(s_ccipCC.getTotalChainConfigurations(), 2, "total chain configs must be 2");
+    assertEq(s_ccipCC.getNumChainConfigurations(), 2, "total chain configs must be 2");
 
     uint64[] memory removes = new uint64[](1);
     removes[0] = uint64(1);
@@ -261,7 +261,7 @@ contract CCIPConfig_chainConfig is CCIPConfigSetup {
     emit CCIPConfig.ChainConfigRemoved(1);
     s_ccipCC.applyChainConfigUpdates(removes, new CCIPConfigTypes.ChainConfigInfo[](0));
 
-    assertEq(s_ccipCC.getTotalChainConfigurations(), 1, "total chain configs must be 1");
+    assertEq(s_ccipCC.getNumChainConfigurations(), 1, "total chain configs must be 1");
   }
 
   // Reverts.
