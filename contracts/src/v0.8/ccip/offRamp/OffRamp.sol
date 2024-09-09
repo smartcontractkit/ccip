@@ -40,7 +40,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error UnexpectedTokenData();
   error ManualExecutionNotYetEnabled(uint64 sourceChainSelector);
   error ManualExecutionGasLimitMismatch();
-  error InvalidManualExecutionGasLimit(uint64 sourceChainSelector, uint256 index, uint256 newLimit);
+  error InvalidManualExecutionGasLimit(uint64 sourceChainSelector, bytes32 messageId, uint256 newLimit);
   error InvalidManualExecutionTokenGasOverride(bytes32 messageId, uint256 tokenIndex, uint256 oldLimit, uint256 tokenGasOverride);
   error ManualExecutionGasAmountCountMismatch(bytes32 messageId, uint64 sequenceNumber);
   error RootNotCommitted(uint64 sourceChainSelector);
@@ -281,12 +281,12 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       for (uint256 msgIndex = 0; msgIndex < numMsgs; ++msgIndex) {
         uint256 newLimit = msgGasLimitOverrides[msgIndex].receiverExecutionGasLimit;
         // Checks to ensure message cannot be executed with less gas than specified.
+        Internal.Any2EVMRampMessage memory message = report.messages[msgIndex];
         if (newLimit != 0) {
-          if (newLimit < report.messages[msgIndex].gasLimit) {
-            revert InvalidManualExecutionGasLimit(report.sourceChainSelector, msgIndex, newLimit);
+          if (newLimit < message.gasLimit) {
+            revert InvalidManualExecutionGasLimit(report.sourceChainSelector, message.header.messageId, newLimit);
           }
         }
-        Internal.Any2EVMRampMessage memory message = report.messages[msgIndex];
         if (message.tokenAmounts.length != msgGasLimitOverrides[msgIndex].tokenGasOverrides.length) {
           revert ManualExecutionGasAmountCountMismatch(message.header.messageId, message.header.sequenceNumber);
         }
@@ -352,7 +352,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     GasLimitOverride[] memory manualExecGasExecOverrides
   ) internal {
     uint64 sourceChainSelector = report.sourceChainSelector;
-    bool manualExecution = manualExecGasLimits.length != 0;
+    bool manualExecution = manualExecGasExecOverrides.length != 0;
     if (i_rmn.isCursed(bytes16(uint128(sourceChainSelector)))) {
       if (manualExecution) {
         // For manual execution we don't want to silently fail so we revert
@@ -392,8 +392,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       // Including the known OnRamp ensures that the message originates from the correct on ramp version
       hashedLeaves[i] = Internal._hash(message, onRamp);
     }
-
-    bool manualExecution = manualExecGasExecOverrides.length != 0;
 
     // SECURITY CRITICAL CHECK
     // NOTE: This check also verifies that all messages match the report's sourceChainSelector

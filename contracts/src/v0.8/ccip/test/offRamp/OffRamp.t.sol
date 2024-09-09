@@ -770,7 +770,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       _generateReportFromMessages(
         SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
       ),
-      new uint256[](0)
+      new OffRamp.GasLimitOverride[](0)
     );
   }
 
@@ -783,7 +783,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       _generateReportFromMessages(
         SOURCE_CHAIN_SELECTOR_1, _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1)
       ),
-      new uint256[](0)
+      new OffRamp.GasLimitOverride[](0)
     );
 
     _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, false);
@@ -1320,7 +1320,7 @@ contract OffRamp_batchExecute is OffRampSetup {
     vm.expectEmit();
     emit OffRamp.SkippedReportExecution(SOURCE_CHAIN_SELECTOR_1);
 
-    s_offRamp.batchExecute(reports, new uint256[][](2));
+    s_offRamp.batchExecute(reports, new OffRamp.GasLimitOverride[][](2));
 
     Vm.Log[] memory logs = vm.getRecordedLogs();
 
@@ -1390,7 +1390,7 @@ contract OffRamp_batchExecute is OffRampSetup {
   // Reverts
   function test_ZeroReports_Revert() public {
     vm.expectRevert(OffRamp.EmptyReport.selector);
-    s_offRamp.batchExecute(new Internal.ExecutionReportSingleChain[](0), new uint256[][](1));
+    s_offRamp.batchExecute(new Internal.ExecutionReportSingleChain[](0), new OffRamp.GasLimitOverride[][](1));
   }
 
   function test_OutOfBoundsGasLimitsAccess_Revert() public {
@@ -1786,7 +1786,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       abi.encodeWithSelector(
         OffRamp.InvalidManualExecutionGasLimit.selector,
         SOURCE_CHAIN_SELECTOR_1,
-        0,
+        messages[0].header.messageId,
         gasLimitOverrides[0][0].receiverExecutionGasLimit
       )
     );
@@ -1949,7 +1949,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     reports[0] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages1);
     reports[1] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_3, messages2);
 
-    uint256[][] memory gasLimitOverrides = new uint256[][](2);
+    OffRamp.GasLimitOverride[][] memory gasLimitOverrides = new OffRamp.GasLimitOverride[][](2);
     gasLimitOverrides[0] = _getGasLimitsFromMessages(messages1);
     gasLimitOverrides[1] = _getGasLimitsFromMessages(messages2);
 
@@ -1970,7 +1970,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     reports[0] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages1);
     reports[1] = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_3, messages2);
 
-    uint256[][] memory gasLimitOverrides = new uint256[][](2);
+    OffRamp.GasLimitOverride[][] memory gasLimitOverrides = new OffRamp.GasLimitOverride[][](2);
     gasLimitOverrides[0] = _getGasLimitsFromMessages(messages1);
     gasLimitOverrides[1] = _getGasLimitsFromMessages(messages2);
 
