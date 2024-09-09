@@ -132,8 +132,18 @@ contract BaseTest is Test {
     return priceUpdates;
   }
 
-  /// @dev returns a pseudo-random 32 bytes
+  /// @dev returns a pseudo-random bytes32
   function _randomBytes32() internal returns (bytes32) {
     return keccak256(abi.encodePacked(++randNonce));
+  }
+
+  /// @dev returns a pseudo-random number
+  function _randomNum() internal returns (uint256) {
+    return uint256(_randomBytes32());
+  }
+
+  /// @dev returns a pseudo-random address
+  function _randomAddress() internal returns (address) {
+    return address(uint160(_randomNum()));
   }
 }
