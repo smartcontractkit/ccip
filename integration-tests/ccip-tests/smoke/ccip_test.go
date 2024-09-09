@@ -970,8 +970,7 @@ func performAboveFinalityReorgAndValidate(t *testing.T, network string) {
 	if network == "Source" {
 		// if it is source chain reorg, the transaction will not even be initiated
 		require.Error(t, err,
-			"CCIP send transaction shouldn't be initiated as there is above finality depth reorg in source"+
-				" chain")
+			"CCIP send transaction shouldn't be initiated as there is above finality depth reorg in source chain")
 	} else {
 		// if it is destination chain reorg, the transaction will be initiated and will fail in the process
 		require.NoError(t, err,
