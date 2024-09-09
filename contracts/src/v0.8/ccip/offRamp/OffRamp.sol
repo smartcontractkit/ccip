@@ -146,7 +146,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice SourceChainConfig per chain
   /// (forms lane configurations from sourceChainSelector => StaticConfig.chainSelector)
-  mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) internal s_sourceChainConfigs;
+  mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) private s_sourceChainConfigs;
 
   // STATE
   /// @dev A mapping of sequence numbers (per source chain) to execution state using a bitmap with each execution

@@ -67,17 +67,17 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   uint256 internal constant MAX_NUM_ORACLES = 256;
 
   /// @notice chain configuration for each chain that CCIP is deployed on.
-  mapping(uint64 chainSelector => CCIPConfigTypes.ChainConfig chainConfig) internal s_chainConfigurations;
+  mapping(uint64 chainSelector => CCIPConfigTypes.ChainConfig chainConfig) private s_chainConfigurations;
 
   /// @notice All chains that are configured.
-  EnumerableSet.UintSet internal s_remoteChainSelectors;
+  EnumerableSet.UintSet private s_remoteChainSelectors;
 
   /// @notice OCR3 configurations for each DON.
   /// Each CR DON will have a commit and execution configuration.
   /// This means that a DON can have up to 4 configurations, since we are implementing blue/green deployments.
   mapping(
     uint32 donId => mapping(Internal.OCRPluginType pluginType => CCIPConfigTypes.OCR3ConfigWithMeta[] ocr3Configs)
-  ) internal s_ocr3Configs;
+  ) private s_ocr3Configs;
 
   /// @param capabilitiesRegistry the canonical capabilities registry address.
   constructor(address capabilitiesRegistry) {

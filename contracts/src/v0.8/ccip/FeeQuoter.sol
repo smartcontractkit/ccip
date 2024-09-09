@@ -151,6 +151,11 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     uint64 premiumMultiplierWeiPerEth; // ──╯ Multiplier for destination chain specific premiums.
   }
 
+  /// @dev The base decimals for cost calculations
+  uint256 public constant FEE_BASE_DECIMALS = 36;
+  /// @dev The decimals that Keystone reports prices in
+  uint256 public constant KEYSTONE_PRICE_DECIMALS = 18;
+
   string public constant override typeAndVersion = "FeeQuoter 1.6.0-dev";
 
   /// @dev The gas price per unit of gas for a given destination chain, in USD with 18 decimals.
@@ -175,13 +180,13 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   mapping(address token => IFeeQuoter.TokenPriceFeedConfig dataFeedAddress) private s_usdPriceFeedsPerToken;
 
   /// @dev The multiplier for destination chain specific premiums that can be set by the owner or fee admin
-  mapping(address token => uint64 premiumMultiplierWeiPerEth) internal s_premiumMultiplierWeiPerEth;
+  mapping(address token => uint64 premiumMultiplierWeiPerEth) private s_premiumMultiplierWeiPerEth;
 
   /// @dev The destination chain specific fee configs
   mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfigs;
 
   /// @dev The token transfer fee config that can be set by the owner or fee admin
-  mapping(uint64 destChainSelector => mapping(address token => TokenTransferFeeConfig tranferFeeConfig)) internal
+  mapping(uint64 destChainSelector => mapping(address token => TokenTransferFeeConfig tranferFeeConfig)) private
     s_tokenTransferFeeConfig;
 
   /// @dev Maximum fee that can be charged for a message. This is a guard to prevent massively overcharging due to misconfiguation.
@@ -646,10 +651,10 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     uint8 excessDecimals = dataFeedDecimal + tokenDecimal;
     uint256 rebasedVal;
 
-    if (excessDecimals > 36) {
-      rebasedVal = feedValue / (10 ** (excessDecimals - 36));
+    if (excessDecimals > FEE_BASE_DECIMALS) {
+      rebasedVal = feedValue / (10 ** (excessDecimals - FEE_BASE_DECIMALS));
     } else {
-      rebasedVal = feedValue * (10 ** (36 - excessDecimals));
+      rebasedVal = feedValue * (10 ** (FEE_BASE_DECIMALS - excessDecimals));
     }
 
     if (rebasedVal > type(uint224).max) {
