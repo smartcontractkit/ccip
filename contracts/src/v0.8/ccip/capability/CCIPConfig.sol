@@ -51,10 +51,10 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   error WrongConfigDigestBlueGreen(bytes32 got, bytes32 expected);
   error ZeroAddressNotAllowed();
 
-  /// @notice Type and version override.
+  /// @dev Type and version override.
   string public constant override typeAndVersion = "CCIPConfig 1.6.0-dev";
 
-  /// @notice The canonical capabilities registry address.
+  /// @dev The canonical capabilities registry address.
   address internal immutable i_capabilitiesRegistry;
 
   uint8 internal constant MAX_OCR3_CONFIGS_PER_PLUGIN = 2;
@@ -66,13 +66,13 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @dev 256 is the hard limit due to the bit encoding of their indexes into a uint256.
   uint256 internal constant MAX_NUM_ORACLES = 256;
 
-  /// @notice chain configuration for each chain that CCIP is deployed on.
+  /// @dev chain configuration for each chain that CCIP is deployed on.
   mapping(uint64 chainSelector => CCIPConfigTypes.ChainConfig chainConfig) private s_chainConfigurations;
 
-  /// @notice All chains that are configured.
+  /// @dev All chains that are configured.
   EnumerableSet.UintSet private s_remoteChainSelectors;
 
-  /// @notice OCR3 configurations for each DON.
+  /// @dev OCR3 configurations for each DON.
   /// Each CR DON will have a commit and execution configuration.
   /// This means that a DON can have up to 4 configurations, since we are implementing blue/green deployments.
   mapping(

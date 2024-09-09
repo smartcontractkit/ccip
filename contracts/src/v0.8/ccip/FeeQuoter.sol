@@ -58,7 +58,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   event DestChainConfigUpdated(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
   event DestChainAdded(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
 
-  /// @notice Token price data feed update
+  /// @dev Token price data feed update
   struct TokenPriceFeedUpdate {
     address sourceToken; // Source token to update feed for
     IFeeQuoter.TokenPriceFeedConfig feedConfig; // Feed config update data
@@ -73,7 +73,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     uint32 stalenessThreshold; // The amount of time a gas price can be stale before it is considered invalid.
   }
 
-  /// @notice The struct representing the received CCIP feed report from keystone IReceiver.onReport()
+  /// @dev The struct representing the received CCIP feed report from keystone IReceiver.onReport()
   struct ReceivedCCIPFeedReport {
     address token; // Token address
     uint224 price; // ─────────╮ Price of the token in USD with 18 decimals
@@ -535,7 +535,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     _applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
   }
 
-  /// @dev Set the fee config.
+  /// @notice Sets the fee config.
   /// @param premiumMultiplierWeiPerEthArgs The multiplier for destination chain specific premiums.
   function _applyPremiumMultiplierWeiPerEthUpdates(
     PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs
