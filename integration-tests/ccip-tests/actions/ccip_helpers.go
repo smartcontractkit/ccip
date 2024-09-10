@@ -61,6 +61,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
@@ -3776,6 +3777,12 @@ func SetOCR2Config(
 	if len(execNodes) > 0 {
 		nodes = execNodes
 	}
+
+	// Use out of order batching strategy if we expect to be sending out of order messages
+	batchingStrategyID := ccipexec.BestEffortBatchingStrategyID
+	if pointer.GetBool(testConf.AllowOutOfOrder) {
+		batchingStrategyID = ccipexec.ZKOverflowBatchingStrategyID
+	}
 	if destCCIP.OffRamp != nil {
 		execOffchainCfg, err := contracts.NewExecOffchainConfig(
 			1,
@@ -3783,6 +3790,7 @@ func SetOCR2Config(
 			0.7,
 			*inflightExpiryExec,
 			*commonconfig.MustNewDuration(RootSnoozeTime),
+			batchingStrategyID,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create exec offchain config: %w", err)

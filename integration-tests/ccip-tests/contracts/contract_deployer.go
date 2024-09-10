@@ -1466,12 +1466,14 @@ func NewExecOnchainConfig(
 	}
 }
 
+// NewExecOffchainConfig creates a config for the OffChain portion of how CCIP operates
 func NewExecOffchainConfig(
 	destOptimisticConfirmations uint32,
 	batchGasLimit uint32,
 	relativeBoostPerWaitHour float64,
 	inflightCacheExpiry config.Duration,
 	rootSnoozeTime config.Duration,
+	batchingStrategyID uint32, // 0 = Standard, 1 = Out of Order
 ) (ccipconfig.OffchainConfig, error) {
 	switch VersionMap[OffRampContract] {
 	case Latest:
@@ -1481,6 +1483,7 @@ func NewExecOffchainConfig(
 			relativeBoostPerWaitHour,
 			inflightCacheExpiry,
 			rootSnoozeTime,
+			batchingStrategyID,
 		), nil
 	case V1_2_0:
 		return testhelpers_1_4_0.NewExecOffchainConfig(
@@ -1489,6 +1492,7 @@ func NewExecOffchainConfig(
 			relativeBoostPerWaitHour,
 			inflightCacheExpiry,
 			rootSnoozeTime,
+			batchingStrategyID,
 		), nil
 	default:
 		return nil, fmt.Errorf("version not supported: %s", VersionMap[OffRampContract])
