@@ -1850,6 +1850,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -1944,6 +1945,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -2038,6 +2040,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -2132,6 +2135,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -2227,6 +2231,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -2321,6 +2326,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -2415,6 +2421,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -2510,6 +2517,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -2604,6 +2612,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -2697,6 +2706,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -2790,6 +2800,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -2977,6 +2988,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -3072,6 +3084,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -3166,6 +3179,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -3260,6 +3274,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -3354,6 +3369,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -3448,6 +3464,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -3542,6 +3559,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -3636,6 +3654,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -3730,6 +3749,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -3824,6 +3844,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -3918,6 +3939,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -4013,6 +4035,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -4107,6 +4130,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -4388,6 +4412,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -4482,6 +4507,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -4576,6 +4602,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -4670,6 +4697,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -4764,6 +4792,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -4857,6 +4886,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -4951,6 +4981,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -5045,6 +5076,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -5139,6 +5171,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -5233,6 +5266,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -5421,6 +5455,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -5515,6 +5550,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -5609,6 +5645,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -5704,6 +5741,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -5799,6 +5837,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -5989,6 +6028,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -6083,6 +6123,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -6177,6 +6218,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -6271,6 +6313,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -6365,6 +6408,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -6458,6 +6502,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -6551,6 +6596,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -6644,6 +6690,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -6738,6 +6785,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -6926,6 +6974,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -7019,6 +7068,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -7208,6 +7258,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -7303,6 +7354,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -7398,6 +7450,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -7493,6 +7546,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -7588,6 +7642,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -7682,6 +7737,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -7776,6 +7832,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -7870,6 +7927,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -7964,6 +8022,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -8153,6 +8212,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -8247,6 +8307,7 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
+NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 4
@@ -8970,6 +9031,7 @@ NodeIsSyncingEnabled = false # Default
 FinalizedBlockPollInterval = '5s' # Default
 EnforceRepeatableRead = false # Default
 DeathDeclarationDelay = '10s' # Default
+NewHeadsPollInterval = '0s' # Default
 ```
 The node pool manages multiple RPC endpoints.
 
@@ -9061,6 +9123,14 @@ DeathDeclarationDelay defines the minimum duration an RPC must be in unhealthy s
 Larger values might be helpful to reduce the noisiness of health checks like `EnforceRepeatableRead = true', which might be falsely
 trigger declaration of `FinalizedBlockOutOfSync` due to insignificant network delays in broadcasting of the finalized state among RPCs.
 RPC will not be picked to handle a request even if this option is set to a nonzero value.
+
+### NewHeadsPollInterval
+```toml
+NewHeadsPollInterval = '0s' # Default
+```
+NewHeadsPollInterval define an interval for polling new block periodically using http client rather than subscribe to ws feed
+
+Set to 0 to disable.
 
 ## EVM.NodePool.Errors
 :warning: **_ADVANCED_**: _Do not change these settings unless you know what you are doing._
