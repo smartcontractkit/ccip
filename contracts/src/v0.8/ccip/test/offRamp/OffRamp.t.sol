@@ -3060,7 +3060,6 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
 
     sourceChainConfigs[0].onRamp = ON_RAMP_ADDRESS_2;
 
-
     vm.expectEmit();
     emit OffRamp.SourceChainConfigSet(
       SOURCE_CHAIN_SELECTOR_1,
