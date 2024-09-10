@@ -784,7 +784,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
     // Verify RMN signatures
     if (commitReport.merkleRoots.length > 0) {
-      i_rmn.verify(commitReport.merkleRoots, commitReport.rmnSignatures);
+      i_rmn.verify(address(this), commitReport.merkleRoots, commitReport.rmnSignatures);
     }
 
     // Check if the report contains price updates

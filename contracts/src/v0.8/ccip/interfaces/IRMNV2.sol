@@ -11,7 +11,11 @@ interface IRMNV2 {
     bytes32 s;
   }
 
-  function verify(Internal.MerkleRoot[] memory merkleRoots, Signature[] memory signatures) external view;
+  function verify(
+    address offRampAddress,
+    Internal.MerkleRoot[] memory merkleRoots,
+    Signature[] memory signatures
+  ) external view;
 
   /// @notice If there is an active global or legacy curse, this function returns true.
   function isCursed() external view returns (bool);
