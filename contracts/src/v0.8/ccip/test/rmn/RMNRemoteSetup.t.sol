@@ -21,8 +21,7 @@ contract RMNRemoteSetup is BaseTest {
     s_rmnRemote = new RMNRemote(1);
     OFF_RAMP_ADDRESS = makeAddr("OFF RAMP");
 
-    // NOTE if tests are running out of gas, try reducing the number of signers
-    _setupSigners(7);
+    _setupSigners(10);
   }
 
   /// @notice sets up a list of signers with strictly increasing onchain public keys
@@ -42,33 +41,39 @@ contract RMNRemoteSetup is BaseTest {
 
   /// @notice generates n destLaneUpdates and matching valid signatures and populates them into
   /// the provided storage arrays
+  /// @dev if tests are running out of gas, try reducing the number of sigs generated
   /// @dev important note here that ONLY v=27 sigs are valid in the RMN contract. Because there is
   /// very little control over how these sigs are generated in foundry, we have to "get lucky" with the
   /// payload / signature combination. Therefore, we generate a payload and sigs together here in 1 function.
   /// If we can't generate valid (v=27 for all signers) sigs we re-generate the payload and try again.
   /// Warning: this is very annoying and clunky code. Tweak at your own risk.
   function _generatePayloadAndSigs(
-    uint256 n,
+    uint256 numUpdates,
+    uint256 numSigs,
     Internal.MerkleRoot[] storage destLaneUpdates,
     IRMNV2.Signature[] storage signatures
   ) internal {
-    require(n > 0, "need at least 1 dest lane update");
+    require(numUpdates > 0, "need at least 1 dest lane update");
     require(destLaneUpdates.length == 0, "storage array should be empty");
     require(signatures.length == 0, "storage array should be empty");
+    require(numSigs <= s_signerWallets.length, "cannot generate more sigs than signers");
 
-    for (uint256 i = 0; i < n; i++) {
+    for (uint256 i = 0; i < numUpdates; i++) {
       destLaneUpdates.push(_generateRandomDestLaneUpdate());
     }
 
     while (true) {
-      bool allValid = true;
-      for (uint256 i = 0; i < s_signerWallets.length; i++) {
-        (bool valid, IRMNV2.Signature memory sig) = _signDestLaneUpdate(destLaneUpdates, s_signerWallets[i]);
+      bool allSigsValid = true;
+      for (uint256 i = 0; i < numSigs; i++) {
+        (bool isValid, IRMNV2.Signature memory sig) = _signDestLaneUpdate(destLaneUpdates, s_signerWallets[i]);
         signatures.push(sig);
-        allValid = allValid && valid;
+        allSigsValid = allSigsValid && isValid;
+        if (!allSigsValid) {
+          break;
+        }
       }
       // if all sigs are valid, don't change anything!!
-      if (allValid) {
+      if (allSigsValid) {
         break;
       }
       // try again with a different payload if not all sigs are valid

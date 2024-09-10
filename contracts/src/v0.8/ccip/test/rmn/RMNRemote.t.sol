@@ -112,7 +112,7 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     RMNRemote.Config memory config =
       RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 2});
     s_rmnRemote.setConfig(config);
-    _generatePayloadAndSigs(2, s_destLaneUpdates, s_signatures);
+    _generatePayloadAndSigs(2, 2, s_destLaneUpdates, s_signatures);
   }
 
   function test_verify_success() public {
@@ -127,5 +127,30 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     );
 
     s_rmnRemote.verify(s_destLaneUpdates, new IRMNV2.Signature[](0));
+  }
+
+  function test_verify_outOfOrderSig_reverts() public {
+    IRMNV2.Signature memory sig1 = s_signatures[s_signatures.length - 1];
+    s_signatures.pop();
+    IRMNV2.Signature memory sig2 = s_signatures[s_signatures.length - 1];
+    s_signatures.pop();
+    s_signatures.push(sig1);
+    s_signatures.push(sig2);
+
+    vm.expectRevert(RMNRemote.OutOfOrderSignatures.selector);
+    vm.stopPrank();
+    vm.prank(OFF_RAMP_ADDRESS);
+    s_rmnRemote.verify(s_destLaneUpdates, s_signatures);
+  }
+
+  function test_verify_duplicateSignature_reverts() public {
+    IRMNV2.Signature memory sig = s_signatures[s_signatures.length - 2];
+    s_signatures.pop();
+    s_signatures.push(sig);
+
+    vm.expectRevert(RMNRemote.OutOfOrderSignatures.selector);
+    vm.stopPrank();
+    vm.prank(OFF_RAMP_ADDRESS);
+    s_rmnRemote.verify(s_destLaneUpdates, s_signatures);
   }
 }
