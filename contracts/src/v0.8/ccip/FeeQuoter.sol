@@ -535,7 +535,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     _applyPremiumMultiplierWeiPerEthUpdates(premiumMultiplierWeiPerEthArgs);
   }
 
-  /// @notice Sets the fee config.
+  /// @dev Sets the fee config.
   /// @param premiumMultiplierWeiPerEthArgs The multiplier for destination chain specific premiums.
   function _applyPremiumMultiplierWeiPerEthUpdates(
     PremiumMultiplierWeiPerEthArgs[] memory premiumMultiplierWeiPerEthArgs
