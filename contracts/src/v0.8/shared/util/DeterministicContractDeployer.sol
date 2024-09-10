@@ -24,13 +24,14 @@ library DeterministicContractDeployer {
   }
 
     function _predictAddressOfUndeployedContract(
-    bytes calldata initCode,
+    bytes memory initCode,
     bytes32 salt,
     address deployer
   ) internal pure returns (address) {
+    
     // according to evm.codes, the below formula is used to predict the address of a contract
     // address = keccak256(0xff + sender_address + salt + keccak256(initialisation_code))[12:]
-    bytes32 bytesValue = keccak256(abi.encodePacked(hex"ff", deployer, salt, initCode));
+    bytes32 bytesValue = keccak256(abi.encodePacked(hex"ff", deployer, salt, keccak256(initCode)));
 
     return address(uint160(uint256(bytesValue)));
   }
