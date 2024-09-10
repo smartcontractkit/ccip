@@ -175,4 +175,13 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     vm.prank(OFF_RAMP_ADDRESS);
     s_rmnRemote.verify(s_destLaneUpdates, s_signatures);
   }
+
+  function test_verify_insufficientSignatures_reverts() public {
+    _generatePayloadAndSigs(2, 1, s_destLaneUpdates, s_signatures); // 1 sig requested, but 2 required
+
+    vm.expectRevert(RMNRemote.ThresholdNotMet.selector);
+    vm.stopPrank();
+    vm.prank(OFF_RAMP_ADDRESS);
+    s_rmnRemote.verify(s_destLaneUpdates, s_signatures);
+  }
 }
