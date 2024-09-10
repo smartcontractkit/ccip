@@ -8,8 +8,6 @@ import {Internal} from "../../libraries/Internal.sol";
 import {CCIPConfigHelper} from "../helpers/CCIPConfigHelper.sol";
 import {Test} from "forge-std/Test.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 contract CCIPConfigSetup is Test {
   address public constant OWNER = 0x82ae2B4F57CA5C1CBF8f744ADbD3697aD1a35AFe;
   address public constant CAPABILITIES_REGISTRY = 0x272aF4BF7FBFc4944Ed59F914Cd864DfD912D55e;
@@ -1189,17 +1187,24 @@ contract CCIPConfig_updatePluginConfig is CCIPConfigSetup {
     CCIPConfigTypes.OCR3Config[] memory configs = new CCIPConfigTypes.OCR3Config[](1);
     configs[0] = blueConfig;
 
-    s_ccipCC.updatePluginConfig(donId, Internal.OCRPluginType.Commit, configs);
-
-    // should see the updated config in the contract state.
-    CCIPConfigTypes.OCR3ConfigWithMeta[] memory storedConfig =
-      s_ccipCC.getOCRConfig(donId, Internal.OCRPluginType.Commit);
     CCIPConfigTypes.OCR3ConfigWithMeta[] memory expectedConfig = new CCIPConfigTypes.OCR3ConfigWithMeta[](1);
     expectedConfig[0] = CCIPConfigTypes.OCR3ConfigWithMeta({
       config: blueConfig,
       configCount: 1,
       configDigest: s_ccipCC.computeConfigDigest(donId, 1, blueConfig)
     });
+
+    vm.expectEmit();
+    emit CCIPConfig.ConfigSet(
+      donId,
+      uint8(Internal.OCRPluginType.Commit),
+      expectedConfig
+    );
+    s_ccipCC.updatePluginConfig(donId, Internal.OCRPluginType.Commit, configs);
+
+    // should see the updated config in the contract state.
+    CCIPConfigTypes.OCR3ConfigWithMeta[] memory storedConfig =
+      s_ccipCC.getOCRConfig(donId, Internal.OCRPluginType.Commit);
 
     _assertOCR3ConfigWithMetaEqual(storedConfig, expectedConfig);
   }
@@ -1239,11 +1244,6 @@ contract CCIPConfig_updatePluginConfig is CCIPConfigSetup {
     blueAndGreen[0] = blueConfig;
     blueAndGreen[1] = greenConfig;
 
-    s_ccipCC.updatePluginConfig(donId, Internal.OCRPluginType.Commit, blueAndGreen);
-
-    // should see the updated config in the contract state.
-    CCIPConfigTypes.OCR3ConfigWithMeta[] memory storedConfig =
-      s_ccipCC.getOCRConfig(donId, Internal.OCRPluginType.Commit);
     CCIPConfigTypes.OCR3ConfigWithMeta[] memory expectedConfig = new CCIPConfigTypes.OCR3ConfigWithMeta[](2);
     expectedConfig[0] = CCIPConfigTypes.OCR3ConfigWithMeta({
       config: blueConfig,
@@ -1255,6 +1255,19 @@ contract CCIPConfig_updatePluginConfig is CCIPConfigSetup {
       configCount: 2,
       configDigest: s_ccipCC.computeConfigDigest(donId, 2, greenConfig)
     });
+
+    vm.expectEmit();
+    emit CCIPConfig.ConfigSet(
+      donId,
+      uint8(Internal.OCRPluginType.Commit),
+      expectedConfig
+    );
+
+    s_ccipCC.updatePluginConfig(donId, Internal.OCRPluginType.Commit, blueAndGreen);
+
+    // should see the updated config in the contract state.
+    CCIPConfigTypes.OCR3ConfigWithMeta[] memory storedConfig =
+      s_ccipCC.getOCRConfig(donId, Internal.OCRPluginType.Commit);
 
     _assertOCR3ConfigWithMetaEqual(storedConfig, expectedConfig);
   }
@@ -1294,11 +1307,6 @@ contract CCIPConfig_updatePluginConfig is CCIPConfigSetup {
     blueAndGreen[0] = blueConfig;
     blueAndGreen[1] = greenConfig;
 
-    s_ccipCC.updatePluginConfig(donId, Internal.OCRPluginType.Commit, blueAndGreen);
-
-    // should see the updated config in the contract state.
-    CCIPConfigTypes.OCR3ConfigWithMeta[] memory storedConfig =
-      s_ccipCC.getOCRConfig(donId, Internal.OCRPluginType.Commit);
     CCIPConfigTypes.OCR3ConfigWithMeta[] memory expectedConfig = new CCIPConfigTypes.OCR3ConfigWithMeta[](2);
     expectedConfig[0] = CCIPConfigTypes.OCR3ConfigWithMeta({
       config: blueConfig,
@@ -1310,6 +1318,19 @@ contract CCIPConfig_updatePluginConfig is CCIPConfigSetup {
       configCount: 2,
       configDigest: s_ccipCC.computeConfigDigest(donId, 2, greenConfig)
     });
+    
+    vm.expectEmit();
+    emit CCIPConfig.ConfigSet(
+      donId,
+      uint8(Internal.OCRPluginType.Commit),
+      expectedConfig
+    );
+
+    s_ccipCC.updatePluginConfig(donId, Internal.OCRPluginType.Commit, blueAndGreen);
+
+    // should see the updated config in the contract state.
+    CCIPConfigTypes.OCR3ConfigWithMeta[] memory storedConfig =
+      s_ccipCC.getOCRConfig(donId, Internal.OCRPluginType.Commit);
 
     _assertOCR3ConfigWithMetaEqual(storedConfig, expectedConfig);
   }

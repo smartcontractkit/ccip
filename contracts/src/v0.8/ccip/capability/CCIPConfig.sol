@@ -51,6 +51,8 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   error WrongConfigDigestBlueGreen(bytes32 got, bytes32 expected);
   error ZeroAddressNotAllowed();
 
+  event ConfigSet(uint32 indexed donId, uint8 indexed pluginType, CCIPConfigTypes.OCR3ConfigWithMeta[] config);
+
   /// @dev Type and version override.
   string public constant override typeAndVersion = "CCIPConfig 1.6.0-dev";
 
@@ -207,6 +209,8 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     for (uint256 i = 0; i < newConfigWithMeta.length; ++i) {
       s_ocr3Configs[donId][pluginType].push(newConfigWithMeta[i]);
     }
+
+    emit ConfigSet(donId, uint8(pluginType), newConfigWithMeta);
   }
 
   // ================================================================
