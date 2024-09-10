@@ -21,6 +21,8 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   error DuplicateOnchainPublicKey();
 
   event ConfigSet(VersionedConfig versionedConfig);
+  event Cursed(bytes16[] subjects);
+  event Uncursed(bytes16[] subjects);
 
   struct Signer {
     address onchainPublicKey; // for signing reports
@@ -103,11 +105,16 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   }
 
   /// @notice Verifies signatures of RMN nodes, on dest lane updates as provided in the CommitReport
+  /// @param offrampAddress is not inferred by msg.sender, in case the call is made through ARMProxy
   /// @param destLaneUpdates must be well formed, and is a representation of the CommitReport received from the oracles
   /// @param signatures must be sorted in ascending order by signer address
   /// @dev Will revert if verification fails. Needs to be called by the OffRamp for which the signatures are produced,
   /// otherwise verification will fail.
-  function verify(Internal.MerkleRoot[] memory destLaneUpdates, Signature[] memory signatures) external view {
+  function verify(
+    address offrampAddress,
+    Internal.MerkleRoot[] memory destLaneUpdates,
+    Signature[] memory signatures
+  ) external view {
     if (s_configCount == 0) {
       revert ConfigNotSet();
     }
@@ -119,7 +126,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
           destChainId: block.chainid,
           destChainSelector: i_chainSelector,
           rmnRemoteContractAddress: address(this),
-          offrampAddress: msg.sender,
+          offrampAddress: offrampAddress,
           rmnHomeContractConfigDigest: s_config.rmnHomeContractConfigDigest,
           destLaneUpdates: destLaneUpdates
         })
@@ -140,20 +147,77 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     if (numSigners < s_config.minSigners) revert ThresholdNotMet();
   }
 
+  /// @notice Returns the chain selector configured at deployment time
+  /// @return chainSelector the chain selector (not the chain ID)
+  function getChainSelector() external view returns (uint64 chainSelector) {
+    return i_chainSelector;
+  }
+
+  ///
+  /// Cursing support sketch
+  ///
+
+  // An active curse on this subject will cause isCursed() to return true. Use this subject if there is an issue with a
+  // remote chain, for which there exists a legacy lane contract deployed on the same chain as this RMN contract is
+  // deployed, relying on isCursed().
+  bytes16 constant LEGACY_CURSE_SUBJECT = 0x01000000000000000000000000000000;
+
+  // An active curse on this subject will cause isCursed() and isCursed(bytes16) to return true. Use this subject for
+  // issues affecting all of CCIP chains, or pertaining to the chain that this contract is deployed on, instead of using
+  // the local chain selector as a subject.
+  bytes16 constant GLOBAL_CURSE_SUBJECT = 0x01000000000000000000000000000001;
+
+  mapping(bytes16 subject => uint256 indexPlusOne) private s_cursedSubjectsIndexPlusOne;
+  bytes16[] private s_cursedSubjectsSequence;
+
+  function ownerCurse(bytes16[] memory subjects) external onlyOwner {
+    for (uint256 i = 0; i < subjects.length; ++i) {
+      bytes16 toCurseSubject = subjects[i];
+      if (s_cursedSubjectsIndexPlusOne[toCurseSubject] == 0) {
+        s_cursedSubjectsSequence.push(toCurseSubject);
+        s_cursedSubjectsIndexPlusOne[toCurseSubject] = s_cursedSubjectsSequence.length;
+      }
+    }
+    emit Cursed(subjects);
+  }
+
+  function ownerUncurse(bytes16[] memory subjects) external onlyOwner {
+    for (uint256 i = 0; i < subjects.length; ++i) {
+      bytes16 toUncurseSubject = subjects[i];
+      uint256 toUncurseSubjectIndexPlusOne = s_cursedSubjectsIndexPlusOne[toUncurseSubject];
+      if (toUncurseSubjectIndexPlusOne > 0) {
+        uint256 toUncurseSubjectIndex = toUncurseSubjectIndexPlusOne - 1;
+        // copy the last subject to the position of the subject to uncurse
+        bytes16 lastSubject = s_cursedSubjectsSequence[s_cursedSubjectsSequence.length - 1];
+        s_cursedSubjectsSequence[toUncurseSubjectIndex] = lastSubject;
+        s_cursedSubjectsIndexPlusOne[lastSubject] = toUncurseSubjectIndexPlusOne;
+        // then pop, since we have the last subject also in toUncurseSubjectIndex
+        s_cursedSubjectsSequence.pop();
+        delete s_cursedSubjectsIndexPlusOne[toUncurseSubject];
+      }
+    }
+    emit Uncursed(subjects);
+  }
+
+  function getCursedSubjects() external view returns (bytes16[] memory) {
+    return s_cursedSubjectsSequence;
+  }
+
   /// @notice If there is an active global or legacy curse, this function returns true.
   function isCursed() external view returns (bool) {
-    return false; // XXX temporary workaround
+    if (s_cursedSubjectsSequence.length == 0) {
+      return false;
+    }
+    return
+      s_cursedSubjectsIndexPlusOne[LEGACY_CURSE_SUBJECT] > 0 || s_cursedSubjectsIndexPlusOne[GLOBAL_CURSE_SUBJECT] > 0;
   }
 
   /// @notice If there is an active global curse, or an active curse for `subject`, this function returns true.
   /// @param subject To check whether a particular chain is cursed, set to bytes16(uint128(chainSelector)).
   function isCursed(bytes16 subject) external view returns (bool) {
-    return false; // XXX temporary workaround
-  }
-
-  /// @notice Returns the chain selector configured at deployment time
-  /// @return chainSelector the chain selector (not the chain ID)
-  function getChainSelector() external view returns (uint64 chainSelector) {
-    return i_chainSelector;
+    if (s_cursedSubjectsSequence.length == 0) {
+      return false;
+    }
+    return s_cursedSubjectsIndexPlusOne[subject] > 0 || s_cursedSubjectsIndexPlusOne[GLOBAL_CURSE_SUBJECT] > 0;
   }
 }
