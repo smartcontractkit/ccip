@@ -113,19 +113,23 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
       RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 2});
     s_rmnRemote.setConfig(config);
     _generatePayloadAndSigs(2, 2, s_destLaneUpdates, s_signatures);
+    vm.stopPrank();
+    vm.startPrank(OFF_RAMP_ADDRESS);
   }
 
   function test_verify_success() public {
-    vm.stopPrank();
-    vm.prank(OFF_RAMP_ADDRESS);
     s_rmnRemote.verify(s_destLaneUpdates, s_signatures);
   }
 
   function test_verify_minSignersIsZero_success() public {
+    vm.stopPrank();
+    vm.prank(OWNER);
     s_rmnRemote.setConfig(
       RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 0})
     );
 
+    vm.stopPrank();
+    vm.prank(OFF_RAMP_ADDRESS);
     s_rmnRemote.verify(s_destLaneUpdates, new IRMNV2.Signature[](0));
   }
 
@@ -136,8 +140,6 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     s_signatures.push(sig);
 
     vm.expectRevert(RMNRemote.InvalidSignature.selector);
-    vm.stopPrank();
-    vm.prank(OFF_RAMP_ADDRESS);
     s_rmnRemote.verify(s_destLaneUpdates, s_signatures);
   }
 
@@ -150,8 +152,6 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     s_signatures.push(sig2);
 
     vm.expectRevert(RMNRemote.OutOfOrderSignatures.selector);
-    vm.stopPrank();
-    vm.prank(OFF_RAMP_ADDRESS);
     s_rmnRemote.verify(s_destLaneUpdates, s_signatures);
   }
 
@@ -161,8 +161,6 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     s_signatures.push(sig);
 
     vm.expectRevert(RMNRemote.OutOfOrderSignatures.selector);
-    vm.stopPrank();
-    vm.prank(OFF_RAMP_ADDRESS);
     s_rmnRemote.verify(s_destLaneUpdates, s_signatures);
   }
 
@@ -171,8 +169,6 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     _generatePayloadAndSigs(2, 2, s_destLaneUpdates, s_signatures);
 
     vm.expectRevert(RMNRemote.UnexpectedSigner.selector);
-    vm.stopPrank();
-    vm.prank(OFF_RAMP_ADDRESS);
     s_rmnRemote.verify(s_destLaneUpdates, s_signatures);
   }
 
@@ -180,8 +176,6 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     _generatePayloadAndSigs(2, 1, s_destLaneUpdates, s_signatures); // 1 sig requested, but 2 required
 
     vm.expectRevert(RMNRemote.ThresholdNotMet.selector);
-    vm.stopPrank();
-    vm.prank(OFF_RAMP_ADDRESS);
     s_rmnRemote.verify(s_destLaneUpdates, s_signatures);
   }
 }
