@@ -45,8 +45,11 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     uint256 gasLimit,
     address receiver
   ) internal returns (bool success, bytes memory retData, uint256 gasUsed) {
-    // Only send through the router if the receiver is a contract and implements the IAny2EVMMessageReceiver interface.
-    if (receiver.code.length == 0 || !receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)) {
+    // Receiver can be skipped in 3 cases referred to here: https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/offRamp/EVM2EVMOffRamp.sol#L512
+    if (
+      (message.data.length == 0 && gasLimit == 0) || receiver.code.length == 0
+        || !receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
+    ) {
       return (true, "", 0);
     }
 
