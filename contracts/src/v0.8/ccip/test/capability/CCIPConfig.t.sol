@@ -1200,11 +1200,7 @@ contract CCIPConfig_updatePluginConfig is CCIPConfigSetup {
     });
 
     vm.expectEmit();
-    emit CCIPConfig.ConfigSet(
-      donId,
-      uint8(Internal.OCRPluginType.Commit),
-      expectedConfig
-    );
+    emit CCIPConfig.ConfigSet(donId, uint8(Internal.OCRPluginType.Commit), expectedConfig);
     s_ccipCC.updatePluginConfig(donId, Internal.OCRPluginType.Commit, configs);
 
     // should see the updated config in the contract state.
@@ -1262,11 +1258,7 @@ contract CCIPConfig_updatePluginConfig is CCIPConfigSetup {
     });
 
     vm.expectEmit();
-    emit CCIPConfig.ConfigSet(
-      donId,
-      uint8(Internal.OCRPluginType.Commit),
-      expectedConfig
-    );
+    emit CCIPConfig.ConfigSet(donId, uint8(Internal.OCRPluginType.Commit), expectedConfig);
 
     s_ccipCC.updatePluginConfig(donId, Internal.OCRPluginType.Commit, blueAndGreen);
 
@@ -1323,13 +1315,9 @@ contract CCIPConfig_updatePluginConfig is CCIPConfigSetup {
       configCount: 2,
       configDigest: s_ccipCC.computeConfigDigest(donId, 2, greenConfig)
     });
-    
+
     vm.expectEmit();
-    emit CCIPConfig.ConfigSet(
-      donId,
-      uint8(Internal.OCRPluginType.Commit),
-      expectedConfig
-    );
+    emit CCIPConfig.ConfigSet(donId, uint8(Internal.OCRPluginType.Commit), expectedConfig);
 
     s_ccipCC.updatePluginConfig(donId, Internal.OCRPluginType.Commit, blueAndGreen);
 
