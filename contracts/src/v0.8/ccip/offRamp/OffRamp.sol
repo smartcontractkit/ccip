@@ -132,6 +132,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   // STATIC CONFIG
   string public constant override typeAndVersion = "OffRamp 1.6.0-dev";
+  /// @dev Hash of encoded address(0) used for empty address checks
+  bytes32 internal constant EMPTY_ENCODED_ADDRESS_HASH = keccak256(abi.encode(address(0)));
   /// @dev ChainSelector of this chain
   uint64 internal immutable i_chainSelector;
   /// @dev The RMN verification contract
@@ -738,21 +740,19 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       }
 
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
-      bytes memory currentOnRamp = currentConfig.onRamp;
       bytes memory newOnRamp = sourceConfigUpdate.onRamp;
 
-      // OnRamp can never be zero - if it is, then the source chain has been added for the first time
-      if (currentOnRamp.length == 0) {
-        if (newOnRamp.length == 0) {
-          revert ZeroAddressNotAllowed();
-        }
-
-        currentConfig.onRamp = newOnRamp;
+      if (currentConfig.onRamp.length == 0) {
         currentConfig.minSeqNr = 1;
         emit SourceChainSelectorAdded(sourceChainSelector);
-      } else if (keccak256(currentOnRamp) != keccak256(newOnRamp)) {
-        revert InvalidStaticConfig(sourceChainSelector);
       }
+
+      // OnRamp can never be zero - if it is, then the source chain has been added for the first time
+      if (newOnRamp.length == 0 || keccak256(newOnRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
+        revert ZeroAddressNotAllowed();
+      }
+
+      currentConfig.onRamp = newOnRamp;
 
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
       currentConfig.router = sourceConfigUpdate.router;

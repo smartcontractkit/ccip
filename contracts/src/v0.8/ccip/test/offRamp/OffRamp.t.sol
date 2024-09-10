@@ -3047,6 +3047,28 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     );
   }
 
+  function test_ReplaceExistingChainOnRamp_Success() public {
+    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](1);
+    sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
+      router: s_destRouter,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      onRamp: ON_RAMP_ADDRESS_1,
+      isEnabled: true
+    });
+
+    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+
+    sourceChainConfigs[0].onRamp = ON_RAMP_ADDRESS_2;
+
+
+    vm.expectEmit();
+    emit OffRamp.SourceChainConfigSet(
+      SOURCE_CHAIN_SELECTOR_1,
+      OffRamp.SourceChainConfig({router: s_destRouter, isEnabled: true, minSeqNr: 1, onRamp: ON_RAMP_ADDRESS_2})
+    );
+    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+  }
+
   // Reverts
 
   function test_ZeroOnRampAddress_Revert() public {
@@ -3058,6 +3080,10 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       isEnabled: true
     });
 
+    vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
+    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+
+    sourceChainConfigs[0].onRamp = abi.encode(address(0));
     vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
   }
@@ -3085,23 +3111,6 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     });
 
     vm.expectRevert(OffRamp.ZeroChainSelectorNotAllowed.selector);
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
-  }
-
-  function test_ReplaceExistingChainOnRamp_Revert() public {
-    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](1);
-    sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
-      router: s_destRouter,
-      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRamp: ON_RAMP_ADDRESS_1,
-      isEnabled: true
-    });
-
-    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
-
-    sourceChainConfigs[0].onRamp = ON_RAMP_ADDRESS_2;
-
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidStaticConfig.selector, SOURCE_CHAIN_SELECTOR_1));
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
   }
 }
