@@ -315,7 +315,7 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
       gasLimit: GAS_LIMIT
     });
 
-    message.header.messageId = Internal._hash(message, onRamp);
+    message.header.messageId = _hashMessage(message, onRamp);
 
     return message;
   }
@@ -535,5 +535,19 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     for (uint256 i = 0; i < logs.length; i++) {
       assertTrue(logs[i].topics[0] != eventSelector);
     }
+  }
+
+  function _hashMessage(
+    Internal.Any2EVMRampMessage memory message,
+    bytes memory onRamp
+  ) internal view returns (bytes32) {
+    return Internal._hash(
+      message,
+      keccak256(
+        abi.encode(
+          Internal.ANY_2_EVM_MESSAGE_HASH, message.header.sourceChainSelector, message.header.destChainSelector, onRamp
+        )
+      )
+    );
   }
 }
