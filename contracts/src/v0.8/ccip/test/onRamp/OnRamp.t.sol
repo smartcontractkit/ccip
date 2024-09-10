@@ -855,7 +855,7 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
 }
 
 contract OnRamp_applyAllowListUpdates is OnRampSetup {
-  function test_applyAllowList_Success() public {
+  function test_applyAllowListUpdates_Success() public {
     vm.stopPrank();
     vm.startPrank(OWNER);
 
@@ -946,7 +946,7 @@ contract OnRamp_applyAllowListUpdates is OnRampSetup {
     assertEq(3, s_onRamp.getAllowedSendersList(DEST_CHAIN_SELECTOR).length);
   }
 
-  function test_applyAllowList_Revert() public {
+  function test_applyAllowListUpdates_Revert() public {
     vm.stopPrank();
     vm.startPrank(OWNER);
 
