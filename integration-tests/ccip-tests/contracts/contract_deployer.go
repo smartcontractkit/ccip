@@ -1473,7 +1473,7 @@ func NewExecOffchainConfig(
 	relativeBoostPerWaitHour float64,
 	inflightCacheExpiry config.Duration,
 	rootSnoozeTime config.Duration,
-	batchingStrategyID uint32, // 0 = Standard, 1 = Out of Order
+	batchingStrategyID uint32, // See ccipexec package
 ) (ccipconfig.OffchainConfig, error) {
 	switch VersionMap[OffRampContract] {
 	case Latest:
