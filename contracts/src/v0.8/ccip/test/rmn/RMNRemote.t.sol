@@ -129,6 +129,18 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     s_rmnRemote.verify(s_destLaneUpdates, new IRMNV2.Signature[](0));
   }
 
+  function test_verify_invalidSig_reverts() public {
+    IRMNV2.Signature memory sig = s_signatures[s_signatures.length - 1];
+    sig.r = _randomBytes32();
+    s_signatures.pop();
+    s_signatures.push(sig);
+
+    vm.expectRevert(RMNRemote.InvalidSignature.selector);
+    vm.stopPrank();
+    vm.prank(OFF_RAMP_ADDRESS);
+    s_rmnRemote.verify(s_destLaneUpdates, s_signatures);
+  }
+
   function test_verify_outOfOrderSig_reverts() public {
     IRMNV2.Signature memory sig1 = s_signatures[s_signatures.length - 1];
     s_signatures.pop();
@@ -149,6 +161,16 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     s_signatures.push(sig);
 
     vm.expectRevert(RMNRemote.OutOfOrderSignatures.selector);
+    vm.stopPrank();
+    vm.prank(OFF_RAMP_ADDRESS);
+    s_rmnRemote.verify(s_destLaneUpdates, s_signatures);
+  }
+
+  function test_verify_unknownSigner_reverts() public {
+    _setupSigners(2); // create 2 new signers that aren't configured on RMNRemote
+    _generatePayloadAndSigs(2, 2, s_destLaneUpdates, s_signatures);
+
+    vm.expectRevert(RMNRemote.UnexpectedSigner.selector);
     vm.stopPrank();
     vm.prank(OFF_RAMP_ADDRESS);
     s_rmnRemote.verify(s_destLaneUpdates, s_signatures);

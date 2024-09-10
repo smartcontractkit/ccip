@@ -27,7 +27,7 @@ contract RMNRemoteSetup is BaseTest {
   /// @notice sets up a list of signers with strictly increasing onchain public keys
   /// @dev signers do not have to be in order when configured, but they do when generating signatures
   /// rather than sort signers every time, we do it once here and store the sorted list
-  function _setupSigners(uint256 numSigners) private {
+  function _setupSigners(uint256 numSigners) internal {
     for (uint256 i = 0; i < numSigners; i++) {
       s_signerWallets.push(vm.createWallet(_randomNum()));
     }
@@ -54,9 +54,15 @@ contract RMNRemoteSetup is BaseTest {
     IRMNV2.Signature[] storage signatures
   ) internal {
     require(numUpdates > 0, "need at least 1 dest lane update");
-    require(destLaneUpdates.length == 0, "storage array should be empty");
-    require(signatures.length == 0, "storage array should be empty");
     require(numSigs <= s_signerWallets.length, "cannot generate more sigs than signers");
+
+    // remove any existing updates and sigs
+    for (uint256 i = 0; i < destLaneUpdates.length; i++) {
+      destLaneUpdates.pop();
+    }
+    for (uint256 i = 0; i < signatures.length; i++) {
+      signatures.pop();
+    }
 
     for (uint256 i = 0; i < numUpdates; i++) {
       destLaneUpdates.push(_generateRandomDestLaneUpdate());
