@@ -89,11 +89,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   // │                         Verification                         │
   // ================================================================
 
-  /// @notice Verifies signatures of RMN nodes, on dest lane updates as provided in the CommitReport
-  /// @param offrampAddress is not inferred by msg.sender, in case the call is made through ARMProxy
-  /// @param destLaneUpdates must be well formed, and is a representation of the CommitReport received from the oracles
-  /// @param signatures must be sorted in ascending order by signer address
-  /// @dev Will revert if verification fails
+  /// @inheritdoc IRMNV2
   function verify(
     address offrampAddress,
     Internal.MerkleRoot[] memory destLaneUpdates,
@@ -236,7 +232,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     return s_cursedSubjectsSequence;
   }
 
-  /// @notice If there is an active global or legacy curse, this function returns true.
+  /// @inheritdoc IRMNV2
   function isCursed() external view returns (bool) {
     if (s_cursedSubjectsSequence.length == 0) {
       return false;
@@ -245,8 +241,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
       s_cursedSubjectsIndexPlusOne[LEGACY_CURSE_SUBJECT] > 0 || s_cursedSubjectsIndexPlusOne[GLOBAL_CURSE_SUBJECT] > 0;
   }
 
-  /// @notice If there is an active global curse, or an active curse for `subject`, this function returns true.
-  /// @param subject To check whether a particular chain is cursed, set to bytes16(uint128(chainSelector)).
+  /// @inheritdoc IRMNV2
   function isCursed(bytes16 subject) external view returns (bool) {
     if (s_cursedSubjectsSequence.length == 0) {
       return false;
