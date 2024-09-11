@@ -10,6 +10,7 @@ import {FacadeClient} from "./FacadeClient.sol";
 import {ReentrantMaliciousTokenPool} from "./ReentrantMaliciousTokenPool.sol";
 
 import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {ReentrancyGuard} from "../../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/ReentrancyGuard.sol";
 
 /// @title MultiOnRampTokenPoolReentrancy
 /// Attempts to perform a reentrancy exploit on Onramp with a malicious TokenPool
@@ -106,10 +107,7 @@ contract MultiOnRampTokenPoolReentrancy is OnRampSetup {
     Internal.EVM2AnyRampMessage memory msgEvent1 = _messageToEvent(message1, 1, 1, expectedFee, address(s_facadeClient));
     Internal.EVM2AnyRampMessage memory msgEvent2 = _messageToEvent(message2, 2, 2, expectedFee, address(s_facadeClient));
 
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, msgEvent2);
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, msgEvent1);
+    vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
 
     s_facadeClient.send(amount);
   }

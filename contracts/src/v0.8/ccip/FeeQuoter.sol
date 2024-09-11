@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
 import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
-import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
+import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
 
 import {AuthorizedCallers} from "../shared/access/AuthorizedCallers.sol";
 import {AggregatorV3Interface} from "./../shared/interfaces/AggregatorV3Interface.sol";
@@ -225,7 +225,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   // │                     Price calculations                       │
   // ================================================================
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function getTokenPrice(address token) public view override returns (Internal.TimestampedPackedUint224 memory) {
     IFeeQuoter.TokenPriceFeedConfig memory priceFeedConfig = s_usdPriceFeedsPerToken[token];
     if (priceFeedConfig.dataFeedAddress == address(0)) {
@@ -235,12 +235,12 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     return _getTokenPriceFromDataFeed(priceFeedConfig);
   }
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function getValidatedTokenPrice(address token) external view override returns (uint224) {
     return _getValidatedTokenPrice(token);
   }
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function getTokenPrices(
     address[] calldata tokens
   ) external view override returns (Internal.TimestampedPackedUint224[] memory) {
@@ -259,14 +259,14 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     return s_usdPriceFeedsPerToken[token];
   }
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function getDestinationChainGasPrice(
     uint64 destChainSelector
   ) external view override returns (Internal.TimestampedPackedUint224 memory) {
     return s_usdPerUnitGasByDestChainSelector[destChainSelector];
   }
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function getTokenAndGasPrices(
     address token,
     uint64 destChainSelector
@@ -280,7 +280,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     return (_getValidatedTokenPrice(token), gasPrice.value);
   }
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   /// @dev this function assumes that no more than 1e59 dollars are sent as payment.
   /// If more is sent, the multiplication of feeTokenAmount and feeTokenValue will overflow.
   /// Since there isn't even close to 1e59 dollars in the world economy this is safe.
@@ -339,7 +339,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   // │                         Fee tokens                           │
   // ================================================================
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function getFeeTokens() external view returns (address[] memory) {
     return s_feeTokens.values();
   }
@@ -376,7 +376,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   // │                       Price updates                          │
   // ================================================================
 
-  /// @inheritdoc IPriceRegistry
+  /// @inheritdoc IFeeQuoter
   function updatePrices(Internal.PriceUpdates calldata priceUpdates) external override {
     // The caller must be the fee updater
     _validateCaller();
@@ -823,12 +823,24 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   }
 
   /// @inheritdoc IFeeQuoter
+  /// @dev precondition - rampTokenAmounts and sourceTokenAmounts lengths must be equal
   function processMessageArgs(
     uint64 destChainSelector,
     address feeToken,
     uint256 feeTokenAmount,
-    bytes calldata extraArgs
-  ) external view returns (uint256 msgFeeJuels, bool isOutOfOrderExecution, bytes memory convertedExtraArgs) {
+    bytes calldata extraArgs,
+    Internal.RampTokenAmount[] calldata rampTokenAmounts,
+    Client.EVMTokenAmount[] calldata sourceTokenAmounts
+  )
+    external
+    view
+    returns (
+      uint256 msgFeeJuels,
+      bool isOutOfOrderExecution,
+      bytes memory convertedExtraArgs,
+      bytes[] memory destExecDataPerToken
+    )
+  {
     // Convert feeToken to link if not already in link
     if (feeToken == i_linkToken) {
       msgFeeJuels = feeTokenAmount;
@@ -843,17 +855,17 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     // We can parse unvalidated args since this message is called after getFee (which will already validate the params)
     Client.EVMExtraArgsV2 memory parsedExtraArgs = _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, defaultTxGasLimit);
     isOutOfOrderExecution = parsedExtraArgs.allowOutOfOrderExecution;
+    destExecDataPerToken = _processPoolReturnData(destChainSelector, rampTokenAmounts, sourceTokenAmounts);
 
-    return (msgFeeJuels, isOutOfOrderExecution, Client._argsToBytes(parsedExtraArgs));
+    return (msgFeeJuels, isOutOfOrderExecution, Client._argsToBytes(parsedExtraArgs), destExecDataPerToken);
   }
 
-  /// @inheritdoc IFeeQuoter
   /// @dev precondition - rampTokenAmounts and sourceTokenAmounts lengths must be equal
-  function processPoolReturnData(
+  function _processPoolReturnData(
     uint64 destChainSelector,
     Internal.RampTokenAmount[] calldata rampTokenAmounts,
     Client.EVMTokenAmount[] calldata sourceTokenAmounts
-  ) external view returns (bytes[] memory destExecDataPerToken) {
+  ) internal view returns (bytes[] memory destExecDataPerToken) {
     bytes4 chainFamilySelector = s_destChainConfigs[destChainSelector].chainFamilySelector;
     destExecDataPerToken = new bytes[](rampTokenAmounts.length);
     for (uint256 i = 0; i < rampTokenAmounts.length; ++i) {
