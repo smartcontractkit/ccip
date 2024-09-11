@@ -611,7 +611,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         if (commitReport.merkleRoots.length == 0) revert StaleCommitReport();
       }
     }
-  
+
     for (uint256 i = 0; i < commitReport.merkleRoots.length; ++i) {
       Internal.MerkleRoot memory root = commitReport.merkleRoots[i];
       uint64 sourceChainSelector = root.sourceChainSelector;
@@ -621,7 +621,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       }
 
       SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
-      bytes memory onRamp = sourceChainConfig.onRamp; 
+      bytes memory onRamp = sourceChainConfig.onRamp;
 
       if (keccak256(root.onRampAddress) != keccak256(onRamp)) {
         revert InvalidOnRamp(root.onRampAddress, onRamp);
