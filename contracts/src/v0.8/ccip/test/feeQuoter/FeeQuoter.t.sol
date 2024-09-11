@@ -353,9 +353,8 @@ contract FeeQuoter_getValidatedTokenPrice is FeeQuoterSetup {
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](1),
       gasPriceUpdates: new Internal.GasPriceUpdate[](0)
     });
-    priceUpdates.tokenPriceUpdates[0] =
-      Internal.TokenPriceUpdate({sourceToken: sourceToken, usdPerToken: 0});
-    
+    priceUpdates.tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: sourceToken, usdPerToken: 0});
+
     s_feeQuoter.updatePrices(priceUpdates);
 
     vm.expectRevert(abi.encodeWithSelector(FeeQuoter.TokenNotSupported.selector, sourceToken));
