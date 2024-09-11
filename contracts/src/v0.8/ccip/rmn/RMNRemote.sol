@@ -11,6 +11,8 @@ bytes32 constant RMN_V1_6_ANY2EVM_REPORT = keccak256("RMN_V1_6_ANY2EVM_REPORT");
 
 /// @notice This contract supports verification of RMN reports for any Any2EVM OffRamp.
 contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
+  error AlreadyCursed(bytes16 subject);
+  error NotCursed(bytes16 subject);
   error InvalidSignature();
   error OutOfOrderSignatures();
   error UnexpectedSigner();
@@ -178,31 +180,33 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   // │                           Cursing                            │
   // ================================================================
 
-  function curse(bytes16[] memory subjects) external onlyOwner {
+  function curse(bytes16[] calldata subjects) external onlyOwner {
     for (uint256 i = 0; i < subjects.length; ++i) {
       bytes16 toCurseSubject = subjects[i];
-      if (s_cursedSubjectsIndexPlusOne[toCurseSubject] == 0) {
-        s_cursedSubjectsSequence.push(toCurseSubject);
-        s_cursedSubjectsIndexPlusOne[toCurseSubject] = s_cursedSubjectsSequence.length;
+      if (s_cursedSubjectsIndexPlusOne[toCurseSubject] != 0) {
+        revert AlreadyCursed(toCurseSubject);
       }
+      s_cursedSubjectsSequence.push(toCurseSubject);
+      s_cursedSubjectsIndexPlusOne[toCurseSubject] = s_cursedSubjectsSequence.length;
     }
     emit Cursed(subjects);
   }
 
-  function uncurse(bytes16[] memory subjects) external onlyOwner {
+  function uncurse(bytes16[] calldata subjects) external onlyOwner {
     for (uint256 i = 0; i < subjects.length; ++i) {
       bytes16 toUncurseSubject = subjects[i];
       uint256 toUncurseSubjectIndexPlusOne = s_cursedSubjectsIndexPlusOne[toUncurseSubject];
-      if (toUncurseSubjectIndexPlusOne > 0) {
-        uint256 toUncurseSubjectIndex = toUncurseSubjectIndexPlusOne - 1;
-        // copy the last subject to the position of the subject to uncurse
-        bytes16 lastSubject = s_cursedSubjectsSequence[s_cursedSubjectsSequence.length - 1];
-        s_cursedSubjectsSequence[toUncurseSubjectIndex] = lastSubject;
-        s_cursedSubjectsIndexPlusOne[lastSubject] = toUncurseSubjectIndexPlusOne;
-        // then pop, since we have the last subject also in toUncurseSubjectIndex
-        s_cursedSubjectsSequence.pop();
-        delete s_cursedSubjectsIndexPlusOne[toUncurseSubject];
+      if (toUncurseSubjectIndexPlusOne == 0) {
+        revert NotCursed(toUncurseSubject);
       }
+      uint256 toUncurseSubjectIndex = toUncurseSubjectIndexPlusOne - 1;
+      // copy the last subject to the position of the subject to uncurse
+      bytes16 lastSubject = s_cursedSubjectsSequence[s_cursedSubjectsSequence.length - 1];
+      s_cursedSubjectsSequence[toUncurseSubjectIndex] = lastSubject;
+      s_cursedSubjectsIndexPlusOne[lastSubject] = toUncurseSubjectIndexPlusOne;
+      // then pop, since we have the last subject also in toUncurseSubjectIndex
+      s_cursedSubjectsSequence.pop();
+      delete s_cursedSubjectsIndexPlusOne[toUncurseSubject];
     }
     emit Uncursed(subjects);
   }
