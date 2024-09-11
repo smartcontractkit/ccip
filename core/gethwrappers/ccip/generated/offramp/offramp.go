@@ -43,11 +43,6 @@ type ClientEVMTokenAmount struct {
 	Amount *big.Int
 }
 
-type IRMNV2Signature struct {
-	R [32]byte
-	S [32]byte
-}
-
 type InternalAny2EVMRampMessage struct {
 	Header       InternalRampMessageHeader
 	Sender       []byte
@@ -124,12 +119,6 @@ type MultiOCR3BaseOCRConfigArgs struct {
 	IsSignatureVerificationEnabled bool
 	Signers                        []common.Address
 	Transmitters                   []common.Address
-}
-
-type OffRampCommitReport struct {
-	PriceUpdates  InternalPriceUpdates
-	MerkleRoots   []InternalMerkleRoot
-	RmnSignatures []IRMNV2Signature
 }
 
 type OffRampDynamicConfig struct {
@@ -810,8 +799,9 @@ func (it *OffRampCommitReportAcceptedIterator) Close() error {
 }
 
 type OffRampCommitReportAccepted struct {
-	Report OffRampCommitReport
-	Raw    types.Log
+	MerkleRoots  []InternalMerkleRoot
+	PriceUpdates InternalPriceUpdates
+	Raw          types.Log
 }
 
 func (_OffRamp *OffRampFilterer) FilterCommitReportAccepted(opts *bind.FilterOpts) (*OffRampCommitReportAcceptedIterator, error) {
@@ -2409,7 +2399,7 @@ func (OffRampAlreadyAttempted) Topic() common.Hash {
 }
 
 func (OffRampCommitReportAccepted) Topic() common.Hash {
-	return common.HexToHash("0x23bc80217a08968cec0790cd045b396fa7eea0a21af469e603329940b883d86d")
+	return common.HexToHash("0x35c02761bcd3ef995c6a601a1981f4ed3934dcbe5041e24e286c89f5531d17e4")
 }
 
 func (OffRampConfigSet) Topic() common.Hash {
