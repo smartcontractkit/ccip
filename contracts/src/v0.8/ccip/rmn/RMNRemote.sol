@@ -7,6 +7,7 @@ import {IRMNV2} from "../interfaces/IRMNV2.sol";
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {Internal} from "../libraries/Internal.sol";
 
+/// @dev this is included in the preimage of the digest that RMN nodes sign
 bytes32 constant RMN_V1_6_ANY2EVM_REPORT = keccak256("RMN_V1_6_ANY2EVM_REPORT");
 
 /// @dev An active curse on this subject will cause isCursed() to return true. Use this subject if there is an issue with a
@@ -29,7 +30,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   error MinSignersTooHigh();
   error NotCursed(bytes16 subject);
   error OutOfOrderSignatures();
-  error ThresholdçNotMet();
+  error ThresholdNotMet();
   error UnexpectedSigner();
 
   event ConfigSet(VersionedConfig versionedConfig);
@@ -37,29 +38,33 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   event Uncursed(bytes16[] subjects);
 
   struct Signer {
-    address onchainPublicKey; // for signing reports
-    uint64 nodeIndex; // maps to nodes in home chain config, should be strictly increasing
+    address onchainPublicKey; // ────╮ for signing reports
+    uint64 nodeIndex; // ────────────╯ maps to nodes in home chain config, should be strictly increasing
   }
 
   struct Config {
-    bytes32 rmnHomeContractConfigDigest;
-    Signer[] signers;
-    uint64 minSigners;
+    bytes32 rmnHomeContractConfigDigest; // digest of the RMNHome contract config
+    Signer[] signers; // list of signers
+    uint64 minSigners; // threshold for the number of signers required to verify a report
   }
 
   struct VersionedConfig {
-    uint32 version;
-    Config config;
+    uint32 version; // for tracking the version of the config
+    Config config; // the config
   }
 
   struct Report {
     uint256 destChainId; // to guard against chain selector misconfiguration
-    uint64 destChainSelector;
-    address rmnRemoteContractAddress;
-    address offrampAddress;
-    bytes32 rmnHomeContractConfigDigest;
-    Internal.MerkleRoot[] destLaneUpdates;
+    uint64 destChainSelector; // the chain selector of the destination chain
+    address rmnRemoteContractAddress; // the address of this contract
+    address offrampAddress; // the address of the offramp on the same chain as this contract
+    bytes32 rmnHomeContractConfigDigest; // the digest of the RMNHome contract config
+    Internal.MerkleRoot[] destLaneUpdates; // the dest lane updates
   }
+
+  // ================================================================
+  // │                           Storage                            │
+  // ================================================================
 
   Config s_config;
   uint32 s_configCount;
@@ -71,6 +76,11 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   mapping(bytes16 subject => uint256 indexPlusOne) private s_cursedSubjectsIndexPlusOne;
   mapping(address signer => bool exists) s_signers; // for more gas efficient verify
 
+  // ================================================================
+  // │                         Constructor                          │
+  // ================================================================
+
+  /// @param chainSelector the chain selector of the chain this contract is deployed to
   constructor(uint64 chainSelector) {
     i_chainSelector = chainSelector;
   }
@@ -83,8 +93,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   /// @param offrampAddress is not inferred by msg.sender, in case the call is made through ARMProxy
   /// @param destLaneUpdates must be well formed, and is a representation of the CommitReport received from the oracles
   /// @param signatures must be sorted in ascending order by signer address
-  /// @dev Will revert if verification fails. Needs to be called by the OffRamp for which the signatures are produced,
-  /// otherwise verification will fail.
+  /// @dev Will revert if verification fails
   function verify(
     address offrampAddress,
     Internal.MerkleRoot[] memory destLaneUpdates,
