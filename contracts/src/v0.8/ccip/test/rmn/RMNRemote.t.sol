@@ -3,11 +3,11 @@ pragma solidity 0.8.24;
 
 import {IRMNV2} from "../../interfaces/IRMNV2.sol";
 import {Internal} from "../../libraries/Internal.sol";
-import {RMNRemote} from "../../rmn/RMNRemote.sol";
+import {GLOBAL_CURSE_SUBJECT, LEGACY_CURSE_SUBJECT, RMNRemote} from "../../rmn/RMNRemote.sol";
 import {RMNRemoteSetup} from "./RMNRemoteSetup.t.sol";
 
 contract RMNRemote_constructor is RMNRemoteSetup {
-  function test_constructor_success() public {
+  function test_constructor_success() public view {
     assertEq(s_rmnRemote.getChainSelector(), 1);
   }
 }
@@ -116,7 +116,7 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     _generatePayloadAndSigs(2, 2, s_destLaneUpdates, s_signatures);
   }
 
-  function test_verify_success() public {
+  function test_verify_success() public view {
     s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures);
   }
 
@@ -250,5 +250,29 @@ contract RMNRemote_uncurse is RMNRemoteSetup {
     vm.stopPrank();
     vm.prank(STRANGER);
     s_rmnRemote.uncurse(s_subjects);
+  }
+}
+
+contract RMNRemote_global_and_legacy_curses is RMNRemoteSetup {
+  function test_global_and_legacy_curses_success() public {
+    bytes16 randSubject = bytes16(keccak256("random subject"));
+    assertFalse(s_rmnRemote.isCursed());
+    assertFalse(s_rmnRemote.isCursed(randSubject));
+
+    s_rmnRemote.curse(GLOBAL_CURSE_SUBJECT);
+    assertTrue(s_rmnRemote.isCursed());
+    assertTrue(s_rmnRemote.isCursed(randSubject));
+
+    s_rmnRemote.uncurse(GLOBAL_CURSE_SUBJECT);
+    assertFalse(s_rmnRemote.isCursed());
+    assertFalse(s_rmnRemote.isCursed(randSubject));
+
+    s_rmnRemote.curse(LEGACY_CURSE_SUBJECT);
+    assertTrue(s_rmnRemote.isCursed());
+    assertFalse(s_rmnRemote.isCursed(randSubject)); // legacy curse doesn't affect specific subjects
+
+    s_rmnRemote.uncurse(LEGACY_CURSE_SUBJECT);
+    assertFalse(s_rmnRemote.isCursed());
+    assertFalse(s_rmnRemote.isCursed(randSubject));
   }
 }

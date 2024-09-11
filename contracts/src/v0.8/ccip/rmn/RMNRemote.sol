@@ -9,18 +9,28 @@ import {Internal} from "../libraries/Internal.sol";
 
 bytes32 constant RMN_V1_6_ANY2EVM_REPORT = keccak256("RMN_V1_6_ANY2EVM_REPORT");
 
+/// @dev An active curse on this subject will cause isCursed() to return true. Use this subject if there is an issue with a
+/// remote chain, for which there exists a legacy lane contract deployed on the same chain as this RMN contract is
+/// deployed, relying on isCursed().
+bytes16 constant LEGACY_CURSE_SUBJECT = 0x01000000000000000000000000000000;
+
+/// @dev An active curse on this subject will cause isCursed() and isCursed(bytes16) to return true. Use this subject for
+/// issues affecting all of CCIP chains, or pertaining to the chain that this contract is deployed on, instead of using
+/// the local chain selector as a subject.
+bytes16 constant GLOBAL_CURSE_SUBJECT = 0x01000000000000000000000000000001;
+
 /// @notice This contract supports verification of RMN reports for any Any2EVM OffRamp.
 contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   error AlreadyCursed(bytes16 subject);
-  error NotCursed(bytes16 subject);
-  error InvalidSignature();
-  error OutOfOrderSignatures();
-  error UnexpectedSigner();
-  error ThresholdNotMet();
   error ConfigNotSet();
+  error DuplicateOnchainPublicKey();
+  error InvalidSignature();
   error InvalidSignerOrder();
   error MinSignersTooHigh();
-  error DuplicateOnchainPublicKey();
+  error NotCursed(bytes16 subject);
+  error OutOfOrderSignatures();
+  error ThresholdçNotMet();
+  error UnexpectedSigner();
 
   event ConfigSet(VersionedConfig versionedConfig);
   event Cursed(bytes16[] subjects);
@@ -53,16 +63,6 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
 
   Config s_config;
   uint32 s_configCount;
-
-  /// @notice An active curse on this subject will cause isCursed() to return true. Use this subject if there is an issue with a
-  /// remote chain, for which there exists a legacy lane contract deployed on the same chain as this RMN contract is
-  /// deployed, relying on isCursed().
-  bytes16 constant LEGACY_CURSE_SUBJECT = 0x01000000000000000000000000000000;
-
-  /// @notice An active curse on this subject will cause isCursed() and isCursed(bytes16) to return true. Use this subject for
-  /// issues affecting all of CCIP chains, or pertaining to the chain that this contract is deployed on, instead of using
-  /// the local chain selector as a subject.
-  bytes16 constant GLOBAL_CURSE_SUBJECT = 0x01000000000000000000000000000001;
 
   string public constant override typeAndVersion = "RMNRemote 1.6.0-dev";
   uint64 internal immutable i_chainSelector;
@@ -180,7 +180,13 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   // │                           Cursing                            │
   // ================================================================
 
-  function curse(bytes16[] calldata subjects) external onlyOwner {
+  function curse(bytes16 subject) external {
+    bytes16[] memory subjects = new bytes16[](1);
+    subjects[0] = subject;
+    curse(subjects);
+  }
+
+  function curse(bytes16[] memory subjects) public onlyOwner {
     for (uint256 i = 0; i < subjects.length; ++i) {
       bytes16 toCurseSubject = subjects[i];
       if (s_cursedSubjectsIndexPlusOne[toCurseSubject] != 0) {
@@ -192,7 +198,13 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     emit Cursed(subjects);
   }
 
-  function uncurse(bytes16[] calldata subjects) external onlyOwner {
+  function uncurse(bytes16 subject) external {
+    bytes16[] memory subjects = new bytes16[](1);
+    subjects[0] = subject;
+    uncurse(subjects);
+  }
+
+  function uncurse(bytes16[] memory subjects) public onlyOwner {
     for (uint256 i = 0; i < subjects.length; ++i) {
       bytes16 toUncurseSubject = subjects[i];
       uint256 toUncurseSubjectIndexPlusOne = s_cursedSubjectsIndexPlusOne[toUncurseSubject];
