@@ -545,8 +545,11 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
       message,
       keccak256(
         abi.encode(
-          Internal.ANY_2_EVM_MESSAGE_HASH, message.header.sourceChainSelector, message.header.destChainSelector, keccak256(onRamp
-        ))
+          Internal.ANY_2_EVM_MESSAGE_HASH,
+          message.header.sourceChainSelector,
+          message.header.destChainSelector,
+          keccak256(onRamp)
+        )
       )
     );
   }
