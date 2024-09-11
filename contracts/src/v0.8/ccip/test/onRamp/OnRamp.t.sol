@@ -17,6 +17,7 @@ import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMint
 import "./OnRampSetup.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
 
 contract OnRamp_constructor is OnRampSetup {
   function test_Constructor_Success() public {
@@ -667,8 +668,12 @@ contract OnRamp_getFee is OnRampSetup {
 }
 
 contract OnRamp_setDynamicConfig is OnRampSetup {
-  function test_SetDynamicConfig_Success() public {
+  function test_setDynamicConfig_Success() public {
     OnRamp.StaticConfig memory staticConfig = s_onRamp.getStaticConfig();
+
+    address messageValidator = makeAddr("messageValidator");
+    vm.mockCall(messageValidator, abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IMessageInterceptor).interfaceId), abi.encode(true));
+    
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(23423),
       messageValidator: makeAddr("messageValidator"),
@@ -687,7 +692,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
 
   // Reverts
 
-  function test_SetConfigInvalidConfigFeeQuoterEqAddressZero_Revert() public {
+  function test_setDynamicConfig_InvalidConfigFeeQuoterEqAddressZero_Revert() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(0),
       feeAggregator: FEE_AGGREGATOR,
@@ -699,21 +704,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     s_onRamp.setDynamicConfig(newConfig);
   }
 
-  function test_SetConfigInvalidConfig_Revert() public {
-    OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
-      feeQuoter: address(23423),
-      messageValidator: address(0),
-      feeAggregator: FEE_AGGREGATOR,
-      allowListAdmin: address(0)
-    });
-
-    // Invalid price reg reverts.
-    newConfig.feeQuoter = address(0);
-    vm.expectRevert(OnRamp.InvalidConfig.selector);
-    s_onRamp.setDynamicConfig(newConfig);
-  }
-
-  function test_SetConfigInvalidConfigFeeAggregatorEqAddressZero_Revert() public {
+  function test_setDynamicConfig_InvalidConfigFeeAggregatorEqAddressZero_Revert() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(23423),
       messageValidator: address(0),
@@ -725,13 +716,29 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     s_onRamp.setDynamicConfig(newConfig);
   }
 
-  function test_SetConfigOnlyOwner_Revert() public {
+  function test_setDynamicConfig_OnlyOwner_Revert() public {
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     s_onRamp.setDynamicConfig(_generateDynamicOnRampConfig(address(2)));
     vm.startPrank(ADMIN);
     vm.expectRevert("Only callable by owner");
     s_onRamp.setDynamicConfig(_generateDynamicOnRampConfig(address(2)));
+  }
+
+    function test_setDynamicConfig_InvalidConfig_Revert() public {
+      address messageValidator = makeAddr("messageValidator");
+
+      OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
+      feeQuoter: address(23423),
+      messageValidator: messageValidator,
+      feeAggregator: FEE_AGGREGATOR,
+      allowListAdmin: address(0)
+    });
+
+    vm.mockCall(messageValidator, abi.encodeWithSelector(IERC165.supportsInterface.selector), abi.encode(false));
+
+    vm.expectRevert(OnRamp.InvalidConfig.selector);
+    s_onRamp.setDynamicConfig(newConfig);
   }
 }
 

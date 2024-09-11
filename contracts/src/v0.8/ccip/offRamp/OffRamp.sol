@@ -54,6 +54,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
   error InvalidStaticConfig(uint64 sourceChainSelector);
+  error InvalidDynamicConfig();
   error StaleCommitReport();
   error InvalidInterval(uint64 sourceChainSelector, uint64 min, uint64 max);
   error ZeroAddressNotAllowed();
@@ -771,6 +772,12 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
     if (dynamicConfig.feeQuoter == address(0)) {
       revert ZeroAddressNotAllowed();
+    }
+
+    address messageValidator = dynamicConfig.messageValidator;
+
+    if (messageValidator != address(0)) {
+      if (!IMessageInterceptor(messageValidator).supportsInterface(type(IMessageInterceptor).interfaceId)) revert InvalidDynamicConfig();
     }
 
     s_dynamicConfig = dynamicConfig;

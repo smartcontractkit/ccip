@@ -328,6 +328,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
     if (dynamicConfig.feeQuoter == address(0) || dynamicConfig.feeAggregator == address(0)) revert InvalidConfig();
 
+    address messageValidator = dynamicConfig.messageValidator;
+
+    if (messageValidator != address(0)) {
+      if (!IMessageInterceptor(messageValidator).supportsInterface(type(IMessageInterceptor).interfaceId)) {
+        revert InvalidConfig();
+      }
+    }
+
     s_dynamicConfig = dynamicConfig;
 
     emit ConfigSet(

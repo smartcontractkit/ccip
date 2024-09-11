@@ -27,4 +27,8 @@ contract MessageInterceptorHelper is IMessageInterceptor {
     }
     return;
   }
+
+  function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
+    return interfaceId == type(IMessageInterceptor).interfaceId;
+  }
 }

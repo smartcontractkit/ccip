@@ -28,6 +28,7 @@ import {OffRampSetup} from "./OffRampSetup.t.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
 
 contract OffRamp_constructor is OffRampSetup {
   function test_Constructor_Success() public {
@@ -311,6 +312,18 @@ contract OffRamp_setDynamicConfig is OffRampSetup {
     OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(ZERO_ADDRESS);
 
     vm.expectRevert(OffRamp.ZeroAddressNotAllowed.selector);
+
+    s_offRamp.setDynamicConfig(dynamicConfig);
+  }
+
+  function test_InvalidDynamicConfig_Revert() public {
+    OffRamp.DynamicConfig memory dynamicConfig = _generateDynamicOffRampConfig(address(s_feeQuoter));
+    address messageValidator = makeAddr("messageValidator");
+    dynamicConfig.messageValidator = address(messageValidator);
+
+    vm.mockCall(messageValidator, abi.encodeWithSelector(IERC165.supportsInterface.selector), abi.encode(false));
+
+    vm.expectRevert(OffRamp.InvalidDynamicConfig.selector);
 
     s_offRamp.setDynamicConfig(dynamicConfig);
   }

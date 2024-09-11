@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol"; 
+
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {MultiAggregateRateLimiter} from "../../MultiAggregateRateLimiter.sol";
 import {Client} from "../../libraries/Client.sol";
@@ -121,6 +123,7 @@ contract MultiAggregateRateLimiter_constructor is MultiAggregateRateLimiterSetup
 
     assertEq(OWNER, s_rateLimiter.owner());
     assertEq(address(s_feeQuoter), s_rateLimiter.getFeeQuoter());
+    assertTrue(s_rateLimiter.supportsInterface(type(IMessageInterceptor).interfaceId));
   }
 
   function test_Constructor_Success() public {

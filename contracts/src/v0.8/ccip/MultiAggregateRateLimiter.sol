@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
 import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "./interfaces/IMessageInterceptor.sol";
+import {IERC165} from "../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
 
 import {AuthorizedCallers} from "../shared/access/AuthorizedCallers.sol";
 import {EnumerableMapAddresses} from "./../shared/enumerable/EnumerableMapAddresses.sol";
@@ -72,6 +73,11 @@ contract MultiAggregateRateLimiter is IMessageInterceptor, AuthorizedCallers, IT
   /// @param authorizedCallers the authorized callers to set.
   constructor(address feeQuoter, address[] memory authorizedCallers) AuthorizedCallers(authorizedCallers) {
     _setFeeQuoter(feeQuoter);
+  }
+
+  /// @inheritdoc IERC165
+  function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
+    return interfaceId == type(IMessageInterceptor).interfaceId;
   }
 
   /// @inheritdoc IMessageInterceptor
