@@ -5,10 +5,8 @@ import {IBurnMintERC20} from "../ERC20/IBurnMintERC20.sol";
 
 import {OwnerIsCreator} from "../../access/OwnerIsCreator.sol";
 
-
 import {ERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
 import {ERC20Burnable} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-
 
 import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
@@ -28,6 +26,8 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
   event MintAccessRevoked(address indexed minter);
   event BurnAccessRevoked(address indexed burner);
 
+  event CCIPAdminTransferred(address indexed previousAdmin, address indexed newAdmin);
+
   // @dev the allowed minter addresses
   EnumerableSet.AddressSet internal s_minters;
   // @dev the allowed burner addresses
@@ -39,9 +39,21 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
   /// @dev The maximum supply of the token, 0 if unlimited
   uint256 internal immutable i_maxSupply;
 
-  constructor(string memory name, string memory symbol, uint8 decimals_, uint256 maxSupply_) ERC20(name, symbol) {
+  address internal s_ccipAdmin;
+
+  /// @dev A 1 step ownership transfer is performed here
+  constructor(string memory name, string memory symbol, uint8 decimals_, uint256 maxSupply_, uint256 preMint_, address newOwner_) ERC20(name, symbol) {
     i_decimals = decimals_;
     i_maxSupply = maxSupply_;
+
+    s_ccipAdmin = newOwner_;
+
+    // Mint the initial supply to the new Owner
+    _mint(newOwner_, preMint_);
+
+    // Grant the deployer the minter and burner roles
+    grantMintRole(newOwner_);
+    grantBurnRole(newOwner_);
   }
 
   function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
@@ -184,6 +196,18 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
   /// @notice Returns all permissioned burners
   function getBurners() public view returns (address[] memory) {
     return s_burners.values();
+  }
+
+  function getCCIPAdmin() public view returns (address) {
+    return s_ccipAdmin;
+  }
+
+  function setCCIPAdmin(address newAdmin) public onlyOwner {
+    address currentAdmin = s_ccipAdmin;
+   
+    s_ccipAdmin = newAdmin;
+
+    emit CCIPAdminTransferred(currentAdmin, newAdmin);
   }
 
   // ================================================================
