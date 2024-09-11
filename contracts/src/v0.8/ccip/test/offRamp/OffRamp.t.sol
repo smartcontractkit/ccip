@@ -789,24 +789,6 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     s_offRamp.executeSingleReport(executionReport, new uint256[](0));
   }
 
-  function test_MismatchingOnRampRoot_Revert() public {
-    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, 0);
-
-    Internal.Any2EVMRampMessage[] memory messages =
-      _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
-
-    OffRamp.CommitReport memory commitReport = _constructCommitReport(
-      // Root against mismatching on ramp
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_3)
-    );
-    _commit(commitReport, s_latestSequenceNumber);
-
-    Internal.ExecutionReportSingleChain memory executionReport =
-      _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.RootNotCommitted.selector, SOURCE_CHAIN_SELECTOR_1));
-    s_offRamp.executeSingleReport(executionReport, new uint256[](0));
-  }
-
   function test_UnhealthySingleChainCurse_Revert() public {
     _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, true);
     vm.expectEmit();
@@ -3146,7 +3128,7 @@ contract OffRamp_commit is OffRampSetup {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: ON_RAMP_ADDRESS_1,
       minSeqNr: 1,
       maxSeqNr: max1,
       merkleRoot: root
@@ -3175,7 +3157,7 @@ contract OffRamp_commit is OffRampSetup {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: ON_RAMP_ADDRESS_1,
       minSeqNr: 1,
       maxSeqNr: maxSeq,
       merkleRoot: "stale report 1"
@@ -3326,7 +3308,7 @@ contract OffRamp_commit is OffRampSetup {
     roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: ON_RAMP_ADDRESS_1,
       minSeqNr: 1,
       maxSeqNr: maxSeq,
       merkleRoot: "stale report"
@@ -3432,7 +3414,7 @@ contract OffRamp_commit is OffRampSetup {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: ON_RAMP_ADDRESS_1,
       minSeqNr: 1,
       maxSeqNr: 4,
       merkleRoot: bytes32(0)
@@ -3448,7 +3430,7 @@ contract OffRamp_commit is OffRampSetup {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: ON_RAMP_ADDRESS_1,
       minSeqNr: 2,
       maxSeqNr: 2,
       merkleRoot: bytes32(0)
@@ -3469,7 +3451,7 @@ contract OffRamp_commit is OffRampSetup {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: ON_RAMP_ADDRESS_1,
       minSeqNr: 1,
       maxSeqNr: 0,
       merkleRoot: bytes32(0)
@@ -3534,7 +3516,7 @@ contract OffRamp_commit is OffRampSetup {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: ON_RAMP_ADDRESS_1,
       minSeqNr: 1,
       maxSeqNr: 2,
       merkleRoot: "Only a single root"
@@ -3552,11 +3534,20 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, ++s_latestSequenceNumber);
   }
 
+  function test_InvalidOnRamp_Revert() public {
+    OffRamp.CommitReport memory commitReport = _constructCommitReport();
+
+    commitReport.merkleRoots[0].onRampAddress = ON_RAMP_ADDRESS_2;
+
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidOnRamp.selector, ON_RAMP_ADDRESS_2, ON_RAMP_ADDRESS_1));
+    _commit(commitReport, s_latestSequenceNumber);
+  }
+
   function _constructCommitReport() internal view returns (OffRamp.CommitReport memory) {
     Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
     roots[0] = Internal.MerkleRoot({
       sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
-      onRampAddress: abi.encode(ON_RAMP_ADDRESS_1),
+      onRampAddress: ON_RAMP_ADDRESS_1,
       minSeqNr: 1,
       maxSeqNr: s_maxInterval,
       merkleRoot: "test #2"

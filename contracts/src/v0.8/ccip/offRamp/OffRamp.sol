@@ -60,6 +60,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
   error SourceChainSelectorMismatch(uint64 reportSourceChainSelector, uint64 messageSourceChainSelector);
   error SignatureVerificationDisabled();
+  error InvalidOnRamp(bytes reportOnRamp, bytes configOnRamp);
+  error InvalidOnRampUpdate();
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -609,7 +611,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         if (commitReport.merkleRoots.length == 0) revert StaleCommitReport();
       }
     }
-
+  
     for (uint256 i = 0; i < commitReport.merkleRoots.length; ++i) {
       Internal.MerkleRoot memory root = commitReport.merkleRoots[i];
       uint64 sourceChainSelector = root.sourceChainSelector;
@@ -619,6 +621,11 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       }
 
       SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
+      bytes memory onRamp = sourceChainConfig.onRamp; 
+
+      if (keccak256(root.onRampAddress) != keccak256(onRamp)) {
+        revert InvalidOnRamp(root.onRampAddress, onRamp);
+      }
 
       if (sourceChainConfig.minSeqNr != root.minSeqNr || root.minSeqNr > root.maxSeqNr) {
         revert InvalidInterval(root.sourceChainSelector, root.minSeqNr, root.maxSeqNr);
@@ -752,10 +759,17 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         revert ZeroAddressNotAllowed();
       }
 
-      currentConfig.onRamp = newOnRamp;
+      // OnRamp updates should only happens due to a misconfiguration
+      // If an OnRamp is misconfigured not reports should have been committed and no messages should have been executed
+      // This is enforced byt the onRamp address check in the commit function
+      if (currentConfig.minSeqNr != 1) {
+        revert InvalidOnRampUpdate();
+      }
 
+      currentConfig.onRamp = newOnRamp;
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
       currentConfig.router = sourceConfigUpdate.router;
+
       emit SourceChainConfigSet(sourceChainSelector, currentConfig);
     }
   }
