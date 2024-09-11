@@ -16,6 +16,7 @@ contract RMNRemote_setConfig is RMNRemoteSetup {
   function test_setConfig_minSignersIs0_success() public {
     RMNRemote.Config memory config =
       RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 0});
+    // TODO event test
     s_rmnRemote.setConfig(config);
     RMNRemote.VersionedConfig memory versionedConfig = s_rmnRemote.getVersionedConfig();
     assertEq(versionedConfig.config.minSigners, 0);
@@ -175,5 +176,79 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
 
     vm.expectRevert(RMNRemote.ThresholdNotMet.selector);
     s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures);
+  }
+}
+
+contract RMNRemote_curse is RMNRemoteSetup {
+  bytes16 constant subj1 = bytes16(keccak256("subject 1"));
+  bytes16 constant subj2 = bytes16(keccak256("subject 2"));
+  bytes16 constant subj3 = bytes16(keccak256("subject 3"));
+  bytes16[] public s_subjects;
+
+  function setUp() public override {
+    super.setUp();
+    s_subjects.push(subj1);
+    s_subjects.push(subj2);
+  }
+
+  function test_curse_success() public {
+    vm.expectEmit();
+    emit RMNRemote.Cursed(s_subjects);
+    s_rmnRemote.curse(s_subjects);
+    assertEq(abi.encode(s_rmnRemote.getCursedSubjects()), abi.encode(s_subjects));
+    assertTrue(s_rmnRemote.isCursed(subj1));
+    assertTrue(s_rmnRemote.isCursed(subj2));
+    assertFalse(s_rmnRemote.isCursed(subj3));
+  }
+
+  function test_curse_duplicateSubject_reverts() public {
+    s_subjects.push(subj1);
+
+    vm.expectRevert(abi.encodeWithSelector(RMNRemote.AlreadyCursed.selector, subj1));
+    s_rmnRemote.curse(s_subjects);
+  }
+
+  function test_curse_calledByNonOwner_reverts() public {
+    vm.expectRevert("Only callable by owner");
+    vm.stopPrank();
+    vm.prank(STRANGER);
+    s_rmnRemote.curse(s_subjects);
+  }
+}
+
+contract RMNRemote_uncurse is RMNRemoteSetup {
+  bytes16 constant subj1 = bytes16(keccak256("subject 1"));
+  bytes16 constant subj2 = bytes16(keccak256("subject 2"));
+  bytes16 constant subj3 = bytes16(keccak256("subject 3"));
+  bytes16[] public s_subjects;
+
+  function setUp() public override {
+    super.setUp();
+    s_subjects.push(subj1);
+    s_subjects.push(subj2);
+    s_rmnRemote.curse(s_subjects);
+  }
+
+  function test_uncurse_success() public {
+    vm.expectEmit();
+    emit RMNRemote.Uncursed(s_subjects);
+    s_rmnRemote.uncurse(s_subjects);
+    assertEq(s_rmnRemote.getCursedSubjects().length, 0);
+    assertFalse(s_rmnRemote.isCursed(subj1));
+    assertFalse(s_rmnRemote.isCursed(subj2));
+  }
+
+  function test_uncurse_duplicateSubject_reverts() public {
+    s_subjects.push(subj1);
+
+    vm.expectRevert(abi.encodeWithSelector(RMNRemote.NotCursed.selector, subj1));
+    s_rmnRemote.uncurse(s_subjects);
+  }
+
+  function test_uncurse_calledByNonOwner_reverts() public {
+    vm.expectRevert("Only callable by owner");
+    vm.stopPrank();
+    vm.prank(STRANGER);
+    s_rmnRemote.uncurse(s_subjects);
   }
 }
