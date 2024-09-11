@@ -178,7 +178,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   // │                           Cursing                            │
   // ================================================================
 
-  function ownerCurse(bytes16[] memory subjects) external onlyOwner {
+  function curse(bytes16[] memory subjects) external onlyOwner {
     for (uint256 i = 0; i < subjects.length; ++i) {
       bytes16 toCurseSubject = subjects[i];
       if (s_cursedSubjectsIndexPlusOne[toCurseSubject] == 0) {
@@ -189,7 +189,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     emit Cursed(subjects);
   }
 
-  function ownerUncurse(bytes16[] memory subjects) external onlyOwner {
+  function uncurse(bytes16[] memory subjects) external onlyOwner {
     for (uint256 i = 0; i < subjects.length; ++i) {
       bytes16 toUncurseSubject = subjects[i];
       uint256 toUncurseSubjectIndexPlusOne = s_cursedSubjectsIndexPlusOne[toUncurseSubject];
