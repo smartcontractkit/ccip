@@ -22,9 +22,7 @@ contract TokenPoolFactory is OwnerIsCreator {
   address internal immutable i_rmnProxy;
   address internal immutable i_ccipRouter;
 
-  event RemoteChainConfigUpdated(
-    uint64 indexed remoteChainSelector, RemoteChainConfig remoteChainConfig
-  );
+  event RemoteChainConfigUpdated(uint64 indexed remoteChainSelector, RemoteChainConfig remoteChainConfig);
 
   error InvalidZeroAddress();
 
@@ -61,7 +59,7 @@ contract TokenPoolFactory is OwnerIsCreator {
 
   function deployTokenAndTokenPool(
     ExistingTokenPool[] memory remoteTokenPools,
-    bytes memory tokenInitCode, 
+    bytes memory tokenInitCode,
     bytes memory tokenPoolInitCode,
     bytes memory tokenPoolInitArgs,
     bytes32 salt
@@ -71,36 +69,36 @@ contract TokenPoolFactory is OwnerIsCreator {
 
     address token = tokenInitCode._deploy(salt);
 
-    return _createTokenPool(token, remoteTokenPools, tokenPoolInitCode, tokenPoolInitArgs, salt);
+    return _createTokenPool(token, remoteTokenPools, tokenPoolInitCode, tokenPoolInitArgs, salt, false);
   }
 
-  function deployTokenPoolWithExistingToken( 
+  function deployTokenPoolWithExistingToken(
     address token,
     ExistingTokenPool[] memory remoteTokenPools,
-    bytes memory tokenInitCode, 
+    bytes memory tokenInitCode,
     bytes memory tokenPoolInitCode,
     bytes memory tokenPoolInitArgs,
     bytes32 salt
-    ) external returns (address tokenAddress, address poolAddress) {
-      // Ensure a unique deployment between senders even if the same input parameter is used
-      salt = keccak256(abi.encodePacked(salt, msg.sender));
+  ) external returns (address tokenAddress, address poolAddress) {
+    // Ensure a unique deployment between senders even if the same input parameter is used
+    salt = keccak256(abi.encodePacked(salt, msg.sender));
 
-      return _createTokenPool(token, remoteTokenPools, tokenPoolInitCode, tokenPoolInitArgs, salt);
-    }
+    return _createTokenPool(token, remoteTokenPools, tokenPoolInitCode, tokenPoolInitArgs, salt, true);
+  }
 
   function _createTokenPool(
     address token,
     ExistingTokenPool[] memory remoteTokenPools,
     bytes memory tokenPoolInitCode,
     bytes memory tokenPoolInitArgs,
-    bytes32 salt
+    bytes32 salt,
+    bool isExistingToken
   ) internal returns (address tokenAddress, address poolAddress) {
-
     // If the user doesn't want to provide any special parameters which may be needed for the token pool
     // then use the standard burn/mint token pool params. Since the user can provide custom token pool
     // init code, they must also be able to provide custom constructor args.
     if (bytes4(tokenPoolInitArgs) == EMPTY_PARAMETER_FLAG) {
-        tokenPoolInitArgs = abi.encode(token, new address[](0), i_rmnProxy, i_ccipRouter);
+      tokenPoolInitArgs = abi.encode(token, new address[](0), i_rmnProxy, i_ccipRouter);
     }
 
     // Construct the code that will be depoyed from the initCode and the initArgs
@@ -116,8 +114,7 @@ contract TokenPoolFactory is OwnerIsCreator {
 
       // For Each remote chain in the remoteTokenPools array
       for (uint256 i = 0; i < remoteTokenPools.length; i++) {
-
-        // The address of the remote token is needed later in the function as an address, not as 
+        // The address of the remote token is needed later in the function as an address, not as
         // bytes so we store it in memory here
         address remoteTokenAddress;
 
@@ -138,16 +135,18 @@ contract TokenPoolFactory is OwnerIsCreator {
         // otherwise we can use the address provided by the user
         if (bytes4(remoteTokenPools[i].remoteTokenAddress) == EMPTY_PARAMETER_FLAG) {
           // The user must provide the initCode for the remote token, so we can predict its address correctly. It's provided in the remoteTokenInitCode field for the remoteTokenPool
-          remoteTokenAddress = remoteTokenPools[i].remoteTokenInitCode._predictAddressOfUndeployedContract(salt, remoteChainConfig.remotePoolFactory);
+          remoteTokenAddress = remoteTokenPools[i].remoteTokenInitCode._predictAddressOfUndeployedContract(
+            salt, remoteChainConfig.remotePoolFactory
+          );
 
           // The library returns an EVM-compatible address but chainUpdate takes bytes so we encode it
-          chainUpdate.remoteTokenAddress = abi.encode(remoteTokenAddress); 
+          chainUpdate.remoteTokenAddress = abi.encode(remoteTokenAddress);
         } else {
-
           // If the user already has a remote token deployed, reuse the address. We still need it as
           // an address for later, so we store it in memory after decoding.
           // NOTE: This assumes that the provided address can be decoded into an EVM address.
           remoteTokenAddress = abi.decode(remoteTokenPools[i].remoteTokenAddress, (address));
+
           chainUpdate.remoteTokenAddress = remoteTokenPools[i].remoteTokenAddress;
         }
 
@@ -155,19 +154,19 @@ contract TokenPoolFactory is OwnerIsCreator {
         if (bytes4(remoteTokenPools[i].remotePoolAddress) == EMPTY_PARAMETER_FLAG) {
           // Generate the initCode that will be used on the remote chain. It is assumed that tokenInitCode
           // will be the same on all chains, so we can reuse it here.
-          
+
           // Calculate the remote pool Args with an empty allowList, remote RMN, and Remote Router addresses. Since the first constructor parameter is an EVM token address, we can use the remoteTokenAddress we acquired earlier.
           bytes memory remotePoolInitArgs = abi.encode(
             remoteTokenAddress, new address[](0), remoteChainConfig.remoteRMNProxy, remoteChainConfig.remoteRouter
           );
 
           // Combine the initCode with the initArgs to create the full initCode
-          bytes memory remotePoolInitcode =
-            abi.encodePacked(type(BurnMintTokenPool).creationCode, remotePoolInitArgs);
+          bytes memory remotePoolInitcode = abi.encodePacked(type(BurnMintTokenPool).creationCode, remotePoolInitArgs);
 
           // Predict the address of the undeployed contract on the destination chain
-          chainUpdate.remotePoolAddress =
-            abi.encode(remotePoolInitcode._predictAddressOfUndeployedContract(salt, remoteChainConfig.remotePoolFactory));
+          chainUpdate.remotePoolAddress = abi.encode(
+            remotePoolInitcode._predictAddressOfUndeployedContract(salt, remoteChainConfig.remotePoolFactory)
+          );
         } else {
           // If the user already has a remote pool deployed, reuse the address.
           chainUpdate.remotePoolAddress = remoteTokenPools[i].remotePoolAddress;
@@ -177,14 +176,18 @@ contract TokenPoolFactory is OwnerIsCreator {
         chainUpdates[i] = chainUpdate;
       }
 
-       // Setup token roles
-      _setTokenPool(token, poolAddress);
+      // If the token already exists, then this contract will not be the owner,
+      // and thus it will not be able to set the token pool or transfer ownership
+      // which must be done manually by the end user.
+      if (!isExistingToken) {
+        _setTokenPool(token, poolAddress);
+        OwnerIsCreator(token).transferOwnership(address(msg.sender)); // 2 step ownership transfer
+      }
 
       // Apply the chain updates to the token pool
       TokenPool(poolAddress).applyChainUpdates(chainUpdates);
 
-      // Release the ownership of the tokenAdminRegistry, the token, and the pool.
-      _releaseOwnership(token, poolAddress);
+      OwnerIsCreator(poolAddress).transferOwnership(address(msg.sender)); // 2 step ownership transfer
 
       // TODO: Add more events
       return (token, poolAddress);
@@ -200,17 +203,14 @@ contract TokenPoolFactory is OwnerIsCreator {
 
     // Set the pool address in the token admin registry
     i_tokenAdminRegistry.setPool(token, pool);
-  }
 
-  function _releaseOwnership(address token, address pool) internal {
     i_tokenAdminRegistry.transferAdminRole(token, msg.sender);
-
-    OwnerIsCreator(token).transferOwnership(address(msg.sender)); // 2 step ownership transfer
-    OwnerIsCreator(pool).transferOwnership(address(msg.sender)); // 2 step ownership transfer
   }
 
-  // TODO: Update Event Maybe.
-  function updateRemoteChainConfig(uint64 remoteChainSelector, RemoteChainConfig calldata remoteConfig) public onlyOwner {
+  function updateRemoteChainConfig(
+    uint64 remoteChainSelector,
+    RemoteChainConfig calldata remoteConfig
+  ) public onlyOwner {
     s_remoteChainConfigs[remoteChainSelector] = remoteConfig;
 
     emit RemoteChainConfigUpdated(remoteChainSelector, remoteConfig);
