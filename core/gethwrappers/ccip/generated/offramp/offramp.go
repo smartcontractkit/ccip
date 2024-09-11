@@ -67,10 +67,10 @@ type InternalGasPriceUpdate struct {
 
 type InternalMerkleRoot struct {
 	SourceChainSelector uint64
+	OnRampAddress       []byte
 	MinSeqNr            uint64
 	MaxSeqNr            uint64
 	MerkleRoot          [32]byte
-	OnRampAddress       []byte
 }
 
 type InternalPriceUpdates struct {

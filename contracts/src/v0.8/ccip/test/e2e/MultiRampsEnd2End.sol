@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {IRMN} from "../../interfaces/IRMN.sol";
+
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../NonceManager.sol";
 import {IRMNV2} from "../../interfaces/IRMNV2.sol";
@@ -153,17 +155,17 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
       Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](2);
       roots[0] = Internal.MerkleRoot({
         sourceChainSelector: SOURCE_CHAIN_SELECTOR,
+        onRampAddress: abi.encode(address(s_onRamp)),
         minSeqNr: messages1[0].header.sequenceNumber,
         maxSeqNr: messages1[1].header.sequenceNumber,
-        merkleRoot: merkleRoots[0],
-        onRampAddress: abi.encode(address(s_onRamp))
+        merkleRoot: merkleRoots[0]
       });
       roots[1] = Internal.MerkleRoot({
         sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
+        onRampAddress: abi.encode(address(s_onRamp)),
         minSeqNr: messages2[0].header.sequenceNumber,
         maxSeqNr: messages2[0].header.sequenceNumber,
-        merkleRoot: merkleRoots[1],
-        onRampAddress: abi.encode(address(s_onRamp))
+        merkleRoot: merkleRoots[1]
       });
 
       OffRamp.CommitReport memory report =
