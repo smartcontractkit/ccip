@@ -199,7 +199,7 @@ library Internal {
         keccak256(
           abi.encode(
             original.header.messageId,
-            original.sender,
+            keccak256(original.sender),
             original.receiver,
             original.header.sequenceNumber,
             original.gasLimit,
@@ -222,7 +222,7 @@ library Internal {
         keccak256(
           abi.encode(
             original.sender,
-            original.receiver,
+            keccak256(original.receiver),
             original.header.sequenceNumber,
             original.header.nonce,
             original.feeToken,

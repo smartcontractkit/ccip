@@ -540,13 +540,13 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
   function _hashMessage(
     Internal.Any2EVMRampMessage memory message,
     bytes memory onRamp
-  ) internal view returns (bytes32) {
+  ) internal pure returns (bytes32) {
     return Internal._hash(
       message,
       keccak256(
         abi.encode(
-          Internal.ANY_2_EVM_MESSAGE_HASH, message.header.sourceChainSelector, message.header.destChainSelector, onRamp
-        )
+          Internal.ANY_2_EVM_MESSAGE_HASH, message.header.sourceChainSelector, message.header.destChainSelector, keccak256(onRamp
+        ))
       )
     );
   }

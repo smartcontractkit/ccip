@@ -373,7 +373,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
             Internal.ANY_2_EVM_MESSAGE_HASH,
             message.header.sourceChainSelector,
             message.header.destChainSelector,
-            onRamp
+            keccak256(onRamp)
           )
         )
       );
