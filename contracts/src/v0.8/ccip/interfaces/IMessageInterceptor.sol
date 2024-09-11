@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Client} from "../libraries/Client.sol";
 import {IERC165} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
+import {Client} from "../libraries/Client.sol";
 
 /// @notice Interface for plug-in message hook contracts that intercept OffRamp & OnRamp messages
 ///         and perform validations / state changes on top of the messages. The interceptor functions are expected to

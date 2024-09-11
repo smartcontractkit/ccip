@@ -672,8 +672,12 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     OnRamp.StaticConfig memory staticConfig = s_onRamp.getStaticConfig();
 
     address messageValidator = makeAddr("messageValidator");
-    vm.mockCall(messageValidator, abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IMessageInterceptor).interfaceId), abi.encode(true));
-    
+    vm.mockCall(
+      messageValidator,
+      abi.encodeWithSelector(IERC165.supportsInterface.selector, type(IMessageInterceptor).interfaceId),
+      abi.encode(true)
+    );
+
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(23423),
       messageValidator: makeAddr("messageValidator"),
@@ -725,10 +729,10 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     s_onRamp.setDynamicConfig(_generateDynamicOnRampConfig(address(2)));
   }
 
-    function test_setDynamicConfig_InvalidConfig_Revert() public {
-      address messageValidator = makeAddr("messageValidator");
+  function test_setDynamicConfig_InvalidConfig_Revert() public {
+    address messageValidator = makeAddr("messageValidator");
 
-      OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
+    OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(23423),
       messageValidator: messageValidator,
       feeAggregator: FEE_AGGREGATOR,

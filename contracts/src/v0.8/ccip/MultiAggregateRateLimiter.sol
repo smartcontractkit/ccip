@@ -2,9 +2,10 @@
 pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
+
+import {IERC165} from "../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
 import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "./interfaces/IMessageInterceptor.sol";
-import {IERC165} from "../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
 
 import {AuthorizedCallers} from "../shared/access/AuthorizedCallers.sol";
 import {EnumerableMapAddresses} from "./../shared/enumerable/EnumerableMapAddresses.sol";

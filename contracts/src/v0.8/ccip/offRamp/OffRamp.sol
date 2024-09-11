@@ -777,7 +777,9 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     address messageValidator = dynamicConfig.messageValidator;
 
     if (messageValidator != address(0)) {
-      if (!IMessageInterceptor(messageValidator).supportsInterface(type(IMessageInterceptor).interfaceId)) revert InvalidDynamicConfig();
+      if (!IMessageInterceptor(messageValidator).supportsInterface(type(IMessageInterceptor).interfaceId)) {
+        revert InvalidDynamicConfig();
+      }
     }
 
     s_dynamicConfig = dynamicConfig;

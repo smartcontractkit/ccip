@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol"; 
+import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {MultiAggregateRateLimiter} from "../../MultiAggregateRateLimiter.sol";
