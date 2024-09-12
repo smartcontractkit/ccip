@@ -671,6 +671,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     OnRamp.StaticConfig memory staticConfig = s_onRamp.getStaticConfig();
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(23423),
+      hasEntered: false,
       messageValidator: makeAddr("messageValidator"),
       feeAggregator: FEE_AGGREGATOR,
       allowListAdmin: address(0)
@@ -690,6 +691,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
   function test_SetConfigInvalidConfigFeeQuoterEqAddressZero_Revert() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(0),
+      hasEntered: false,
       feeAggregator: FEE_AGGREGATOR,
       messageValidator: makeAddr("messageValidator"),
       allowListAdmin: address(0)
@@ -702,6 +704,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
   function test_SetConfigInvalidConfig_Revert() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(23423),
+      hasEntered: false,
       messageValidator: address(0),
       feeAggregator: FEE_AGGREGATOR,
       allowListAdmin: address(0)
@@ -716,6 +719,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
   function test_SetConfigInvalidConfigFeeAggregatorEqAddressZero_Revert() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(23423),
+      hasEntered: false,
       messageValidator: address(0),
       feeAggregator: address(0),
       allowListAdmin: address(0)
