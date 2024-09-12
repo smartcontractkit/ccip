@@ -46,7 +46,7 @@ type RMNRemoteReport struct {
 }
 
 var EncodingUtilsMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"destChainId\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"rmnRemoteContractAddress\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"offrampAddress\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"rmnHomeContractConfigDigest\",\"type\":\"bytes32\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"onRampAddress\",\"type\":\"bytes\"},{\"internalType\":\"uint64\",\"name\":\"minSeqNr\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"maxSeqNr\",\"type\":\"uint64\"},{\"internalType\":\"bytes32\",\"name\":\"merkleRoot\",\"type\":\"bytes32\"}],\"internalType\":\"structInternal.MerkleRoot[]\",\"name\":\"destLaneUpdates\",\"type\":\"tuple[]\"}],\"internalType\":\"structRMNRemote.Report\",\"name\":\"rmnReport\",\"type\":\"tuple\"}],\"name\":\"_rmnReport\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"rmnVersionString\",\"type\":\"bytes32\"},{\"components\":[{\"internalType\":\"uint256\",\"name\":\"destChainId\",\"type\":\"uint256\"},{\"internalType\":\"uint64\",\"name\":\"destChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"address\",\"name\":\"rmnRemoteContractAddress\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"offrampAddress\",\"type\":\"address\"},{\"internalType\":\"bytes32\",\"name\":\"rmnHomeContractConfigDigest\",\"type\":\"bytes32\"},{\"components\":[{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"onRampAddress\",\"type\":\"bytes\"},{\"internalType\":\"uint64\",\"name\":\"minSeqNr\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"maxSeqNr\",\"type\":\"uint64\"},{\"internalType\":\"bytes32\",\"name\":\"merkleRoot\",\"type\":\"bytes32\"}],\"internalType\":\"structInternal.MerkleRoot[]\",\"name\":\"destLaneUpdates\",\"type\":\"tuple[]\"}],\"internalType\":\"structRMNRemote.Report\",\"name\":\"rmnReport\",\"type\":\"tuple\"}],\"name\":\"_rmnReport\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
 	Bin: "0x608060405234801561001057600080fd5b5060405162461bcd60e51b815260206004820152600d60248201526c646f206e6f74206465706c6f7960981b604482015260640160405180910390fdfe",
 }
 
@@ -186,16 +186,16 @@ func (_EncodingUtils *EncodingUtilsTransactorRaw) Transact(opts *bind.TransactOp
 	return _EncodingUtils.Contract.contract.Transact(opts, method, params...)
 }
 
-func (_EncodingUtils *EncodingUtilsTransactor) RmnReport(opts *bind.TransactOpts, rmnReport RMNRemoteReport) (*types.Transaction, error) {
-	return _EncodingUtils.contract.Transact(opts, "_rmnReport", rmnReport)
+func (_EncodingUtils *EncodingUtilsTransactor) RmnReport(opts *bind.TransactOpts, rmnVersionString [32]byte, rmnReport RMNRemoteReport) (*types.Transaction, error) {
+	return _EncodingUtils.contract.Transact(opts, "_rmnReport", rmnVersionString, rmnReport)
 }
 
-func (_EncodingUtils *EncodingUtilsSession) RmnReport(rmnReport RMNRemoteReport) (*types.Transaction, error) {
-	return _EncodingUtils.Contract.RmnReport(&_EncodingUtils.TransactOpts, rmnReport)
+func (_EncodingUtils *EncodingUtilsSession) RmnReport(rmnVersionString [32]byte, rmnReport RMNRemoteReport) (*types.Transaction, error) {
+	return _EncodingUtils.Contract.RmnReport(&_EncodingUtils.TransactOpts, rmnVersionString, rmnReport)
 }
 
-func (_EncodingUtils *EncodingUtilsTransactorSession) RmnReport(rmnReport RMNRemoteReport) (*types.Transaction, error) {
-	return _EncodingUtils.Contract.RmnReport(&_EncodingUtils.TransactOpts, rmnReport)
+func (_EncodingUtils *EncodingUtilsTransactorSession) RmnReport(rmnVersionString [32]byte, rmnReport RMNRemoteReport) (*types.Transaction, error) {
+	return _EncodingUtils.Contract.RmnReport(&_EncodingUtils.TransactOpts, rmnVersionString, rmnReport)
 }
 
 func (_EncodingUtils *EncodingUtils) Address() common.Address {
@@ -203,7 +203,7 @@ func (_EncodingUtils *EncodingUtils) Address() common.Address {
 }
 
 type EncodingUtilsInterface interface {
-	RmnReport(opts *bind.TransactOpts, rmnReport RMNRemoteReport) (*types.Transaction, error)
+	RmnReport(opts *bind.TransactOpts, rmnVersionString [32]byte, rmnReport RMNRemoteReport) (*types.Transaction, error)
 
 	Address() common.Address
 }

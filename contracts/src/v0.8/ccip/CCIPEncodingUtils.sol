@@ -12,5 +12,5 @@ contract CCIPEncodingUtils {
   }
 
   /// @dev the RMN Report struct is used in integration / E2E tests
-  function _rmnReport(RMNRemote.Report memory rmnReport) external {}
+  function _rmnReport(bytes32 rmnVersionString, RMNRemote.Report memory rmnReport) external {}
 }
