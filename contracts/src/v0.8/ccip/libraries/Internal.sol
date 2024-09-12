@@ -199,13 +199,13 @@ library Internal {
         keccak256(
           abi.encode(
             original.header.messageId,
-            keccak256(original.sender),
             original.receiver,
             original.header.sequenceNumber,
             original.gasLimit,
             original.header.nonce
           )
         ),
+        keccak256(original.sender),
         keccak256(original.data),
         keccak256(abi.encode(original.tokenAmounts))
       )
@@ -222,13 +222,13 @@ library Internal {
         keccak256(
           abi.encode(
             original.sender,
-            keccak256(original.receiver),
             original.header.sequenceNumber,
             original.header.nonce,
             original.feeToken,
             original.feeTokenAmount
           )
         ),
+        keccak256(original.receiver),
         keccak256(original.data),
         keccak256(abi.encode(original.tokenAmounts)),
         keccak256(original.extraArgs)
