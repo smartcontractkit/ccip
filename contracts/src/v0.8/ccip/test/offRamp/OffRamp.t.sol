@@ -3234,6 +3234,41 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     vm.expectRevert(OffRamp.ZeroChainSelectorNotAllowed.selector);
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
   }
+
+  function test_InvalidOnRampUpdate_Revert() public {
+    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](1);
+    sourceChainConfigs[0] = OffRamp.SourceChainConfigArgs({
+      router: s_destRouter,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      onRamp: ON_RAMP_ADDRESS_1,
+      isEnabled: true
+    });
+
+    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+
+    Internal.MerkleRoot[] memory roots = new Internal.MerkleRoot[](1);
+    roots[0] = Internal.MerkleRoot({
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR_1,
+      onRampAddress: ON_RAMP_ADDRESS_1,
+      minSeqNr: 1,
+      maxSeqNr: 2,
+      merkleRoot: "test #2"
+    });
+
+    _commit(OffRamp.CommitReport({
+      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures
+    }), s_latestSequenceNumber);
+
+    vm.stopPrank();
+    vm.startPrank(OWNER);
+
+    sourceChainConfigs[0].onRamp = ON_RAMP_ADDRESS_2;
+
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidOnRampUpdate.selector, SOURCE_CHAIN_SELECTOR_1));
+    s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
+  }
 }
 
 contract OffRamp_commit is OffRampSetup {

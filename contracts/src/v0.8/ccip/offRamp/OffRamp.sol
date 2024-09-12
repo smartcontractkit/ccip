@@ -64,7 +64,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error SourceChainSelectorMismatch(uint64 reportSourceChainSelector, uint64 messageSourceChainSelector);
   error SignatureVerificationDisabled();
   error InvalidOnRamp(bytes reportOnRamp, bytes configOnRamp);
-  error InvalidOnRampUpdate();
+  error InvalidOnRampUpdate(uint64 sourceChainSelector);
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -791,7 +791,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         // OnRamp updates should only happens due to a misconfiguration
         // If an OnRamp is misconfigured not reports should have been committed and no messages should have been executed
         // This is enforced byt the onRamp address check in the commit function
-        revert InvalidOnRampUpdate();
+        revert InvalidOnRampUpdate(sourceChainSelector);
       }
 
       // OnRamp can never be zero - if it is, then the source chain has been added for the first time
