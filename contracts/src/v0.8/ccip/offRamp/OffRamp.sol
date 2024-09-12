@@ -63,7 +63,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
   error SourceChainSelectorMismatch(uint64 reportSourceChainSelector, uint64 messageSourceChainSelector);
   error SignatureVerificationDisabled();
-  error InvalidOnRamp(bytes reportOnRamp, bytes configOnRamp);
+  error CommitOnRampMismatch(bytes reportOnRamp, bytes configOnRamp);
   error InvalidOnRampUpdate(uint64 sourceChainSelector);
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
@@ -659,7 +659,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
 
       if (keccak256(root.onRampAddress) != keccak256(sourceChainConfig.onRamp)) {
-        revert InvalidOnRamp(root.onRampAddress, sourceChainConfig.onRamp);
+        revert CommitOnRampMismatch(root.onRampAddress, sourceChainConfig.onRamp);
       }
 
       if (sourceChainConfig.minSeqNr != root.minSeqNr || root.minSeqNr > root.maxSeqNr) {

@@ -3712,12 +3712,12 @@ contract OffRamp_commit is OffRampSetup {
     _commit(commitReport, ++s_latestSequenceNumber);
   }
 
-  function test_InvalidOnRamp_Revert() public {
+  function test_CommitOnRampMismatch_Revert() public {
     OffRamp.CommitReport memory commitReport = _constructCommitReport();
 
     commitReport.merkleRoots[0].onRampAddress = ON_RAMP_ADDRESS_2;
 
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.InvalidOnRamp.selector, ON_RAMP_ADDRESS_2, ON_RAMP_ADDRESS_1));
+    vm.expectRevert(abi.encodeWithSelector(OffRamp.CommitOnRampMismatch.selector, ON_RAMP_ADDRESS_2, ON_RAMP_ADDRESS_1));
     _commit(commitReport, s_latestSequenceNumber);
   }
 
