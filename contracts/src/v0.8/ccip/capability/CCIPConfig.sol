@@ -36,9 +36,9 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   error TooManySigners();
   error P2PIdsLengthNotMatching(uint256 p2pIdsLength, uint256 signersLength, uint256 transmittersLength);
   error NotEnoughTransmitters(uint256 got, uint256 minimum);
-  error FMustBePositive();
   error FChainMustBePositive();
   error FTooHigh();
+  error FChainTooHigh();
   error InvalidPluginType();
   error OfframpAddressCannotBeZero();
   error InvalidConfigLength(uint256 length);
@@ -167,6 +167,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   }
 
   /// @notice Called by the registry prior to the config being set for a particular DON.
+  /// @dev precondition Requires all chain configs to be set
   function beforeCapabilityConfigSet(
     bytes32[] calldata, /* nodes */
     bytes calldata config,
@@ -352,9 +353,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   /// @param ocr3Configs The OCR3 configurations to group.
   /// @return commitConfigs The commit configurations.
   /// @return execConfigs The execution configurations.
-  function _groupByPluginType(
-    CCIPConfigTypes.OCR3Config[] memory ocr3Configs
-  )
+  function _groupByPluginType(CCIPConfigTypes.OCR3Config[] memory ocr3Configs)
     internal
     pure
     returns (CCIPConfigTypes.OCR3Config[] memory commitConfigs, CCIPConfigTypes.OCR3Config[] memory execConfigs)
@@ -402,18 +401,37 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
     }
     if (!s_remoteChainSelectors.contains(cfg.chainSelector)) revert ChainSelectorNotFound(cfg.chainSelector);
 
-    // We check for chain config presence above, so fChain here must be non-zero.
-    uint256 minTransmittersLength = 3 * s_chainConfigurations[cfg.chainSelector].fChain + 1;
-    if (cfg.transmitters.length < minTransmittersLength) {
-      revert NotEnoughTransmitters(cfg.transmitters.length, minTransmittersLength);
+    // fChain cannot exceed F, since it is a subcommittee in the larger DON
+    uint256 F = cfg.F;
+    uint256 fChain = s_chainConfigurations[cfg.chainSelector].fChain;
+    // F != 0 check here is done implicitly, since fChain > 0 (since the config is set via the contains() check),
+    // and F >= fChain
+    if (fChain > F) {
+      revert FChainTooHigh();
+    }
+
+    // Transmitters can be set to 0 since there can be more signers than transmitters,
+    uint256 nonZeroTransmitters = 0;
+    for (uint256 i = 0; i < cfg.transmitters.length; ++i) {
+      if (cfg.transmitters[i].length != 0) {
+        nonZeroTransmitters++;
+      }
+    }
+
+    // We check for chain config presence above, so fChain here must be non-zero. fChain <= F due to the checks above.
+    // There can be less transmitters than signers - so they can be set to zero (which indicates that a node is a signer, but not a transmitter).
+    uint256 minTransmittersLength = 3 * fChain + 1;
+    if (nonZeroTransmitters < minTransmittersLength) {
+      revert NotEnoughTransmitters(nonZeroTransmitters, minTransmittersLength);
     }
     uint256 numberOfSigners = cfg.signers.length;
     if (numberOfSigners > MAX_NUM_ORACLES) revert TooManySigners();
+
+    // Enforcing len(signers) == len(transmitters) = len(p2pIds)
     if (numberOfSigners != cfg.p2pIds.length || numberOfSigners != cfg.transmitters.length) {
       revert P2PIdsLengthNotMatching(cfg.p2pIds.length, cfg.signers.length, cfg.transmitters.length);
     }
-    if (cfg.F == 0) revert FMustBePositive();
-    if (numberOfSigners <= 3 * cfg.F) revert FTooHigh();
+    if (numberOfSigners <= 3 * F) revert FTooHigh();
 
     // Check that the readers are in the capabilities registry.
     _ensureInRegistry(cfg.p2pIds);
@@ -459,6 +477,7 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
   // ================================================================
 
   /// @notice Sets and/or removes chain configurations.
+  /// Does not validate that fChain <= F and relies on OCR3Configs to be changed in case fChain becomes larger than the big F value.
   /// @param chainSelectorRemoves The chain configurations to remove.
   /// @param chainConfigAdds The chain configurations to add.
   function applyChainConfigUpdates(
