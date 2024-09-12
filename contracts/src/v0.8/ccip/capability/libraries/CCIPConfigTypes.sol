@@ -31,7 +31,7 @@ library CCIPConfigTypes {
   }
 
   /// @notice OCR3 configuration.
-  /// Note that F >= fChain, since F represents the role DON, and fChain represents committees.
+  /// Note that F >= fChain, since F represents the role DON, and fChain represents sub-committees.
   /// F values are typically identical across multiple OCR3 configs since the chains pertain to one role DON,
   /// but F values can change across OCR3 configs to indicate role DON splits.
   struct OCR3Config {
@@ -43,7 +43,7 @@ library CCIPConfigTypes {
     // len(p2pIds) == len(signers) == len(transmitters) >= 3 * F + 1
     // NOTE: indexes matter here! The p2p ID at index i corresponds to the signer at index i and the transmitter at index i.
     // This is crucial in order to build the oracle ID <-> peer ID mapping offchain.
-    // Transmitters can be set to 0-bytes to represent that a node is a signer but not a transmitter (since len(signers) >= len(transmitters))
+    // Transmitters can be set to 0-bytes to represent that a node is a signer but not a transmitter
     bytes32[] p2pIds; // The P2P IDs of the oracles that are part of the role DON.
     bytes[] signers; // The onchain signing keys of nodes in the don.
     bytes[] transmitters; // The onchain transmitter keys of nodes in the don.
