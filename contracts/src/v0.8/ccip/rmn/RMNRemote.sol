@@ -39,31 +39,31 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
 
   /// @dev the configuration of an RMN signer
   struct Signer {
-    address onchainPublicKey; // ────╮ for signing reports
-    uint64 nodeIndex; // ────────────╯ maps to nodes in home chain config, should be strictly increasing
+    address onchainPublicKey; // ────╮ For signing reports
+    uint64 nodeIndex; // ────────────╯ Maps to nodes in home chain config, should be strictly increasing
   }
 
   /// @dev the contract config
   struct Config {
-    bytes32 rmnHomeContractConfigDigest; // digest of the RMNHome contract config
-    Signer[] signers; // list of signers
-    uint64 minSigners; // threshold for the number of signers required to verify a report
+    bytes32 rmnHomeContractConfigDigest; // Digest of the RMNHome contract config
+    Signer[] signers; // List of signers
+    uint64 minSigners; // Threshold for the number of signers required to verify a report
   }
 
   /// @dev the contract config + a version number
   struct VersionedConfig {
-    uint32 version; // for tracking the version of the config
-    Config config; // the config
+    uint32 version; // For tracking the version of the config
+    Config config; // The config
   }
 
   /// @dev the payload that RMN nodes sign
   struct Report {
-    uint256 destChainId; // to guard against chain selector misconfiguration
-    uint64 destChainSelector; // the chain selector of the destination chain
-    address rmnRemoteContractAddress; // the address of this contract
-    address offrampAddress; // the address of the offramp on the same chain as this contract
-    bytes32 rmnHomeContractConfigDigest; // the digest of the RMNHome contract config
-    Internal.MerkleRoot[] destLaneUpdates; // the dest lane updates
+    uint256 destChainId; // To guard against chain selector misconfiguration
+    uint64 destChainSelector; // The chain selector of the destination chain
+    address rmnRemoteContractAddress; // The address of this contract
+    address offrampAddress; // The address of the offramp on the same chain as this contract
+    bytes32 rmnHomeContractConfigDigest; // The digest of the RMNHome contract config
+    Internal.MerkleRoot[] destLaneUpdates; // The dest lane updates
   }
 
   // ================================================================
@@ -135,6 +135,9 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   // │                            Config                            │
   // ================================================================
 
+  /// @notice Sets the configuration of the contract
+  /// @param newConfig the new configuration
+  /// @dev setting congig is atomic; we delete all pre-existing config and set everything from scratch
   function setConfig(Config calldata newConfig) external onlyOwner {
     // sanity checks
     {
@@ -175,6 +178,8 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     emit ConfigSet(VersionedConfig({version: newConfigCount, config: newConfig}));
   }
 
+  /// @notice Returns the current configuration of the contract + a version number
+  /// @return versionedConfig the current configuration + version
   function getVersionedConfig() external view returns (VersionedConfig memory) {
     return VersionedConfig({version: s_configCount, config: s_config});
   }
@@ -189,12 +194,17 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   // │                           Cursing                            │
   // ================================================================
 
+  /// @notice Curse a single subject
+  /// @param subject the subject to curse
   function curse(bytes16 subject) external {
     bytes16[] memory subjects = new bytes16[](1);
     subjects[0] = subject;
     curse(subjects);
   }
 
+  /// @notice Curse an array of subjects
+  /// @param subjects the subjects to curse
+  /// @dev reverts if any of the subjects are already cursed or if there is a duplicate
   function curse(bytes16[] memory subjects) public onlyOwner {
     for (uint256 i = 0; i < subjects.length; ++i) {
       bytes16 toCurseSubject = subjects[i];
@@ -207,12 +217,17 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     emit Cursed(subjects);
   }
 
+  /// @notice Uncurse a single subject
+  /// @param subject the subject to uncurse
   function uncurse(bytes16 subject) external {
     bytes16[] memory subjects = new bytes16[](1);
     subjects[0] = subject;
     uncurse(subjects);
   }
 
+  /// @notice Uncurse an array of subjects
+  /// @param subjects the subjects to uncurse
+  /// @dev reverts if any of the subjects are not cursed or if there is a duplicate
   function uncurse(bytes16[] memory subjects) public onlyOwner {
     for (uint256 i = 0; i < subjects.length; ++i) {
       bytes16 toUncurseSubject = subjects[i];
@@ -232,7 +247,8 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     emit Uncursed(subjects);
   }
 
-  function getCursedSubjects() external view returns (bytes16[] memory) {
+  /// @inheritdoc IRMNV2
+  function getCursedSubjects() external view returns (bytes16[] memory subjects) {
     return s_cursedSubjectsSequence;
   }
 
