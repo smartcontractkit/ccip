@@ -658,10 +658,9 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       }
 
       SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
-      bytes memory onRamp = sourceChainConfig.onRamp;
 
-      if (keccak256(root.onRampAddress) != keccak256(onRamp)) {
-        revert InvalidOnRamp(root.onRampAddress, onRamp);
+      if (keccak256(root.onRampAddress) != keccak256(sourceChainConfig.onRamp)) {
+        revert InvalidOnRamp(root.onRampAddress, sourceChainConfig.onRamp);
       }
 
       if (sourceChainConfig.minSeqNr != root.minSeqNr || root.minSeqNr > root.maxSeqNr) {
