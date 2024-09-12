@@ -268,8 +268,15 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
     vm.pauseGasMetering();
 
     uint256 gasLimit = s_feeQuoter.parseEVMExtraArgsFromBytes(msgEvent.extraArgs, DEST_CHAIN_SELECTOR).gasLimit;
+    Internal.Any2EVMTokenTransfer[] memory any2EVMTokenTransfer = new Internal.Any2EVMTokenTransfer[](msgEvent.tokenAmounts.length);
     for (uint256 i = 0; i < msgEvent.tokenAmounts.length; ++i) {
-      msgEvent.tokenAmounts[i].destExecData = abi.encode(MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS);
+        any2EVMTokenTransfer[i] = Internal.Any2EVMTokenTransfer({
+          sourcePoolAddress: abi.encode(msgEvent.tokenAmounts[i].sourcePoolAddress),
+          destTokenAddress: abi.decode(msgEvent.tokenAmounts[i].destTokenAddress, (address)),
+          extraData: msgEvent.tokenAmounts[i].extraData,
+          amount: msgEvent.tokenAmounts[i].amount,
+          destGasAmount: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS
+        });
     }
     return Internal.Any2EVMRampMessage({
       header: Internal.RampMessageHeader({
@@ -283,7 +290,7 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
       data: msgEvent.data,
       receiver: abi.decode(msgEvent.receiver, (address)),
       gasLimit: s_feeQuoter.parseEVMExtraArgsFromBytes(msgEvent.extraArgs, DEST_CHAIN_SELECTOR).gasLimit,
-      tokenAmounts: msgEvent.tokenAmounts
+      tokenAmounts: any2EVMTokenTransfer
     });
   }
 }

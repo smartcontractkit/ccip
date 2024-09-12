@@ -310,6 +310,35 @@ library Internal {
     uint64 nonce; // ────────────────╯ nonce for this lane for this sender, not unique across senders/lanes
   }
 
+  struct EVM2AnyTokenTransfer {
+    // The source pool EVM address. This value is trusted as it was obtained through the onRamp. It can be
+    // relied upon by the destination pool to validate the source pool.
+    address sourcePoolAddress;
+    // The EVM address of the destination token
+    // This value is UNTRUSTED as any pool owner can return whatever value they want.
+    bytes destTokenAddress;
+    // Optional pool data to be transferred to the destination chain. Be default this is capped at
+    // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
+    // has to be set for the specific token.
+    bytes extraData;
+    uint256 amount; // Amount of tokens.
+    // Destination chain specific execution data encoded in bytes
+    //(for EVM destination it consists of the amount of gas available for the releaseOrMint and transfer calls on the offRamp
+    bytes destExecData;
+  }
+
+  struct Any2EVMTokenTransfer {
+    bytes sourcePoolAddress;
+    address destTokenAddress;
+    // Optional pool data to be transferred to the destination chain. Be default this is capped at
+    // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
+    // has to be set for the specific token.
+    bytes extraData;
+    uint256 amount; // Amount of tokens.
+    //The amount of gas available for the releaseOrMint and transfer calls on the offRamp.
+    uint256 destGasAmount;
+  }
+
   /// @notice Family-agnostic message routed to an OffRamp
   /// Note: hash(Any2EVMRampMessage) != hash(EVM2AnyRampMessage), hash(Any2EVMRampMessage) != messageId
   /// due to encoding & parameter differences
@@ -319,7 +348,7 @@ library Internal {
     bytes data; // arbitrary data payload supplied by the message sender
     address receiver; // receiver address on the destination chain
     uint256 gasLimit; // user supplied maximum gas amount available for dest chain execution
-    RampTokenAmount[] tokenAmounts; // array of tokens and amounts to transfer
+    Any2EVMTokenTransfer[] tokenAmounts; // array of tokens and amounts to transfer
   }
 
   /// @notice Family-agnostic message emitted from the OnRamp
@@ -333,7 +362,7 @@ library Internal {
     bytes extraArgs; // destination-chain specific extra args, such as the gasLimit for EVM chains
     address feeToken; // fee token
     uint256 feeTokenAmount; // fee token amount
-    RampTokenAmount[] tokenAmounts; // array of tokens and amounts to transfer
+    EVM2AnyTokenTransfer[] tokenAmounts; // array of tokens and amounts to transfer
   }
 
   // bytes4(keccak256("CCIP ChainFamilySelector EVM"))

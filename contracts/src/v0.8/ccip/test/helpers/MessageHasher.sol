@@ -13,9 +13,9 @@ contract MessageHasher {
   }
 
   function encodeTokenAmountsHashPreimage(
-    Internal.RampTokenAmount[] memory rampTokenAmounts
+    Internal.Any2EVMTokenTransfer[] memory tokenAmounts
   ) public pure returns (bytes memory) {
-    return abi.encode(rampTokenAmounts);
+    return abi.encode(tokenAmounts);
   }
 
   function encodeMetadataHashPreimage(
