@@ -3,7 +3,6 @@ pragma solidity 0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
-import {IRMN} from "../../interfaces/IRMN.sol";
 import {IRMNV2} from "../../interfaces/IRMNV2.sol";
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
@@ -16,7 +15,6 @@ import {MultiOCR3Base} from "../../ocr/MultiOCR3Base.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
-
 import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
@@ -229,9 +227,7 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     return OffRamp.DynamicConfig({
       permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
       feeQuoter: feeQuoter,
-      messageValidator: address(0),
-      maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
-      maxTokenTransferGas: MAX_TOKEN_POOL_TRANSFER_GAS
+      messageValidator: address(0)
     });
   }
 
@@ -375,10 +371,10 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
 
   function _getGasLimitsFromMessages(
     Internal.Any2EVMRampMessage[] memory messages
-  ) internal pure returns (uint256[] memory) {
-    uint256[] memory gasLimits = new uint256[](messages.length);
+  ) internal pure returns (OffRamp.GasLimitOverride[] memory) {
+    OffRamp.GasLimitOverride[] memory gasLimits = new OffRamp.GasLimitOverride[](messages.length);
     for (uint256 i = 0; i < messages.length; ++i) {
-      gasLimits[i] = messages[i].gasLimit;
+      gasLimits[i].receiverExecutionGasLimit = messages[i].gasLimit;
     }
 
     return gasLimits;
@@ -386,8 +382,6 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
 
   function _assertSameConfig(OffRamp.DynamicConfig memory a, OffRamp.DynamicConfig memory b) public pure {
     assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
-    assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);
-    assertEq(a.maxTokenTransferGas, b.maxTokenTransferGas);
     assertEq(a.messageValidator, b.messageValidator);
     assertEq(a.feeQuoter, b.feeQuoter);
   }
