@@ -266,9 +266,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @notice Get the `tokenPrice` for an array of tokens.
   /// @param tokens The tokens to get prices for.
   /// @return tokenPrices The tokenPrices for the given tokens.
-  function getTokenPrices(
-    address[] calldata tokens
-  ) external view returns (Internal.TimestampedPackedUint224[] memory) {
+  function getTokenPrices(address[] calldata tokens) external view returns (Internal.TimestampedPackedUint224[] memory) {
     uint256 length = tokens.length;
     Internal.TimestampedPackedUint224[] memory tokenPrices = new Internal.TimestampedPackedUint224[](length);
     for (uint256 i = 0; i < length; ++i) {
@@ -280,9 +278,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @notice Returns the token price data feed configuration
   /// @param token The token to retrieve the feed config for
   /// @return tokenPriceFeedConfig The token price data feed config (if feed address is 0, the feed config is disabled)
-  function getTokenPriceFeedConfig(
-    address token
-  ) external view  returns (TokenPriceFeedConfig memory) {
+  function getTokenPriceFeedConfig(address token) external view returns (TokenPriceFeedConfig memory) {
     return s_usdPriceFeedsPerToken[token];
   }
 
@@ -296,7 +292,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @return gasPrice The encoded gasPrice for the given destination chain ID.
   function getDestinationChainGasPrice(
     uint64 destChainSelector
-  ) external view  returns (Internal.TimestampedPackedUint224 memory) {
+  ) external view returns (Internal.TimestampedPackedUint224 memory) {
     return s_usdPerUnitGasByDestChainSelector[destChainSelector];
   }
 
@@ -308,7 +304,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   function getTokenAndGasPrices(
     address token,
     uint64 destChainSelector
-  ) public view  returns (uint224 tokenPrice, uint224 gasPriceValue) {
+  ) public view returns (uint224 tokenPrice, uint224 gasPriceValue) {
     Internal.TimestampedPackedUint224 memory gasPrice = s_usdPerUnitGasByDestChainSelector[destChainSelector];
     // We do allow a gas price of 0, but no stale or unset gas prices
     if (gasPrice.timestamp == 0) revert ChainNotSupported(destChainSelector);

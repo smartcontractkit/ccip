@@ -1777,7 +1777,6 @@ contract FeeQuoter_processMessageArgs is FeeQuoterFeeSetup {
       new Client.EVMTokenAmount[](0)
     );
 
-
     assertEq(msgFeeJuels, expectedConvertedAmount);
   }
 
@@ -1791,7 +1790,6 @@ contract FeeQuoter_processMessageArgs is FeeQuoterFeeSetup {
     ) = s_feeQuoter.processMessageArgs(
       DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, "", new Internal.RampTokenAmount[](0), new Client.EVMTokenAmount[](0)
     );
-
 
     assertEq(isOutOfOrderExecution, false);
     assertEq(convertedExtraArgs, Client._argsToBytes(s_feeQuoter.parseEVMExtraArgsFromBytes("", DEST_CHAIN_SELECTOR)));
@@ -1852,7 +1850,7 @@ contract FeeQuoter_processMessageArgs is FeeQuoterFeeSetup {
       abi.encodeWithSelector(FeeQuoter.MessageFeeTooHigh.selector, MAX_MSG_FEES_JUELS + 1, MAX_MSG_FEES_JUELS)
     );
 
-     s_feeQuoter.processMessageArgs(
+    s_feeQuoter.processMessageArgs(
       DEST_CHAIN_SELECTOR,
       s_sourceTokens[0],
       MAX_MSG_FEES_JUELS + 1,
