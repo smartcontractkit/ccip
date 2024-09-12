@@ -182,6 +182,32 @@ selected_networks = [
     'SEPOLIA',
 ]
 
+[CCIP.Groups.smoke]
+# these are all the valid network pairs
+NetworkPairs = [
+    'AVALANCHE_FUJI,BSC_TESTNET',
+    'SEPOLIA,ARBITRUM_SEPOLIA',
+    'BASE_SEPOLIA,OPTIMISM_SEPOLIA',
+]
+
+BiDirectionalLane = true
+PhaseTimeout = '30m'
+LocalCluster = false
+ExistingDeployment = true
+ReuseContracts = true
+
+
+[CCIP.Groups.smoke.TokenConfig]
+NoOfTokensPerChain = 1
+CCIPOwnerTokens = true
+
+[CCIP.Groups.smoke.MsgDetails]
+MsgType = 'Data'
+DestGasLimit = 0
+DataLength = 100
+NoOfTokens = 1
+AmountPerToken = 1
+
 [CCIP.Groups.load]
 NetworkPairs = [
     'AVALANCHE_FUJI,SEPOLIA',
@@ -199,7 +225,7 @@ NoOfTokensPerChain = 1
 RequestPerUnitTime = [12]
 TimeUnit = '1m'
 TestDuration = '1h'
-TestRunName = 'v2.12.0-ccip1.4.16-load'
+TestRunName = 'v2.12.0-ccip1.5.1-load'
 
 # There is slower exec rounds in Sepolia/Ethereum, therefore reducing the frequency
 # 1msg/12sec = 5msg/min
