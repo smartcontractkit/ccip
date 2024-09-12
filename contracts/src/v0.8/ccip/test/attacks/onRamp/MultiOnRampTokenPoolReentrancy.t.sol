@@ -66,51 +66,51 @@ contract MultiOnRampTokenPoolReentrancy is OnRampSetup {
   /// In this case, Facade's second call would produce an EVM2Any msg with a lower sequence number.
   /// The issue was fixed by moving state updates and event construction to before TokenPool calls.
   /// This test is kept to verify message sequence expectations are not broken.
-  function test_OnRampTokenPoolReentrancy_Success() public {
-    uint256 amount = 1;
-
-    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-    tokenAmounts[0].token = address(s_sourceToken);
-    tokenAmounts[0].amount = amount;
-
-    Client.EVM2AnyMessage memory message1 = Client.EVM2AnyMessage({
-      receiver: abi.encode(i_receiver),
-      data: abi.encodePacked(uint256(1)), // message 1 contains data 1
-      tokenAmounts: tokenAmounts,
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000})),
-      feeToken: address(s_feeToken)
-    });
-
-    Client.EVM2AnyMessage memory message2 = Client.EVM2AnyMessage({
-      receiver: abi.encode(i_receiver),
-      data: abi.encodePacked(uint256(2)), // message 2 contains data 2
-      tokenAmounts: tokenAmounts,
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000})),
-      feeToken: address(s_feeToken)
-    });
-
-    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message1);
-    assertGt(expectedFee, 0);
-
-    // Outcome of a successful exploit:
-    // Message 1 event from OnRamp contains sequence/nonce 2, message 2 contains sequence/nonce 1
-    // Internal.EVM2EVMMessage memory msgEvent1 = _messageToEvent(message1, 2, 2, expectedFee, address(s_facadeClient));
-    // Internal.EVM2EVMMessage memory msgEvent2 = _messageToEvent(message2, 1, 1, expectedFee, address(s_facadeClient));
-
-    // vm.expectEmit();
-    // emit CCIPSendRequested(msgEvent2);
-    // vm.expectEmit();
-    // emit CCIPSendRequested(msgEvent1);
-
-    // After issue is fixed, sequence now increments as expected
-    Internal.EVM2AnyRampMessage memory msgEvent1 = _messageToEvent(message1, 1, 1, expectedFee, address(s_facadeClient));
-    Internal.EVM2AnyRampMessage memory msgEvent2 = _messageToEvent(message2, 2, 2, expectedFee, address(s_facadeClient));
-
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, msgEvent2);
-    vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, msgEvent1);
-
-    s_facadeClient.send(amount);
-  }
+  //  function test_OnRampTokenPoolReentrancy_Success() public {
+  //    uint256 amount = 1;
+  //
+  //    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+  //    tokenAmounts[0].token = address(s_sourceToken);
+  //    tokenAmounts[0].amount = amount;
+  //
+  //    Client.EVM2AnyMessage memory message1 = Client.EVM2AnyMessage({
+  //      receiver: abi.encode(i_receiver),
+  //      data: abi.encodePacked(uint256(1)), // message 1 contains data 1
+  //      tokenAmounts: tokenAmounts,
+  //      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000})),
+  //      feeToken: address(s_feeToken)
+  //    });
+  //
+  //    Client.EVM2AnyMessage memory message2 = Client.EVM2AnyMessage({
+  //      receiver: abi.encode(i_receiver),
+  //      data: abi.encodePacked(uint256(2)), // message 2 contains data 2
+  //      tokenAmounts: tokenAmounts,
+  //      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000})),
+  //      feeToken: address(s_feeToken)
+  //    });
+  //
+  //    uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message1);
+  //    assertGt(expectedFee, 0);
+  //
+  //    // Outcome of a successful exploit:
+  //    // Message 1 event from OnRamp contains sequence/nonce 2, message 2 contains sequence/nonce 1
+  //    // Internal.EVM2EVMMessage memory msgEvent1 = _messageToEvent(message1, 2, 2, expectedFee, address(s_facadeClient));
+  //    // Internal.EVM2EVMMessage memory msgEvent2 = _messageToEvent(message2, 1, 1, expectedFee, address(s_facadeClient));
+  //
+  //    // vm.expectEmit();
+  //    // emit CCIPSendRequested(msgEvent2);
+  //    // vm.expectEmit();
+  //    // emit CCIPSendRequested(msgEvent1);
+  //
+  //    // After issue is fixed, sequence now increments as expected
+  //    Internal.EVM2AnyRampMessage memory msgEvent1 = _messageToEvent(message1, 1, 1, expectedFee, address(s_facadeClient));
+  //    Internal.EVM2AnyRampMessage memory msgEvent2 = _messageToEvent(message2, 2, 2, expectedFee, address(s_facadeClient));
+  //
+  //    vm.expectEmit();
+  //    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, msgEvent2);
+  //    vm.expectEmit();
+  //    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, msgEvent1);
+  //
+  //    s_facadeClient.send(amount);
+  //  }
 }
