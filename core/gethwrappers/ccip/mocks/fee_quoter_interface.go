@@ -3356,7 +3356,7 @@ func (_c *FeeQuoterInterface_ProcessMessageArgs_Call) RunAndReturn(run func(*bin
 }
 
 // ProcessPoolReturnData provides a mock function with given fields: opts, destChainSelector, rampTokenAmounts, sourceTokenAmounts
-func (_m *FeeQuoterInterface) ProcessPoolReturnData(opts *bind.CallOpts, destChainSelector uint64, rampTokenAmounts []fee_quoter.InternalRampTokenAmount, sourceTokenAmounts []fee_quoter.ClientEVMTokenAmount) ([][]byte, error) {
+func (_m *FeeQuoterInterface) ProcessPoolReturnData(opts *bind.CallOpts, destChainSelector uint64, rampTokenAmounts []fee_quoter.InternalEVM2AnyTokenTransfer, sourceTokenAmounts []fee_quoter.ClientEVMTokenAmount) ([][]byte, error) {
 	ret := _m.Called(opts, destChainSelector, rampTokenAmounts, sourceTokenAmounts)
 
 	if len(ret) == 0 {
@@ -3365,10 +3365,10 @@ func (_m *FeeQuoterInterface) ProcessPoolReturnData(opts *bind.CallOpts, destCha
 
 	var r0 [][]byte
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, uint64, []fee_quoter.InternalRampTokenAmount, []fee_quoter.ClientEVMTokenAmount) ([][]byte, error)); ok {
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, uint64, []fee_quoter.InternalEVM2AnyTokenTransfer, []fee_quoter.ClientEVMTokenAmount) ([][]byte, error)); ok {
 		return rf(opts, destChainSelector, rampTokenAmounts, sourceTokenAmounts)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, uint64, []fee_quoter.InternalRampTokenAmount, []fee_quoter.ClientEVMTokenAmount) [][]byte); ok {
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, uint64, []fee_quoter.InternalEVM2AnyTokenTransfer, []fee_quoter.ClientEVMTokenAmount) [][]byte); ok {
 		r0 = rf(opts, destChainSelector, rampTokenAmounts, sourceTokenAmounts)
 	} else {
 		if ret.Get(0) != nil {
@@ -3376,7 +3376,7 @@ func (_m *FeeQuoterInterface) ProcessPoolReturnData(opts *bind.CallOpts, destCha
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts, uint64, []fee_quoter.InternalRampTokenAmount, []fee_quoter.ClientEVMTokenAmount) error); ok {
+	if rf, ok := ret.Get(1).(func(*bind.CallOpts, uint64, []fee_quoter.InternalEVM2AnyTokenTransfer, []fee_quoter.ClientEVMTokenAmount) error); ok {
 		r1 = rf(opts, destChainSelector, rampTokenAmounts, sourceTokenAmounts)
 	} else {
 		r1 = ret.Error(1)
@@ -3399,9 +3399,9 @@ func (_e *FeeQuoterInterface_Expecter) ProcessPoolReturnData(opts interface{}, d
 	return &FeeQuoterInterface_ProcessPoolReturnData_Call{Call: _e.mock.On("ProcessPoolReturnData", opts, destChainSelector, rampTokenAmounts, sourceTokenAmounts)}
 }
 
-func (_c *FeeQuoterInterface_ProcessPoolReturnData_Call) Run(run func(opts *bind.CallOpts, destChainSelector uint64, rampTokenAmounts []fee_quoter.InternalRampTokenAmount, sourceTokenAmounts []fee_quoter.ClientEVMTokenAmount)) *FeeQuoterInterface_ProcessPoolReturnData_Call {
+func (_c *FeeQuoterInterface_ProcessPoolReturnData_Call) Run(run func(opts *bind.CallOpts, destChainSelector uint64, rampTokenAmounts []fee_quoter.InternalEVM2AnyTokenTransfer, sourceTokenAmounts []fee_quoter.ClientEVMTokenAmount)) *FeeQuoterInterface_ProcessPoolReturnData_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*bind.CallOpts), args[1].(uint64), args[2].([]fee_quoter.InternalRampTokenAmount), args[3].([]fee_quoter.ClientEVMTokenAmount))
+		run(args[0].(*bind.CallOpts), args[1].(uint64), args[2].([]fee_quoter.InternalEVM2AnyTokenTransfer), args[3].([]fee_quoter.ClientEVMTokenAmount))
 	})
 	return _c
 }
@@ -3411,7 +3411,7 @@ func (_c *FeeQuoterInterface_ProcessPoolReturnData_Call) Return(_a0 [][]byte, _a
 	return _c
 }
 
-func (_c *FeeQuoterInterface_ProcessPoolReturnData_Call) RunAndReturn(run func(*bind.CallOpts, uint64, []fee_quoter.InternalRampTokenAmount, []fee_quoter.ClientEVMTokenAmount) ([][]byte, error)) *FeeQuoterInterface_ProcessPoolReturnData_Call {
+func (_c *FeeQuoterInterface_ProcessPoolReturnData_Call) RunAndReturn(run func(*bind.CallOpts, uint64, []fee_quoter.InternalEVM2AnyTokenTransfer, []fee_quoter.ClientEVMTokenAmount) ([][]byte, error)) *FeeQuoterInterface_ProcessPoolReturnData_Call {
 	_c.Call.Return(run)
 	return _c
 }
