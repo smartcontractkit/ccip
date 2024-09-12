@@ -12,7 +12,7 @@ interface IRMNV2 {
   }
 
   /// @notice Verifies signatures of RMN nodes, on dest lane updates as provided in the CommitReport
-  /// @param offrampAddress is not inferred by msg.sender, in case the call is made through ARMProxy
+  /// @param offRampAddress is not inferred by msg.sender, in case the call is made through ARMProxy
   /// @param destLaneUpdates must be well formed, and is a representation of the CommitReport received from the oracles
   /// @param signatures must be sorted in ascending order by signer address
   /// @dev Will revert if verification fails
@@ -22,10 +22,16 @@ interface IRMNV2 {
     Signature[] memory signatures
   ) external view;
 
+  /// @notice gets the current set of cursed subjects
+  /// @return subjects the list of cursed subjects
+  function getCursedSubjects() external view returns (bytes16[] memory subjects);
+
   /// @notice If there is an active global or legacy curse, this function returns true.
+  /// @return bool true if there is an active global curse
   function isCursed() external view returns (bool);
 
   /// @notice If there is an active global curse, or an active curse for `subject`, this function returns true.
   /// @param subject To check whether a particular chain is cursed, set to bytes16(uint128(chainSelector)).
+  /// @return bool true if the profived subject is cured *or* if there is an active global curse
   function isCursed(bytes16 subject) external view returns (bool);
 }
