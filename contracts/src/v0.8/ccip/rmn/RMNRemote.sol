@@ -37,22 +37,26 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   event Cursed(bytes16[] subjects);
   event Uncursed(bytes16[] subjects);
 
+  /// @dev the configuration of an RMN signer
   struct Signer {
     address onchainPublicKey; // ────╮ for signing reports
     uint64 nodeIndex; // ────────────╯ maps to nodes in home chain config, should be strictly increasing
   }
 
+  /// @dev the contract config
   struct Config {
     bytes32 rmnHomeContractConfigDigest; // digest of the RMNHome contract config
     Signer[] signers; // list of signers
     uint64 minSigners; // threshold for the number of signers required to verify a report
   }
 
+  /// @dev the contract config + a version number
   struct VersionedConfig {
     uint32 version; // for tracking the version of the config
     Config config; // the config
   }
 
+  /// @dev the payload that RMN nodes sign
   struct Report {
     uint256 destChainId; // to guard against chain selector misconfiguration
     uint64 destChainSelector; // the chain selector of the destination chain
