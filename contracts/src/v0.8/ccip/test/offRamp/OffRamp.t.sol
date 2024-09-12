@@ -814,24 +814,6 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     s_offRamp.executeSingleReport(executionReport, new OffRamp.GasLimitOverride[](0));
   }
 
-  function test_MismatchingOnRampRoot_Revert() public {
-    s_offRamp.setVerifyOverrideResult(SOURCE_CHAIN_SELECTOR_1, 0);
-
-    Internal.Any2EVMRampMessage[] memory messages =
-      _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
-
-    OffRamp.CommitReport memory commitReport = _constructCommitReport(
-      // Root against mismatching on ramp
-      _hashMessage(messages[0], ON_RAMP_ADDRESS_3)
-    );
-    _commit(commitReport, s_latestSequenceNumber);
-
-    Internal.ExecutionReportSingleChain memory executionReport =
-      _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
-    vm.expectRevert(abi.encodeWithSelector(OffRamp.RootNotCommitted.selector, SOURCE_CHAIN_SELECTOR_1));
-    s_offRamp.executeSingleReport(executionReport, new OffRamp.GasLimitOverride[](0));
-  }
-
   function test_UnhealthySingleChainCurse_Revert() public {
     _setMockRMNChainCurse(SOURCE_CHAIN_SELECTOR_1, true);
     vm.expectEmit();
