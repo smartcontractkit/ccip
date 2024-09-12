@@ -48,7 +48,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   event FeeTokenRemoved(address indexed feeToken);
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
   event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
-  event PriceFeedPerTokenUpdated(address indexed token, IFeeQuoter.TokenPriceFeedConfig priceFeedConfig);
+  event PriceFeedPerTokenUpdated(address indexed token, TokenPriceFeedConfig priceFeedConfig);
   event TokenTransferFeeConfigUpdated(
     uint64 indexed destChainSelector, address indexed token, TokenTransferFeeConfig tokenTransferFeeConfig
   );
@@ -57,10 +57,16 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   event DestChainConfigUpdated(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
   event DestChainAdded(uint64 indexed destChainSelector, DestChainConfig destChainConfig);
 
+  /// @dev Token price data feed configuration
+  struct TokenPriceFeedConfig {
+    address dataFeedAddress; // ──╮ AggregatorV3Interface contract (0 - feed is unset)
+    uint8 tokenDecimals; // ──────╯ Decimals of the token that the feed represents
+  }
+
   /// @dev Token price data feed update
   struct TokenPriceFeedUpdate {
     address sourceToken; // Source token to update feed for
-    IFeeQuoter.TokenPriceFeedConfig feedConfig; // Feed config update data
+    TokenPriceFeedConfig feedConfig; // Feed config update data
   }
 
   /// @dev Struct that contains the static configuration
@@ -176,7 +182,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   mapping(address token => Internal.TimestampedPackedUint224 price) private s_usdPerToken;
 
   /// @dev Stores the price data feed configurations per token.
-  mapping(address token => IFeeQuoter.TokenPriceFeedConfig dataFeedAddress) private s_usdPriceFeedsPerToken;
+  mapping(address token => TokenPriceFeedConfig dataFeedAddress) private s_usdPriceFeedsPerToken;
 
   /// @dev The multiplier for destination chain specific premiums that can be set by the owner or fee admin
   mapping(address token => uint64 premiumMultiplierWeiPerEth) private s_premiumMultiplierWeiPerEth;
@@ -238,7 +244,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       return tokenPrice;
     }
 
-    IFeeQuoter.TokenPriceFeedConfig memory priceFeedConfig = s_usdPriceFeedsPerToken[token];
+    TokenPriceFeedConfig memory priceFeedConfig = s_usdPriceFeedsPerToken[token];
 
     // If the token price feed is not set, return the stale price
     if (priceFeedConfig.dataFeedAddress == address(0)) {
@@ -250,15 +256,19 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     return _getTokenPriceFromDataFeed(priceFeedConfig);
   }
 
-  /// @inheritdoc IFeeQuoter
-  function getValidatedTokenPrice(address token) external view override returns (uint224) {
+  /// @notice Get the `tokenPrice` for a given token, checks if the price is valid.
+  /// @param token The token to get the price for.
+  /// @return tokenPrice The tokenPrice for the given token if it exists and is valid.
+  function getValidatedTokenPrice(address token) external view returns (uint224) {
     return _getValidatedTokenPrice(token);
   }
 
-  /// @inheritdoc IFeeQuoter
+  /// @notice Get the `tokenPrice` for an array of tokens.
+  /// @param tokens The tokens to get prices for.
+  /// @return tokenPrices The tokenPrices for the given tokens.
   function getTokenPrices(
     address[] calldata tokens
-  ) external view override returns (Internal.TimestampedPackedUint224[] memory) {
+  ) external view returns (Internal.TimestampedPackedUint224[] memory) {
     uint256 length = tokens.length;
     Internal.TimestampedPackedUint224[] memory tokenPrices = new Internal.TimestampedPackedUint224[](length);
     for (uint256 i = 0; i < length; ++i) {
@@ -267,25 +277,38 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     return tokenPrices;
   }
 
-  /// @inheritdoc IFeeQuoter
+  /// @notice Returns the token price data feed configuration
+  /// @param token The token to retrieve the feed config for
+  /// @return tokenPriceFeedConfig The token price data feed config (if feed address is 0, the feed config is disabled)
   function getTokenPriceFeedConfig(
     address token
-  ) external view override returns (IFeeQuoter.TokenPriceFeedConfig memory) {
+  ) external view  returns (TokenPriceFeedConfig memory) {
     return s_usdPriceFeedsPerToken[token];
   }
 
-  /// @inheritdoc IFeeQuoter
+  /// @notice Get an encoded `gasPrice` for a given destination chain ID.
+  /// The 224-bit result encodes necessary gas price components.
+  /// On L1 chains like Ethereum or Avax, the only component is the gas price.
+  /// On Optimistic Rollups, there are two components - the L2 gas price, and L1 base fee for data availability.
+  /// On future chains, there could be more or differing price components.
+  /// PriceRegistry does not contain chain-specific logic to parse destination chain price components.
+  /// @param destChainSelector The destination chain to get the price for.
+  /// @return gasPrice The encoded gasPrice for the given destination chain ID.
   function getDestinationChainGasPrice(
     uint64 destChainSelector
-  ) external view override returns (Internal.TimestampedPackedUint224 memory) {
+  ) external view  returns (Internal.TimestampedPackedUint224 memory) {
     return s_usdPerUnitGasByDestChainSelector[destChainSelector];
   }
 
-  /// @inheritdoc IFeeQuoter
+  /// @notice Gets the fee token price and the gas price, both denominated in dollars.
+  /// @param token The source token to get the price for.
+  /// @param destChainSelector The destination chain to get the gas price for.
+  /// @return tokenPrice The price of the feeToken in 1e18 dollars per base unit.
+  /// @return gasPriceValue The price of gas in 1e18 dollars per base unit.
   function getTokenAndGasPrices(
     address token,
     uint64 destChainSelector
-  ) public view override returns (uint224 tokenPrice, uint224 gasPriceValue) {
+  ) public view  returns (uint224 tokenPrice, uint224 gasPriceValue) {
     Internal.TimestampedPackedUint224 memory gasPrice = s_usdPerUnitGasByDestChainSelector[destChainSelector];
     // We do allow a gas price of 0, but no stale or unset gas prices
     if (gasPrice.timestamp == 0) revert ChainNotSupported(destChainSelector);
@@ -295,15 +318,19 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     return (_getValidatedTokenPrice(token), gasPrice.value);
   }
 
-  /// @inheritdoc IFeeQuoter
+  /// @notice Convert a given token amount to target token amount.
   /// @dev this function assumes that no more than 1e59 dollars are sent as payment.
   /// If more is sent, the multiplication of feeTokenAmount and feeTokenValue will overflow.
   /// Since there isn't even close to 1e59 dollars in the world economy this is safe.
+  /// @param fromToken The given token address.
+  /// @param fromTokenAmount The given token amount.
+  /// @param toToken The target token address.
+  /// @return toTokenAmount The target token amount.
   function convertTokenAmount(
     address fromToken,
     uint256 fromTokenAmount,
     address toToken
-  ) public view override returns (uint256) {
+  ) public view returns (uint256) {
     /// Example:
     /// fromTokenAmount:   1e18      // 1 ETH
     /// ETH:               2_000e18
@@ -326,7 +353,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @param priceFeedConfig token data feed configuration with valid data feed address (used to retrieve price & timestamp)
   /// @return tokenPrice data feed price answer rebased to s_usdPerToken units, with latest block timestamp
   function _getTokenPriceFromDataFeed(
-    IFeeQuoter.TokenPriceFeedConfig memory priceFeedConfig
+    TokenPriceFeedConfig memory priceFeedConfig
   ) internal view returns (Internal.TimestampedPackedUint224 memory tokenPrice) {
     AggregatorV3Interface dataFeedContract = AggregatorV3Interface(priceFeedConfig.dataFeedAddress);
     (
@@ -427,7 +454,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     for (uint256 i; i < tokenPriceFeedUpdates.length; ++i) {
       TokenPriceFeedUpdate memory update = tokenPriceFeedUpdates[i];
       address sourceToken = update.sourceToken;
-      IFeeQuoter.TokenPriceFeedConfig memory tokenPriceFeedConfig = update.feedConfig;
+      TokenPriceFeedConfig memory tokenPriceFeedConfig = update.feedConfig;
 
       s_usdPriceFeedsPerToken[sourceToken] = tokenPriceFeedConfig;
       emit PriceFeedPerTokenUpdated(sourceToken, tokenPriceFeedConfig);
