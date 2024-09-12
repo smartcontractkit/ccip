@@ -285,7 +285,8 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
   ) internal view returns (Internal.Any2EVMRampMessage memory) {
     bytes memory data = abi.encode(0);
 
-    Internal.Any2EVMTokenTransfer[] memory any2EVMTokenTransfer = new Internal.Any2EVMTokenTransfer[](tokenAmounts.length);
+    Internal.Any2EVMTokenTransfer[] memory any2EVMTokenTransfer =
+      new Internal.Any2EVMTokenTransfer[](tokenAmounts.length);
 
     // Correctly set the TokenDataPayload for each token. Tokens have to be set up in the TokenSetup.
     for (uint256 i = 0; i < tokenAmounts.length; ++i) {
