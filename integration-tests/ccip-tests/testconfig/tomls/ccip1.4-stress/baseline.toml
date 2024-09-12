@@ -66,7 +66,7 @@ block_time = 1
 [CCIP.Env.NewCLCluster]
 NoOfNodes = 17
 NodeMemory = '10Gi'
-NodeCPU = '4'
+NodeCPU = '6'
 DBMemory = '16Gi'
 DBCPU = '4'
 DBStorageClass = 'gp3'
@@ -140,8 +140,8 @@ NoOfCommitNodes = 16
 PhaseTimeout = '40m'
 NodeFunding = 1000.0
 NoOfRoutersPerPair = 1
-NoOfNetworks = 30
-MaxNoOfLanes = 300
+NoOfNetworks = 40
+MaxNoOfLanes = 400
 
 [CCIP.Groups.load.OffRampConfig]
 BatchGasLimit = 11000000
@@ -154,7 +154,7 @@ DynamicPriceUpdateInterval ='15s'
 CCIPOwnerTokens = true
 
 [CCIP.Groups.load.LoadProfile]
-TestDuration = '6h'
+TestDuration = '2h'
 TimeUnit = '5s'
 RequestPerUnitTime = [1]
 OptimizeSpace = true
