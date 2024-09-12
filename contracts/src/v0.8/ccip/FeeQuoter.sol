@@ -247,6 +247,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     }
 
     // If the token price feed is set, return the price from the feed
+    // The price feed is the fallback because we do not expect it to be the default source due to the gas cost of reading from it
     return _getTokenPriceFromDataFeed(priceFeedConfig);
   }
 
