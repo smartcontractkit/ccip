@@ -3255,11 +3255,14 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       merkleRoot: "test #2"
     });
 
-    _commit(OffRamp.CommitReport({
-      priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
-      merkleRoots: roots,
-      rmnSignatures: s_rmnSignatures
-    }), s_latestSequenceNumber);
+    _commit(
+      OffRamp.CommitReport({
+        priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
+        merkleRoots: roots,
+        rmnSignatures: s_rmnSignatures
+      }),
+      s_latestSequenceNumber
+    );
 
     vm.stopPrank();
     vm.startPrank(OWNER);

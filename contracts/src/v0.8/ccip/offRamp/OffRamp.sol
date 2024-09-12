@@ -787,7 +787,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       if (currentConfig.onRamp.length == 0) {
         currentConfig.minSeqNr = 1;
         emit SourceChainSelectorAdded(sourceChainSelector);
-      } else if (currentConfig.minSeqNr != 1)  {
+      } else if (currentConfig.minSeqNr != 1) {
         // OnRamp updates should only happens due to a misconfiguration
         // If an OnRamp is misconfigured not reports should have been committed and no messages should have been executed
         // This is enforced byt the onRamp address check in the commit function
@@ -798,7 +798,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       if (newOnRamp.length == 0 || keccak256(newOnRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
         revert ZeroAddressNotAllowed();
       }
-
 
       currentConfig.onRamp = newOnRamp;
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
