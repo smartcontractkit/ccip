@@ -388,7 +388,7 @@ contract FeeQuoterFeeSetup is FeeQuoterSetup {
       extraArgs: Client._argsToBytes(extraArgs),
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
-      tokenAmounts: new Internal.RampTokenAmount[](message.tokenAmounts.length)
+      tokenAmounts: new Internal.EVM2AnyTokenTransfer[](message.tokenAmounts.length)
     });
 
     for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
@@ -404,7 +404,7 @@ contract FeeQuoterFeeSetup is FeeQuoterSetup {
     Client.EVMTokenAmount memory tokenAmount,
     TokenAdminRegistry tokenAdminRegistry,
     uint64 destChainSelector
-  ) internal view returns (Internal.RampTokenAmount memory) {
+  ) internal view returns (Internal.EVM2AnyTokenTransfer memory) {
     address destToken = s_destTokenBySourceToken[tokenAmount.token];
 
     uint32 expectedDestGasAmount;
@@ -413,8 +413,8 @@ contract FeeQuoterFeeSetup is FeeQuoterSetup {
     expectedDestGasAmount =
       tokenTransferFeeConfig.isEnabled ? tokenTransferFeeConfig.destGasOverhead : DEFAULT_TOKEN_DEST_GAS_OVERHEAD;
 
-    return Internal.RampTokenAmount({
-      sourcePoolAddress: abi.encode(tokenAdminRegistry.getTokenConfig(tokenAmount.token).tokenPool),
+    return Internal.EVM2AnyTokenTransfer({
+      sourcePoolAddress: tokenAdminRegistry.getTokenConfig(tokenAmount.token).tokenPool,
       destTokenAddress: abi.encode(destToken),
       extraData: "",
       amount: tokenAmount.amount,

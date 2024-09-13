@@ -87,12 +87,12 @@ interface IPriceRegistry {
 
   /// @notice Validates pool return data
   /// @param destChainSelector Destination chain selector to which the token amounts are sent to
-  /// @param rampTokenAmounts Token amounts with populated pool return data
+  /// @param tokenAmounts Token amounts with populated pool return data
   /// @param sourceTokenAmounts Token amounts originally sent in a Client.EVM2AnyMessage message
   /// @return destExecData Destination chain execution data
   function processPoolReturnData(
     uint64 destChainSelector,
-    Internal.RampTokenAmount[] memory rampTokenAmounts,
+    Internal.EVM2AnyTokenTransfer[] memory tokenAmounts,
     Client.EVMTokenAmount[] calldata sourceTokenAmounts
   ) external view returns (bytes[] memory);
 }
