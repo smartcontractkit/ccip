@@ -48,10 +48,12 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
 
     s_ccipAdmin = newOwner_;
 
-    // Mint the initial supply to the new Owner
-    _mint(newOwner_, preMint_);
+    // Mint the initial supply to the new Owner, save gas by not calling if the mint amount is zero
+    if (preMint_ != 0) _mint(newOwner_, preMint_);
 
-    // Grant the deployer the minter and burner roles
+    // Grant the deployer the minter and burner roles. This contract is expected to be deployed by a factory
+    // contract that will transfer ownership to the correct address after deployment, so granting minting and burning
+    // privileges here saves the user gas by not requiring two transactions.
     grantMintRole(newOwner_);
     grantBurnRole(newOwner_);
   }

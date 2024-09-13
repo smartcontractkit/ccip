@@ -1,5 +1,6 @@
 pragma solidity ^0.8.24;
 
+import {ITypeAndVersion} from "../../shared/interfaces/ItypeAndVersion.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
@@ -9,29 +10,45 @@ import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {TokenPool} from "../pools/TokenPool.sol";
 import {RegistryModuleOwnerCustom} from "./RegistryModuleOwnerCustom.sol";
 
-import {BurnMintERC677} from "../../shared/token/ERC677/BurnMintERC677.sol";
 import {BurnMintTokenPool} from "../pools/BurnMintTokenPool.sol";
 
-import {console2 as console} from "forge-std/console2.sol";
-
-contract TokenPoolFactory is OwnerIsCreator {
+contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
   using DeterministicContractDeployer for bytes;
-
-  ITokenAdminRegistry internal immutable i_tokenAdminRegistry;
-  RegistryModuleOwnerCustom internal immutable i_registryModuleOwnerCustom;
-  address internal immutable i_rmnProxy;
-  address internal immutable i_ccipRouter;
 
   event RemoteChainConfigUpdated(uint64 indexed remoteChainSelector, RemoteChainConfig remoteChainConfig);
 
   error InvalidZeroAddress();
 
+  struct RemoteTokenPoolInfo {
+    uint64 remoteChainSelector;
+    bytes remotePoolAddress;
+    bytes remoteTokenAddress;
+    bytes remoteTokenInitCode;
+    RateLimiter.Config outboundRateLimiterConfig;
+    RateLimiter.Config inboundRateLimiterConfig;
+  }
+
+  struct RemoteChainConfig {
+    address remotePoolFactory;
+    address remoteRouter;
+    address remoteRMNProxy;
+  }
+
+  ITokenAdminRegistry internal immutable i_tokenAdminRegistry;
+  RegistryModuleOwnerCustom internal immutable i_registryModuleOwnerCustom;
+
+  address internal immutable i_rmnProxy;
+  address internal immutable i_ccipRouter;
+
+  // bytes4(keccak256("EMPTY_PARAMETER_FLAG"))
+  bytes4 public constant EMPTY_PARAMETER_FLAG = 0x8fc9a1e4;
+
   mapping(uint64 remoteChainSelector => RemoteChainConfig) internal s_remoteChainConfigs;
 
-  bytes4 public constant EMPTY_PARAMETER_FLAG = bytes4(keccak256("EMPTY_PARAMETER"));
-
   constructor(address tokenAdminRegistry, address tokenAdminModule, address rmnProxy, address ccipRouter) {
-    if (tokenAdminRegistry == address(0) || rmnProxy == address(0)) revert InvalidZeroAddress();
+    if (
+      tokenAdminRegistry == address(0) || rmnProxy == address(0) || rmnProxy == address(0) || ccipRouter == address(0)
+    ) revert InvalidZeroAddress();
 
     i_tokenAdminRegistry = ITokenAdminRegistry(tokenAdminRegistry);
     i_registryModuleOwnerCustom = RegistryModuleOwnerCustom(tokenAdminModule);
@@ -39,26 +56,8 @@ contract TokenPoolFactory is OwnerIsCreator {
     i_ccipRouter = ccipRouter;
   }
 
-  struct ExistingTokenPool {
-    uint64 remoteChainSelector;
-    bytes remotePoolAddress;
-    bytes remoteTokenAddress;
-    bytes remoteTokenInitCode;
-    RateLimiter.Config outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of
-      //  the onRamps for the given chain
-    RateLimiter.Config inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of
-      // the offRamps for the given chain
-  }
-
-  /// @dev ORDERING IS CRITICAL IN PREDICTING ADDRESSES
-  struct RemoteChainConfig {
-    address remotePoolFactory;
-    address remoteRouter;
-    address remoteRMNProxy;
-  }
-
   function deployTokenAndTokenPool(
-    ExistingTokenPool[] memory remoteTokenPools,
+    RemoteTokenPoolInfo[] memory remoteTokenPools,
     bytes memory tokenInitCode,
     bytes memory tokenPoolInitCode,
     bytes memory tokenPoolInitArgs,
@@ -67,45 +66,79 @@ contract TokenPoolFactory is OwnerIsCreator {
     // Ensure a unique deployment between senders even if the same input parameter is used
     salt = keccak256(abi.encodePacked(salt, msg.sender));
 
+    // Deploy the token
     address token = tokenInitCode._deploy(salt);
 
-    return _createTokenPool(token, remoteTokenPools, tokenPoolInitCode, tokenPoolInitArgs, salt, false);
+    // Deploy the token pool
+    poolAddress = _createTokenPool(token, remoteTokenPools, tokenPoolInitCode, tokenPoolInitArgs, salt);
+
+    // Set the token pool in the token admin registry since this contract is the owner of the token and the pool
+    _setTokenPool(token, poolAddress);
+
+    // Transfer the ownership of the token to the msg.sender.
+    // This is a 2 step process and must be accepted in a separate tx.
+    OwnerIsCreator(token).transferOwnership(address(msg.sender)); // 2 step ownership transfer
+
+    return (token, poolAddress);
   }
 
+  /// @notice Deploys a token pool with an existing ERC20 token
+  /// @dev Since the token already exists, this contract is not the owner and therefore cannot configure the
+  /// token pool in the token admin registry in the same transaction. The user must invoke the calls to the
+  /// tokenAdminRegistry manually
+  /// @param token The address of the existing token to be used in the token pool
+  /// @param remoteTokenPools An array of remote token pools info to be used in the pool's applyChainUpdates function
+  /// @param tokenPoolInitCode The creation code for the token pool
+  /// @param tokenPoolInitArgs The arguments to be passed to the token pool's constructor and concatenated with the
+  /// initCode to be passed into the deployer function
+  /// @param salt The salt to be used in the create2 deployment of the token pool
+  /// @return poolAddress The address of the token pool that was deployed
   function deployTokenPoolWithExistingToken(
     address token,
-    ExistingTokenPool[] memory remoteTokenPools,
-    bytes memory tokenInitCode,
+    RemoteTokenPoolInfo[] memory remoteTokenPools,
     bytes memory tokenPoolInitCode,
     bytes memory tokenPoolInitArgs,
     bytes32 salt
-  ) external returns (address tokenAddress, address poolAddress) {
+  ) external returns (address poolAddress) {
     // Ensure a unique deployment between senders even if the same input parameter is used
     salt = keccak256(abi.encodePacked(salt, msg.sender));
 
-    return _createTokenPool(token, remoteTokenPools, tokenPoolInitCode, tokenPoolInitArgs, salt, true);
+    // create the token pool and return the address
+    return _createTokenPool(token, remoteTokenPools, tokenPoolInitCode, tokenPoolInitArgs, salt);
   }
 
+  /// @notice Deploys a token pool with the given token information and remote token pools
+  /// @param token The token to be used in the token pool
+  /// @param remoteTokenPools An array of remote token pools info to be used in the pool's applyChainUpdates function
+  /// @param tokenPoolInitCode The creation code for the token pool
+  /// @param tokenPoolInitArgs The arguments to be passed to the token pool's constructor and concatenated with the
+  /// initCode to be passed into the deployer function
+  /// @param salt The salt to be used in the create2 deployment of the token pool
+  /// @return poolAddress The address of the token pool that was deployed
   function _createTokenPool(
     address token,
-    ExistingTokenPool[] memory remoteTokenPools,
+    RemoteTokenPoolInfo[] memory remoteTokenPools,
     bytes memory tokenPoolInitCode,
     bytes memory tokenPoolInitArgs,
-    bytes32 salt,
-    bool isExistingToken
-  ) internal returns (address tokenAddress, address poolAddress) {
-    // If the user doesn't want to provide any special parameters which may be needed for the token pool
-    // then use the standard burn/mint token pool params. Since the user can provide custom token pool
-    // init code, they must also be able to provide custom constructor args.
+    bytes32 salt
+  ) internal returns (address) {
+    // If the user doesn't want to provide any special parameters which may be neededfor a custom the token pool then
+    /// use the standard burn/mint token pool params. Since the user can provide custom token pool init code,
+    // they must also provide custom constructor args.
     if (bytes4(tokenPoolInitArgs) == EMPTY_PARAMETER_FLAG) {
       tokenPoolInitArgs = abi.encode(token, new address[](0), i_rmnProxy, i_ccipRouter);
     }
 
-    // Construct the code that will be depoyed from the initCode and the initArgs
-    bytes memory newtokenPoolInitCode = abi.encodePacked(tokenPoolInitCode, tokenPoolInitArgs);
 
-    // deploy the pool using the above
-    poolAddress = newtokenPoolInitCode._deploy(salt);
+    // Stack scoping to reduce pressure on stack too deep from the concatenated initCode and initArgs
+    address poolAddress;
+    {
+      // Construct the code that will be depoyed from the initCode and the initArgs
+      bytes memory newtokenPoolInitCode = abi.encodePacked(tokenPoolInitCode, tokenPoolInitArgs);
+
+      // deploy the pool using the above
+      poolAddress = newtokenPoolInitCode._deploy(salt);
+    }
 
     // Stack Scoping to reduce pressure on stack too deep
     {
@@ -131,10 +164,11 @@ contract TokenPoolFactory is OwnerIsCreator {
         // Get the address of the remote factory, caching the storage value in memory
         RemoteChainConfig memory remoteChainConfig = s_remoteChainConfigs[remoteTokenPools[i].remoteChainSelector];
 
-        // If the user provides the empty parameter flag, then we need to predict the address of the token
-        // otherwise we can use the address provided by the user
+        // If the user provides the empty parameter flag, then the address of the token needs to be predicted
+        // otherwise the address provided is used.
         if (bytes4(remoteTokenPools[i].remoteTokenAddress) == EMPTY_PARAMETER_FLAG) {
-          // The user must provide the initCode for the remote token, so we can predict its address correctly. It's provided in the remoteTokenInitCode field for the remoteTokenPool
+          // The user must provide the initCode for the remote token, so we can predict its address correctly. It's
+          // provided in the remoteTokenInitCode field for the remoteTokenPool
           remoteTokenAddress = remoteTokenPools[i].remoteTokenInitCode._predictAddressOfUndeployedContract(
             salt, remoteChainConfig.remotePoolFactory
           );
@@ -144,18 +178,20 @@ contract TokenPoolFactory is OwnerIsCreator {
         } else {
           // If the user already has a remote token deployed, reuse the address. We still need it as
           // an address for later, so we store it in memory after decoding.
-          // NOTE: This assumes that the provided address can be decoded into an EVM address.
+          // This assumes that the provided address can be decoded into an EVM address.
           remoteTokenAddress = abi.decode(remoteTokenPools[i].remoteTokenAddress, (address));
 
           chainUpdate.remoteTokenAddress = remoteTokenPools[i].remoteTokenAddress;
         }
 
-        // If the user provides the empty parameter flag, then we need to predict the address of the pool
+        // If the user provides the empty parameter flag, the address of the pool should be predicted
         if (bytes4(remoteTokenPools[i].remotePoolAddress) == EMPTY_PARAMETER_FLAG) {
           // Generate the initCode that will be used on the remote chain. It is assumed that tokenInitCode
-          // will be the same on all chains, so we can reuse it here.
+          // will be the same on all chains, so it can be reused here.
 
-          // Calculate the remote pool Args with an empty allowList, remote RMN, and Remote Router addresses. Since the first constructor parameter is an EVM token address, we can use the remoteTokenAddress we acquired earlier.
+          // Calculate the remote pool Args with an empty allowList, remote RMN, and Remote Router addresses.
+          // Since the first constructor parameter is an EVM token address, the remoteTokenAddress acquired earlier.
+          // can be used.
           bytes memory remotePoolInitArgs = abi.encode(
             remoteTokenAddress, new address[](0), remoteChainConfig.remoteRMNProxy, remoteChainConfig.remoteRouter
           );
@@ -176,25 +212,22 @@ contract TokenPoolFactory is OwnerIsCreator {
         chainUpdates[i] = chainUpdate;
       }
 
-      // If the token already exists, then this contract will not be the owner,
-      // and thus it will not be able to set the token pool or transfer ownership
-      // which must be done manually by the end user.
-      if (!isExistingToken) {
-        _setTokenPool(token, poolAddress);
-        OwnerIsCreator(token).transferOwnership(address(msg.sender)); // 2 step ownership transfer
-      }
-
       // Apply the chain updates to the token pool
       TokenPool(poolAddress).applyChainUpdates(chainUpdates);
 
+      // Being the 2 step ownership transfer of the token pool to the msg.sender.
       OwnerIsCreator(poolAddress).transferOwnership(address(msg.sender)); // 2 step ownership transfer
 
-      // TODO: Add more events
-      return (token, poolAddress);
+      return poolAddress;
     }
   }
 
-  function _setTokenPool(address token, address pool) public {
+  /// @notice Sets the token pool address in the token admin registry for a newly deployed token pool.
+  /// @dev this function should only be called when the token is deployed by this contract as well, otherwise
+  /// the token pool will not be able to be set in the token admin registry, and this function will revert.
+  /// @param token The address of the token to set the pool for
+  /// @param pool The address of the pool to set in the token admin registry
+  function _setTokenPool(address token, address pool) internal {
     // propose this factory as the admin for the token in the token admin registry
     i_registryModuleOwnerCustom.registerAdminViaOwner(token);
 
@@ -204,19 +237,31 @@ contract TokenPoolFactory is OwnerIsCreator {
     // Set the pool address in the token admin registry
     i_tokenAdminRegistry.setPool(token, pool);
 
+    // Transfer the admin role for the token pool back to the msg.sender. This is a 2 step process
+    // and must be accepted in a separate tx.
     i_tokenAdminRegistry.transferAdminRole(token, msg.sender);
   }
 
   function updateRemoteChainConfig(
-    uint64 remoteChainSelector,
-    RemoteChainConfig calldata remoteConfig
-  ) public onlyOwner {
-    s_remoteChainConfigs[remoteChainSelector] = remoteConfig;
-
-    emit RemoteChainConfigUpdated(remoteChainSelector, remoteConfig);
+    uint64[] calldata remoteChainSelectors,
+    RemoteChainConfig[] calldata remoteConfigs
+  ) external onlyOwner {
+    for (uint256 i = 0; i < remoteChainSelectors.length; i++) {
+      s_remoteChainConfigs[remoteChainSelectors[i]] = remoteConfigs[i];
+      emit RemoteChainConfigUpdated(remoteChainSelectors[i], remoteConfigs[i]);
+    }
   }
 
+  /// @notice Get the remote chain config for a given remote chain selector
+  /// @param remoteChainSelector The remote chain selector to get the config for
+  /// @return remoteChainConfig The remote chain config for the given remote chain selector
   function getRemoteChainConfig(uint64 remoteChainSelector) public view returns (RemoteChainConfig memory) {
     return s_remoteChainConfigs[remoteChainSelector];
+  }
+
+  /// @notice Get the type and version of the contract
+  /// @return The type and version of the contract
+  function typeAndVersion() external pure returns (string memory) {
+    return "TokenPoolFactory 1.0.0-dev";
   }
 }
