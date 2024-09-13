@@ -32,6 +32,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   error OutOfOrderSignatures();
   error ThresholdNotMet();
   error UnexpectedSigner();
+  error ZeroValueNotAllowed();
 
   event ConfigSet(VersionedConfig versionedConfig);
   event Cursed(bytes16[] subjects);
@@ -44,6 +45,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   }
 
   /// @dev the contract config
+  /// @dev note: minSigners can be set to 0 to disable verification for chains without RMN support
   struct Config {
     bytes32 rmnHomeContractConfigDigest; // Digest of the RMNHome contract config
     Signer[] signers; // List of signers
@@ -57,13 +59,14 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   }
 
   /// @dev part of the payload that RMN nodes sign: keccak256(abi.encode(RMN_V1_6_ANY2EVM_REPORT, report))
+  /// @dev this struct is only ever abi-encoded and hashed; it is never stored
   struct Report {
-    uint256 destChainId; // To guard against chain selector misconfiguration
-    uint64 destChainSelector; // The chain selector of the destination chain
-    address rmnRemoteContractAddress; // The address of this contract
-    address offrampAddress; // The address of the offramp on the same chain as this contract
-    bytes32 rmnHomeContractConfigDigest; // The digest of the RMNHome contract config
-    Internal.MerkleRoot[] destLaneUpdates; // The dest lane updates
+    uint256 destChainId; //                     To guard against chain selector misconfiguration
+    uint64 destChainSelector; //  ────────────╮ The chain selector of the destination chain
+    address rmnRemoteContractAddress; // ─────╯ The address of this contract
+    address offrampAddress; //                  The address of the offramp on the same chain as this contract
+    bytes32 rmnHomeContractConfigDigest; //     The digest of the RMNHome contract config
+    Internal.MerkleRoot[] destLaneUpdates; //   The dest lane updates
   }
 
   Config s_config;
@@ -79,6 +82,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
 
   /// @param localChainSelector the chain selector of the chain this contract is deployed to
   constructor(uint64 localChainSelector) {
+    if (localChainSelector == 0) revert ZeroValueNotAllowed();
     i_localChainSelector = localChainSelector;
   }
 
