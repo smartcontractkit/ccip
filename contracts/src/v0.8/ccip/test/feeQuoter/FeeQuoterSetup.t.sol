@@ -122,7 +122,7 @@ contract FeeQuoterSetup is TokenSetup {
           minFeeUSDCents: 1_00, // 1 USD
           maxFeeUSDCents: 1000_00, // 1,000 USD
           deciBps: 2_5, // 2.5 bps, or 0.025%
-          destGasOverhead: 40_000,
+          destGasOverhead: 100_000,
           destBytesOverhead: 32,
           isEnabled: true
         })
@@ -135,7 +135,7 @@ contract FeeQuoterSetup is TokenSetup {
           minFeeUSDCents: 2_00, // 1 USD
           maxFeeUSDCents: 2000_00, // 1,000 USD
           deciBps: 10_0, // 10 bps, or 0.1%
-          destGasOverhead: 1,
+          destGasOverhead: 95_000,
           destBytesOverhead: 200,
           isEnabled: true
         })
