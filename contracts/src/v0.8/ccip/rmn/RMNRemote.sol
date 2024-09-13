@@ -78,7 +78,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   bytes16[] private s_cursedSubjectsSequence;
   /// @dev the index+1 is stored to easily distinguish b/t noncursed and cursed at the 0 index
   mapping(bytes16 subject => uint256 indexPlusOne) private s_cursedSubjectsIndexPlusOne;
-  mapping(address signer => bool exists) s_signers; // for more gas efficient verify
+  mapping(address signer => bool exists) private s_signers; // for more gas efficient verify
 
   /// @param localChainSelector the chain selector of the chain this contract is deployed to
   constructor(uint64 localChainSelector) {
@@ -100,7 +100,9 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
       revert ConfigNotSet();
     }
 
-    bytes32 signedHash = keccak256(
+    if (signatures.length < s_config.minSigners) revert ThresholdNotMet();
+
+    bytes32 digest = keccak256(
       abi.encode(
         RMN_V1_6_ANY2EVM_REPORT,
         Report({
@@ -114,18 +116,16 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
       )
     );
 
-    uint256 numSigners = 0;
-    address prevAddress = address(0);
+    address prevAddress;
+    address signerAddress;
     for (uint256 i = 0; i < signatures.length; ++i) {
       Signature memory sig = signatures[i];
-      address signerAddress = ecrecover(signedHash, 27, sig.r, sig.s);
+      signerAddress = ecrecover(digest, 27, sig.r, sig.s);
       if (signerAddress == address(0)) revert InvalidSignature();
       if (!(prevAddress < signerAddress)) revert OutOfOrderSignatures();
       if (!s_signers[signerAddress]) revert UnexpectedSigner();
       prevAddress = signerAddress;
-      ++numSigners;
     }
-    if (numSigners < s_config.minSigners) revert ThresholdNotMet();
   }
 
   // ================================================================
