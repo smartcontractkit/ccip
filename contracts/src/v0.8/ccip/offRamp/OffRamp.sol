@@ -631,8 +631,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     }
 
     // We retrieve the local token balance of the receiver before the pool call.
-    (uint256 balancePre, uint256 gasLeft) =
-      _getBalanceOfReceiver(receiver, localToken, sourceTokenAmount.destGasAmount);
+    (uint256 balancePre, uint256 gasLeft) = _getBalanceOfReceiver(receiver, localToken, sourceTokenAmount.destGasAmount);
 
     // We determined that the pool address is a valid EVM address, but that does not mean the code at this
     // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location

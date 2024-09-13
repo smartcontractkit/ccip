@@ -306,7 +306,7 @@ library Internal {
     bytes extraData;
     uint256 amount; // Amount of tokens.
     // Destination chain specific execution data encoded in bytes
-    // for an EVM destination, it consists of the amount of gas available for the releaseOrMint 
+    // for an EVM destination, it consists of the amount of gas available for the releaseOrMint
     // and transfer calls made by the offRamp
     bytes destExecData;
   }

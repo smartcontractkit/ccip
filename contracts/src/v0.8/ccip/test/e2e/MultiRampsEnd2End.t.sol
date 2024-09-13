@@ -276,7 +276,7 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
         destTokenAddress: abi.decode(msgEvent.tokenAmounts[i].destTokenAddress, (address)),
         extraData: msgEvent.tokenAmounts[i].extraData,
         amount: msgEvent.tokenAmounts[i].amount,
-        destGasAmount: abi.decode(msgEvent.tokenAmounts[i].destExecData, (uint32))
+        destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
       });
     }
     return Internal.Any2EVMRampMessage({
