@@ -862,13 +862,13 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   }
 
   /// @inheritdoc IFeeQuoter
-  /// @dev precondition - rampTokenAmounts and sourceTokenAmounts lengths must be equal
+  /// @dev precondition - onRampTokenTransfers and sourceTokenAmounts lengths must be equal
   function processMessageArgs(
     uint64 destChainSelector,
     address feeToken,
     uint256 feeTokenAmount,
     bytes calldata extraArgs,
-    Internal.EVM2AnyTokenTransfer[] calldata rampTokenAmounts,
+    Internal.EVM2AnyTokenTransfer[] calldata onRampTokenTransfers,
     Client.EVMTokenAmount[] calldata sourceTokenAmounts
   )
     external
@@ -894,7 +894,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     // We can parse unvalidated args since this message is called after getFee (which will already validate the params)
     Client.EVMExtraArgsV2 memory parsedExtraArgs = _parseUnvalidatedEVMExtraArgsFromBytes(extraArgs, defaultTxGasLimit);
     isOutOfOrderExecution = parsedExtraArgs.allowOutOfOrderExecution;
-    destExecDataPerToken = _processPoolReturnData(destChainSelector, rampTokenAmounts, sourceTokenAmounts);
+    destExecDataPerToken = _processPoolReturnData(destChainSelector, onRampTokenTransfers, sourceTokenAmounts);
 
     return (msgFeeJuels, isOutOfOrderExecution, Client._argsToBytes(parsedExtraArgs), destExecDataPerToken);
   }
