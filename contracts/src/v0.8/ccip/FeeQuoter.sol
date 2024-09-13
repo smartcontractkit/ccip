@@ -868,7 +868,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
     address feeToken,
     uint256 feeTokenAmount,
     bytes calldata extraArgs,
-    Internal.RampTokenAmount[] calldata rampTokenAmounts,
+    Internal.EVM2AnyTokenTransfer[] calldata rampTokenAmounts,
     Client.EVMTokenAmount[] calldata sourceTokenAmounts
   )
     external
@@ -901,7 +901,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
 
   /// @notice Validates pool return data
   /// @param destChainSelector Destination chain selector to which the token amounts are sent to
-  /// @param rampTokenAmounts Token amounts with populated pool return data
+  /// @param onRampTokenTransfers Token amounts with populated pool return data
   /// @param sourceTokenAmounts Token amounts originally sent in a Client.EVM2AnyMessage message
   /// @return destExecDataPerToken Destination chain execution data
   function _processPoolReturnData(
