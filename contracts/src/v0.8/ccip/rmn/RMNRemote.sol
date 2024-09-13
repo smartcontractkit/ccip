@@ -94,11 +94,13 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   function verify(
     address offrampAddress,
     Internal.MerkleRoot[] memory destLaneUpdates,
-    Signature[] memory signatures
+    Signature[] memory signatures,
+    uint256 rawVs
   ) external view {
     if (s_configCount == 0) {
       revert ConfigNotSet();
     }
+    if (signatures.length < s_config.minSigners) revert ThresholdNotMet();
 
     bytes32 signedHash = keccak256(
       abi.encode(
@@ -114,18 +116,15 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
       )
     );
 
-    uint256 numSigners = 0;
     address prevAddress = address(0);
     for (uint256 i = 0; i < signatures.length; ++i) {
       Signature memory sig = signatures[i];
-      address signerAddress = ecrecover(signedHash, 27, sig.r, sig.s);
-      if (signerAddress == address(0)) revert InvalidSignature();
-      if (!(prevAddress < signerAddress)) revert OutOfOrderSignatures();
+      address signerAddress = ecrecover(signedHash, 27 + uint8(rawVs & 0x01 << i), sig.r, sig.s);
+      // check for duplicates and also validates that no signature is 0
+      if (prevAddress >= signerAddress) revert OutOfOrderSignatures();
       if (!s_signers[signerAddress]) revert UnexpectedSigner();
       prevAddress = signerAddress;
-      ++numSigners;
     }
-    if (numSigners < s_config.minSigners) revert ThresholdNotMet();
   }
 
   // ================================================================
@@ -134,7 +133,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
 
   /// @notice Sets the configuration of the contract
   /// @param newConfig the new configuration
-  /// @dev setting congig is atomic; we delete all pre-existing config and set everything from scratch
+  /// @dev setting config is atomic; we delete all pre-existing config and set everything from scratch
   function setConfig(Config calldata newConfig) external onlyOwner {
     // sanity checks
     {

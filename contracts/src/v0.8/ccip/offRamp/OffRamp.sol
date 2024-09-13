@@ -131,6 +131,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     Internal.PriceUpdates priceUpdates; // Collection of gas and price updates to commit
     Internal.MerkleRoot[] merkleRoots; // Collection of merkle roots per source chain to commit
     IRMNV2.Signature[] rmnSignatures; // RMN signatures on the merkle roots
+    uint256 rawVs; // Raw v values of the RMN signatures
   }
 
   struct GasLimitOverride {
@@ -626,7 +627,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
     // Verify RMN signatures
     if (commitReport.merkleRoots.length > 0) {
-      i_rmn.verify(address(this), commitReport.merkleRoots, commitReport.rmnSignatures);
+      i_rmn.verify(address(this), commitReport.merkleRoots, commitReport.rmnSignatures, 0);
     }
 
     // Check if the report contains price updates
