@@ -56,7 +56,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     Config config; // The config
   }
 
-  /// @dev the payload that RMN nodes sign
+  /// @dev part of the payload that RMN nodes sign: keccak256(abi.encode(RMN_V1_6_ANY2EVM_REPORT, report))
   struct Report {
     uint256 destChainId; // To guard against chain selector misconfiguration
     uint64 destChainSelector; // The chain selector of the destination chain
