@@ -83,9 +83,14 @@ type FeeQuoterStaticConfig struct {
 	StalenessThreshold uint32
 }
 
+type FeeQuoterTokenPriceFeedConfig struct {
+	DataFeedAddress common.Address
+	TokenDecimals   uint8
+}
+
 type FeeQuoterTokenPriceFeedUpdate struct {
 	SourceToken common.Address
-	FeedConfig  IFeeQuoterTokenPriceFeedConfig
+	FeedConfig  FeeQuoterTokenPriceFeedConfig
 }
 
 type FeeQuoterTokenTransferFeeConfig struct {
@@ -110,19 +115,6 @@ type FeeQuoterTokenTransferFeeConfigRemoveArgs struct {
 type FeeQuoterTokenTransferFeeConfigSingleTokenArgs struct {
 	Token                  common.Address
 	TokenTransferFeeConfig FeeQuoterTokenTransferFeeConfig
-}
-
-type IFeeQuoterTokenPriceFeedConfig struct {
-	DataFeedAddress common.Address
-	TokenDecimals   uint8
-}
-
-type InternalEVM2AnyTokenTransfer struct {
-	SourcePoolAddress common.Address
-	DestTokenAddress  []byte
-	ExtraData         []byte
-	Amount            *big.Int
-	DestExecData      []byte
 }
 
 type InternalGasPriceUpdate struct {
@@ -544,25 +536,25 @@ func (_FeeQuoter *FeeQuoterCallerSession) GetTokenPrice(token common.Address) (I
 	return _FeeQuoter.Contract.GetTokenPrice(&_FeeQuoter.CallOpts, token)
 }
 
-func (_FeeQuoter *FeeQuoterCaller) GetTokenPriceFeedConfig(opts *bind.CallOpts, token common.Address) (IFeeQuoterTokenPriceFeedConfig, error) {
+func (_FeeQuoter *FeeQuoterCaller) GetTokenPriceFeedConfig(opts *bind.CallOpts, token common.Address) (FeeQuoterTokenPriceFeedConfig, error) {
 	var out []interface{}
 	err := _FeeQuoter.contract.Call(opts, &out, "getTokenPriceFeedConfig", token)
 
 	if err != nil {
-		return *new(IFeeQuoterTokenPriceFeedConfig), err
+		return *new(FeeQuoterTokenPriceFeedConfig), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(IFeeQuoterTokenPriceFeedConfig)).(*IFeeQuoterTokenPriceFeedConfig)
+	out0 := *abi.ConvertType(out[0], new(FeeQuoterTokenPriceFeedConfig)).(*FeeQuoterTokenPriceFeedConfig)
 
 	return out0, err
 
 }
 
-func (_FeeQuoter *FeeQuoterSession) GetTokenPriceFeedConfig(token common.Address) (IFeeQuoterTokenPriceFeedConfig, error) {
+func (_FeeQuoter *FeeQuoterSession) GetTokenPriceFeedConfig(token common.Address) (FeeQuoterTokenPriceFeedConfig, error) {
 	return _FeeQuoter.Contract.GetTokenPriceFeedConfig(&_FeeQuoter.CallOpts, token)
 }
 
-func (_FeeQuoter *FeeQuoterCallerSession) GetTokenPriceFeedConfig(token common.Address) (IFeeQuoterTokenPriceFeedConfig, error) {
+func (_FeeQuoter *FeeQuoterCallerSession) GetTokenPriceFeedConfig(token common.Address) (FeeQuoterTokenPriceFeedConfig, error) {
 	return _FeeQuoter.Contract.GetTokenPriceFeedConfig(&_FeeQuoter.CallOpts, token)
 }
 
@@ -676,11 +668,11 @@ func (_FeeQuoter *FeeQuoterCallerSession) Owner() (common.Address, error) {
 	return _FeeQuoter.Contract.Owner(&_FeeQuoter.CallOpts)
 }
 
-func (_FeeQuoter *FeeQuoterCaller) ProcessMessageArgs(opts *bind.CallOpts, destChainSelector uint64, feeToken common.Address, feeTokenAmount *big.Int, extraArgs []byte) (ProcessMessageArgs,
+func (_FeeQuoter *FeeQuoterCaller) ProcessMessageArgs(opts *bind.CallOpts, destChainSelector uint64, feeToken common.Address, feeTokenAmount *big.Int, extraArgs []byte, rampTokenAmounts []InternalRampTokenAmount, sourceTokenAmounts []ClientEVMTokenAmount) (ProcessMessageArgs,
 
 	error) {
 	var out []interface{}
-	err := _FeeQuoter.contract.Call(opts, &out, "processMessageArgs", destChainSelector, feeToken, feeTokenAmount, extraArgs)
+	err := _FeeQuoter.contract.Call(opts, &out, "processMessageArgs", destChainSelector, feeToken, feeTokenAmount, extraArgs, rampTokenAmounts, sourceTokenAmounts)
 
 	outstruct := new(ProcessMessageArgs)
 	if err != nil {
@@ -690,18 +682,19 @@ func (_FeeQuoter *FeeQuoterCaller) ProcessMessageArgs(opts *bind.CallOpts, destC
 	outstruct.MsgFeeJuels = *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
 	outstruct.IsOutOfOrderExecution = *abi.ConvertType(out[1], new(bool)).(*bool)
 	outstruct.ConvertedExtraArgs = *abi.ConvertType(out[2], new([]byte)).(*[]byte)
+	outstruct.DestExecDataPerToken = *abi.ConvertType(out[3], new([][]byte)).(*[][]byte)
 
 	return *outstruct, err
 
 }
 
-func (_FeeQuoter *FeeQuoterSession) ProcessMessageArgs(destChainSelector uint64, feeToken common.Address, feeTokenAmount *big.Int, extraArgs []byte) (ProcessMessageArgs,
+func (_FeeQuoter *FeeQuoterSession) ProcessMessageArgs(destChainSelector uint64, feeToken common.Address, feeTokenAmount *big.Int, extraArgs []byte, rampTokenAmounts []InternalRampTokenAmount, sourceTokenAmounts []ClientEVMTokenAmount) (ProcessMessageArgs,
 
 	error) {
-	return _FeeQuoter.Contract.ProcessMessageArgs(&_FeeQuoter.CallOpts, destChainSelector, feeToken, feeTokenAmount, extraArgs)
+	return _FeeQuoter.Contract.ProcessMessageArgs(&_FeeQuoter.CallOpts, destChainSelector, feeToken, feeTokenAmount, extraArgs, rampTokenAmounts, sourceTokenAmounts)
 }
 
-func (_FeeQuoter *FeeQuoterCallerSession) ProcessMessageArgs(destChainSelector uint64, feeToken common.Address, feeTokenAmount *big.Int, extraArgs []byte) (ProcessMessageArgs,
+func (_FeeQuoter *FeeQuoterCallerSession) ProcessMessageArgs(destChainSelector uint64, feeToken common.Address, feeTokenAmount *big.Int, extraArgs []byte, rampTokenAmounts []InternalRampTokenAmount, sourceTokenAmounts []ClientEVMTokenAmount) (ProcessMessageArgs,
 
 	error) {
 	return _FeeQuoter.Contract.ProcessMessageArgs(&_FeeQuoter.CallOpts, destChainSelector, feeToken, feeTokenAmount, extraArgs)
@@ -2089,7 +2082,7 @@ func (it *FeeQuoterPriceFeedPerTokenUpdatedIterator) Close() error {
 
 type FeeQuoterPriceFeedPerTokenUpdated struct {
 	Token           common.Address
-	PriceFeedConfig IFeeQuoterTokenPriceFeedConfig
+	PriceFeedConfig FeeQuoterTokenPriceFeedConfig
 	Raw             types.Log
 }
 
@@ -2822,6 +2815,7 @@ type ProcessMessageArgs struct {
 	MsgFeeJuels           *big.Int
 	IsOutOfOrderExecution bool
 	ConvertedExtraArgs    []byte
+	DestExecDataPerToken  [][]byte
 }
 
 func (_FeeQuoter *FeeQuoter) ParseLog(log types.Log) (generated.AbigenLog, error) {
@@ -2951,7 +2945,7 @@ type FeeQuoterInterface interface {
 
 	GetTokenPrice(opts *bind.CallOpts, token common.Address) (InternalTimestampedPackedUint224, error)
 
-	GetTokenPriceFeedConfig(opts *bind.CallOpts, token common.Address) (IFeeQuoterTokenPriceFeedConfig, error)
+	GetTokenPriceFeedConfig(opts *bind.CallOpts, token common.Address) (FeeQuoterTokenPriceFeedConfig, error)
 
 	GetTokenPrices(opts *bind.CallOpts, tokens []common.Address) ([]InternalTimestampedPackedUint224, error)
 
@@ -2963,7 +2957,7 @@ type FeeQuoterInterface interface {
 
 	Owner(opts *bind.CallOpts) (common.Address, error)
 
-	ProcessMessageArgs(opts *bind.CallOpts, destChainSelector uint64, feeToken common.Address, feeTokenAmount *big.Int, extraArgs []byte) (ProcessMessageArgs,
+	ProcessMessageArgs(opts *bind.CallOpts, destChainSelector uint64, feeToken common.Address, feeTokenAmount *big.Int, extraArgs []byte, rampTokenAmounts []InternalRampTokenAmount, sourceTokenAmounts []ClientEVMTokenAmount) (ProcessMessageArgs,
 
 		error)
 

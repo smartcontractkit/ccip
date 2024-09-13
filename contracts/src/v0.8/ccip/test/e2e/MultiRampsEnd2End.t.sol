@@ -267,9 +267,6 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
     router.ccipSend(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
-    uint256 gasLimit = s_feeQuoter.parseEVMExtraArgsFromBytes(msgEvent.extraArgs, DEST_CHAIN_SELECTOR).gasLimit;
-    Internal.Any2EVMTokenTransfer[] memory any2EVMTokenTransfer =
-      new Internal.Any2EVMTokenTransfer[](msgEvent.tokenAmounts.length);
     for (uint256 i = 0; i < msgEvent.tokenAmounts.length; ++i) {
       any2EVMTokenTransfer[i] = Internal.Any2EVMTokenTransfer({
         sourcePoolAddress: abi.encode(msgEvent.tokenAmounts[i].sourcePoolAddress),
@@ -279,6 +276,7 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
         destGasAmount: abi.decode(msgEvent.tokenAmounts[i].destExecData, (uint32))
       });
     }
+
     return Internal.Any2EVMRampMessage({
       header: Internal.RampMessageHeader({
         messageId: msgEvent.header.messageId,
