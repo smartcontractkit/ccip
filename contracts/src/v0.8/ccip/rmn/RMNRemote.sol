@@ -74,7 +74,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   uint32 s_configCount;
 
   string public constant override typeAndVersion = "RMNRemote 1.6.0-dev";
-  uint64 internal immutable i_chainSelector;
+  uint64 internal immutable i_localChainSelector;
 
   bytes16[] private s_cursedSubjectsSequence;
   mapping(bytes16 subject => uint256 indexPlusOne) private s_cursedSubjectsIndexPlusOne;
@@ -84,9 +84,9 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   // │                         Constructor                          │
   // ================================================================
 
-  /// @param chainSelector the chain selector of the chain this contract is deployed to
-  constructor(uint64 chainSelector) {
-    i_chainSelector = chainSelector;
+  /// @param localChainSelector the chain selector of the chain this contract is deployed to
+  constructor(uint64 localChainSelector) {
+    i_localChainSelector = localChainSelector;
   }
 
   // ================================================================
@@ -108,7 +108,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
         RMN_V1_6_ANY2EVM_REPORT,
         Report({
           destChainId: block.chainid,
-          destChainSelector: i_chainSelector,
+          destChainSelector: i_localChainSelector,
           rmnRemoteContractAddress: address(this),
           offrampAddress: offrampAddress,
           rmnHomeContractConfigDigest: s_config.rmnHomeContractConfigDigest,
@@ -185,9 +185,9 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   }
 
   /// @notice Returns the chain selector configured at deployment time
-  /// @return chainSelector the chain selector (not the chain ID)
-  function getChainSelector() external view returns (uint64 chainSelector) {
-    return i_chainSelector;
+  /// @return localChainSelector the chain selector (not the chain ID)
+  function getLocalChainSelector() external view returns (uint64 localChainSelector) {
+    return i_localChainSelector;
   }
 
   // ================================================================
