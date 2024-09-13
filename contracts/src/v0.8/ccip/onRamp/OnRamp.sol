@@ -69,7 +69,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   struct DynamicConfig {
     address feeQuoter; // FeeQuoter address
     bool reentrancyGuardEntered; // Reentrancy protection
-    address messageValidator; // Optional message validator to validate outbound messages (zero address = no validator)
+    address messageInterceptor; // Optional message interceptor to validate outbound messages (zero address = no interceptor)
     address feeAggregator; // Fee aggregator address
     address allowListAdmin; // authorized admin to add or remove allowed senders
   }
@@ -187,9 +187,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
 
     {
       // scoped to reduce stack usage
-      address messageValidator = s_dynamicConfig.messageValidator;
-      if (messageValidator != address(0)) {
-        IMessageInterceptor(messageValidator).onOutboundMessage(destChainSelector, message);
+      address messageInterceptor = s_dynamicConfig.messageInterceptor;
+      if (messageInterceptor != address(0)) {
+        IMessageInterceptor(messageInterceptor).onOutboundMessage(destChainSelector, message);
       }
     }
 

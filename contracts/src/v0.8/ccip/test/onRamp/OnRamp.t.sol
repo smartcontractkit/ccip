@@ -363,8 +363,8 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     );
   }
 
-  function test_forwardFromRouter_WithValidation_Success() public {
-    _enableOutboundMessageValidator();
+  function test_forwardFromRouter_WithInterception_Success() public {
+    _enableOutboundMessageInterceptor();
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
@@ -373,7 +373,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     message.tokenAmounts[0].amount = 1e18;
     message.tokenAmounts[0].token = s_sourceTokens[0];
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-    s_outboundMessageValidator.setMessageIdValidationState(keccak256(abi.encode(message)), false);
+    s_outboundmessageInterceptor.setMessageIdValidationState(keccak256(abi.encode(message)), false);
 
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
@@ -420,8 +420,8 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, STRANGER);
   }
 
-  function test_MessageValidationError_Revert() public {
-    _enableOutboundMessageValidator();
+  function test_MessageInterceptionError_Revert() public {
+    _enableOutboundMessageInterceptor();
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
@@ -430,7 +430,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     message.tokenAmounts[0].amount = 1e18;
     message.tokenAmounts[0].token = s_sourceTokens[0];
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-    s_outboundMessageValidator.setMessageIdValidationState(keccak256(abi.encode(message)), true);
+    s_outboundmessageInterceptor.setMessageIdValidationState(keccak256(abi.encode(message)), true);
 
     vm.expectRevert(
       abi.encodeWithSelector(IMessageInterceptor.MessageValidationError.selector, bytes("Invalid message"))
@@ -672,7 +672,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(23423),
       reentrancyGuardEntered: false,
-      messageValidator: makeAddr("messageValidator"),
+      messageInterceptor: makeAddr("messageInterceptor"),
       feeAggregator: FEE_AGGREGATOR,
       allowListAdmin: address(0)
     });
@@ -693,7 +693,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
       feeQuoter: address(0),
       reentrancyGuardEntered: false,
       feeAggregator: FEE_AGGREGATOR,
-      messageValidator: makeAddr("messageValidator"),
+      messageInterceptor: makeAddr("messageInterceptor"),
       allowListAdmin: address(0)
     });
 
@@ -705,7 +705,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(23423),
       reentrancyGuardEntered: false,
-      messageValidator: address(0),
+      messageInterceptor: address(0),
       feeAggregator: FEE_AGGREGATOR,
       allowListAdmin: address(0)
     });
@@ -720,7 +720,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(23423),
       reentrancyGuardEntered: false,
-      messageValidator: address(0),
+      messageInterceptor: address(0),
       feeAggregator: address(0),
       allowListAdmin: address(0)
     });
