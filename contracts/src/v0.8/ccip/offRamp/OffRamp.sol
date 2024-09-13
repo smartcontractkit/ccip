@@ -57,13 +57,14 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
-  error InvalidStaticConfig(uint64 sourceChainSelector);
   error StaleCommitReport();
   error InvalidInterval(uint64 sourceChainSelector, uint64 min, uint64 max);
   error ZeroAddressNotAllowed();
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
   error SourceChainSelectorMismatch(uint64 reportSourceChainSelector, uint64 messageSourceChainSelector);
   error SignatureVerificationDisabled();
+  error CommitOnRampMismatch(bytes reportOnRamp, bytes configOnRamp);
+  error InvalidOnRampUpdate(uint64 sourceChainSelector);
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -121,7 +122,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   struct DynamicConfig {
     address feeQuoter; // ──────────────────────────────╮ FeeQuoter address on the local chain
     uint32 permissionLessExecutionThresholdSeconds; //──╯ Waiting time before manual execution is enabled
-    address messageValidator; // Optional message validator to validate incoming messages (zero address = no validator)
+    address messageInterceptor; // Optional message interceptor to validate incoming messages (zero address = no interceptor)
   }
 
   /// @dev Report that is committed by the observing DON at the committing phase
@@ -140,6 +141,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   // STATIC CONFIG
   string public constant override typeAndVersion = "OffRamp 1.6.0-dev";
+  /// @dev Hash of encoded address(0) used for empty address checks
+  bytes32 internal constant EMPTY_ENCODED_ADDRESS_HASH = keccak256(abi.encode(address(0)));
   /// @dev ChainSelector of this chain
   uint64 internal immutable i_chainSelector;
   /// @dev The RMN verification contract
@@ -195,17 +198,13 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   }
 
   // ================================================================
-  // │                          Messaging                           │
+  // │                           Execution                          │
   // ================================================================
 
   // The size of the execution state in bits
   uint256 private constant MESSAGE_EXECUTION_STATE_BIT_WIDTH = 2;
   // The mask for the execution state bits
   uint256 private constant MESSAGE_EXECUTION_STATE_MASK = (1 << MESSAGE_EXECUTION_STATE_BIT_WIDTH) - 1;
-
-  // ================================================================
-  // │                           Execution                          │
-  // ================================================================
 
   /// @notice Returns the current execution state of a message based on its sequenceNumber.
   /// @param sourceChainSelector The source chain to get the execution state for
@@ -566,9 +565,9 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       destTokenAmounts: destTokenAmounts
     });
 
-    address messageValidator = s_dynamicConfig.messageValidator;
-    if (messageValidator != address(0)) {
-      try IMessageInterceptor(messageValidator).onInboundMessage(any2EvmMessage) {}
+    address messageInterceptor = s_dynamicConfig.messageInterceptor;
+    if (messageInterceptor != address(0)) {
+      try IMessageInterceptor(messageInterceptor).onInboundMessage(any2EvmMessage) {}
       catch (bytes memory err) {
         revert IMessageInterceptor.MessageValidationError(err);
       }
@@ -593,238 +592,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       .routeMessage(any2EvmMessage, Internal.GAS_FOR_CALL_EXACT_CHECK, message.gasLimit, message.receiver);
     // If CCIP receiver execution is not successful, revert the call including token transfers
     if (!success) revert ReceiverError(returnData);
-  }
-
-  // ================================================================
-  // │                           Commit                             │
-  // ================================================================
-
-  /// @notice Transmit function for commit reports. The function requires signatures,
-  /// and expects the commit plugin type to be configured with signatures.
-  /// @param report serialized commit report
-  /// @dev A commitReport can have two distinct parts (batched together to amortize the cost of checking sigs):
-  /// 1. Price updates
-  /// 2. A batch of merkle root and sequence number intervals (per-source)
-  /// Both have their own, separate, staleness checks, with price updates using the epoch and round
-  /// number of the latest price update. The merkle root checks for staleness are based on the seqNums.
-  /// They need to be separate because a price report for round t+2 might be included before a report
-  /// containing a merkle root for round t+1. This merkle root report for round t+1 is still valid
-  /// and should not be rejected. When a report with a stale root but valid price updates is submitted,
-  /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
-  /// If that happens, prices will be updated in later rounds.
-  function commit(
-    bytes32[3] calldata reportContext,
-    bytes calldata report,
-    bytes32[] calldata rs,
-    bytes32[] calldata ss,
-    bytes32 rawVs // signatures
-  ) external {
-    CommitReport memory commitReport = abi.decode(report, (CommitReport));
-
-    // Verify RMN signatures
-    if (commitReport.merkleRoots.length > 0) {
-      i_rmn.verify(commitReport.merkleRoots, commitReport.rmnSignatures);
-    }
-
-    // Check if the report contains price updates
-    if (commitReport.priceUpdates.tokenPriceUpdates.length > 0 || commitReport.priceUpdates.gasPriceUpdates.length > 0)
-    {
-      uint64 ocrSequenceNumber = uint64(uint256(reportContext[1]));
-
-      // Check for price staleness based on the epoch and round
-      if (s_latestPriceSequenceNumber < ocrSequenceNumber) {
-        // If prices are not stale, update the latest epoch and round
-        s_latestPriceSequenceNumber = ocrSequenceNumber;
-        // And update the prices in the fee quoter
-        IFeeQuoter(s_dynamicConfig.feeQuoter).updatePrices(commitReport.priceUpdates);
-      } else {
-        // If prices are stale and the report doesn't contain a root, this report
-        // does not have any valid information and we revert.
-        // If it does contain a merkle root, continue to the root checking section.
-        if (commitReport.merkleRoots.length == 0) revert StaleCommitReport();
-      }
-    }
-
-    for (uint256 i = 0; i < commitReport.merkleRoots.length; ++i) {
-      Internal.MerkleRoot memory root = commitReport.merkleRoots[i];
-      uint64 sourceChainSelector = root.sourceChainSelector;
-
-      if (i_rmn.isCursed(bytes16(uint128(sourceChainSelector)))) {
-        revert CursedByRMN(sourceChainSelector);
-      }
-
-      SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
-
-      if (sourceChainConfig.minSeqNr != root.minSeqNr || root.minSeqNr > root.maxSeqNr) {
-        revert InvalidInterval(root.sourceChainSelector, root.minSeqNr, root.maxSeqNr);
-      }
-
-      bytes32 merkleRoot = root.merkleRoot;
-      if (merkleRoot == bytes32(0)) revert InvalidRoot();
-      // If we reached this section, the report should contain a valid root
-      // We disallow duplicate roots as that would reset the timestamp and
-      // delay potential manual execution.
-      if (s_roots[root.sourceChainSelector][merkleRoot] != 0) {
-        revert RootAlreadyCommitted(root.sourceChainSelector, merkleRoot);
-      }
-
-      sourceChainConfig.minSeqNr = root.maxSeqNr + 1;
-      s_roots[root.sourceChainSelector][merkleRoot] = block.timestamp;
-    }
-
-    emit CommitReportAccepted(commitReport.merkleRoots, commitReport.priceUpdates);
-
-    _transmit(uint8(Internal.OCRPluginType.Commit), reportContext, report, rs, ss, rawVs);
-  }
-
-  /// @notice Returns the sequence number of the last price update.
-  /// @return sequenceNumber The latest price update sequence number.
-  function getLatestPriceSequenceNumber() external view returns (uint64) {
-    return s_latestPriceSequenceNumber;
-  }
-
-  /// @notice Returns the timestamp of a potentially previously committed merkle root.
-  /// If the root was never committed 0 will be returned.
-  /// @param sourceChainSelector The source chain selector.
-  /// @param root The merkle root to check the commit status for.
-  /// @return timestamp The timestamp of the committed root or zero in the case that it was never
-  /// committed.
-  function getMerkleRoot(uint64 sourceChainSelector, bytes32 root) external view returns (uint256) {
-    return s_roots[sourceChainSelector][root];
-  }
-
-  /// @notice Returns timestamp of when root was accepted or 0 if verification fails.
-  /// @dev This method uses a merkle tree within a merkle tree, with the hashedLeaves,
-  /// proofs and proofFlagBits being used to get the root of the inner tree.
-  /// This root is then used as the singular leaf of the outer tree.
-  /// @return timestamp The commit timestamp of the root
-  function _verify(
-    uint64 sourceChainSelector,
-    bytes32[] memory hashedLeaves,
-    bytes32[] memory proofs,
-    uint256 proofFlagBits
-  ) internal view virtual returns (uint256 timestamp) {
-    bytes32 root = MerkleMultiProof.merkleRoot(hashedLeaves, proofs, proofFlagBits);
-    return s_roots[sourceChainSelector][root];
-  }
-
-  /// @inheritdoc MultiOCR3Base
-  function _afterOCR3ConfigSet(uint8 ocrPluginType) internal override {
-    if (ocrPluginType == uint8(Internal.OCRPluginType.Commit)) {
-      // Signature verification must be enabled for commit plugin
-      if (!s_ocrConfigs[ocrPluginType].configInfo.isSignatureVerificationEnabled) {
-        revert SignatureVerificationDisabled();
-      }
-      // When the OCR config changes, we reset the sequence number
-      // since it is scoped per config digest.
-      // Note that s_minSeqNr/roots do not need to be reset as the roots persist
-      // across reconfigurations and are de-duplicated separately.
-      s_latestPriceSequenceNumber = 0;
-    }
-  }
-
-  // ================================================================
-  // │                           Config                             │
-  // ================================================================
-
-  /// @notice Returns the static config.
-  /// @dev This function will always return the same struct as the contents is static and can never change.
-  /// RMN depends on this function, if changing, please notify the RMN maintainers.
-  /// @return staticConfig The static config.
-  function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({
-      chainSelector: i_chainSelector,
-      rmn: i_rmn,
-      tokenAdminRegistry: i_tokenAdminRegistry,
-      nonceManager: i_nonceManager
-    });
-  }
-
-  /// @notice Returns the current dynamic config.
-  /// @return dynamicConfig The current dynamic config.
-  function getDynamicConfig() external view returns (DynamicConfig memory) {
-    return s_dynamicConfig;
-  }
-
-  /// @notice Returns the source chain config for the provided source chain selector
-  /// @param sourceChainSelector chain to retrieve configuration for
-  /// @return sourceChainConfig The config for the source chain
-  function getSourceChainConfig(uint64 sourceChainSelector) external view returns (SourceChainConfig memory) {
-    return s_sourceChainConfigs[sourceChainSelector];
-  }
-
-  /// @notice Updates source configs
-  /// @param sourceChainConfigUpdates Source chain configs
-  function applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigUpdates) external onlyOwner {
-    _applySourceChainConfigUpdates(sourceChainConfigUpdates);
-  }
-
-  /// @notice Updates source configs
-  /// @param sourceChainConfigUpdates Source chain configs
-  function _applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigUpdates) internal {
-    for (uint256 i = 0; i < sourceChainConfigUpdates.length; ++i) {
-      SourceChainConfigArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
-      uint64 sourceChainSelector = sourceConfigUpdate.sourceChainSelector;
-
-      if (sourceChainSelector == 0) {
-        revert ZeroChainSelectorNotAllowed();
-      }
-
-      if (address(sourceConfigUpdate.router) == address(0)) {
-        revert ZeroAddressNotAllowed();
-      }
-
-      SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
-      bytes memory currentOnRamp = currentConfig.onRamp;
-      bytes memory newOnRamp = sourceConfigUpdate.onRamp;
-
-      // OnRamp can never be zero - if it is, then the source chain has been added for the first time
-      if (currentOnRamp.length == 0) {
-        if (newOnRamp.length == 0) {
-          revert ZeroAddressNotAllowed();
-        }
-
-        currentConfig.onRamp = newOnRamp;
-        currentConfig.minSeqNr = 1;
-        emit SourceChainSelectorAdded(sourceChainSelector);
-      } else if (keccak256(currentOnRamp) != keccak256(newOnRamp)) {
-        revert InvalidStaticConfig(sourceChainSelector);
-      }
-
-      currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
-      currentConfig.router = sourceConfigUpdate.router;
-      emit SourceChainConfigSet(sourceChainSelector, currentConfig);
-    }
-  }
-
-  /// @notice Sets the dynamic config.
-  /// @param dynamicConfig The new dynamic config.
-  function setDynamicConfig(DynamicConfig memory dynamicConfig) external onlyOwner {
-    _setDynamicConfig(dynamicConfig);
-  }
-
-  /// @notice Sets the dynamic config.
-  /// @param dynamicConfig The dynamic config.
-  function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
-    if (dynamicConfig.feeQuoter == address(0)) {
-      revert ZeroAddressNotAllowed();
-    }
-
-    s_dynamicConfig = dynamicConfig;
-
-    emit DynamicConfigSet(dynamicConfig);
-  }
-
-  /// @notice Returns a source chain config with a check that the config is enabled
-  /// @param sourceChainSelector Source chain selector to check for cursing
-  /// @return sourceChainConfig The source chain config storage pointer
-  function _getEnabledSourceChainConfig(uint64 sourceChainSelector) internal view returns (SourceChainConfig storage) {
-    SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
-    if (!sourceChainConfig.isEnabled) {
-      revert SourceChainNotEnabled(sourceChainSelector);
-    }
-
-    return sourceChainConfig;
   }
 
   // ================================================================
@@ -980,10 +747,249 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   }
 
   // ================================================================
-  // │                            Access and RMN                    │
+  // │                           Commit                             │
   // ================================================================
 
-  /// @notice Reverts as this contract should not access CCIP messages
+  /// @notice Transmit function for commit reports. The function requires signatures,
+  /// and expects the commit plugin type to be configured with signatures.
+  /// @param report serialized commit report
+  /// @dev A commitReport can have two distinct parts (batched together to amortize the cost of checking sigs):
+  /// 1. Price updates
+  /// 2. A batch of merkle root and sequence number intervals (per-source)
+  /// Both have their own, separate, staleness checks, with price updates using the epoch and round
+  /// number of the latest price update. The merkle root checks for staleness are based on the seqNums.
+  /// They need to be separate because a price report for round t+2 might be included before a report
+  /// containing a merkle root for round t+1. This merkle root report for round t+1 is still valid
+  /// and should not be rejected. When a report with a stale root but valid price updates is submitted,
+  /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
+  /// If that happens, prices will be updated in later rounds.
+  function commit(
+    bytes32[3] calldata reportContext,
+    bytes calldata report,
+    bytes32[] calldata rs,
+    bytes32[] calldata ss,
+    bytes32 rawVs // signatures
+  ) external {
+    CommitReport memory commitReport = abi.decode(report, (CommitReport));
+
+    // Verify RMN signatures
+    if (commitReport.merkleRoots.length > 0) {
+      i_rmn.verify(commitReport.merkleRoots, commitReport.rmnSignatures);
+    }
+
+    // Check if the report contains price updates
+    if (commitReport.priceUpdates.tokenPriceUpdates.length > 0 || commitReport.priceUpdates.gasPriceUpdates.length > 0)
+    {
+      uint64 ocrSequenceNumber = uint64(uint256(reportContext[1]));
+
+      // Check for price staleness based on the epoch and round
+      if (s_latestPriceSequenceNumber < ocrSequenceNumber) {
+        // If prices are not stale, update the latest epoch and round
+        s_latestPriceSequenceNumber = ocrSequenceNumber;
+        // And update the prices in the fee quoter
+        IFeeQuoter(s_dynamicConfig.feeQuoter).updatePrices(commitReport.priceUpdates);
+      } else {
+        // If prices are stale and the report doesn't contain a root, this report
+        // does not have any valid information and we revert.
+        // If it does contain a merkle root, continue to the root checking section.
+        if (commitReport.merkleRoots.length == 0) revert StaleCommitReport();
+      }
+    }
+
+    for (uint256 i = 0; i < commitReport.merkleRoots.length; ++i) {
+      Internal.MerkleRoot memory root = commitReport.merkleRoots[i];
+      uint64 sourceChainSelector = root.sourceChainSelector;
+
+      if (i_rmn.isCursed(bytes16(uint128(sourceChainSelector)))) {
+        revert CursedByRMN(sourceChainSelector);
+      }
+
+      SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
+
+      if (keccak256(root.onRampAddress) != keccak256(sourceChainConfig.onRamp)) {
+        revert CommitOnRampMismatch(root.onRampAddress, sourceChainConfig.onRamp);
+      }
+
+      if (sourceChainConfig.minSeqNr != root.minSeqNr || root.minSeqNr > root.maxSeqNr) {
+        revert InvalidInterval(root.sourceChainSelector, root.minSeqNr, root.maxSeqNr);
+      }
+
+      bytes32 merkleRoot = root.merkleRoot;
+      if (merkleRoot == bytes32(0)) revert InvalidRoot();
+      // If we reached this section, the report should contain a valid root
+      // We disallow duplicate roots as that would reset the timestamp and
+      // delay potential manual execution.
+      if (s_roots[root.sourceChainSelector][merkleRoot] != 0) {
+        revert RootAlreadyCommitted(root.sourceChainSelector, merkleRoot);
+      }
+
+      sourceChainConfig.minSeqNr = root.maxSeqNr + 1;
+      s_roots[root.sourceChainSelector][merkleRoot] = block.timestamp;
+    }
+
+    emit CommitReportAccepted(commitReport.merkleRoots, commitReport.priceUpdates);
+
+    _transmit(uint8(Internal.OCRPluginType.Commit), reportContext, report, rs, ss, rawVs);
+  }
+
+  /// @notice Returns the sequence number of the last price update.
+  /// @return sequenceNumber The latest price update sequence number.
+  function getLatestPriceSequenceNumber() external view returns (uint64) {
+    return s_latestPriceSequenceNumber;
+  }
+
+  /// @notice Returns the timestamp of a potentially previously committed merkle root.
+  /// If the root was never committed 0 will be returned.
+  /// @param sourceChainSelector The source chain selector.
+  /// @param root The merkle root to check the commit status for.
+  /// @return timestamp The timestamp of the committed root or zero in the case that it was never
+  /// committed.
+  function getMerkleRoot(uint64 sourceChainSelector, bytes32 root) external view returns (uint256) {
+    return s_roots[sourceChainSelector][root];
+  }
+
+  /// @notice Returns timestamp of when root was accepted or 0 if verification fails.
+  /// @dev This method uses a merkle tree within a merkle tree, with the hashedLeaves,
+  /// proofs and proofFlagBits being used to get the root of the inner tree.
+  /// This root is then used as the singular leaf of the outer tree.
+  /// @return timestamp The commit timestamp of the root
+  function _verify(
+    uint64 sourceChainSelector,
+    bytes32[] memory hashedLeaves,
+    bytes32[] memory proofs,
+    uint256 proofFlagBits
+  ) internal view virtual returns (uint256 timestamp) {
+    bytes32 root = MerkleMultiProof.merkleRoot(hashedLeaves, proofs, proofFlagBits);
+    return s_roots[sourceChainSelector][root];
+  }
+
+  /// @inheritdoc MultiOCR3Base
+  function _afterOCR3ConfigSet(uint8 ocrPluginType) internal override {
+    if (ocrPluginType == uint8(Internal.OCRPluginType.Commit)) {
+      // Signature verification must be enabled for commit plugin
+      if (!s_ocrConfigs[ocrPluginType].configInfo.isSignatureVerificationEnabled) {
+        revert SignatureVerificationDisabled();
+      }
+      // When the OCR config changes, we reset the sequence number
+      // since it is scoped per config digest.
+      // Note that s_minSeqNr/roots do not need to be reset as the roots persist
+      // across reconfigurations and are de-duplicated separately.
+      s_latestPriceSequenceNumber = 0;
+    }
+  }
+
+  // ================================================================
+  // │                           Config                             │
+  // ================================================================
+
+  /// @notice Returns the static config.
+  /// @dev This function will always return the same struct as the contents is static and can never change.
+  /// RMN depends on this function, if changing, please notify the RMN maintainers.
+  /// @return staticConfig The static config.
+  function getStaticConfig() external view returns (StaticConfig memory) {
+    return StaticConfig({
+      chainSelector: i_chainSelector,
+      rmn: i_rmn,
+      tokenAdminRegistry: i_tokenAdminRegistry,
+      nonceManager: i_nonceManager
+    });
+  }
+
+  /// @notice Returns the current dynamic config.
+  /// @return dynamicConfig The current dynamic config.
+  function getDynamicConfig() external view returns (DynamicConfig memory) {
+    return s_dynamicConfig;
+  }
+
+  /// @notice Returns the source chain config for the provided source chain selector
+  /// @param sourceChainSelector chain to retrieve configuration for
+  /// @return sourceChainConfig The config for the source chain
+  function getSourceChainConfig(uint64 sourceChainSelector) external view returns (SourceChainConfig memory) {
+    return s_sourceChainConfigs[sourceChainSelector];
+  }
+
+  /// @notice Updates source configs
+  /// @param sourceChainConfigUpdates Source chain configs
+  function applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigUpdates) external onlyOwner {
+    _applySourceChainConfigUpdates(sourceChainConfigUpdates);
+  }
+
+  /// @notice Updates source configs
+  /// @param sourceChainConfigUpdates Source chain configs
+  function _applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigUpdates) internal {
+    for (uint256 i = 0; i < sourceChainConfigUpdates.length; ++i) {
+      SourceChainConfigArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
+      uint64 sourceChainSelector = sourceConfigUpdate.sourceChainSelector;
+
+      if (sourceChainSelector == 0) {
+        revert ZeroChainSelectorNotAllowed();
+      }
+
+      if (address(sourceConfigUpdate.router) == address(0)) {
+        revert ZeroAddressNotAllowed();
+      }
+
+      SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
+      bytes memory newOnRamp = sourceConfigUpdate.onRamp;
+
+      if (currentConfig.onRamp.length == 0) {
+        currentConfig.minSeqNr = 1;
+        emit SourceChainSelectorAdded(sourceChainSelector);
+      } else if (currentConfig.minSeqNr != 1) {
+        // OnRamp updates should only happens due to a misconfiguration
+        // If an OnRamp is misconfigured not reports should have been committed and no messages should have been executed
+        // This is enforced byt the onRamp address check in the commit function
+        revert InvalidOnRampUpdate(sourceChainSelector);
+      }
+
+      // OnRamp can never be zero - if it is, then the source chain has been added for the first time
+      if (newOnRamp.length == 0 || keccak256(newOnRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
+        revert ZeroAddressNotAllowed();
+      }
+
+      currentConfig.onRamp = newOnRamp;
+      currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
+      currentConfig.router = sourceConfigUpdate.router;
+
+      emit SourceChainConfigSet(sourceChainSelector, currentConfig);
+    }
+  }
+
+  /// @notice Sets the dynamic config.
+  /// @param dynamicConfig The new dynamic config.
+  function setDynamicConfig(DynamicConfig memory dynamicConfig) external onlyOwner {
+    _setDynamicConfig(dynamicConfig);
+  }
+
+  /// @notice Sets the dynamic config.
+  /// @param dynamicConfig The dynamic config.
+  function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
+    if (dynamicConfig.feeQuoter == address(0)) {
+      revert ZeroAddressNotAllowed();
+    }
+
+    s_dynamicConfig = dynamicConfig;
+
+    emit DynamicConfigSet(dynamicConfig);
+  }
+
+  /// @notice Returns a source chain config with a check that the config is enabled
+  /// @param sourceChainSelector Source chain selector to check for cursing
+  /// @return sourceChainConfig The source chain config storage pointer
+  function _getEnabledSourceChainConfig(uint64 sourceChainSelector) internal view returns (SourceChainConfig storage) {
+    SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
+    if (!sourceChainConfig.isEnabled) {
+      revert SourceChainNotEnabled(sourceChainSelector);
+    }
+
+    return sourceChainConfig;
+  }
+
+  // ================================================================
+  // │                            Access                            │
+  // ================================================================
+
+  /// @notice Reverts as this contract should not be able to receive CCIP messages
   function ccipReceive(Client.Any2EVMMessage calldata) external pure {
     // solhint-disable-next-line
     revert();
