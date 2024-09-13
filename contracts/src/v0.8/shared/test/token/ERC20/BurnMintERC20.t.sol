@@ -3,8 +3,8 @@ pragma solidity 0.8.19;
 
 import {IBurnMintERC20} from "../../../token/ERC20/IBurnMintERC20.sol";
 
-import {BaseTest} from "../../BaseTest.t.sol";
 import {BurnMintERC20} from "../../../token/ERC20/BurnMintERC20.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
 
 import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC20.sol";
 import {IERC165} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
@@ -119,9 +119,7 @@ contract BurnMintERC20_mint is BurnMintERC20Setup {
     // Mint max supply
     s_burnMintERC20.mint(OWNER, s_burnMintERC20.maxSupply());
 
-    vm.expectRevert(
-      abi.encodeWithSelector(BurnMintERC20.MaxSupplyExceeded.selector, s_burnMintERC20.maxSupply() + 1)
-    );
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC20.MaxSupplyExceeded.selector, s_burnMintERC20.maxSupply() + 1));
 
     // Attempt to mint 1 more than max supply
     s_burnMintERC20.mint(OWNER, 1);

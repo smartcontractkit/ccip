@@ -6,11 +6,12 @@ import {IBurnMintERC20} from "../ERC20/IBurnMintERC20.sol";
 import {OwnerIsCreator} from "../../access/OwnerIsCreator.sol";
 
 import {ERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
-import {ERC20Burnable} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import {ERC20Burnable} from
+  "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 
-import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
-import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
+import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice A basic ERC20 compatible token contract with burn and minting roles.
 /// @dev The total supply can be limited during deployment.
@@ -39,30 +40,36 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
   /// @dev The maximum supply of the token, 0 if unlimited
   uint256 internal immutable i_maxSupply;
 
+  /// @dev the CCIPAdmin can be used to register with the CCIP token admin registry, but has no other special powers,
+  /// and can only be transferred by the owner.
   address internal s_ccipAdmin;
 
-  /// @dev A 1 step ownership transfer is performed here
-  constructor(string memory name, string memory symbol, uint8 decimals_, uint256 maxSupply_, uint256 preMint_, address newOwner_) ERC20(name, symbol) {
+  constructor(
+    string memory name,
+    string memory symbol,
+    uint8 decimals_,
+    uint256 maxSupply_,
+    uint256 preMint_,
+    address newOwner_
+  ) ERC20(name, symbol) {
     i_decimals = decimals_;
     i_maxSupply = maxSupply_;
 
     s_ccipAdmin = newOwner_;
 
-    // Mint the initial supply to the new Owner, save gas by not calling if the mint amount is zero
+    // Mint the initial supply to the new Owner, saving gas by not calling if the mint amount is zero
     if (preMint_ != 0) _mint(newOwner_, preMint_);
 
     // Grant the deployer the minter and burner roles. This contract is expected to be deployed by a factory
     // contract that will transfer ownership to the correct address after deployment, so granting minting and burning
-    // privileges here saves the user gas by not requiring two transactions.
+    // privileges here saves gas by not requiring two transactions.
     grantMintRole(newOwner_);
     grantBurnRole(newOwner_);
   }
 
   function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
-    return
-      interfaceId == type(IERC20).interfaceId ||
-      interfaceId == type(IBurnMintERC20).interfaceId ||
-      interfaceId == type(IERC165).interfaceId;
+    return interfaceId == type(IERC20).interfaceId || interfaceId == type(IBurnMintERC20).interfaceId
+      || interfaceId == type(IERC165).interfaceId;
   }
 
   // ================================================================
@@ -200,13 +207,17 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
     return s_burners.values();
   }
 
+  /// @notice Returns the current CCIPAdmin
   function getCCIPAdmin() public view returns (address) {
     return s_ccipAdmin;
   }
 
+  /// @notice Transfers the CCIPAdmin role to a new address
+  /// @dev only the owner can call this function, NOT the current ccipAdmin, and 1-step ownership transfer is used
+  /// @param newAdmin The address to transfer the CCIPAdmin role to
   function setCCIPAdmin(address newAdmin) public onlyOwner {
     address currentAdmin = s_ccipAdmin;
-   
+
     s_ccipAdmin = newAdmin;
 
     emit CCIPAdminTransferred(currentAdmin, newAdmin);
