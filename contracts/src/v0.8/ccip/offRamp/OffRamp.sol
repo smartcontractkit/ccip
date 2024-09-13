@@ -40,7 +40,11 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error UnexpectedTokenData();
   error ManualExecutionNotYetEnabled(uint64 sourceChainSelector);
   error ManualExecutionGasLimitMismatch();
-  error InvalidManualExecutionGasLimit(uint64 sourceChainSelector, uint256 index, uint256 newLimit);
+  error InvalidManualExecutionGasLimit(uint64 sourceChainSelector, bytes32 messageId, uint256 newLimit);
+  error InvalidManualExecutionTokenGasOverride(
+    bytes32 messageId, uint256 tokenIndex, uint256 oldLimit, uint256 tokenGasOverride
+  );
+  error ManualExecutionGasAmountCountMismatch(bytes32 messageId, uint64 sequenceNumber);
   error RootNotCommitted(uint64 sourceChainSelector);
   error RootAlreadyCommitted(uint64 sourceChainSelector, bytes32 merkleRoot);
   error InvalidRoot();
@@ -53,13 +57,14 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
-  error InvalidStaticConfig(uint64 sourceChainSelector);
   error StaleCommitReport();
   error InvalidInterval(uint64 sourceChainSelector, uint64 min, uint64 max);
   error ZeroAddressNotAllowed();
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
   error SourceChainSelectorMismatch(uint64 reportSourceChainSelector, uint64 messageSourceChainSelector);
   error SignatureVerificationDisabled();
+  error CommitOnRampMismatch(bytes reportOnRamp, bytes configOnRamp);
+  error InvalidOnRampUpdate(uint64 sourceChainSelector);
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -79,7 +84,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   event SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
   event AlreadyAttempted(uint64 sourceChainSelector, uint64 sequenceNumber);
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
-  event CommitReportAccepted(CommitReport report);
+  event CommitReportAccepted(Internal.MerkleRoot[] merkleRoots, Internal.PriceUpdates priceUpdates);
   event RootRemoved(bytes32 root);
   event SkippedReportExecution(uint64 sourceChainSelector);
 
@@ -116,9 +121,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev Since DynamicConfig is part of DynamicConfigSet event, if changing it, we should update the ABI on Atlas
   struct DynamicConfig {
     address feeQuoter; // ──────────────────────────────╮ FeeQuoter address on the local chain
-    uint32 permissionLessExecutionThresholdSeconds; //  │ Waiting time before manual execution is enabled
-    uint32 maxTokenTransferGas; //                      │ Maximum amount of gas passed on to token `transfer` call
-    uint32 maxPoolReleaseOrMintGas; // ─────────────────╯ Maximum amount of gas passed on to token pool when calling releaseOrMint
+    uint32 permissionLessExecutionThresholdSeconds; //──╯ Waiting time before manual execution is enabled
     address messageValidator; // Optional message validator to validate incoming messages (zero address = no validator)
   }
 
@@ -130,8 +133,16 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     IRMNV2.Signature[] rmnSignatures; // RMN signatures on the merkle roots
   }
 
+  struct GasLimitOverride {
+    // A value of zero in both fields signifies no override and allows the corresponding field to be overridden as valid
+    uint256 receiverExecutionGasLimit; // Overrides EVM2EVMMessage.gasLimit.
+    uint32[] tokenGasOverrides; // Overrides EVM2EVMMessage.sourceTokenData.destGasAmount, length must be same as tokenAmounts.
+  }
+
   // STATIC CONFIG
   string public constant override typeAndVersion = "OffRamp 1.6.0-dev";
+  /// @dev Hash of encoded address(0) used for empty address checks
+  bytes32 internal constant EMPTY_ENCODED_ADDRESS_HASH = keccak256(abi.encode(address(0)));
   /// @dev ChainSelector of this chain
   uint64 internal immutable i_chainSelector;
   /// @dev The RMN verification contract
@@ -187,17 +198,13 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   }
 
   // ================================================================
-  // │                          Messaging                           │
+  // │                           Execution                          │
   // ================================================================
 
   // The size of the execution state in bits
   uint256 private constant MESSAGE_EXECUTION_STATE_BIT_WIDTH = 2;
   // The mask for the execution state bits
   uint256 private constant MESSAGE_EXECUTION_STATE_MASK = (1 << MESSAGE_EXECUTION_STATE_BIT_WIDTH) - 1;
-
-  // ================================================================
-  // │                           Execution                          │
-  // ================================================================
 
   /// @notice Returns the current execution state of a message based on its sequenceNumber.
   /// @param sourceChainSelector The source chain to get the execution state for
@@ -257,7 +264,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// The reports do not have to contain all the messages (they can be omitted). Multiple reports can be passed in simultaneously.
   function manuallyExecute(
     Internal.ExecutionReportSingleChain[] memory reports,
-    uint256[][] memory gasLimitOverrides
+    GasLimitOverride[][] memory gasLimitOverrides
   ) external {
     // We do this here because the other _execute path is already covered by MultiOCR3Base.
     _whenChainNotForked();
@@ -269,15 +276,35 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       Internal.ExecutionReportSingleChain memory report = reports[reportIndex];
 
       uint256 numMsgs = report.messages.length;
-      uint256[] memory msgGasLimitOverrides = gasLimitOverrides[reportIndex];
+      GasLimitOverride[] memory msgGasLimitOverrides = gasLimitOverrides[reportIndex];
       if (numMsgs != msgGasLimitOverrides.length) revert ManualExecutionGasLimitMismatch();
 
       for (uint256 msgIndex = 0; msgIndex < numMsgs; ++msgIndex) {
-        uint256 newLimit = msgGasLimitOverrides[msgIndex];
+        uint256 newLimit = msgGasLimitOverrides[msgIndex].receiverExecutionGasLimit;
         // Checks to ensure message cannot be executed with less gas than specified.
+        Internal.Any2EVMRampMessage memory message = report.messages[msgIndex];
         if (newLimit != 0) {
-          if (newLimit < report.messages[msgIndex].gasLimit) {
-            revert InvalidManualExecutionGasLimit(report.sourceChainSelector, msgIndex, newLimit);
+          if (newLimit < message.gasLimit) {
+            revert InvalidManualExecutionGasLimit(report.sourceChainSelector, message.header.messageId, newLimit);
+          }
+        }
+        if (message.tokenAmounts.length != msgGasLimitOverrides[msgIndex].tokenGasOverrides.length) {
+          revert ManualExecutionGasAmountCountMismatch(message.header.messageId, message.header.sequenceNumber);
+        }
+
+        // The gas limit can not be lowered as that could cause the message to fail. If manual execution is done
+        // from an UNTOUCHED state and we would allow lower gas limit, anyone could grief by executing the message with
+        // lower gas limit than the DON would have used. This results in the message being marked FAILURE and the DON
+        // would not attempt it with the correct gas limit.
+        for (uint256 tokenIndex = 0; tokenIndex < message.tokenAmounts.length; ++tokenIndex) {
+          uint256 tokenGasOverride = msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex];
+          if (tokenGasOverride != 0) {
+            uint32 destGasAmount = abi.decode(message.tokenAmounts[tokenIndex].destExecData, (uint32));
+            if (tokenGasOverride < destGasAmount) {
+              revert InvalidManualExecutionTokenGasOverride(
+                message.header.messageId, tokenIndex, destGasAmount, tokenGasOverride
+              );
+            }
           }
         }
       }
@@ -290,7 +317,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// and expects the exec plugin type to be configured with no signatures.
   /// @param report serialized execution report
   function execute(bytes32[3] calldata reportContext, bytes calldata report) external {
-    _batchExecute(abi.decode(report, (Internal.ExecutionReportSingleChain[])), new uint256[][](0));
+    _batchExecute(abi.decode(report, (Internal.ExecutionReportSingleChain[])), new GasLimitOverride[][](0));
 
     bytes32[] memory emptySigs = new bytes32[](0);
     _transmit(uint8(Internal.OCRPluginType.Execution), reportContext, report, emptySigs, emptySigs, bytes32(""));
@@ -305,30 +332,30 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev If called from manual execution, each inner array's length has to match the number of messages.
   function _batchExecute(
     Internal.ExecutionReportSingleChain[] memory reports,
-    uint256[][] memory manualExecGasLimits
+    GasLimitOverride[][] memory manualExecGasOverrides
   ) internal {
     if (reports.length == 0) revert EmptyReport();
 
-    bool areManualGasLimitsEmpty = manualExecGasLimits.length == 0;
+    bool areManualGasLimitsEmpty = manualExecGasOverrides.length == 0;
     // Cache array for gas savings in the loop's condition
-    uint256[] memory emptyGasLimits = new uint256[](0);
+    GasLimitOverride[] memory emptyGasLimits = new GasLimitOverride[](0);
 
     for (uint256 i = 0; i < reports.length; ++i) {
-      _executeSingleReport(reports[i], areManualGasLimitsEmpty ? emptyGasLimits : manualExecGasLimits[i]);
+      _executeSingleReport(reports[i], areManualGasLimitsEmpty ? emptyGasLimits : manualExecGasOverrides[i]);
     }
   }
 
   /// @notice Executes a report, executing each message in order.
   /// @param report The execution report containing the messages and proofs.
-  /// @param manualExecGasLimits An array of gas limits to use for manual execution.
+  /// @param manualExecGasExecOverrides An array of gas limits to use for manual execution.
   /// @dev If called from the DON, this array is always empty.
   /// @dev If called from manual execution, this array is always same length as messages.
   function _executeSingleReport(
     Internal.ExecutionReportSingleChain memory report,
-    uint256[] memory manualExecGasLimits
+    GasLimitOverride[] memory manualExecGasExecOverrides
   ) internal {
     uint64 sourceChainSelector = report.sourceChainSelector;
-    bool manualExecution = manualExecGasLimits.length != 0;
+    bool manualExecution = manualExecGasExecOverrides.length != 0;
     if (i_rmn.isCursed(bytes16(uint128(sourceChainSelector)))) {
       if (manualExecution) {
         // For manual execution we don't want to silently fail so we revert
@@ -396,8 +423,9 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         emit SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
         continue;
       }
-
+      uint32[] memory tokenGasOverrides;
       if (manualExecution) {
+        tokenGasOverrides = manualExecGasExecOverrides[i].tokenGasOverrides;
         bool isOldCommitReport =
           (block.timestamp - timestampCommitted) > s_dynamicConfig.permissionLessExecutionThresholdSeconds;
         // Manually execution is fine if we previously failed or if the commit report is just too old
@@ -407,8 +435,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         }
 
         // Manual execution gas limit can override gas limit specified in the message. Value of 0 indicates no override.
-        if (manualExecGasLimits[i] != 0) {
-          message.gasLimit = manualExecGasLimits[i];
+        if (manualExecGasExecOverrides[i].receiverExecutionGasLimit != 0) {
+          message.gasLimit = manualExecGasExecOverrides[i].receiverExecutionGasLimit;
         }
       } else {
         // DON can only execute a message once
@@ -445,7 +473,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       }
 
       _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-      (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
+      (Internal.MessageExecutionState newState, bytes memory returnData) =
+        _trialExecute(message, offchainTokenData, tokenGasOverrides);
       _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
 
       // Since it's hard to estimate whether manual execution will succeed, we
@@ -490,9 +519,10 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @return errData Revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
     Internal.Any2EVMRampMessage memory message,
-    bytes[] memory offchainTokenData
+    bytes[] memory offchainTokenData,
+    uint32[] memory tokenGasOverrides
   ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
-    try this.executeSingleMessage(message, offchainTokenData) {}
+    try this.executeSingleMessage(message, offchainTokenData, tokenGasOverrides) {}
     catch (bytes memory err) {
       // return the message execution state as FAILURE and the revert data
       // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES
@@ -511,13 +541,19 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// (for example smart contract wallets) without an associated message.
   function executeSingleMessage(
     Internal.Any2EVMRampMessage memory message,
-    bytes[] calldata offchainTokenData
+    bytes[] calldata offchainTokenData,
+    uint32[] calldata tokenGasOverrides
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
       destTokenAmounts = _releaseOrMintTokens(
-        message.tokenAmounts, message.sender, message.receiver, message.header.sourceChainSelector, offchainTokenData
+        message.tokenAmounts,
+        message.sender,
+        message.receiver,
+        message.header.sourceChainSelector,
+        offchainTokenData,
+        tokenGasOverrides
       );
     }
 
@@ -556,6 +592,158 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       .routeMessage(any2EvmMessage, Internal.GAS_FOR_CALL_EXACT_CHECK, message.gasLimit, message.receiver);
     // If CCIP receiver execution is not successful, revert the call including token transfers
     if (!success) revert ReceiverError(returnData);
+  }
+
+  // ================================================================
+  // │                      Tokens and pools                        │
+  // ================================================================
+
+  /// @notice Uses a pool to release or mint a token to a receiver address, with balance checks before and after the
+  /// transfer. This is done to ensure the exact number of tokens the pool claims to release are actually transferred.
+  /// @dev The local token address is validated through the TokenAdminRegistry. If, due to some misconfiguration, the
+  /// token is unknown to the registry, the offRamp will revert. The tx, and the tokens, can be retrieved by
+  /// registering the token on this chain, and re-trying the msg.
+  /// @param sourceTokenAmount Amount and source data of the token to be released/minted.
+  /// @param originalSender The message sender on the source chain.
+  /// @param receiver The address that will receive the tokens.
+  /// @param sourceChainSelector The remote source chain selector
+  /// @param offchainTokenData Data fetched offchain by the DON.
+  /// @return destTokenAmount local token address with amount
+  function _releaseOrMintSingleToken(
+    Internal.RampTokenAmount memory sourceTokenAmount,
+    bytes memory originalSender,
+    address receiver,
+    uint64 sourceChainSelector,
+    bytes memory offchainTokenData
+  ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
+    // We need to safely decode the token address from the sourceTokenData, as it could be wrong,
+    // in which case it doesn't have to be a valid EVM address.
+    address localToken = Internal._validateEVMAddress(sourceTokenAmount.destTokenAddress);
+    // We check with the token admin registry if the token has a pool on this chain.
+    address localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
+    // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
+    // This is done to prevent a pool from reverting the entire transaction if it doesn't support the interface.
+    // The call gets a max or 30k gas per instance, of which there are three. This means gas estimations should
+    // account for 90k gas overhead due to the interface check.
+    if (localPoolAddress == address(0) || !localPoolAddress.supportsInterface(Pool.CCIP_POOL_V1)) {
+      revert NotACompatiblePool(localPoolAddress);
+    }
+
+    // We retrieve the local token balance of the receiver before the pool call.
+    (uint256 balancePre, uint256 gasLeft) =
+      _getBalanceOfReceiver(receiver, localToken, abi.decode(sourceTokenAmount.destExecData, (uint32)));
+
+    // We determined that the pool address is a valid EVM address, but that does not mean the code at this
+    // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location
+    // contains a contract. If it doesn't it reverts with a known error, which we catch gracefully.
+    // We call the pool with exact gas to increase resistance against malicious tokens or token pools.
+    // We protect against return data bombs by capping the return data size at MAX_RET_BYTES.
+    (bool success, bytes memory returnData, uint256 gasUsedReleaseOrMint) = CallWithExactGas
+      ._callWithExactGasSafeReturnData(
+      abi.encodeCall(
+        IPoolV1.releaseOrMint,
+        Pool.ReleaseOrMintInV1({
+          originalSender: originalSender,
+          receiver: receiver,
+          amount: sourceTokenAmount.amount,
+          localToken: localToken,
+          remoteChainSelector: sourceChainSelector,
+          sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,
+          sourcePoolData: sourceTokenAmount.extraData,
+          offchainTokenData: offchainTokenData
+        })
+      ),
+      localPoolAddress,
+      gasLeft,
+      Internal.GAS_FOR_CALL_EXACT_CHECK,
+      Internal.MAX_RET_BYTES
+    );
+
+    // Wrap and rethrow the error so we can catch it lower in the stack
+    if (!success) revert TokenHandlingError(returnData);
+
+    // If the call was successful, the returnData should be the local token address.
+    if (returnData.length != Pool.CCIP_POOL_V1_RET_BYTES) {
+      revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
+    }
+
+    uint256 localAmount = abi.decode(returnData, (uint256));
+    // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case
+    // of a lockRelease pool.
+    if (receiver != localPoolAddress) {
+      (uint256 balancePost,) = _getBalanceOfReceiver(receiver, localToken, gasLeft - gasUsedReleaseOrMint);
+
+      // First we check if the subtraction would result in an underflow to ensure we revert with a clear error
+      if (balancePost < balancePre || balancePost - balancePre != localAmount) {
+        revert ReleaseOrMintBalanceMismatch(localAmount, balancePre, balancePost);
+      }
+    }
+
+    return Client.EVMTokenAmount({token: localToken, amount: localAmount});
+  }
+
+  /// @notice Retrieves the balance of a receiver address for a given token.
+  /// @param receiver The address to check the balance of.
+  /// @param token The token address.
+  /// @param gasLimit The gas limit to use for the call.
+  /// @return balance The balance of the receiver.
+  /// @return gasLeft The gas left after the call.
+  function _getBalanceOfReceiver(
+    address receiver,
+    address token,
+    uint256 gasLimit
+  ) internal returns (uint256 balance, uint256 gasLeft) {
+    (bool success, bytes memory returnData, uint256 gasUsed) = CallWithExactGas._callWithExactGasSafeReturnData(
+      abi.encodeCall(IERC20.balanceOf, (receiver)),
+      token,
+      gasLimit,
+      Internal.GAS_FOR_CALL_EXACT_CHECK,
+      Internal.MAX_RET_BYTES
+    );
+    if (!success) revert TokenHandlingError(returnData);
+
+    // If the call was successful, the returnData should contain only the balance.
+    if (returnData.length != Internal.MAX_BALANCE_OF_RET_BYTES) {
+      revert InvalidDataLength(Internal.MAX_BALANCE_OF_RET_BYTES, returnData.length);
+    }
+
+    // Return the decoded balance, which cannot fail as we checked the length, and the gas that is left
+    // after this call.
+    return (abi.decode(returnData, (uint256)), gasLimit - gasUsed);
+  }
+
+  /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
+  /// @param sourceTokenAmounts List of token amounts with source data of the tokens to be released/minted.
+  /// @param originalSender The message sender on the source chain.
+  /// @param receiver The address that will receive the tokens.
+  /// @param sourceChainSelector The remote source chain selector.
+  /// @param offchainTokenData Array of token data fetched offchain by the DON.
+  /// @return destTokenAmounts local token addresses with amounts
+  /// @dev This function wraps the token pool call in a try catch block to gracefully handle
+  /// any non-rate limiting errors that may occur. If we encounter a rate limiting related error
+  /// we bubble it up. If we encounter a non-rate limiting error we wrap it in a TokenHandlingError.
+  function _releaseOrMintTokens(
+    Internal.RampTokenAmount[] memory sourceTokenAmounts,
+    bytes memory originalSender,
+    address receiver,
+    uint64 sourceChainSelector,
+    bytes[] calldata offchainTokenData,
+    uint32[] calldata tokenGasOverrides
+  ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
+    destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
+    bool isTokenGasOverridesEmpty = tokenGasOverrides.length == 0;
+    for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
+      if (!isTokenGasOverridesEmpty) {
+        if (tokenGasOverrides[i] != 0) {
+          sourceTokenAmounts[i].destExecData = abi.encode(tokenGasOverrides[i]);
+        }
+      }
+      destTokenAmounts[i] = _releaseOrMintSingleToken(
+        sourceTokenAmounts[i], originalSender, receiver, sourceChainSelector, offchainTokenData[i]
+      );
+    }
+
+    return destTokenAmounts;
   }
 
   // ================================================================
@@ -618,6 +806,10 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
       SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
 
+      if (keccak256(root.onRampAddress) != keccak256(sourceChainConfig.onRamp)) {
+        revert CommitOnRampMismatch(root.onRampAddress, sourceChainConfig.onRamp);
+      }
+
       if (sourceChainConfig.minSeqNr != root.minSeqNr || root.minSeqNr > root.maxSeqNr) {
         revert InvalidInterval(root.sourceChainSelector, root.minSeqNr, root.maxSeqNr);
       }
@@ -635,7 +827,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       s_roots[root.sourceChainSelector][merkleRoot] = block.timestamp;
     }
 
-    emit CommitReportAccepted(commitReport);
+    emit CommitReportAccepted(commitReport.merkleRoots, commitReport.priceUpdates);
 
     _transmit(uint8(Internal.OCRPluginType.Commit), reportContext, report, rs, ss, rawVs);
   }
@@ -738,24 +930,27 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       }
 
       SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
-      bytes memory currentOnRamp = currentConfig.onRamp;
       bytes memory newOnRamp = sourceConfigUpdate.onRamp;
 
-      // OnRamp can never be zero - if it is, then the source chain has been added for the first time
-      if (currentOnRamp.length == 0) {
-        if (newOnRamp.length == 0) {
-          revert ZeroAddressNotAllowed();
-        }
-
-        currentConfig.onRamp = newOnRamp;
+      if (currentConfig.onRamp.length == 0) {
         currentConfig.minSeqNr = 1;
         emit SourceChainSelectorAdded(sourceChainSelector);
-      } else if (keccak256(currentOnRamp) != keccak256(newOnRamp)) {
-        revert InvalidStaticConfig(sourceChainSelector);
+      } else if (currentConfig.minSeqNr != 1) {
+        // OnRamp updates should only happens due to a misconfiguration
+        // If an OnRamp is misconfigured not reports should have been committed and no messages should have been executed
+        // This is enforced byt the onRamp address check in the commit function
+        revert InvalidOnRampUpdate(sourceChainSelector);
       }
 
+      // OnRamp can never be zero - if it is, then the source chain has been added for the first time
+      if (newOnRamp.length == 0 || keccak256(newOnRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
+        revert ZeroAddressNotAllowed();
+      }
+
+      currentConfig.onRamp = newOnRamp;
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
       currentConfig.router = sourceConfigUpdate.router;
+
       emit SourceChainConfigSet(sourceChainSelector, currentConfig);
     }
   }
@@ -791,155 +986,10 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   }
 
   // ================================================================
-  // │                      Tokens and pools                        │
+  // │                            Access                            │
   // ================================================================
 
-  /// @notice Uses a pool to release or mint a token to a receiver address, with balance checks before and after the
-  /// transfer. This is done to ensure the exact number of tokens the pool claims to release are actually transferred.
-  /// @dev The local token address is validated through the TokenAdminRegistry. If, due to some misconfiguration, the
-  /// token is unknown to the registry, the offRamp will revert. The tx, and the tokens, can be retrieved by
-  /// registering the token on this chain, and re-trying the msg.
-  /// @param sourceTokenAmount Amount and source data of the token to be released/minted.
-  /// @param originalSender The message sender on the source chain.
-  /// @param receiver The address that will receive the tokens.
-  /// @param sourceChainSelector The remote source chain selector
-  /// @param offchainTokenData Data fetched offchain by the DON.
-  /// @return destTokenAmount local token address with amount
-  function _releaseOrMintSingleToken(
-    Internal.RampTokenAmount memory sourceTokenAmount,
-    bytes memory originalSender,
-    address receiver,
-    uint64 sourceChainSelector,
-    bytes memory offchainTokenData
-  ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
-    // We need to safely decode the token address from the sourceTokenData, as it could be wrong,
-    // in which case it doesn't have to be a valid EVM address.
-    address localToken = Internal._validateEVMAddress(sourceTokenAmount.destTokenAddress);
-    // We check with the token admin registry if the token has a pool on this chain.
-    address localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
-    // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
-    // This is done to prevent a pool from reverting the entire transaction if it doesn't support the interface.
-    // The call gets a max or 30k gas per instance, of which there are three. This means gas estimations should
-    // account for 90k gas overhead due to the interface check.
-    if (localPoolAddress == address(0) || !localPoolAddress.supportsInterface(Pool.CCIP_POOL_V1)) {
-      revert NotACompatiblePool(localPoolAddress);
-    }
-
-    // We retrieve the local token balance of the receiver before the pool call.
-    (uint256 balancePre, uint256 gasLeft) =
-      _getBalanceOfReceiver(receiver, localToken, s_dynamicConfig.maxPoolReleaseOrMintGas);
-
-    // We determined that the pool address is a valid EVM address, but that does not mean the code at this
-    // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location
-    // contains a contract. If it doesn't it reverts with a known error, which we catch gracefully.
-    // We call the pool with exact gas to increase resistance against malicious tokens or token pools.
-    // We protect against return data bombs by capping the return data size at MAX_RET_BYTES.
-    (bool success, bytes memory returnData, uint256 gasUsedReleaseOrMint) = CallWithExactGas
-      ._callWithExactGasSafeReturnData(
-      abi.encodeCall(
-        IPoolV1.releaseOrMint,
-        Pool.ReleaseOrMintInV1({
-          originalSender: originalSender,
-          receiver: receiver,
-          amount: sourceTokenAmount.amount,
-          localToken: localToken,
-          remoteChainSelector: sourceChainSelector,
-          sourcePoolAddress: sourceTokenAmount.sourcePoolAddress,
-          sourcePoolData: sourceTokenAmount.extraData,
-          offchainTokenData: offchainTokenData
-        })
-      ),
-      localPoolAddress,
-      gasLeft,
-      Internal.GAS_FOR_CALL_EXACT_CHECK,
-      Internal.MAX_RET_BYTES
-    );
-
-    // Wrap and rethrow the error so we can catch it lower in the stack
-    if (!success) revert TokenHandlingError(returnData);
-
-    // If the call was successful, the returnData should be the local token address.
-    if (returnData.length != Pool.CCIP_POOL_V1_RET_BYTES) {
-      revert InvalidDataLength(Pool.CCIP_POOL_V1_RET_BYTES, returnData.length);
-    }
-
-    uint256 localAmount = abi.decode(returnData, (uint256));
-    // We don't need to do balance checks if the pool is the receiver, as they would always fail in the case
-    // of a lockRelease pool.
-    if (receiver != localPoolAddress) {
-      (uint256 balancePost,) = _getBalanceOfReceiver(receiver, localToken, gasLeft - gasUsedReleaseOrMint);
-
-      // First we check if the subtraction would result in an underflow to ensure we revert with a clear error
-      if (balancePost < balancePre || balancePost - balancePre != localAmount) {
-        revert ReleaseOrMintBalanceMismatch(localAmount, balancePre, balancePost);
-      }
-    }
-
-    return Client.EVMTokenAmount({token: localToken, amount: localAmount});
-  }
-
-  /// @notice Retrieves the balance of a receiver address for a given token.
-  /// @param receiver The address to check the balance of.
-  /// @param token The token address.
-  /// @param gasLimit The gas limit to use for the call.
-  /// @return balance The balance of the receiver.
-  /// @return gasLeft The gas left after the call.
-  function _getBalanceOfReceiver(
-    address receiver,
-    address token,
-    uint256 gasLimit
-  ) internal returns (uint256 balance, uint256 gasLeft) {
-    (bool success, bytes memory returnData, uint256 gasUsed) = CallWithExactGas._callWithExactGasSafeReturnData(
-      abi.encodeCall(IERC20.balanceOf, (receiver)),
-      token,
-      gasLimit,
-      Internal.GAS_FOR_CALL_EXACT_CHECK,
-      Internal.MAX_RET_BYTES
-    );
-    if (!success) revert TokenHandlingError(returnData);
-
-    // If the call was successful, the returnData should contain only the balance.
-    if (returnData.length != Internal.MAX_BALANCE_OF_RET_BYTES) {
-      revert InvalidDataLength(Internal.MAX_BALANCE_OF_RET_BYTES, returnData.length);
-    }
-
-    // Return the decoded balance, which cannot fail as we checked the length, and the gas that is left
-    // after this call.
-    return (abi.decode(returnData, (uint256)), gasLimit - gasUsed);
-  }
-
-  /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
-  /// @param sourceTokenAmounts List of token amounts with source data of the tokens to be released/minted.
-  /// @param originalSender The message sender on the source chain.
-  /// @param receiver The address that will receive the tokens.
-  /// @param sourceChainSelector The remote source chain selector.
-  /// @param offchainTokenData Array of token data fetched offchain by the DON.
-  /// @return destTokenAmounts local token addresses with amounts
-  /// @dev This function wraps the token pool call in a try catch block to gracefully handle
-  /// any non-rate limiting errors that may occur. If we encounter a rate limiting related error
-  /// we bubble it up. If we encounter a non-rate limiting error we wrap it in a TokenHandlingError.
-  function _releaseOrMintTokens(
-    Internal.RampTokenAmount[] memory sourceTokenAmounts,
-    bytes memory originalSender,
-    address receiver,
-    uint64 sourceChainSelector,
-    bytes[] calldata offchainTokenData
-  ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
-    destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
-    for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
-      destTokenAmounts[i] = _releaseOrMintSingleToken(
-        sourceTokenAmounts[i], originalSender, receiver, sourceChainSelector, offchainTokenData[i]
-      );
-    }
-
-    return destTokenAmounts;
-  }
-
-  // ================================================================
-  // │                            Access and RMN                    │
-  // ================================================================
-
-  /// @notice Reverts as this contract should not access CCIP messages
+  /// @notice Reverts as this contract should not be able to receive CCIP messages
   function ccipReceive(Client.Any2EVMMessage calldata) external pure {
     // solhint-disable-next-line
     revert();
