@@ -3,21 +3,9 @@ pragma solidity ^0.8.0;
 
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
+import {IPriceRegistry} from "./IPriceRegistry.sol";
 
-interface IFeeQuoter {
-  /// @notice Update the price for given tokens and gas prices for given chains.
-  /// @param priceUpdates The price updates to apply.
-  function updatePrices(Internal.PriceUpdates memory priceUpdates) external;
-
-  /// @notice Get the `tokenPrice` for a given token.
-  /// @param token The token to get the price for.
-  /// @return tokenPrice The tokenPrice for the given token.
-  function getTokenPrice(address token) external view returns (Internal.TimestampedPackedUint224 memory);
-
-  /// @notice Get the list of fee tokens.
-  /// @return feeTokens The tokens set as fee tokens.
-  function getFeeTokens() external view returns (address[] memory);
-
+interface IFeeQuoter is IPriceRegistry {
   /// @notice Validates the ccip message & returns the fee
   /// @param destChainSelector The destination chain selector.
   /// @param message The message to get quote for.

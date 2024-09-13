@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
 import {IFeeQuoter} from "./interfaces/IFeeQuoter.sol";
+import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {AuthorizedCallers} from "../shared/access/AuthorizedCallers.sol";
 import {AggregatorV3Interface} from "./../shared/interfaces/AggregatorV3Interface.sol";
@@ -235,7 +236,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   // │                     Price calculations                       │
   // ================================================================
 
-  /// @inheritdoc IFeeQuoter
+  /// @inheritdoc IPriceRegistry
   function getTokenPrice(address token) public view override returns (Internal.TimestampedPackedUint224 memory) {
     Internal.TimestampedPackedUint224 memory tokenPrice = s_usdPerToken[token];
 
@@ -377,7 +378,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   // │                         Fee tokens                           │
   // ================================================================
 
-  /// @inheritdoc IFeeQuoter
+  /// @inheritdoc IPriceRegistry
   function getFeeTokens() external view returns (address[] memory) {
     return s_feeTokens.values();
   }
@@ -414,7 +415,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   // │                       Price updates                          │
   // ================================================================
 
-  /// @inheritdoc IFeeQuoter
+  /// @inheritdoc IPriceRegistry
   function updatePrices(Internal.PriceUpdates calldata priceUpdates) external override {
     // The caller must be the fee updater
     _validateCaller();
