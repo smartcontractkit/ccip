@@ -7,7 +7,7 @@ import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
-import {IRMN} from "../interfaces/IRMN.sol";
+import {IRMNV2} from "../interfaces/IRMNV2.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
@@ -58,7 +58,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
     uint64 chainSelector; // ─────╮ Source chain selector
-    address rmnProxy; // ─────────╯ RMN proxy address
+    IRMNV2 rmn; // ───────────────╯ RMN remote address
     address nonceManager; // Nonce manager address
     address tokenAdminRegistry; // Token admin registry address
   }
@@ -108,20 +108,20 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   // STATIC CONFIG
   string public constant override typeAndVersion = "OnRamp 1.6.0-dev";
   /// @dev The chain ID of the source chain that this contract is deployed to
-  uint64 internal immutable i_chainSelector;
-  /// @dev The address of the rmn proxy
-  address internal immutable i_rmnProxy;
+  uint64 private immutable i_chainSelector;
+  /// @dev The rmn contract
+  IRMNV2 private immutable i_rmn;
   /// @dev The address of the nonce manager
-  address internal immutable i_nonceManager;
+  address private immutable i_nonceManager;
   /// @dev The address of the token admin registry
-  address internal immutable i_tokenAdminRegistry;
+  address private immutable i_tokenAdminRegistry;
 
   // DYNAMIC CONFIG
   /// @dev The dynamic config for the onRamp
-  DynamicConfig internal s_dynamicConfig;
+  DynamicConfig private s_dynamicConfig;
 
   /// @dev The destination chain specific configs
-  mapping(uint64 destChainSelector => DestChainConfig destChainConfig) internal s_destChainConfigs;
+  mapping(uint64 destChainSelector => DestChainConfig destChainConfig) private s_destChainConfigs;
 
   constructor(
     StaticConfig memory staticConfig,
@@ -129,14 +129,14 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     DestChainConfigArgs[] memory destChainConfigArgs
   ) {
     if (
-      staticConfig.chainSelector == 0 || staticConfig.rmnProxy == address(0) || staticConfig.nonceManager == address(0)
-        || staticConfig.tokenAdminRegistry == address(0)
+      staticConfig.chainSelector == 0 || address(staticConfig.rmn) == address(0)
+        || staticConfig.nonceManager == address(0) || staticConfig.tokenAdminRegistry == address(0)
     ) {
       revert InvalidConfig();
     }
 
     i_chainSelector = staticConfig.chainSelector;
-    i_rmnProxy = staticConfig.rmnProxy;
+    i_rmn = staticConfig.rmn;
     i_nonceManager = staticConfig.nonceManager;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
 
@@ -299,7 +299,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   function getStaticConfig() external view returns (StaticConfig memory) {
     return StaticConfig({
       chainSelector: i_chainSelector,
-      rmnProxy: i_rmnProxy,
+      rmn: i_rmn,
       nonceManager: i_nonceManager,
       tokenAdminRegistry: i_tokenAdminRegistry
     });
@@ -333,7 +333,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     emit ConfigSet(
       StaticConfig({
         chainSelector: i_chainSelector,
-        rmnProxy: i_rmnProxy,
+        rmn: i_rmn,
         nonceManager: i_nonceManager,
         tokenAdminRegistry: i_tokenAdminRegistry
       }),
@@ -408,17 +408,19 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
       DestChainConfig storage destChainConfig = s_destChainConfigs[allowListConfigArgs.destChainSelector];
       destChainConfig.allowListEnabled = allowListConfigArgs.allowListEnabled;
 
-      if (allowListConfigArgs.allowListEnabled) {
-        for (uint256 j = 0; j < allowListConfigArgs.addedAllowlistedSenders.length; ++j) {
-          address toAdd = allowListConfigArgs.addedAllowlistedSenders[j];
-          if (toAdd == address(0)) {
-            revert InvalidAllowListRequest(allowListConfigArgs.destChainSelector);
+      if (allowListConfigArgs.addedAllowlistedSenders.length > 0) {
+        if (allowListConfigArgs.allowListEnabled) {
+          for (uint256 j = 0; j < allowListConfigArgs.addedAllowlistedSenders.length; ++j) {
+            address toAdd = allowListConfigArgs.addedAllowlistedSenders[j];
+            if (toAdd == address(0)) {
+              revert InvalidAllowListRequest(allowListConfigArgs.destChainSelector);
+            }
+            destChainConfig.allowedSendersList.add(toAdd);
           }
-          destChainConfig.allowedSendersList.add(toAdd);
-        }
 
-        if (allowListConfigArgs.addedAllowlistedSenders.length > 0) {
           emit AllowListSendersAdded(allowListConfigArgs.destChainSelector, allowListConfigArgs.addedAllowlistedSenders);
+        } else {
+          revert InvalidAllowListRequest(allowListConfigArgs.destChainSelector);
         }
       }
 
@@ -461,7 +463,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message
   ) external view returns (uint256 feeTokenAmount) {
-    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN(destChainSelector);
+    if (i_rmn.isCursed(bytes16(uint128(destChainSelector)))) revert CursedByRMN(destChainSelector);
 
     return IFeeQuoter(s_dynamicConfig.feeQuoter).getValidatedFee(destChainSelector, message);
   }

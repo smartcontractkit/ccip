@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
-import {IRMN} from "../../interfaces/IRMN.sol";
+import {IRMNV2} from "../../interfaces/IRMNV2.sol";
 
 import {AuthorizedCallers} from "../../../shared/access/AuthorizedCallers.sol";
 import {NonceManager} from "../../NonceManager.sol";
@@ -15,7 +15,6 @@ import {MultiOCR3Base} from "../../ocr/MultiOCR3Base.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {OffRamp} from "../../offRamp/OffRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
-
 import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
@@ -55,6 +54,8 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
 
   uint64 internal s_latestSequenceNumber;
 
+  IRMNV2.Signature[] internal s_rmnSignatures;
+
   function setUp() public virtual override(FeeQuoterSetup, MultiOCR3BaseSetup) {
     FeeQuoterSetup.setUp();
     MultiOCR3BaseSetup.setUp();
@@ -67,16 +68,16 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     s_maybeRevertingPool = MaybeRevertingBurnMintTokenPool(s_destPoolByToken[s_destTokens[1]]);
     s_inboundNonceManager = new NonceManager(new address[](0));
 
-    _deployOffRamp(s_mockRMN, s_inboundNonceManager);
+    _deployOffRamp(s_mockRMNRemote, s_inboundNonceManager);
   }
 
-  function _deployOffRamp(IRMN rmnProxy, NonceManager nonceManager) internal {
+  function _deployOffRamp(IRMNV2 rmn, NonceManager nonceManager) internal {
     OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs = new OffRamp.SourceChainConfigArgs[](0);
 
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(rmnProxy),
+        rmn: rmn,
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(nonceManager)
       }),
@@ -226,9 +227,7 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     return OffRamp.DynamicConfig({
       permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
       feeQuoter: feeQuoter,
-      messageValidator: address(0),
-      maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
-      maxTokenTransferGas: MAX_TOKEN_POOL_TRANSFER_GAS
+      messageValidator: address(0)
     });
   }
 
@@ -372,10 +371,10 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
 
   function _getGasLimitsFromMessages(
     Internal.Any2EVMRampMessage[] memory messages
-  ) internal pure returns (uint256[] memory) {
-    uint256[] memory gasLimits = new uint256[](messages.length);
+  ) internal pure returns (OffRamp.GasLimitOverride[] memory) {
+    OffRamp.GasLimitOverride[] memory gasLimits = new OffRamp.GasLimitOverride[](messages.length);
     for (uint256 i = 0; i < messages.length; ++i) {
-      gasLimits[i] = messages[i].gasLimit;
+      gasLimits[i].receiverExecutionGasLimit = messages[i].gasLimit;
     }
 
     return gasLimits;
@@ -383,8 +382,6 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
 
   function _assertSameConfig(OffRamp.DynamicConfig memory a, OffRamp.DynamicConfig memory b) public pure {
     assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
-    assertEq(a.maxPoolReleaseOrMintGas, b.maxPoolReleaseOrMintGas);
-    assertEq(a.maxTokenTransferGas, b.maxTokenTransferGas);
     assertEq(a.messageValidator, b.messageValidator);
     assertEq(a.feeQuoter, b.feeQuoter);
   }
@@ -425,7 +422,7 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     s_offRamp = new OffRampHelper(
       OffRamp.StaticConfig({
         chainSelector: DEST_CHAIN_SELECTOR,
-        rmnProxy: address(s_mockRMN),
+        rmn: s_mockRMNRemote,
         tokenAdminRegistry: address(s_tokenAdminRegistry),
         nonceManager: address(s_inboundNonceManager)
       }),
