@@ -1,6 +1,6 @@
 pragma solidity ^0.8.24;
 
-import {ITypeAndVersion} from "../../shared/interfaces/ItypeAndVersion.sol";
+import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
@@ -128,7 +128,6 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     if (bytes4(tokenPoolInitArgs) == EMPTY_PARAMETER_FLAG) {
       tokenPoolInitArgs = abi.encode(token, new address[](0), i_rmnProxy, i_ccipRouter);
     }
-
 
     // Stack scoping to reduce pressure on stack too deep from the concatenated initCode and initArgs
     address poolAddress;
