@@ -164,6 +164,8 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     uint256 feeTokenAmount,
     address originalSender
   ) external returns (bytes32) {
+    // We rely on a reentrancy guard here due to the untrusted calls performed to the pools
+    // This enables some optimizations by not following the CEI pattern
     if (s_dynamicConfig.hasEntered) revert ReentrancyGuardReentrantCall();
 
     s_dynamicConfig.hasEntered = true;
