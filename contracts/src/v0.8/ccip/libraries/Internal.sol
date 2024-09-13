@@ -312,6 +312,8 @@ library Internal {
   }
 
   struct Any2EVMTokenTransfer {
+    // The source pool EVM address abi.encoded to bytes. This value is trusted as it is obtained through the onRamp. It can be
+    // relied upon by the destination pool to validate the source pool.
     bytes sourcePoolAddress;
     address destTokenAddress; // ──╮ Address of destination token
     uint32 destGasAmount;//────────╯ The amount of gas available for the releaseOrMint and transfer calls on the offRamp.
