@@ -267,7 +267,8 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
     router.ccipSend(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
-    Internal.Any2EVMTokenTransfer[] memory any2EVMTokenTransfer = new Internal.Any2EVMTokenTransfer[](message.tokenAmounts.length);
+    Internal.Any2EVMTokenTransfer[] memory any2EVMTokenTransfer =
+      new Internal.Any2EVMTokenTransfer[](message.tokenAmounts.length);
     for (uint256 i = 0; i < msgEvent.tokenAmounts.length; ++i) {
       any2EVMTokenTransfer[i] = Internal.Any2EVMTokenTransfer({
         sourcePoolAddress: abi.encode(msgEvent.tokenAmounts[i].sourcePoolAddress),

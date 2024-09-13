@@ -1788,7 +1788,12 @@ contract FeeQuoter_processMessageArgs is FeeQuoterFeeSetup {
       bytes memory convertedExtraArgs,
       /* destExecDataPerToken */
     ) = s_feeQuoter.processMessageArgs(
-      DEST_CHAIN_SELECTOR, s_sourceTokens[0], 0, "", new Internal.EVM2AnyTokenTransfer[](0), new Client.EVMTokenAmount[](0)
+      DEST_CHAIN_SELECTOR,
+      s_sourceTokens[0],
+      0,
+      "",
+      new Internal.EVM2AnyTokenTransfer[](0),
+      new Client.EVMTokenAmount[](0)
     );
 
     assertEq(isOutOfOrderExecution, false);
