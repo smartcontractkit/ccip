@@ -742,7 +742,7 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(23423),
       reentrancyGuardEntered: true,
-      messageValidator: makeAddr("messageValidator"),
+      messageInterceptor: makeAddr("messageInterceptor"),
       feeAggregator: FEE_AGGREGATOR,
       allowListAdmin: address(0)
     });
