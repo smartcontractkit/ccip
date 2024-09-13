@@ -68,7 +68,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   // solhint-disable-next-line gas-struct-packing
   struct DynamicConfig {
     address feeQuoter; // FeeQuoter address
-    bool hasEntered; // Reentrancy protection
+    bool reentrancyGuardEntered; // Reentrancy protection
     address messageValidator; // Optional message validator to validate outbound messages (zero address = no validator)
     address feeAggregator; // Fee aggregator address
     address allowListAdmin; // authorized admin to add or remove allowed senders
@@ -166,9 +166,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   ) external returns (bytes32) {
     // We rely on a reentrancy guard here due to the untrusted calls performed to the pools
     // This enables some optimizations by not following the CEI pattern
-    if (s_dynamicConfig.hasEntered) revert ReentrancyGuardReentrantCall();
+    if (s_dynamicConfig.reentrancyGuardEntered) revert ReentrancyGuardReentrantCall();
 
-    s_dynamicConfig.hasEntered = true;
+    s_dynamicConfig.reentrancyGuardEntered = true;
 
     DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
 
@@ -257,7 +257,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     // event in the offchain code.
     emit CCIPMessageSent(destChainSelector, newMessage);
 
-    s_dynamicConfig.hasEntered = false;
+    s_dynamicConfig.reentrancyGuardEntered = false;
 
     return newMessage.header.messageId;
   }

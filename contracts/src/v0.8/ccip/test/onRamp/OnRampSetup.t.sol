@@ -87,7 +87,7 @@ contract OnRampSetup is FeeQuoterFeeSetup {
   function _generateDynamicOnRampConfig(address feeQuoter) internal pure returns (OnRamp.DynamicConfig memory) {
     return OnRamp.DynamicConfig({
       feeQuoter: feeQuoter,
-      hasEntered: false,
+      reentrancyGuardEntered: false,
       messageValidator: address(0),
       feeAggregator: FEE_AGGREGATOR,
       allowListAdmin: address(0)
