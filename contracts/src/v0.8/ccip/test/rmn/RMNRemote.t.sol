@@ -8,7 +8,7 @@ import {RMNRemoteSetup} from "./RMNRemoteSetup.t.sol";
 
 contract RMNRemote_constructor is RMNRemoteSetup {
   function test_constructor_success() public view {
-    assertEq(s_rmnRemote.getChainSelector(), 1);
+    assertEq(s_rmnRemote.getLocalChainSelector(), 1);
   }
 }
 

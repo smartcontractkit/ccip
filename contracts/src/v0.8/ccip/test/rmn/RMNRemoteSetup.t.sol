@@ -117,7 +117,7 @@ contract RMNRemoteSetup is BaseTest {
         RMN_V1_6_ANY2EVM_REPORT,
         RMNRemote.Report({
           destChainId: block.chainid,
-          destChainSelector: s_rmnRemote.getChainSelector(),
+          destChainSelector: s_rmnRemote.getLocalChainSelector(),
           rmnRemoteContractAddress: address(s_rmnRemote),
           offrampAddress: OFF_RAMP_ADDRESS,
           rmnHomeContractConfigDigest: s_rmnRemote.getVersionedConfig().config.rmnHomeContractConfigDigest,
