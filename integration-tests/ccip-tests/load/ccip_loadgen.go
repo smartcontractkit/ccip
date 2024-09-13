@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/ccip/integration-tests/ccip-tests/contracts"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/require"
@@ -190,20 +191,20 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 		msg.TokenAmounts = []router.ClientEVMTokenAmount{}
 	}
 
-	// var (
-	// 	extraArgs []byte
-	// 	err       error
-	// )
-	// // v1.5.0 and later starts using V2 extra args
-	// matchErr := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
-	// 	contracts.OnRampContract: contracts.V1_5_0,
-	// })
-	// if matchErr != nil {
-	// 	extraArgs, err = testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)
-	// } else {
-	// 	extraArgs, err = testhelpers.GetEVMExtraArgsV2(big.NewInt(gasLimit), c.Lane.Source.Common.AllowOutOfOrder)
-	// }
-	extraArgs, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)
+	var (
+		extraArgs []byte
+		err       error
+	)
+	// v1.5.0 and later starts using V2 extra args
+	matchErr := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
+		contracts.OnRampContract: contracts.V1_5_0,
+	})
+	c.Lane.Logger.Info().Err(matchErr).Interface("Version Map", contracts.VersionMap).Msg("// DEBUG: matchErr")
+	if matchErr != nil {
+		extraArgs, err = testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)
+	} else {
+		extraArgs, err = testhelpers.GetEVMExtraArgsV2(big.NewInt(gasLimit), c.Lane.Source.Common.AllowOutOfOrder)
+	}
 	if err != nil {
 		return router.ClientEVM2AnyMessage{}, stats, err
 	}
