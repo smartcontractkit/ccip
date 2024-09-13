@@ -162,7 +162,7 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
       });
       roots[1] = Internal.MerkleRoot({
         sourceChainSelector: SOURCE_CHAIN_SELECTOR + 1,
-        onRampAddress: abi.encode(address(s_onRamp)),
+        onRampAddress: abi.encode(address(s_onRamp2)),
         minSeqNr: messages2[0].header.sequenceNumber,
         maxSeqNr: messages2[0].header.sequenceNumber,
         merkleRoot: merkleRoots[1]
@@ -267,6 +267,10 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
     router.ccipSend(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
+    uint256 gasLimit = s_feeQuoter.parseEVMExtraArgsFromBytes(msgEvent.extraArgs, DEST_CHAIN_SELECTOR).gasLimit;
+    for (uint256 i = 0; i < msgEvent.tokenAmounts.length; ++i) {
+      msgEvent.tokenAmounts[i].destExecData = abi.encode(MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS);
+    }
     return Internal.Any2EVMRampMessage({
       header: Internal.RampMessageHeader({
         messageId: msgEvent.header.messageId,
