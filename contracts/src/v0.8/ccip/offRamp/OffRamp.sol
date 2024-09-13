@@ -610,7 +610,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @param offchainTokenData Data fetched offchain by the DON.
   /// @return destTokenAmount local token address with amount
   function _releaseOrMintSingleToken(
-    Internal.RampTokenAmount memory sourceTokenAmount,
+    Internal.Any2EVMTokenTransfer memory sourceTokenAmount,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
@@ -618,7 +618,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
     // We need to safely decode the token address from the sourceTokenData, as it could be wrong,
     // in which case it doesn't have to be a valid EVM address.
-    address localToken = Internal._validateEVMAddress(sourceTokenAmount.destTokenAddress);
+    // We assume this destTokenAddress already fully validated from a (trusted) OnRamp.
+    address localToken = sourceTokenAmount.destTokenAddress;
     // We check with the token admin registry if the token has a pool on this chain.
     address localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
     // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
@@ -631,7 +632,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
     // We retrieve the local token balance of the receiver before the pool call.
     (uint256 balancePre, uint256 gasLeft) =
-      _getBalanceOfReceiver(receiver, localToken, abi.decode(sourceTokenAmount.destExecData, (uint32)));
+      _getBalanceOfReceiver(receiver, localToken, sourceTokenAmount.destGasAmount);
 
     // We determined that the pool address is a valid EVM address, but that does not mean the code at this
     // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location
@@ -723,7 +724,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// any non-rate limiting errors that may occur. If we encounter a rate limiting related error
   /// we bubble it up. If we encounter a non-rate limiting error we wrap it in a TokenHandlingError.
   function _releaseOrMintTokens(
-    Internal.RampTokenAmount[] memory sourceTokenAmounts,
+    Internal.Any2EVMTokenTransfer[] memory sourceTokenAmounts,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
@@ -735,7 +736,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       if (!isTokenGasOverridesEmpty) {
         if (tokenGasOverrides[i] != 0) {
-          sourceTokenAmounts[i].destExecData = abi.encode(tokenGasOverrides[i]);
+          sourceTokenAmounts[i].destGasAmount = tokenGasOverrides[i];
         }
       }
       destTokenAmounts[i] = _releaseOrMintSingleToken(

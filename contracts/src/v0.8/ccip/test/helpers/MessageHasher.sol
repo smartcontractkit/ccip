@@ -18,6 +18,12 @@ contract MessageHasher {
     return abi.encode(tokenAmounts);
   }
 
+  function encodeTokenAmountsHashPreimage(
+    Internal.EVM2AnyTokenTransfer[] memory tokenAmount
+  ) public pure returns (bytes memory) {
+    return abi.encode(tokenAmount);
+  }
+
   function encodeMetadataHashPreimage(
     bytes32 any2EVMMessageHash,
     uint64 sourceChainSelector,

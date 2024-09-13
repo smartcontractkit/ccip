@@ -867,25 +867,25 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
   /// @dev precondition - evmAnyTokenTransfers and sourceTokenAmounts lengths must be equal
   function processPoolReturnData(
     uint64 destChainSelector,
-    Internal.EVM2AnyTokenTransfer[] calldata EVM2AnyTokenTransfers,
+    Internal.EVM2AnyTokenTransfer[] calldata onRampTokenTransfers,
     Client.EVMTokenAmount[] calldata sourceTokenAmounts
   ) external view returns (bytes[] memory destExecDataPerToken) {
     bytes4 chainFamilySelector = s_destChainConfigs[destChainSelector].chainFamilySelector;
-    destExecDataPerToken = new bytes[](EVM2AnyTokenTransfers.length);
-    for (uint256 i = 0; i < EVM2AnyTokenTransfers.length; ++i) {
+    destExecDataPerToken = new bytes[](onRampTokenTransfers.length);
+    for (uint256 i = 0; i < onRampTokenTransfers.length; ++i) {
       address sourceToken = sourceTokenAmounts[i].token;
 
       // Since the DON has to pay for the extraData to be included on the destination chain, we cap the length of the
       // extraData. This prevents gas bomb attacks on the NOPs. As destBytesOverhead accounts for both
       // extraData and offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
-      uint256 destPoolDataLength = EVM2AnyTokenTransfers[i].extraData.length;
+      uint256 destPoolDataLength = onRampTokenTransfers[i].extraData.length;
       if (destPoolDataLength > Pool.CCIP_LOCK_OR_BURN_V1_RET_BYTES) {
         if (destPoolDataLength > s_tokenTransferFeeConfig[destChainSelector][sourceToken].destBytesOverhead) {
           revert SourceTokenDataTooLarge(sourceToken);
         }
       }
 
-      _validateDestFamilyAddress(chainFamilySelector, EVM2AnyTokenTransfers[i].destTokenAddress);
+      _validateDestFamilyAddress(chainFamilySelector, onRampTokenTransfers[i].destTokenAddress);
       FeeQuoter.TokenTransferFeeConfig memory tokenTransferFeeConfig =
         s_tokenTransferFeeConfig[destChainSelector][sourceToken];
       uint32 defaultGasOverhead = s_destChainConfigs[destChainSelector].defaultTokenDestGasOverhead;

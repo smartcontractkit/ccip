@@ -252,7 +252,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   /// @param destChainSelector Target destination chain selector of the message
   /// @param receiver Message receiver
   /// @param originalSender Message sender
-  /// @return EVM2AnyTokenTransfer Ramp token and amount data
+  /// @return evm2AnyTokenTransfer EVM2Any token and amount data
   function _lockOrBurnSingleToken(
     Client.EVMTokenAmount memory tokenAndAmount,
     uint64 destChainSelector,
