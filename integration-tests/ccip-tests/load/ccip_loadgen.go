@@ -199,6 +199,7 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 	matchErr := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
 		contracts.OnRampContract: contracts.V1_5_0,
 	})
+	c.Lane.Logger.Info().Err(matchErr).Interface("Version Map", contracts.VersionMap).Msg("// DEBUG: Debugging match err and results")
 	if matchErr != nil {
 		extraArgs, err = testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)
 	} else {
