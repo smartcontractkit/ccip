@@ -73,6 +73,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   uint64 internal immutable i_localChainSelector;
 
   bytes16[] private s_cursedSubjectsSequence;
+  /// @dev the index+1 is stored to easily distinguish b/t noncursed and cursed at the 0 index
   mapping(bytes16 subject => uint256 indexPlusOne) private s_cursedSubjectsIndexPlusOne;
   mapping(address signer => bool exists) s_signers; // for more gas efficient verify
 
