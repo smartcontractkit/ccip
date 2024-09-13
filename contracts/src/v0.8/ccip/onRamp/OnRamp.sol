@@ -341,10 +341,10 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
 
   /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
-    // We make sure the reentrancy flag is set to false.
-    dynamicConfig.reentrancyGuardEntered = false;
-
-    if (dynamicConfig.feeQuoter == address(0) || dynamicConfig.feeAggregator == address(0)) revert InvalidConfig();
+    if (
+      dynamicConfig.feeQuoter == address(0) || dynamicConfig.feeAggregator == address(0)
+        || dynamicConfig.reentrancyGuardEntered
+    ) revert InvalidConfig();
 
     s_dynamicConfig = dynamicConfig;
 
