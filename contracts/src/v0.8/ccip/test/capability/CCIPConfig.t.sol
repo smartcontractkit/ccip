@@ -43,25 +43,6 @@ contract CCIPConfigSetup is Test {
     return subset;
   }
 
-  //TODO: Use OZ's Arrays.sort when we upgrade to OZ v5
-  function _sort(bytes32[] memory arr, int256 left, int256 right) private pure {
-    int256 i = left;
-    int256 j = right;
-    if (i == j) return;
-    bytes32 pivot = arr[uint256(left + (right - left) / 2)];
-    while (i <= j) {
-      while (arr[uint256(i)] < pivot) i++;
-      while (pivot < arr[uint256(j)]) j--;
-      if (i <= j) {
-        (arr[uint256(i)], arr[uint256(j)]) = (arr[uint256(j)], arr[uint256(i)]);
-        i++;
-        j--;
-      }
-    }
-    if (left < j) _sort(arr, left, j);
-    if (i < right) _sort(arr, i, right);
-  }
-
   function _addChainConfig(uint256 numNodes) internal returns (CCIPConfigTypes.OCR3Node[] memory nodes) {
     return _addChainConfig(numNodes, 1);
   }
@@ -533,21 +514,21 @@ contract CCIPConfig_validateConfig is CCIPConfigSetup {
     s_ccipCC.validateConfig(config);
   }
 
-  // TODO: rewrite test
-  // function test__validateConfig_P2PIdsLengthNotMatching_Reverts() public {
-  //   CCIPConfigTypes.OCR3Config memory config = _getCorrectOCR3Config();
+  function test__validateConfig_ZeroP2PId_Reverts() public {
+    CCIPConfigTypes.OCR3Config memory config = _getCorrectOCR3Config();
+    config.nodes[1].p2pId = bytes32(0);
 
-  //   uint256 expectedNumberOfP2pIds = config.signers.length;
-  //   uint256 wrongNumberOfP2pIds = expectedNumberOfP2pIds - 1;
-  //   config.p2pIds = new bytes32[](wrongNumberOfP2pIds); // Not enough
+    vm.expectRevert(abi.encodeWithSelector(CCIPConfig.InvalidNode.selector, config.nodes[1]));
+    s_ccipCC.validateConfig(config);
+  }
 
-  //   vm.expectRevert(
-  //     abi.encodeWithSelector(
-  //       CCIPConfig.P2PIdsLengthNotMatching.selector, wrongNumberOfP2pIds, expectedNumberOfP2pIds, expectedNumberOfP2pIds
-  //     )
-  //   );
-  //   s_ccipCC.validateConfig(config);
-  // }
+  function test__validateConfig_ZeroSignerKey_Reverts() public {
+    CCIPConfigTypes.OCR3Config memory config = _getCorrectOCR3Config();
+    config.nodes[2].signerKey = bytes("");
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPConfig.InvalidNode.selector, config.nodes[2]));
+    s_ccipCC.validateConfig(config);
+  }
 
   function test__validateConfig_NodeNotInRegistry_Reverts() public {
     CCIPConfigTypes.OCR3Node[] memory nodes = _addChainConfig(4);
