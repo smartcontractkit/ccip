@@ -195,6 +195,7 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 		extraArgs []byte
 		err       error
 	)
+	// v1.5.0 and later starts using V2 extra args
 	matchErr := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
 		contracts.OnRampContract: contracts.V1_5_0,
 	})
