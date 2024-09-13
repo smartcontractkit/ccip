@@ -7,8 +7,10 @@ import {RMNRemote} from "./rmn/RMNRemote.sol";
 /// doing this allows those structs to be encoded and decoded with type safety in offchain code
 /// and tests because generated wrappers are available
 contract CCIPEncodingUtils {
+  error DoNotDeploy();
+
   constructor() {
-    revert("do not deploy");
+    revert DoNotDeploy();
   }
 
   /// @dev the RMN Report struct is used in integration / E2E tests
