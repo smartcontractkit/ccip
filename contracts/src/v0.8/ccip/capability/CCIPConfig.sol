@@ -230,13 +230,15 @@ contract CCIPConfig is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator
       ocr3Config.offchainConfig = newOcr3Config.offchainConfig;
 
       // Remove all excess nodes
-      for (uint256 j = newOcr3Config.nodes.length; j < ocr3Config.nodes.length; ++j) {
+      while (ocr3Config.nodes.length > newOcr3Config.nodes.length) {
         ocr3Config.nodes.pop();
       }
 
       // Assign nodes
       for (uint256 j = 0; j < newOcr3Config.nodes.length; ++j) {
-        ocr3Config.nodes[j] = newOcr3Config.nodes[j];
+        if (j >= ocr3Config.nodes.length) {
+          ocr3Config.nodes.push(newOcr3Config.nodes[j]);
+        }
       }
     }
 

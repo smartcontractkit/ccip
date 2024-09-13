@@ -477,6 +477,7 @@ contract CCIPConfig_validateConfig is CCIPConfigSetup {
       nodes[i].transmitterKey = bytes("");
     }
 
+    config.nodes = nodes;
     vm.expectRevert(abi.encodeWithSelector(CCIPConfig.NotEnoughTransmitters.selector, numberOfTransmitters, 4));
     s_ccipCC.validateConfig(config);
   }
