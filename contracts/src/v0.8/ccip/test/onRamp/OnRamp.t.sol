@@ -363,8 +363,8 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     );
   }
 
-  function test_forwardFromRouter_WithValidation_Success() public {
-    _enableOutboundMessageValidator();
+  function test_forwardFromRouter_WithInterception_Success() public {
+    _enableOutboundMessageInterceptor();
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
@@ -373,7 +373,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     message.tokenAmounts[0].amount = 1e18;
     message.tokenAmounts[0].token = s_sourceTokens[0];
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-    s_outboundMessageValidator.setMessageIdValidationState(keccak256(abi.encode(message)), false);
+    s_outboundmessageInterceptor.setMessageIdValidationState(keccak256(abi.encode(message)), false);
 
     vm.expectEmit();
     emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
@@ -420,8 +420,8 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, _generateEmptyMessage(), 0, STRANGER);
   }
 
-  function test_MessageValidationError_Revert() public {
-    _enableOutboundMessageValidator();
+  function test_MessageInterceptionError_Revert() public {
+    _enableOutboundMessageInterceptor();
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
@@ -430,7 +430,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     message.tokenAmounts[0].amount = 1e18;
     message.tokenAmounts[0].token = s_sourceTokens[0];
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
-    s_outboundMessageValidator.setMessageIdValidationState(keccak256(abi.encode(message)), true);
+    s_outboundmessageInterceptor.setMessageIdValidationState(keccak256(abi.encode(message)), true);
 
     vm.expectRevert(
       abi.encodeWithSelector(IMessageInterceptor.MessageValidationError.selector, bytes("Invalid message"))
@@ -667,11 +667,12 @@ contract OnRamp_getFee is OnRampSetup {
 }
 
 contract OnRamp_setDynamicConfig is OnRampSetup {
-  function test_SetDynamicConfig_Success() public {
+  function test_setDynamicConfig_Success() public {
     OnRamp.StaticConfig memory staticConfig = s_onRamp.getStaticConfig();
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(23423),
-      messageValidator: makeAddr("messageValidator"),
+      reentrancyGuardEntered: false,
+      messageInterceptor: makeAddr("messageInterceptor"),
       feeAggregator: FEE_AGGREGATOR,
       allowListAdmin: address(0)
     });
@@ -687,11 +688,12 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
 
   // Reverts
 
-  function test_SetConfigInvalidConfigFeeQuoterEqAddressZero_Revert() public {
+  function test_setDynamicConfig_InvalidConfigFeeQuoterEqAddressZero_Revert() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(0),
+      reentrancyGuardEntered: false,
       feeAggregator: FEE_AGGREGATOR,
-      messageValidator: makeAddr("messageValidator"),
+      messageInterceptor: makeAddr("messageInterceptor"),
       allowListAdmin: address(0)
     });
 
@@ -699,10 +701,11 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     s_onRamp.setDynamicConfig(newConfig);
   }
 
-  function test_SetConfigInvalidConfig_Revert() public {
+  function test_setDynamicConfig_InvalidConfigInvalidConfig_Revert() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(23423),
-      messageValidator: address(0),
+      reentrancyGuardEntered: false,
+      messageInterceptor: address(0),
       feeAggregator: FEE_AGGREGATOR,
       allowListAdmin: address(0)
     });
@@ -713,10 +716,11 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     s_onRamp.setDynamicConfig(newConfig);
   }
 
-  function test_SetConfigInvalidConfigFeeAggregatorEqAddressZero_Revert() public {
+  function test_setDynamicConfig_InvalidConfigFeeAggregatorEqAddressZero_Revert() public {
     OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
       feeQuoter: address(23423),
-      messageValidator: address(0),
+      reentrancyGuardEntered: false,
+      messageInterceptor: address(0),
       feeAggregator: address(0),
       allowListAdmin: address(0)
     });
@@ -725,13 +729,26 @@ contract OnRamp_setDynamicConfig is OnRampSetup {
     s_onRamp.setDynamicConfig(newConfig);
   }
 
-  function test_SetConfigOnlyOwner_Revert() public {
+  function test_setDynamicConfig_InvalidConfigOnlyOwner_Revert() public {
     vm.startPrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     s_onRamp.setDynamicConfig(_generateDynamicOnRampConfig(address(2)));
     vm.startPrank(ADMIN);
     vm.expectRevert("Only callable by owner");
     s_onRamp.setDynamicConfig(_generateDynamicOnRampConfig(address(2)));
+  }
+
+  function test_setDynamicConfig_InvalidConfigReentrancyGuardEnteredEqTrue_Revert() public {
+    OnRamp.DynamicConfig memory newConfig = OnRamp.DynamicConfig({
+      feeQuoter: address(23423),
+      reentrancyGuardEntered: true,
+      messageInterceptor: makeAddr("messageInterceptor"),
+      feeAggregator: FEE_AGGREGATOR,
+      allowListAdmin: address(0)
+    });
+
+    vm.expectRevert(OnRamp.InvalidConfig.selector);
+    s_onRamp.setDynamicConfig(newConfig);
   }
 }
 
