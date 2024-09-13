@@ -628,7 +628,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
     // We need to safely decode the token address from the sourceTokenData, as it could be wrong,
     // in which case it doesn't have to be a valid EVM address.
-    // We assume this destTokenAddress already fully validated from a (trusted) OnRamp.
+    // We assume this destTokenAddress has already been fully validated by a (trusted) OnRamp.
     address localToken = sourceTokenAmount.destTokenAddress;
     // We check with the token admin registry if the token has a pool on this chain.
     address localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
