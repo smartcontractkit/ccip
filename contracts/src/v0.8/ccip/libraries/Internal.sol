@@ -313,15 +313,13 @@ library Internal {
 
   struct Any2EVMTokenTransfer {
     bytes sourcePoolAddress;
-    address destTokenAddress; // ──╮
-    uint32 destGasAmount;//────────╯
+    address destTokenAddress; // ──╮ Address of destination token
+    uint32 destGasAmount;//────────╯ The amount of gas available for the releaseOrMint and transfer calls on the offRamp.
     // Optional pool data to be transferred to the destination chain. Be default this is capped at
     // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
     // has to be set for the specific token.
     bytes extraData;
     uint256 amount; // Amount of tokens.
-    // The amount of gas available for the releaseOrMint and transfer calls on the offRamp.
-
   }
 
   /// @notice Family-agnostic message routed to an OffRamp
