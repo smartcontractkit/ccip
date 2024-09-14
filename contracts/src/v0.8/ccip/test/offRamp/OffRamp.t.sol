@@ -2985,10 +2985,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
           || bytes4(reason) == OffRamp.NotACompatiblePool.selector,
         "Expected TokenHandlingError or InvalidEVMAddress"
       );
-
-      if (uint160(destPool) > type(uint160).max) {
-        assertEq(reason, abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, abi.encode(destPool)));
-      }
+      assertEq(reason, abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, abi.encode(destPool)));
     }
   }
 }
