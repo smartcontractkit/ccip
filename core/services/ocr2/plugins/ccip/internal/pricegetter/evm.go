@@ -200,7 +200,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 			},
 			{
 				ReadName:  latestRoundDataMethodName,
-				ReturnVal: latestRoundData,
+				ReturnVal: &latestRoundData,
 			},
 		},
 	})
@@ -210,21 +210,35 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 
 	// Extract results
 	// give result the method key and then you get slice of responses
-	decimalRespSlice := result[decimalsMethodName]
+	offchainAggregatorRespSlice := result["OffchainAggregator"]
 	decimalsCR := make([]uint8, 0, nbDecimalCalls)
+	latestRoundCR := make([]latestRoundDataConfig, 0, nbDecimalCalls)
 	var respErr error
-	for i, read := range decimalRespSlice {
+	for i, read := range offchainAggregatorRespSlice {
 		val, readErr := read.GetResult()
 		if readErr != nil {
 			respErr = multierr.Append(respErr, fmt.Errorf("error with method call %v: %w", batchCalls.decimalCalls[i].MethodName(), readErr))
 			continue
 		}
-		decimal, ok := val.(uint8)
-		if !ok {
-			return fmt.Errorf("expected type uint8 for method call %v on contract %v: %w", batchCalls.decimalCalls[i].MethodName(), batchCalls.decimalCalls[i].ContractAddress(), readErr)
+		if read.ReadName == decimalsMethodName {
+			decimal, ok := val.(uint8)
+			if !ok {
+				return fmt.Errorf("expected type uint8 for method call %v on contract %v: %w", batchCalls.decimalCalls[i].MethodName(), batchCalls.decimalCalls[i].ContractAddress(), readErr)
+			}
+
+			decimalsCR = append(decimalsCR, decimal)
+		} else if read.ReadName == latestRoundDataMethodName {
+			latestRoundDataRes, ok := val.(latestRoundDataConfig)
+			if !ok {
+				return fmt.Errorf("expected type uint8 for method call %v on contract %v: %w", batchCalls.decimalCalls[i].MethodName(), batchCalls.decimalCalls[i].ContractAddress(), readErr)
+			}
+
+			latestRoundCR = append(latestRoundCR, latestRoundDataRes)
 		}
 
-		decimalsCR = append(decimalsCR, decimal)
+	}
+	if respErr != nil {
+		return respErr
 	}
 
 	// Perform batched call (all decimals calls followed by latest round data calls).
