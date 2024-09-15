@@ -9,27 +9,27 @@ import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {OnRamp} from "../../onRamp/OnRamp.sol";
+import {FeeQuoterFeeSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {MessageInterceptorHelper} from "../helpers/MessageInterceptorHelper.sol";
 import {OnRampHelper} from "../helpers/OnRampHelper.sol";
-import {PriceRegistryFeeSetup} from "../priceRegistry/PriceRegistry.t.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-contract OnRampSetup is PriceRegistryFeeSetup {
+contract OnRampSetup is FeeQuoterFeeSetup {
   uint256 internal immutable i_tokenAmount0 = 9;
   uint256 internal immutable i_tokenAmount1 = 7;
 
   bytes32 internal s_metadataHash;
 
   OnRampHelper internal s_onRamp;
-  MessageInterceptorHelper internal s_outboundMessageValidator;
+  MessageInterceptorHelper internal s_outboundmessageInterceptor;
   address[] internal s_offRamps;
   NonceManager internal s_outboundNonceManager;
 
   function setUp() public virtual override {
     super.setUp();
 
-    s_outboundMessageValidator = new MessageInterceptorHelper();
+    s_outboundmessageInterceptor = new MessageInterceptorHelper();
     s_outboundNonceManager = new NonceManager(new address[](0));
     (s_onRamp, s_metadataHash) = _deployOnRamp(
       SOURCE_CHAIN_SELECTOR, s_sourceRouter, address(s_outboundNonceManager), address(s_tokenAdminRegistry)
@@ -84,9 +84,14 @@ contract OnRampSetup is PriceRegistryFeeSetup {
     );
   }
 
-  function _generateDynamicOnRampConfig(address priceRegistry) internal pure returns (OnRamp.DynamicConfig memory) {
-    return
-      OnRamp.DynamicConfig({priceRegistry: priceRegistry, messageValidator: address(0), feeAggregator: FEE_AGGREGATOR});
+  function _generateDynamicOnRampConfig(address feeQuoter) internal pure returns (OnRamp.DynamicConfig memory) {
+    return OnRamp.DynamicConfig({
+      feeQuoter: feeQuoter,
+      reentrancyGuardEntered: false,
+      messageInterceptor: address(0),
+      feeAggregator: FEE_AGGREGATOR,
+      allowListAdmin: address(0)
+    });
   }
 
   // Slicing is only available for calldata. So we have to build a new bytes array.
@@ -113,11 +118,11 @@ contract OnRampSetup is PriceRegistryFeeSetup {
     OnRampHelper onRamp = new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: sourceChainSelector,
-        rmnProxy: address(s_mockRMN),
+        rmn: s_mockRMNRemote,
         nonceManager: nonceManager,
         tokenAdminRegistry: tokenAdminRegistry
       }),
-      _generateDynamicOnRampConfig(address(s_priceRegistry)),
+      _generateDynamicOnRampConfig(address(s_feeQuoter)),
       _generateDestChainConfigArgs(router)
     );
 
@@ -134,7 +139,7 @@ contract OnRampSetup is PriceRegistryFeeSetup {
     );
   }
 
-  function _enableOutboundMessageValidator() internal {
+  function _enableOutboundMessageInterceptor() internal {
     (, address msgSender,) = vm.readCallers();
 
     bool resetPrank = false;
@@ -146,7 +151,7 @@ contract OnRampSetup is PriceRegistryFeeSetup {
     }
 
     OnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
-    dynamicConfig.messageValidator = address(s_outboundMessageValidator);
+    dynamicConfig.messageInterceptor = address(s_outboundmessageInterceptor);
     s_onRamp.setDynamicConfig(dynamicConfig);
 
     if (resetPrank) {
@@ -157,11 +162,11 @@ contract OnRampSetup is PriceRegistryFeeSetup {
 
   function _assertStaticConfigsEqual(OnRamp.StaticConfig memory a, OnRamp.StaticConfig memory b) internal pure {
     assertEq(a.chainSelector, b.chainSelector);
-    assertEq(a.rmnProxy, b.rmnProxy);
+    assertEq(address(a.rmn), address(b.rmn));
     assertEq(a.tokenAdminRegistry, b.tokenAdminRegistry);
   }
 
   function _assertDynamicConfigsEqual(OnRamp.DynamicConfig memory a, OnRamp.DynamicConfig memory b) internal pure {
-    assertEq(a.priceRegistry, b.priceRegistry);
+    assertEq(a.feeQuoter, b.feeQuoter);
   }
 }

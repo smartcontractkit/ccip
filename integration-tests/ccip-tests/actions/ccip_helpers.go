@@ -56,8 +56,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
@@ -528,8 +528,8 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 // of price update events and add the event details to watchers. It subscribes to 'UsdPerUnitGasUpdated'
 // and 'UsdPerTokenUpdated' event.
 func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr *zerolog.Logger) error {
-	gasUpdateEventLatest := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
-	tokenUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerTokenUpdated)
+	gasUpdateEventLatest := make(chan *fee_quoter.FeeQuoterUsdPerUnitGasUpdated)
+	tokenUpdateEvent := make(chan *fee_quoter.FeeQuoterUsdPerTokenUpdated)
 	sub := event.Resubscribe(DefaultResubscriptionTimeout, func(_ context.Context) (event.Subscription, error) {
 		lggr.Info().Msg("Subscribing to UsdPerUnitGasUpdated event")
 		eventSub, err := ccipModule.PriceRegistry.WatchUsdPerUnitGasUpdated(nil, gasUpdateEventLatest, nil)
@@ -3046,6 +3046,7 @@ func (lane *CCIPLane) ExecuteManually(options ...ManualExecutionOption) error {
 
 // validationOptions are used in the ValidateRequests function to specify which phase is expected to fail and how
 type validationOptions struct {
+	expectAnyPhaseToFail bool
 	phaseExpectedToFail  testreporters.Phase // the phase expected to fail
 	expectedErrorMessage string              // if provided, we're looking for a specific error message
 	timeout              time.Duration       // timeout for the validation
@@ -3079,6 +3080,18 @@ func WithTimeout(timeout time.Duration) PhaseSpecificValidationOptionFunc {
 func ExpectPhaseToFail(phase testreporters.Phase, phaseSpecificOptions ...PhaseSpecificValidationOptionFunc) ValidationOptionFunc {
 	return func(opts *validationOptions) {
 		opts.phaseExpectedToFail = phase
+		for _, f := range phaseSpecificOptions {
+			if f != nil {
+				f(opts)
+			}
+		}
+	}
+}
+
+// ExpectAnyPhaseToFail expects any phase in CCIP transaction to fail.
+func ExpectAnyPhaseToFail(phaseSpecificOptions ...PhaseSpecificValidationOptionFunc) ValidationOptionFunc {
+	return func(opts *validationOptions) {
+		opts.expectAnyPhaseToFail = true
 		for _, f := range phaseSpecificOptions {
 			if f != nil {
 				f(opts)
@@ -3132,7 +3145,7 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 		reqStats = append(reqStats, req.RequestStat)
 	}
 
-	if opts.phaseExpectedToFail == testreporters.CCIPSendRe && opts.timeout != 0 {
+	if (opts.phaseExpectedToFail == testreporters.CCIPSendRe || opts.expectAnyPhaseToFail) && opts.timeout != 0 {
 		timeout = opts.timeout
 	}
 	msgLogs, ccipSendReqGenAt, err := lane.Source.AssertEventCCIPSendRequested(
@@ -3158,6 +3171,10 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 		}
 		if reqStat == nil {
 			return fmt.Errorf("could not find request stat for seq number %d", seqNumber)
+		}
+
+		if opts.expectAnyPhaseToFail && opts.timeout != 0 {
+			timeout = opts.timeout
 		}
 
 		if opts.phaseExpectedToFail == testreporters.Commit && opts.timeout != 0 {
@@ -3199,6 +3216,9 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 			return phaseErr
 		}
 	}
+	if opts.expectAnyPhaseToFail {
+		return fmt.Errorf("expected at least any one phase to fail but no phase got failed")
+	}
 	return nil
 }
 
@@ -3210,6 +3230,11 @@ func isPhaseValid(
 	opts validationOptions,
 	err error,
 ) (shouldComplete bool, validationError error) {
+	if opts.expectAnyPhaseToFail && err != nil {
+		logmsg := logger.Info().Str("Failed with Error", err.Error()).Str("Phase", string(currentPhase))
+		logmsg.Msg("Phase failed, as expected")
+		return true, nil
+	}
 	// If no phase is expected to fail or the current phase is not the one expected to fail, we just return what we were given
 	if opts.phaseExpectedToFail == "" || currentPhase != opts.phaseExpectedToFail {
 		return err != nil, err
@@ -3218,13 +3243,14 @@ func isPhaseValid(
 		return true, fmt.Errorf("expected phase '%s' to fail, but it passed", opts.phaseExpectedToFail)
 	}
 	logmsg := logger.Info().Str("Failed with Error", err.Error()).Str("Phase", string(currentPhase))
+
 	if opts.expectedErrorMessage != "" {
 		if !strings.Contains(err.Error(), opts.expectedErrorMessage) {
 			return true, fmt.Errorf("expected phase '%s' to fail with error message '%s' but got error '%s'", currentPhase, opts.expectedErrorMessage, err.Error())
 		}
 		logmsg.Str("Expected Error Message", opts.expectedErrorMessage)
 	}
-	logmsg.Msg("Expected phase to fail and it did")
+	logmsg.Msg("Phase failed, as expected")
 	return true, nil
 }
 
@@ -4056,11 +4082,7 @@ func (c *CCIPTestEnv) ConnectToDeployedNodes() error {
 		}
 		c.CLNodes = chainlinkK8sNodes
 		if _, exists := c.K8Env.URLs[mockserver.InternalURLsKey]; exists {
-			mockServer, err := ctfClient.ConnectMockServer(c.K8Env)
-			if err != nil {
-				return fmt.Errorf("failed to connect to mock server: %w", err)
-			}
-			c.MockServer = mockServer
+			c.MockServer = ctfClient.ConnectMockServer(c.K8Env)
 		}
 	}
 	return nil

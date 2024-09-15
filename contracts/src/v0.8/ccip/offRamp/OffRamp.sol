@@ -3,11 +3,11 @@ pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol";
+import {IFeeQuoter} from "../interfaces/IFeeQuoter.sol";
 import {IMessageInterceptor} from "../interfaces/IMessageInterceptor.sol";
 import {INonceManager} from "../interfaces/INonceManager.sol";
 import {IPoolV1} from "../interfaces/IPool.sol";
-import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
-import {IRMN} from "../interfaces/IRMN.sol";
+import {IRMNV2} from "../interfaces/IRMNV2.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
 
@@ -40,7 +40,11 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error UnexpectedTokenData();
   error ManualExecutionNotYetEnabled(uint64 sourceChainSelector);
   error ManualExecutionGasLimitMismatch();
-  error InvalidManualExecutionGasLimit(uint64 sourceChainSelector, uint256 index, uint256 newLimit);
+  error InvalidManualExecutionGasLimit(uint64 sourceChainSelector, bytes32 messageId, uint256 newLimit);
+  error InvalidManualExecutionTokenGasOverride(
+    bytes32 messageId, uint256 tokenIndex, uint256 oldLimit, uint256 tokenGasOverride
+  );
+  error ManualExecutionGasAmountCountMismatch(bytes32 messageId, uint64 sequenceNumber);
   error RootNotCommitted(uint64 sourceChainSelector);
   error RootAlreadyCommitted(uint64 sourceChainSelector, bytes32 merkleRoot);
   error InvalidRoot();
@@ -53,11 +57,14 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   error NotACompatiblePool(address notPool);
   error InvalidDataLength(uint256 expected, uint256 got);
   error InvalidNewState(uint64 sourceChainSelector, uint64 sequenceNumber, Internal.MessageExecutionState newState);
-  error InvalidStaticConfig(uint64 sourceChainSelector);
   error StaleCommitReport();
-  error InvalidInterval(uint64 sourceChainSelector, Interval interval);
+  error InvalidInterval(uint64 sourceChainSelector, uint64 min, uint64 max);
   error ZeroAddressNotAllowed();
   error InvalidMessageDestChainSelector(uint64 messageDestChainSelector);
+  error SourceChainSelectorMismatch(uint64 reportSourceChainSelector, uint64 messageSourceChainSelector);
+  error SignatureVerificationDisabled();
+  error CommitOnRampMismatch(bytes reportOnRamp, bytes configOnRamp);
+  error InvalidOnRampUpdate(uint64 sourceChainSelector);
 
   /// @dev Atlas depends on this event, if changing, please notify Atlas.
   event StaticConfigSet(StaticConfig staticConfig);
@@ -67,6 +74,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     uint64 indexed sourceChainSelector,
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
+    bytes32 messageHash,
     Internal.MessageExecutionState state,
     bytes returnData,
     uint256 gasUsed
@@ -76,19 +84,23 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   event SkippedAlreadyExecutedMessage(uint64 sourceChainSelector, uint64 sequenceNumber);
   event AlreadyAttempted(uint64 sourceChainSelector, uint64 sequenceNumber);
   /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
-  event CommitReportAccepted(CommitReport report);
+  event CommitReportAccepted(Internal.MerkleRoot[] merkleRoots, Internal.PriceUpdates priceUpdates);
   event RootRemoved(bytes32 root);
+  event SkippedReportExecution(uint64 sourceChainSelector);
 
-  /// @notice Struct that contains the static configuration
+  /// @dev Struct that contains the static configuration
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
+  /// @dev not sure why solhint complains about this, seems like a buggy detector
+  /// https://github.com/protofire/solhint/issues/597
+  // solhint-disable-next-line gas-struct-packing
   struct StaticConfig {
     uint64 chainSelector; // ───╮  Destination chainSelector
-    address rmnProxy; // ───────╯  RMN proxy address
+    IRMNV2 rmn; // ─────────────╯  RMN Verification Contract
     address tokenAdminRegistry; // Token admin registry address
     address nonceManager; // Nonce manager address
   }
 
-  /// @notice Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp)
+  /// @dev Per-chain source config (defining a lane from a Source Chain -> Dest OffRamp)
   struct SourceChainConfig {
     IRouter router; // ──────────╮  Local router to use for messages coming from this source chain
     bool isEnabled; //           |  Flag whether the source chain is enabled or not
@@ -96,7 +108,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     bytes onRamp; // OnRamp address on the source chain
   }
 
-  /// @notice Same as SourceChainConfig but with source chain selector so that an array of these
+  /// @dev Same as SourceChainConfig but with source chain selector so that an array of these
   /// can be passed in the constructor and the applySourceChainConfigUpdates function.
   struct SourceChainConfigArgs {
     IRouter router; // ────────────────╮  Local router to use for messages coming from this source chain
@@ -105,49 +117,36 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     bytes onRamp; // OnRamp address on the source chain
   }
 
-  /// @notice Dynamic offRamp config
+  /// @dev Dynamic offRamp config
   /// @dev Since DynamicConfig is part of DynamicConfigSet event, if changing it, we should update the ABI on Atlas
   struct DynamicConfig {
-    address priceRegistry; // ──────────────────────────╮ Price registry address on the local chain
-    uint32 permissionLessExecutionThresholdSeconds; //  │ Waiting time before manual execution is enabled
-    uint32 maxTokenTransferGas; //                      │ Maximum amount of gas passed on to token `transfer` call
-    uint32 maxPoolReleaseOrMintGas; // ─────────────────╯ Maximum amount of gas passed on to token pool when calling releaseOrMint
-    address messageValidator; // Optional message validator to validate incoming messages (zero address = no validator)
+    address feeQuoter; // ──────────────────────────────╮ FeeQuoter address on the local chain
+    uint32 permissionLessExecutionThresholdSeconds; //──╯ Waiting time before manual execution is enabled
+    address messageInterceptor; // Optional message interceptor to validate incoming messages (zero address = no interceptor)
   }
 
-  /// @notice a sequenceNumber interval
-  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
-  struct Interval {
-    uint64 min; // ───╮ Minimum sequence number, inclusive
-    uint64 max; // ───╯ Maximum sequence number, inclusive
-  }
-
-  /// @dev Struct to hold a merkle root and an interval for a source chain so that an array of these can be passed in the CommitReport.
-  struct MerkleRoot {
-    uint64 sourceChainSelector; // Remote source chain selector that the Merkle Root is scoped to
-    Interval interval; // Report interval of the merkle root
-    bytes32 merkleRoot; // Merkle root covering the interval & source chain messages
-  }
-
-  /// @notice Report that is committed by the observing DON at the committing phase
+  /// @dev Report that is committed by the observing DON at the committing phase
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct CommitReport {
     Internal.PriceUpdates priceUpdates; // Collection of gas and price updates to commit
-    MerkleRoot[] merkleRoots; // Collection of merkle roots per source chain to commit
+    Internal.MerkleRoot[] merkleRoots; // Collection of merkle roots per source chain to commit
+    IRMNV2.Signature[] rmnSignatures; // RMN signatures on the merkle roots
   }
 
-  /// @dev Struct to hold a merkle root for a source chain so that an array of these can be passed in the resetUblessedRoots function.
-  struct UnblessedRoot {
-    uint64 sourceChainSelector; // Remote source chain selector that the Merkle Root is scoped to
-    bytes32 merkleRoot; // Merkle root of a single remote source chain
+  struct GasLimitOverride {
+    // A value of zero in both fields signifies no override and allows the corresponding field to be overridden as valid
+    uint256 receiverExecutionGasLimit; // Overrides EVM2EVMMessage.gasLimit.
+    uint32[] tokenGasOverrides; // Overrides EVM2EVMMessage.sourceTokenData.destGasAmount, length must be same as tokenAmounts.
   }
 
   // STATIC CONFIG
   string public constant override typeAndVersion = "OffRamp 1.6.0-dev";
+  /// @dev Hash of encoded address(0) used for empty address checks
+  bytes32 internal constant EMPTY_ENCODED_ADDRESS_HASH = keccak256(abi.encode(address(0)));
   /// @dev ChainSelector of this chain
   uint64 internal immutable i_chainSelector;
-  /// @dev The address of the RMN proxy
-  address internal immutable i_rmnProxy;
+  /// @dev The RMN verification contract
+  IRMNV2 internal immutable i_rmn;
   /// @dev The address of the token admin registry
   address internal immutable i_tokenAdminRegistry;
   /// @dev The address of the nonce manager
@@ -158,7 +157,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice SourceChainConfig per chain
   /// (forms lane configurations from sourceChainSelector => StaticConfig.chainSelector)
-  mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) internal s_sourceChainConfigs;
+  mapping(uint64 sourceChainSelector => SourceChainConfig sourceChainConfig) private s_sourceChainConfigs;
 
   // STATE
   /// @dev A mapping of sequence numbers (per source chain) to execution state using a bitmap with each execution
@@ -178,7 +177,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     SourceChainConfigArgs[] memory sourceChainConfigs
   ) MultiOCR3Base() {
     if (
-      staticConfig.rmnProxy == address(0) || staticConfig.tokenAdminRegistry == address(0)
+      address(staticConfig.rmn) == address(0) || staticConfig.tokenAdminRegistry == address(0)
         || staticConfig.nonceManager == address(0)
     ) {
       revert ZeroAddressNotAllowed();
@@ -189,7 +188,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     }
 
     i_chainSelector = staticConfig.chainSelector;
-    i_rmnProxy = staticConfig.rmnProxy;
+    i_rmn = staticConfig.rmn;
     i_tokenAdminRegistry = staticConfig.tokenAdminRegistry;
     i_nonceManager = staticConfig.nonceManager;
     emit StaticConfigSet(staticConfig);
@@ -199,17 +198,13 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   }
 
   // ================================================================
-  // │                          Messaging                           │
+  // │                           Execution                          │
   // ================================================================
 
   // The size of the execution state in bits
   uint256 private constant MESSAGE_EXECUTION_STATE_BIT_WIDTH = 2;
   // The mask for the execution state bits
   uint256 private constant MESSAGE_EXECUTION_STATE_MASK = (1 << MESSAGE_EXECUTION_STATE_BIT_WIDTH) - 1;
-
-  // ================================================================
-  // │                           Execution                          │
-  // ================================================================
 
   /// @notice Returns the current execution state of a message based on its sequenceNumber.
   /// @param sourceChainSelector The source chain to get the execution state for
@@ -269,7 +264,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// The reports do not have to contain all the messages (they can be omitted). Multiple reports can be passed in simultaneously.
   function manuallyExecute(
     Internal.ExecutionReportSingleChain[] memory reports,
-    uint256[][] memory gasLimitOverrides
+    GasLimitOverride[][] memory gasLimitOverrides
   ) external {
     // We do this here because the other _execute path is already covered by MultiOCR3Base.
     _whenChainNotForked();
@@ -281,15 +276,35 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       Internal.ExecutionReportSingleChain memory report = reports[reportIndex];
 
       uint256 numMsgs = report.messages.length;
-      uint256[] memory msgGasLimitOverrides = gasLimitOverrides[reportIndex];
+      GasLimitOverride[] memory msgGasLimitOverrides = gasLimitOverrides[reportIndex];
       if (numMsgs != msgGasLimitOverrides.length) revert ManualExecutionGasLimitMismatch();
 
       for (uint256 msgIndex = 0; msgIndex < numMsgs; ++msgIndex) {
-        uint256 newLimit = msgGasLimitOverrides[msgIndex];
+        uint256 newLimit = msgGasLimitOverrides[msgIndex].receiverExecutionGasLimit;
         // Checks to ensure message cannot be executed with less gas than specified.
+        Internal.Any2EVMRampMessage memory message = report.messages[msgIndex];
         if (newLimit != 0) {
-          if (newLimit < report.messages[msgIndex].gasLimit) {
-            revert InvalidManualExecutionGasLimit(report.sourceChainSelector, msgIndex, newLimit);
+          if (newLimit < message.gasLimit) {
+            revert InvalidManualExecutionGasLimit(report.sourceChainSelector, message.header.messageId, newLimit);
+          }
+        }
+        if (message.tokenAmounts.length != msgGasLimitOverrides[msgIndex].tokenGasOverrides.length) {
+          revert ManualExecutionGasAmountCountMismatch(message.header.messageId, message.header.sequenceNumber);
+        }
+
+        // The gas limit can not be lowered as that could cause the message to fail. If manual execution is done
+        // from an UNTOUCHED state and we would allow lower gas limit, anyone could grief by executing the message with
+        // lower gas limit than the DON would have used. This results in the message being marked FAILURE and the DON
+        // would not attempt it with the correct gas limit.
+        for (uint256 tokenIndex = 0; tokenIndex < message.tokenAmounts.length; ++tokenIndex) {
+          uint256 tokenGasOverride = msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex];
+          if (tokenGasOverride != 0) {
+            uint256 destGasAmount = message.tokenAmounts[tokenIndex].destGasAmount;
+            if (tokenGasOverride < destGasAmount) {
+              revert InvalidManualExecutionTokenGasOverride(
+                message.header.messageId, tokenIndex, destGasAmount, tokenGasOverride
+              );
+            }
           }
         }
       }
@@ -302,7 +317,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// and expects the exec plugin type to be configured with no signatures.
   /// @param report serialized execution report
   function execute(bytes32[3] calldata reportContext, bytes calldata report) external {
-    _batchExecute(abi.decode(report, (Internal.ExecutionReportSingleChain[])), new uint256[][](0));
+    _batchExecute(abi.decode(report, (Internal.ExecutionReportSingleChain[])), new GasLimitOverride[][](0));
 
     bytes32[] memory emptySigs = new bytes32[](0);
     _transmit(uint8(Internal.OCRPluginType.Execution), reportContext, report, emptySigs, emptySigs, bytes32(""));
@@ -317,32 +332,41 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @dev If called from manual execution, each inner array's length has to match the number of messages.
   function _batchExecute(
     Internal.ExecutionReportSingleChain[] memory reports,
-    uint256[][] memory manualExecGasLimits
+    GasLimitOverride[][] memory manualExecGasOverrides
   ) internal {
     if (reports.length == 0) revert EmptyReport();
 
-    bool areManualGasLimitsEmpty = manualExecGasLimits.length == 0;
+    bool areManualGasLimitsEmpty = manualExecGasOverrides.length == 0;
     // Cache array for gas savings in the loop's condition
-    uint256[] memory emptyGasLimits = new uint256[](0);
+    GasLimitOverride[] memory emptyGasLimits = new GasLimitOverride[](0);
 
     for (uint256 i = 0; i < reports.length; ++i) {
-      _executeSingleReport(reports[i], areManualGasLimitsEmpty ? emptyGasLimits : manualExecGasLimits[i]);
+      _executeSingleReport(reports[i], areManualGasLimitsEmpty ? emptyGasLimits : manualExecGasOverrides[i]);
     }
   }
 
   /// @notice Executes a report, executing each message in order.
   /// @param report The execution report containing the messages and proofs.
-  /// @param manualExecGasLimits An array of gas limits to use for manual execution.
+  /// @param manualExecGasExecOverrides An array of gas limits to use for manual execution.
   /// @dev If called from the DON, this array is always empty.
   /// @dev If called from manual execution, this array is always same length as messages.
   function _executeSingleReport(
     Internal.ExecutionReportSingleChain memory report,
-    uint256[] memory manualExecGasLimits
+    GasLimitOverride[] memory manualExecGasExecOverrides
   ) internal {
     uint64 sourceChainSelector = report.sourceChainSelector;
-    _whenNotCursed(sourceChainSelector);
+    bool manualExecution = manualExecGasExecOverrides.length != 0;
+    if (i_rmn.isCursed(bytes16(uint128(sourceChainSelector)))) {
+      if (manualExecution) {
+        // For manual execution we don't want to silently fail so we revert
+        revert CursedByRMN(sourceChainSelector);
+      }
+      // For DON execution we do not revert as a single lane curse can revert the entire batch
+      emit SkippedReportExecution(sourceChainSelector);
+      return;
+    }
 
-    SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
+    bytes memory onRamp = _getEnabledSourceChainConfig(sourceChainSelector).onRamp;
 
     uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();
@@ -358,12 +382,28 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       if (message.header.destChainSelector != i_chainSelector) {
         revert InvalidMessageDestChainSelector(message.header.destChainSelector);
       }
+      // If the message source chain selector does not match the report's source chain selector and
+      // the root has not been committed for the report source chain selector, this will be caught by the root verification.
+      // This acts as an extra check.
+      if (message.header.sourceChainSelector != sourceChainSelector) {
+        revert SourceChainSelectorMismatch(sourceChainSelector, message.header.sourceChainSelector);
+      }
 
       // We do this hash here instead of in _verify to avoid two separate loops
       // over the same data, which increases gas cost.
       // Hashing all of the message fields ensures that the message being executed is correct and not tampered with.
       // Including the known OnRamp ensures that the message originates from the correct on ramp version
-      hashedLeaves[i] = Internal._hash(message, sourceChainConfig.onRamp);
+      hashedLeaves[i] = Internal._hash(
+        message,
+        keccak256(
+          abi.encode(
+            Internal.ANY_2_EVM_MESSAGE_HASH,
+            message.header.sourceChainSelector,
+            message.header.destChainSelector,
+            keccak256(onRamp)
+          )
+        )
+      );
     }
 
     // SECURITY CRITICAL CHECK
@@ -372,7 +412,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     if (timestampCommitted == 0) revert RootNotCommitted(sourceChainSelector);
 
     // Execute messages
-    bool manualExecution = manualExecGasLimits.length != 0;
     for (uint256 i = 0; i < numMsgs; ++i) {
       uint256 gasStart = gasleft();
       Internal.Any2EVMRampMessage memory message = report.messages[i];
@@ -394,8 +433,9 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         emit SkippedAlreadyExecutedMessage(sourceChainSelector, message.header.sequenceNumber);
         continue;
       }
-
+      uint32[] memory tokenGasOverrides;
       if (manualExecution) {
+        tokenGasOverrides = manualExecGasExecOverrides[i].tokenGasOverrides;
         bool isOldCommitReport =
           (block.timestamp - timestampCommitted) > s_dynamicConfig.permissionLessExecutionThresholdSeconds;
         // Manually execution is fine if we previously failed or if the commit report is just too old
@@ -405,8 +445,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         }
 
         // Manual execution gas limit can override gas limit specified in the message. Value of 0 indicates no override.
-        if (manualExecGasLimits[i] != 0) {
-          message.gasLimit = manualExecGasLimits[i];
+        if (manualExecGasExecOverrides[i].receiverExecutionGasLimit != 0) {
+          message.gasLimit = manualExecGasExecOverrides[i].receiverExecutionGasLimit;
         }
       } else {
         // DON can only execute a message once
@@ -443,8 +483,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       }
 
       _setExecutionState(sourceChainSelector, message.header.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-
-      (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
+      (Internal.MessageExecutionState newState, bytes memory returnData) =
+        _trialExecute(message, offchainTokenData, tokenGasOverrides);
       _setExecutionState(sourceChainSelector, message.header.sequenceNumber, newState);
 
       // Since it's hard to estimate whether manual execution will succeed, we
@@ -472,8 +512,11 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         sourceChainSelector,
         message.header.sequenceNumber,
         message.header.messageId,
+        hashedLeaves[i],
         newState,
         returnData,
+        // This emit covers not only the execution through the router, but also all of the overhead in executing the
+        // message. This gives the most accurate representation of the gas used in the execution.
         gasStart - gasleft()
       );
     }
@@ -486,9 +529,10 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @return errData Revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
     Internal.Any2EVMRampMessage memory message,
-    bytes[] memory offchainTokenData
+    bytes[] memory offchainTokenData,
+    uint32[] memory tokenGasOverrides
   ) internal returns (Internal.MessageExecutionState executionState, bytes memory) {
-    try this.executeSingleMessage(message, offchainTokenData) {}
+    try this.executeSingleMessage(message, offchainTokenData, tokenGasOverrides) {}
     catch (bytes memory err) {
       // return the message execution state as FAILURE and the revert data
       // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES
@@ -507,13 +551,19 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// (for example smart contract wallets) without an associated message.
   function executeSingleMessage(
     Internal.Any2EVMRampMessage memory message,
-    bytes[] calldata offchainTokenData
+    bytes[] calldata offchainTokenData,
+    uint32[] calldata tokenGasOverrides
   ) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
       destTokenAmounts = _releaseOrMintTokens(
-        message.tokenAmounts, message.sender, message.receiver, message.header.sourceChainSelector, offchainTokenData
+        message.tokenAmounts,
+        message.sender,
+        message.receiver,
+        message.header.sourceChainSelector,
+        offchainTokenData,
+        tokenGasOverrides
       );
     }
 
@@ -525,9 +575,9 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       destTokenAmounts: destTokenAmounts
     });
 
-    address messageValidator = s_dynamicConfig.messageValidator;
-    if (messageValidator != address(0)) {
-      try IMessageInterceptor(messageValidator).onInboundMessage(any2EvmMessage) {}
+    address messageInterceptor = s_dynamicConfig.messageInterceptor;
+    if (messageInterceptor != address(0)) {
+      try IMessageInterceptor(messageInterceptor).onInboundMessage(any2EvmMessage) {}
       catch (bytes memory err) {
         revert IMessageInterceptor.MessageValidationError(err);
       }
@@ -555,253 +605,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   }
 
   // ================================================================
-  // │                           Commit                             │
-  // ================================================================
-
-  /// @notice Transmit function for commit reports. The function requires signatures,
-  /// and expects the commit plugin type to be configured with signatures.
-  /// @param report serialized commit report
-  /// @dev A commitReport can have two distinct parts (batched together to amortize the cost of checking sigs):
-  /// 1. Price updates
-  /// 2. A batch of merkle root and sequence number intervals (per-source)
-  /// Both have their own, separate, staleness checks, with price updates using the epoch and round
-  /// number of the latest price update. The merkle root checks for staleness are based on the seqNums.
-  /// They need to be separate because a price report for round t+2 might be included before a report
-  /// containing a merkle root for round t+1. This merkle root report for round t+1 is still valid
-  /// and should not be rejected. When a report with a stale root but valid price updates is submitted,
-  /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
-  /// If that happens, prices will be updated in later rounds.
-  function commit(
-    bytes32[3] calldata reportContext,
-    bytes calldata report,
-    bytes32[] calldata rs,
-    bytes32[] calldata ss,
-    bytes32 rawVs // signatures
-  ) external {
-    CommitReport memory commitReport = abi.decode(report, (CommitReport));
-
-    // Check if the report contains price updates
-    if (commitReport.priceUpdates.tokenPriceUpdates.length > 0 || commitReport.priceUpdates.gasPriceUpdates.length > 0)
-    {
-      uint64 sequenceNumber = uint64(uint256(reportContext[1]));
-
-      // Check for price staleness based on the epoch and round
-      if (s_latestPriceSequenceNumber < sequenceNumber) {
-        // If prices are not stale, update the latest epoch and round
-        s_latestPriceSequenceNumber = sequenceNumber;
-        // And update the prices in the price registry
-        IPriceRegistry(s_dynamicConfig.priceRegistry).updatePrices(commitReport.priceUpdates);
-      } else {
-        // If prices are stale and the report doesn't contain a root, this report
-        // does not have any valid information and we revert.
-        // If it does contain a merkle root, continue to the root checking section.
-        if (commitReport.merkleRoots.length == 0) revert StaleCommitReport();
-      }
-    }
-
-    for (uint256 i = 0; i < commitReport.merkleRoots.length; ++i) {
-      MerkleRoot memory root = commitReport.merkleRoots[i];
-      uint64 sourceChainSelector = root.sourceChainSelector;
-
-      _whenNotCursed(sourceChainSelector);
-      SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
-
-      if (sourceChainConfig.minSeqNr != root.interval.min || root.interval.min > root.interval.max) {
-        revert InvalidInterval(root.sourceChainSelector, root.interval);
-      }
-
-      // TODO: confirm how RMN offchain blessing impacts commit report
-      bytes32 merkleRoot = root.merkleRoot;
-      if (merkleRoot == bytes32(0)) revert InvalidRoot();
-      // If we reached this section, the report should contain a valid root
-      // We disallow duplicate roots as that would reset the timestamp and
-      // delay potential manual execution.
-      if (s_roots[root.sourceChainSelector][merkleRoot] != 0) {
-        revert RootAlreadyCommitted(root.sourceChainSelector, merkleRoot);
-      }
-
-      sourceChainConfig.minSeqNr = root.interval.max + 1;
-      s_roots[root.sourceChainSelector][merkleRoot] = block.timestamp;
-    }
-
-    emit CommitReportAccepted(commitReport);
-
-    _transmit(uint8(Internal.OCRPluginType.Commit), reportContext, report, rs, ss, rawVs);
-  }
-
-  /// @notice Returns the sequence number of the last price update.
-  /// @return sequenceNumber The latest price update sequence number.
-  function getLatestPriceSequenceNumber() external view returns (uint64) {
-    return s_latestPriceSequenceNumber;
-  }
-
-  /// @notice Returns the timestamp of a potentially previously committed merkle root.
-  /// If the root was never committed 0 will be returned.
-  /// @param sourceChainSelector The source chain selector.
-  /// @param root The merkle root to check the commit status for.
-  /// @return timestamp The timestamp of the committed root or zero in the case that it was never
-  /// committed.
-  function getMerkleRoot(uint64 sourceChainSelector, bytes32 root) external view returns (uint256) {
-    return s_roots[sourceChainSelector][root];
-  }
-
-  /// @notice Returns if a root is blessed or not.
-  /// @param root The merkle root to check the blessing status for.
-  /// @return blessed Whether the root is blessed or not.
-  function isBlessed(bytes32 root) public view returns (bool) {
-    // TODO: update RMN to also consider the source chain selector for blessing
-    return IRMN(i_rmnProxy).isBlessed(IRMN.TaggedRoot({commitStore: address(this), root: root}));
-  }
-
-  /// @notice Used by the owner in case an invalid sequence of roots has been
-  /// posted and needs to be removed. The interval in the report is trusted.
-  /// @param rootToReset The roots that will be reset. This function will only
-  /// reset roots that are not blessed.
-  function resetUnblessedRoots(UnblessedRoot[] calldata rootToReset) external onlyOwner {
-    for (uint256 i = 0; i < rootToReset.length; ++i) {
-      UnblessedRoot memory root = rootToReset[i];
-      if (!isBlessed(root.merkleRoot)) {
-        delete s_roots[root.sourceChainSelector][root.merkleRoot];
-        emit RootRemoved(root.merkleRoot);
-      }
-    }
-  }
-
-  /// @notice Returns timestamp of when root was accepted or 0 if verification fails.
-  /// @dev This method uses a merkle tree within a merkle tree, with the hashedLeaves,
-  /// proofs and proofFlagBits being used to get the root of the inner tree.
-  /// This root is then used as the singular leaf of the outer tree.
-  /// @return timestamp The commit timestamp of the root
-  function _verify(
-    uint64 sourceChainSelector,
-    bytes32[] memory hashedLeaves,
-    bytes32[] memory proofs,
-    uint256 proofFlagBits
-  ) internal view virtual returns (uint256 timestamp) {
-    bytes32 root = MerkleMultiProof.merkleRoot(hashedLeaves, proofs, proofFlagBits);
-    // Only return non-zero if present and blessed.
-    if (!isBlessed(root)) {
-      return 0;
-    }
-    return s_roots[sourceChainSelector][root];
-  }
-
-  /// @inheritdoc MultiOCR3Base
-  function _afterOCR3ConfigSet(uint8 ocrPluginType) internal override {
-    if (ocrPluginType == uint8(Internal.OCRPluginType.Commit)) {
-      // When the OCR config changes, we reset the sequence number
-      // since it is scoped per config digest.
-      // Note that s_minSeqNr/roots do not need to be reset as the roots persist
-      // across reconfigurations and are de-duplicated separately.
-      s_latestPriceSequenceNumber = 0;
-    }
-  }
-
-  // ================================================================
-  // │                           Config                             │
-  // ================================================================
-
-  /// @notice Returns the static config.
-  /// @dev This function will always return the same struct as the contents is static and can never change.
-  /// RMN depends on this function, if changing, please notify the RMN maintainers.
-  /// @return staticConfig The static config.
-  function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({
-      chainSelector: i_chainSelector,
-      rmnProxy: i_rmnProxy,
-      tokenAdminRegistry: i_tokenAdminRegistry,
-      nonceManager: i_nonceManager
-    });
-  }
-
-  /// @notice Returns the current dynamic config.
-  /// @return dynamicConfig The current dynamic config.
-  function getDynamicConfig() external view returns (DynamicConfig memory) {
-    return s_dynamicConfig;
-  }
-
-  /// @notice Returns the source chain config for the provided source chain selector
-  /// @param sourceChainSelector chain to retrieve configuration for
-  /// @return sourceChainConfig The config for the source chain
-  function getSourceChainConfig(uint64 sourceChainSelector) external view returns (SourceChainConfig memory) {
-    return s_sourceChainConfigs[sourceChainSelector];
-  }
-
-  /// @notice Updates source configs
-  /// @param sourceChainConfigUpdates Source chain configs
-  function applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigUpdates) external onlyOwner {
-    _applySourceChainConfigUpdates(sourceChainConfigUpdates);
-  }
-
-  /// @notice Updates source configs
-  /// @param sourceChainConfigUpdates Source chain configs
-  function _applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigUpdates) internal {
-    for (uint256 i = 0; i < sourceChainConfigUpdates.length; ++i) {
-      SourceChainConfigArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
-      uint64 sourceChainSelector = sourceConfigUpdate.sourceChainSelector;
-
-      if (sourceChainSelector == 0) {
-        revert ZeroChainSelectorNotAllowed();
-      }
-
-      if (address(sourceConfigUpdate.router) == address(0)) {
-        revert ZeroAddressNotAllowed();
-      }
-
-      SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
-      bytes memory currentOnRamp = currentConfig.onRamp;
-      bytes memory newOnRamp = sourceConfigUpdate.onRamp;
-
-      // OnRamp can never be zero - if it is, then the source chain has been added for the first time
-      if (currentOnRamp.length == 0) {
-        if (newOnRamp.length == 0) {
-          revert ZeroAddressNotAllowed();
-        }
-
-        currentConfig.onRamp = newOnRamp;
-        currentConfig.minSeqNr = 1;
-        emit SourceChainSelectorAdded(sourceChainSelector);
-      } else if (keccak256(currentOnRamp) != keccak256(newOnRamp)) {
-        revert InvalidStaticConfig(sourceChainSelector);
-      }
-
-      currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
-      currentConfig.router = sourceConfigUpdate.router;
-      emit SourceChainConfigSet(sourceChainSelector, currentConfig);
-    }
-  }
-
-  /// @notice Sets the dynamic config.
-  /// @param dynamicConfig The new dynamic config.
-  function setDynamicConfig(DynamicConfig memory dynamicConfig) external onlyOwner {
-    _setDynamicConfig(dynamicConfig);
-  }
-
-  /// @notice Sets the dynamic config.
-  /// @param dynamicConfig The dynamic config.
-  function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
-    if (dynamicConfig.priceRegistry == address(0)) {
-      revert ZeroAddressNotAllowed();
-    }
-
-    s_dynamicConfig = dynamicConfig;
-
-    emit DynamicConfigSet(dynamicConfig);
-  }
-
-  /// @notice Returns a source chain config with a check that the config is enabled
-  /// @param sourceChainSelector Source chain selector to check for cursing
-  /// @return sourceChainConfig The source chain config storage pointer
-  function _getEnabledSourceChainConfig(uint64 sourceChainSelector) internal view returns (SourceChainConfig storage) {
-    SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
-    if (!sourceChainConfig.isEnabled) {
-      revert SourceChainNotEnabled(sourceChainSelector);
-    }
-
-    return sourceChainConfig;
-  }
-
-  // ================================================================
   // │                      Tokens and pools                        │
   // ================================================================
 
@@ -817,7 +620,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @param offchainTokenData Data fetched offchain by the DON.
   /// @return destTokenAmount local token address with amount
   function _releaseOrMintSingleToken(
-    Internal.RampTokenAmount memory sourceTokenAmount,
+    Internal.Any2EVMTokenTransfer memory sourceTokenAmount,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
@@ -825,7 +628,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
     // We need to safely decode the token address from the sourceTokenData, as it could be wrong,
     // in which case it doesn't have to be a valid EVM address.
-    address localToken = Internal._validateEVMAddress(sourceTokenAmount.destTokenAddress);
+    // We assume this destTokenAddress has already been fully validated by a (trusted) OnRamp.
+    address localToken = sourceTokenAmount.destTokenAddress;
     // We check with the token admin registry if the token has a pool on this chain.
     address localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
     // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
@@ -837,8 +641,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     }
 
     // We retrieve the local token balance of the receiver before the pool call.
-    (uint256 balancePre, uint256 gasLeft) =
-      _getBalanceOfReceiver(receiver, localToken, s_dynamicConfig.maxPoolReleaseOrMintGas);
+    (uint256 balancePre, uint256 gasLeft) = _getBalanceOfReceiver(receiver, localToken, sourceTokenAmount.destGasAmount);
 
     // We determined that the pool address is a valid EVM address, but that does not mean the code at this
     // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location
@@ -930,14 +733,21 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// any non-rate limiting errors that may occur. If we encounter a rate limiting related error
   /// we bubble it up. If we encounter a non-rate limiting error we wrap it in a TokenHandlingError.
   function _releaseOrMintTokens(
-    Internal.RampTokenAmount[] memory sourceTokenAmounts,
+    Internal.Any2EVMTokenTransfer[] memory sourceTokenAmounts,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
-    bytes[] calldata offchainTokenData
+    bytes[] calldata offchainTokenData,
+    uint32[] calldata tokenGasOverrides
   ) internal returns (Client.EVMTokenAmount[] memory destTokenAmounts) {
     destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
+    bool isTokenGasOverridesEmpty = tokenGasOverrides.length == 0;
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
+      if (!isTokenGasOverridesEmpty) {
+        if (tokenGasOverrides[i] != 0) {
+          sourceTokenAmounts[i].destGasAmount = tokenGasOverrides[i];
+        }
+      }
       destTokenAmounts[i] = _releaseOrMintSingleToken(
         sourceTokenAmounts[i], originalSender, receiver, sourceChainSelector, offchainTokenData[i]
       );
@@ -947,20 +757,251 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   }
 
   // ================================================================
-  // │                            Access and RMN                    │
+  // │                           Commit                             │
   // ================================================================
 
-  /// @notice Reverts as this contract should not access CCIP messages
+  /// @notice Transmit function for commit reports. The function requires signatures,
+  /// and expects the commit plugin type to be configured with signatures.
+  /// @param report serialized commit report
+  /// @dev A commitReport can have two distinct parts (batched together to amortize the cost of checking sigs):
+  /// 1. Price updates
+  /// 2. A batch of merkle root and sequence number intervals (per-source)
+  /// Both have their own, separate, staleness checks, with price updates using the epoch and round
+  /// number of the latest price update. The merkle root checks for staleness are based on the seqNums.
+  /// They need to be separate because a price report for round t+2 might be included before a report
+  /// containing a merkle root for round t+1. This merkle root report for round t+1 is still valid
+  /// and should not be rejected. When a report with a stale root but valid price updates is submitted,
+  /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
+  /// If that happens, prices will be updated in later rounds.
+  function commit(
+    bytes32[3] calldata reportContext,
+    bytes calldata report,
+    bytes32[] calldata rs,
+    bytes32[] calldata ss,
+    bytes32 rawVs // signatures
+  ) external {
+    CommitReport memory commitReport = abi.decode(report, (CommitReport));
+
+    // Verify RMN signatures
+    if (commitReport.merkleRoots.length > 0) {
+      i_rmn.verify(commitReport.merkleRoots, commitReport.rmnSignatures);
+    }
+
+    // Check if the report contains price updates
+    if (commitReport.priceUpdates.tokenPriceUpdates.length > 0 || commitReport.priceUpdates.gasPriceUpdates.length > 0)
+    {
+      uint64 ocrSequenceNumber = uint64(uint256(reportContext[1]));
+
+      // Check for price staleness based on the epoch and round
+      if (s_latestPriceSequenceNumber < ocrSequenceNumber) {
+        // If prices are not stale, update the latest epoch and round
+        s_latestPriceSequenceNumber = ocrSequenceNumber;
+        // And update the prices in the fee quoter
+        IFeeQuoter(s_dynamicConfig.feeQuoter).updatePrices(commitReport.priceUpdates);
+      } else {
+        // If prices are stale and the report doesn't contain a root, this report
+        // does not have any valid information and we revert.
+        // If it does contain a merkle root, continue to the root checking section.
+        if (commitReport.merkleRoots.length == 0) revert StaleCommitReport();
+      }
+    }
+
+    for (uint256 i = 0; i < commitReport.merkleRoots.length; ++i) {
+      Internal.MerkleRoot memory root = commitReport.merkleRoots[i];
+      uint64 sourceChainSelector = root.sourceChainSelector;
+
+      if (i_rmn.isCursed(bytes16(uint128(sourceChainSelector)))) {
+        revert CursedByRMN(sourceChainSelector);
+      }
+
+      SourceChainConfig storage sourceChainConfig = _getEnabledSourceChainConfig(sourceChainSelector);
+
+      if (keccak256(root.onRampAddress) != keccak256(sourceChainConfig.onRamp)) {
+        revert CommitOnRampMismatch(root.onRampAddress, sourceChainConfig.onRamp);
+      }
+
+      if (sourceChainConfig.minSeqNr != root.minSeqNr || root.minSeqNr > root.maxSeqNr) {
+        revert InvalidInterval(root.sourceChainSelector, root.minSeqNr, root.maxSeqNr);
+      }
+
+      bytes32 merkleRoot = root.merkleRoot;
+      if (merkleRoot == bytes32(0)) revert InvalidRoot();
+      // If we reached this section, the report should contain a valid root
+      // We disallow duplicate roots as that would reset the timestamp and
+      // delay potential manual execution.
+      if (s_roots[root.sourceChainSelector][merkleRoot] != 0) {
+        revert RootAlreadyCommitted(root.sourceChainSelector, merkleRoot);
+      }
+
+      sourceChainConfig.minSeqNr = root.maxSeqNr + 1;
+      s_roots[root.sourceChainSelector][merkleRoot] = block.timestamp;
+    }
+
+    emit CommitReportAccepted(commitReport.merkleRoots, commitReport.priceUpdates);
+
+    _transmit(uint8(Internal.OCRPluginType.Commit), reportContext, report, rs, ss, rawVs);
+  }
+
+  /// @notice Returns the sequence number of the last price update.
+  /// @return sequenceNumber The latest price update sequence number.
+  function getLatestPriceSequenceNumber() external view returns (uint64) {
+    return s_latestPriceSequenceNumber;
+  }
+
+  /// @notice Returns the timestamp of a potentially previously committed merkle root.
+  /// If the root was never committed 0 will be returned.
+  /// @param sourceChainSelector The source chain selector.
+  /// @param root The merkle root to check the commit status for.
+  /// @return timestamp The timestamp of the committed root or zero in the case that it was never
+  /// committed.
+  function getMerkleRoot(uint64 sourceChainSelector, bytes32 root) external view returns (uint256) {
+    return s_roots[sourceChainSelector][root];
+  }
+
+  /// @notice Returns timestamp of when root was accepted or 0 if verification fails.
+  /// @dev This method uses a merkle tree within a merkle tree, with the hashedLeaves,
+  /// proofs and proofFlagBits being used to get the root of the inner tree.
+  /// This root is then used as the singular leaf of the outer tree.
+  /// @return timestamp The commit timestamp of the root
+  function _verify(
+    uint64 sourceChainSelector,
+    bytes32[] memory hashedLeaves,
+    bytes32[] memory proofs,
+    uint256 proofFlagBits
+  ) internal view virtual returns (uint256 timestamp) {
+    bytes32 root = MerkleMultiProof.merkleRoot(hashedLeaves, proofs, proofFlagBits);
+    return s_roots[sourceChainSelector][root];
+  }
+
+  /// @inheritdoc MultiOCR3Base
+  function _afterOCR3ConfigSet(uint8 ocrPluginType) internal override {
+    if (ocrPluginType == uint8(Internal.OCRPluginType.Commit)) {
+      // Signature verification must be enabled for commit plugin
+      if (!s_ocrConfigs[ocrPluginType].configInfo.isSignatureVerificationEnabled) {
+        revert SignatureVerificationDisabled();
+      }
+      // When the OCR config changes, we reset the sequence number
+      // since it is scoped per config digest.
+      // Note that s_minSeqNr/roots do not need to be reset as the roots persist
+      // across reconfigurations and are de-duplicated separately.
+      s_latestPriceSequenceNumber = 0;
+    }
+  }
+
+  // ================================================================
+  // │                           Config                             │
+  // ================================================================
+
+  /// @notice Returns the static config.
+  /// @dev This function will always return the same struct as the contents is static and can never change.
+  /// RMN depends on this function, if changing, please notify the RMN maintainers.
+  /// @return staticConfig The static config.
+  function getStaticConfig() external view returns (StaticConfig memory) {
+    return StaticConfig({
+      chainSelector: i_chainSelector,
+      rmn: i_rmn,
+      tokenAdminRegistry: i_tokenAdminRegistry,
+      nonceManager: i_nonceManager
+    });
+  }
+
+  /// @notice Returns the current dynamic config.
+  /// @return dynamicConfig The current dynamic config.
+  function getDynamicConfig() external view returns (DynamicConfig memory) {
+    return s_dynamicConfig;
+  }
+
+  /// @notice Returns the source chain config for the provided source chain selector
+  /// @param sourceChainSelector chain to retrieve configuration for
+  /// @return sourceChainConfig The config for the source chain
+  function getSourceChainConfig(uint64 sourceChainSelector) external view returns (SourceChainConfig memory) {
+    return s_sourceChainConfigs[sourceChainSelector];
+  }
+
+  /// @notice Updates source configs
+  /// @param sourceChainConfigUpdates Source chain configs
+  function applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigUpdates) external onlyOwner {
+    _applySourceChainConfigUpdates(sourceChainConfigUpdates);
+  }
+
+  /// @notice Updates source configs
+  /// @param sourceChainConfigUpdates Source chain configs
+  function _applySourceChainConfigUpdates(SourceChainConfigArgs[] memory sourceChainConfigUpdates) internal {
+    for (uint256 i = 0; i < sourceChainConfigUpdates.length; ++i) {
+      SourceChainConfigArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
+      uint64 sourceChainSelector = sourceConfigUpdate.sourceChainSelector;
+
+      if (sourceChainSelector == 0) {
+        revert ZeroChainSelectorNotAllowed();
+      }
+
+      if (address(sourceConfigUpdate.router) == address(0)) {
+        revert ZeroAddressNotAllowed();
+      }
+
+      SourceChainConfig storage currentConfig = s_sourceChainConfigs[sourceChainSelector];
+      bytes memory newOnRamp = sourceConfigUpdate.onRamp;
+
+      if (currentConfig.onRamp.length == 0) {
+        currentConfig.minSeqNr = 1;
+        emit SourceChainSelectorAdded(sourceChainSelector);
+      } else if (currentConfig.minSeqNr != 1) {
+        // OnRamp updates should only happens due to a misconfiguration
+        // If an OnRamp is misconfigured not reports should have been committed and no messages should have been executed
+        // This is enforced byt the onRamp address check in the commit function
+        revert InvalidOnRampUpdate(sourceChainSelector);
+      }
+
+      // OnRamp can never be zero - if it is, then the source chain has been added for the first time
+      if (newOnRamp.length == 0 || keccak256(newOnRamp) == EMPTY_ENCODED_ADDRESS_HASH) {
+        revert ZeroAddressNotAllowed();
+      }
+
+      currentConfig.onRamp = newOnRamp;
+      currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
+      currentConfig.router = sourceConfigUpdate.router;
+
+      emit SourceChainConfigSet(sourceChainSelector, currentConfig);
+    }
+  }
+
+  /// @notice Sets the dynamic config.
+  /// @param dynamicConfig The new dynamic config.
+  function setDynamicConfig(DynamicConfig memory dynamicConfig) external onlyOwner {
+    _setDynamicConfig(dynamicConfig);
+  }
+
+  /// @notice Sets the dynamic config.
+  /// @param dynamicConfig The dynamic config.
+  function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
+    if (dynamicConfig.feeQuoter == address(0)) {
+      revert ZeroAddressNotAllowed();
+    }
+
+    s_dynamicConfig = dynamicConfig;
+
+    emit DynamicConfigSet(dynamicConfig);
+  }
+
+  /// @notice Returns a source chain config with a check that the config is enabled
+  /// @param sourceChainSelector Source chain selector to check for cursing
+  /// @return sourceChainConfig The source chain config storage pointer
+  function _getEnabledSourceChainConfig(uint64 sourceChainSelector) internal view returns (SourceChainConfig storage) {
+    SourceChainConfig storage sourceChainConfig = s_sourceChainConfigs[sourceChainSelector];
+    if (!sourceChainConfig.isEnabled) {
+      revert SourceChainNotEnabled(sourceChainSelector);
+    }
+
+    return sourceChainConfig;
+  }
+
+  // ================================================================
+  // │                            Access                            │
+  // ================================================================
+
+  /// @notice Reverts as this contract should not be able to receive CCIP messages
   function ccipReceive(Client.Any2EVMMessage calldata) external pure {
     // solhint-disable-next-line
     revert();
-  }
-
-  /// @notice Validates that the source chain -> this chain lane, and reverts if it is cursed
-  /// @param sourceChainSelector Source chain selector to check for cursing
-  function _whenNotCursed(uint64 sourceChainSelector) internal view {
-    if (IRMN(i_rmnProxy).isCursed(bytes16(uint128(sourceChainSelector)))) {
-      revert CursedByRMN(sourceChainSelector);
-    }
   }
 }

@@ -23,8 +23,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/seth"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	"github.com/smartcontractkit/libocr/gethwrappers/offchainaggregator"
 	"github.com/smartcontractkit/libocr/gethwrappers2/ocr2aggregator"
@@ -277,8 +278,7 @@ func (o *OCRSoakTest) Setup(ocrTestConfig tt.OcrTestConfig) {
 	nodes, err := client.ConnectChainlinkNodes(o.testEnvironment)
 	require.NoError(o.t, err, "Connecting to chainlink nodes shouldn't fail")
 	o.bootstrapNode, o.workerNodes = nodes[0], nodes[1:]
-	o.mockServer, err = ctf_client.ConnectMockServer(o.testEnvironment)
-	require.NoError(o.t, err, "Creating mockserver clients shouldn't fail")
+	o.mockServer = ctf_client.ConnectMockServer(o.testEnvironment)
 
 	linkContract, err := contracts.DeployLinkTokenContract(o.log, sethClient)
 	require.NoError(o.t, err, "Error deploying LINK contract")
@@ -546,12 +546,9 @@ func (o *OCRSoakTest) LoadState() error {
 		}
 	}
 
-	o.mockServer, err = ctf_client.ConnectMockServerURL(testState.MockServerURL)
-	if err != nil {
-		return err
-	}
+	o.mockServer = ctf_client.ConnectMockServerURL(testState.MockServerURL)
 
-	return err
+	return nil
 }
 
 func (o *OCRSoakTest) Resume() {
@@ -744,7 +741,7 @@ func (o *OCRSoakTest) complete() {
 }
 
 func (o *OCRSoakTest) startGethBlockchainReorg(network blockchain.EVMNetwork, conf ctf_config.ReorgConfig) {
-	client := ctf_client.NewRPCClient(network.HTTPURLs[0])
+	client := ctf_client.NewRPCClient(network.HTTPURLs[0], nil)
 	o.log.Info().
 		Str("URL", client.URL).
 		Int("Depth", conf.Depth).
@@ -756,7 +753,7 @@ func (o *OCRSoakTest) startGethBlockchainReorg(network blockchain.EVMNetwork, co
 }
 
 func (o *OCRSoakTest) startAnvilGasSpikeSimulation(network blockchain.EVMNetwork, conf ctf_config.GasSpikeSimulationConfig) {
-	client := ctf_client.NewRPCClient(network.HTTPURLs[0])
+	client := ctf_client.NewRPCClient(network.HTTPURLs[0], nil)
 	o.log.Info().
 		Str("URL", client.URL).
 		Any("GasSpikeSimulationConfig", conf).
@@ -769,7 +766,7 @@ func (o *OCRSoakTest) startAnvilGasSpikeSimulation(network blockchain.EVMNetwork
 }
 
 func (o *OCRSoakTest) startAnvilGasLimitSimulation(network blockchain.EVMNetwork, conf ctf_config.GasLimitSimulationConfig) {
-	client := ctf_client.NewRPCClient(network.HTTPURLs[0])
+	client := ctf_client.NewRPCClient(network.HTTPURLs[0], nil)
 	latestBlock, err := o.seth.Client.BlockByNumber(context.Background(), nil)
 	require.NoError(o.t, err)
 	newGasLimit := int64(math.Ceil(float64(latestBlock.GasUsed()) * conf.NextGasLimitPercentage))
