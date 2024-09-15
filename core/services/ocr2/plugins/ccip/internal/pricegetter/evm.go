@@ -235,7 +235,6 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 
 			latestRoundCR = append(latestRoundCR, latestRoundDataRes)
 		}
-
 	}
 	if respErr != nil {
 		return respErr
