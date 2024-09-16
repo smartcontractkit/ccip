@@ -141,8 +141,6 @@ PriceMax = '200 gwei'
 LimitDefault = 6000000
 FeeCapDefault = '200 gwei'
 
-[NodePool]
-NewHeadsPollInterval = '10s'
 """
 
 [CCIP.Groups]
