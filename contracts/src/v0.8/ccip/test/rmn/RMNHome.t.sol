@@ -141,12 +141,35 @@ contract RMNHome_setConfig is RMNHomeTest {
     vm.expectRevert(RMNHome.MinObserversTooHigh.selector);
     s_rmnHome.setConfig(config);
   }
+
+  function test_setConfig_OnlyOwner_reverts() public {
+    RMNHome.Config memory config = _getBaseConfig();
+
+    vm.startPrank(address(0));
+
+    vm.expectRevert("Only callable by owner");
+    s_rmnHome.setConfig(config);
+  }
 }
 
 contract RMNHome_revokeAllConfigsButLatest is RMNHomeTest {
   function test_revokeAllConfigsButLatest_success() public {}
+
+  function test_setConfig_OnlyOwner_reverts() public {
+    vm.startPrank(address(0));
+
+    vm.expectRevert("Only callable by owner");
+    s_rmnHome.revokeAllConfigsButLatest();
+  }
 }
 
 contract RMNHome_revokeConfig is RMNHomeTest {
   function test_revokeConfig_success() public {}
+
+  function test_setConfig_OnlyOwner_reverts() public {
+    vm.startPrank(address(0));
+
+    vm.expectRevert("Only callable by owner");
+    s_rmnHome.revokeConfig(keccak256("configDigest"));
+  }
 }

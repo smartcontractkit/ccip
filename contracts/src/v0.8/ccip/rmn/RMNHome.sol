@@ -177,6 +177,10 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     }
   }
 
+  function _getConfigDigest(VersionedConfig memory versionedConfig) internal pure returns (bytes32) {
+    return bytes32((PREFIX & PREFIX_MASK) | (uint256(keccak256(abi.encode(versionedConfig))) & ~PREFIX_MASK));
+  }
+
   // ================================================================
   // │                       Offchain getters                       |
   // │            Gas is not a concern for these functions          |
@@ -254,6 +258,9 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
 
   /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes. Use
   /// in case one of the configs is too large to be returnable by one of the other getters.
+  /// @param configDigest The digest of the config to fetch.
+  /// @return versionedConfig The config and its version.
+  /// @return ok True if the config was found, false otherwise.
   function getVersionedConfig(
     bytes32 configDigest
   ) external view returns (VersionedConfig memory versionedConfig, bool ok) {
@@ -263,9 +270,5 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
       }
     }
     return (versionedConfig, false);
-  }
-
-  function _getConfigDigest(VersionedConfig memory versionedConfig) internal pure returns (bytes32) {
-    return bytes32((PREFIX & PREFIX_MASK) | (uint256(keccak256(abi.encode(versionedConfig))) & ~PREFIX_MASK));
   }
 }
