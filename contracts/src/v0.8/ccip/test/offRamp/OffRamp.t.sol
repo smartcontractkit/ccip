@@ -996,7 +996,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
   }
 }
@@ -3261,7 +3261,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
         priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
         merkleRoots: roots,
         rmnSignatures: s_rmnSignatures,
-        rawVs: 0
+        rmnRawVs: 0
       }),
       s_latestSequenceNumber
     );
@@ -3318,7 +3318,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getEmptyPriceUpdates(),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
 
     vm.expectEmit();
@@ -3350,7 +3350,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getEmptyPriceUpdates(),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
 
     vm.expectEmit();
@@ -3390,7 +3390,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
 
     vm.expectEmit();
@@ -3413,7 +3413,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
 
     vm.expectEmit();
@@ -3432,7 +3432,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
 
     vm.expectEmit();
@@ -3485,7 +3485,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice1),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
 
     vm.expectEmit();
@@ -3599,7 +3599,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getEmptyPriceUpdates(),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.CursedByRMN.selector, roots[0].sourceChainSelector));
@@ -3619,7 +3619,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getEmptyPriceUpdates(),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
 
     vm.expectRevert(OffRamp.InvalidRoot.selector);
@@ -3639,7 +3639,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getEmptyPriceUpdates(),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
 
     vm.expectRevert(
@@ -3664,7 +3664,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getEmptyPriceUpdates(),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
 
     vm.expectRevert(
@@ -3681,7 +3681,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
 
     vm.expectRevert(OffRamp.StaleCommitReport.selector);
@@ -3694,7 +3694,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
 
     vm.expectEmit();
@@ -3719,7 +3719,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getEmptyPriceUpdates(),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.SourceChainNotEnabled.selector, 0));
@@ -3739,7 +3739,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getEmptyPriceUpdates(),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
 
     _commit(commitReport, s_latestSequenceNumber);
@@ -3775,7 +3775,7 @@ contract OffRamp_commit is OffRampSetup {
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots,
       rmnSignatures: s_rmnSignatures,
-      rawVs: 0
+      rmnRawVs: 0
     });
   }
 }

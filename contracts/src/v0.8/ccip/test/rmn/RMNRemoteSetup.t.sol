@@ -42,11 +42,6 @@ contract RMNRemoteSetup is BaseTest {
   /// @notice generates n destLaneUpdates and matching valid signatures and populates them into
   /// the provided storage arrays
   /// @dev if tests are running out of gas, try reducing the number of sigs generated
-  /// @dev important note here that ONLY v=27 sigs are valid in the RMN contract. Because there is
-  /// very little control over how these sigs are generated in foundry, we have to "get lucky" with the
-  /// payload / signature combination. Therefore, we generate a payload and sigs together here in 1 function.
-  /// If we can't generate valid (v=27 for all signers) sigs we re-generate the payload and try again.
-  /// Warning: this is very annoying and clunky code. Tweak at your own risk.
   function _generatePayloadAndSigs(
     uint256 numUpdates,
     uint256 numSigs,
@@ -57,15 +52,18 @@ contract RMNRemoteSetup is BaseTest {
     require(numSigs <= s_signerWallets.length, "cannot generate more sigs than signers");
 
     // remove any existing updates and sigs
-    for (uint256 i = 0; i < destLaneUpdates.length; i++) {
+    uint256 destLength = destLaneUpdates.length;
+    for (uint256 i = 0; i < destLength; i++) {
       destLaneUpdates.pop();
-    }
-    for (uint256 i = 0; i < signatures.length; i++) {
-      signatures.pop();
     }
 
     for (uint256 i = 0; i < numUpdates; i++) {
       destLaneUpdates.push(_generateRandomDestLaneUpdate());
+    }
+
+    uint256 sigLength = signatures.length;
+    for (uint256 i = 0; i < sigLength; i++) {
+      signatures.pop();
     }
 
     for (uint256 i = 0; i < numSigs; i++) {

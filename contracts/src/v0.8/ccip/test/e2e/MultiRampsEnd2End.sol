@@ -172,7 +172,7 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
         priceUpdates: _getEmptyPriceUpdates(),
         merkleRoots: roots,
         rmnSignatures: rmnSignatures,
-        rawVs: 0
+        rmnRawVs: 0
       });
 
       vm.resumeGasMetering();
@@ -271,7 +271,6 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
     router.ccipSend(DEST_CHAIN_SELECTOR, message);
     vm.pauseGasMetering();
 
-    uint256 gasLimit = s_feeQuoter.parseEVMExtraArgsFromBytes(msgEvent.extraArgs, DEST_CHAIN_SELECTOR).gasLimit;
     for (uint256 i = 0; i < msgEvent.tokenAmounts.length; ++i) {
       msgEvent.tokenAmounts[i].destExecData = abi.encode(MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS);
     }

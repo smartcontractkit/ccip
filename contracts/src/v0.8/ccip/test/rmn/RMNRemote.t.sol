@@ -170,8 +170,9 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
   }
 
   function test_verify_unknownSigner_reverts() public {
-    _setupSigners(2); // create 2 new signers that aren't configured on RMNRemote
     uint256 v = _generatePayloadAndSigs(2, 2, s_destLaneUpdates, s_signatures);
+    // Set the first signer to be wrong
+    s_signatures[0].r = _randomBytes32();
 
     vm.expectRevert(RMNRemote.UnexpectedSigner.selector);
     s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures, v);
@@ -180,9 +181,8 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
   function test_verify_insufficientSignatures_reverts() public {
     uint256 v = _generatePayloadAndSigs(2, 1, s_destLaneUpdates, s_signatures); // 1 sig requested, but 2 required
 
-    // TODO FIX
-    //    vm.expectRevert(RMNRemote.ThresholdNotMet.selector);
-    //    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures, v);
+    vm.expectRevert(RMNRemote.ThresholdNotMet.selector);
+    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures, v);
   }
 }
 
