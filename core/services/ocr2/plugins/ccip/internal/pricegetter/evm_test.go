@@ -830,8 +830,7 @@ func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.Lat
 
 	// Mock batch calls per chain: all decimals calls then all latestRoundData calls.
 	// bGLVR = batchGetLatestValueResult
-	var bGLVR types.BatchGetLatestValuesResult
-	bGLVR = make(map[string]types.ContractBatchResults, 1)
+	bGLVR := make(map[string]types.ContractBatchResults, 1)
 
 	bGLVR["OffchainAggregator"] = make([]types.BatchReadResult, 0, len(decimals)+len(rounds))
 	for _, d := range decimals {

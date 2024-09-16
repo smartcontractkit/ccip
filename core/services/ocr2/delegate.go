@@ -1651,9 +1651,9 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 
 			// TRYING TO FIGURE OUT CONTRACT READER
 			relayID := types.RelayID{Network: spec.Relay, ChainID: strconv.FormatUint(chainID, 10)}
-			relay, err := d.RelayGetter.Get(relayID)
-			if err != nil {
-				return nil, err
+			relay, rerr := d.RelayGetter.Get(relayID)
+			if rerr != nil {
+				return nil, rerr
 			}
 
 			contractReaderConfig := evmrelaytypes.ChainReaderConfig{

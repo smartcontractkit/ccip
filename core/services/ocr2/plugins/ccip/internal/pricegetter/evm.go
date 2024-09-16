@@ -29,17 +29,6 @@ const decimalsMethodName = "decimals"
 const latestRoundDataMethodName = "latestRoundData"
 const OFFCHAIN_AGGREGATOR = "OffchainAggregator"
 
-//nolint:lll
-type latestRoundDataConfig struct {
-	// function latestRoundData() external view
-	// returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);
-	RoundID         *big.Int
-	Answer          *big.Int
-	StartedAt       *big.Int
-	UpdatedAt       *big.Int
-	AnsweredInRound *big.Int
-}
-
 func init() {
 	// Ensure existence of latestRoundData method on the Aggregator contract.
 	aggregatorABI, err := abi.JSON(strings.NewReader(offchainaggregator.OffchainAggregatorABI))
@@ -210,7 +199,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 				ReturnVal: &latestRoundData,
 			})
 		} else {
-			fmt.Errorf("unexpected method name in batchCalls: %v", call.MethodName())
+			return fmt.Errorf("unexpected method name in batchCalls: %v", call.MethodName())
 		}
 	}
 	result, err2 := contractReader.BatchGetLatestValues(ctx, batchGetLatestValuesRequest)
@@ -269,12 +258,6 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 		decimals = append(decimals, v)
 	}
 
-	for i := range nbDecimalCalls {
-		if decimals[i] != decimalsCR[i] {
-			panic(fmt.Sprintf("decimalsCR != decimals, at index %v", i))
-		}
-	}
-
 	for i, res := range results[nbDecimalCalls : nbDecimalCalls+nbLatestRoundDataCalls] {
 		// latestRoundData function has multiple outputs (roundId,answer,startedAt,updatedAt,answeredInRound).
 		// we want the second one (answer, at idx=1).
@@ -286,15 +269,29 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 		latestRounds = append(latestRounds, v)
 	}
 
+	for i := range nbDecimalCalls {
+		if decimals[i] != decimalsCR[i] {
+			panic(fmt.Sprintf("decimalsCR != decimals, at index %v", i))
+		}
+	}
+
+	latestRoundAnswerCR := make([]*big.Int, 0, nbLatestRoundDataCalls)
+	for i := range nbLatestRoundDataCalls {
+		if latestRounds[i] != latestRoundCR[i].Answer {
+			panic(fmt.Sprintf("latestRoundCR != latestRounds, at index %v", i))
+		}
+		latestRoundAnswerCR = append(latestRoundAnswerCR, latestRoundCR[i].Answer)
+	}
+
 	// Normalize and store prices.
 	for i := range batchCalls.tokenOrder {
 		// Normalize to 1e18.
 		if decimalsCR[i] < 18 {
-			latestRounds[i].Mul(latestRounds[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(decimalsCR[i])), nil))
+			latestRoundAnswerCR[i].Mul(latestRoundAnswerCR[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(decimalsCR[i])), nil))
 		} else if decimalsCR[i] > 18 {
-			latestRounds[i].Div(latestRounds[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimalsCR[i])-18), nil))
+			latestRoundAnswerCR[i].Div(latestRoundAnswerCR[i], big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimalsCR[i])-18), nil))
 		}
-		prices[ccipcalc.EvmAddrToGeneric(batchCalls.tokenOrder[i])] = latestRounds[i]
+		prices[ccipcalc.EvmAddrToGeneric(batchCalls.tokenOrder[i])] = latestRoundAnswerCR[i]
 	}
 	return nil
 }
