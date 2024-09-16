@@ -4,7 +4,7 @@
 
 /// @dev this is a fully copy of OZ's EnumerableSet library with the addition of a Bytes16Set
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.0;
 
 /**
  * @dev Library for managing

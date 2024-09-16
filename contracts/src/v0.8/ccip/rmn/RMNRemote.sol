@@ -72,7 +72,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   Config private s_config;
   uint32 private s_configCount;
 
-  EnumerableSet.Bytes16Set s_cursedSubjects;
+  EnumerableSet.Bytes16Set private s_cursedSubjects;
   mapping(address signer => bool exists) private s_signers; // for more gas efficient verify
 
   /// @param localChainSelector the chain selector of the chain this contract is deployed to
