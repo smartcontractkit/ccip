@@ -72,8 +72,6 @@ contract RMNHome_setConfig is RMNHomeTest {
 
   function test_setConfig_moreThanRingBuffer_success() public {
     RMNHome.Config memory config = _getBaseConfig();
-    RMNHome.VersionedConfig memory versionedConfig = RMNHome.VersionedConfig({version: 1, config: config});
-    bytes32 configDigest = _getConfigDigest(versionedConfig);
     uint256 ringBufferSize = s_rmnHome.getRingBufferSize();
 
     vm.recordLogs();

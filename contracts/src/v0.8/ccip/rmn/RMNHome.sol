@@ -19,48 +19,67 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   event ConfigRevoked(bytes32 configDigest);
 
   struct Node {
-    bytes32 peerId; // used for p2p communication
-    bytes32 offchainPublicKey; // observations are signed with this public key, and are only verified offchain
+    bytes32 peerId; //            Used for p2p communication.
+    bytes32 offchainPublicKey; // Observations are signed with this public key, and are only verified offchain.
   }
 
   struct SourceChain {
-    uint64 chainSelector;
-    uint64 minObservers; // required to agree on an observation for this source chain
-    uint256 observerNodesBitmap; // observerNodesBitmap & (1<<i) == (1<<i) iff nodes[i] is an observer for this source chain
+    uint64 chainSelector; // ─────╮ The Source chain selector.
+    uint64 minObservers; // ──────╯ Required number of observers to agree on an observation for this source chain.
+    uint256 observerNodesBitmap; // ObserverNodesBitmap & (1<<i) == (1<<i) iff nodes[i] is an observer for this source chain.
   }
 
   struct Config {
     // No sorting requirement for nodes, but ensure that SourceChain.observerNodeIndices in the home chain config &
-    // Signer.nodeIndex in the remote chain configs are appropriately updated when changing this field
+    // Signer.nodeIndex in the remote chain configs are appropriately updated when changing this field.
     Node[] nodes;
     // No sorting requirement for source chains, it is most gas efficient to append new source chains to the right.
     SourceChain[] sourceChains;
-    // Offchain configuration for RMN nodes
-    bytes offchainConfig;
+    bytes offchainConfig; // Offchain configuration for RMN nodes.
   }
 
   struct VersionedConfig {
-    uint32 version;
+    uint32 version; // The version of this config, starting from 1 it increments with each new config.
     Config config;
+  }
+
+  struct VersionedConfigWithDigest {
+    bytes32 configDigest;
+    VersionedConfig versionedConfig;
   }
 
   string public constant override typeAndVersion = "RMNHome 1.6.0-dev";
 
   /// @notice The max number of configs that can be active at the same time.
   uint256 private constant CONFIG_RING_BUFFER_SIZE = 2;
+  /// @notice Used for encoding the config digest prefix
   uint256 private constant PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..00
   uint256 private constant PREFIX = 0x000b << (256 - 16); // 0x000b00..00
 
-  uint32[CONFIG_RING_BUFFER_SIZE] private s_configVersions; // s_configVersions[i] == 0 iff s_configs[i] is unusable
+  /// @notice This array holds just the versions of the configs, the actual configs are stored in s_configs.
+  /// s_configVersions[i] == 0 iff s_configs[i] is unusable, either never set or revoked.
+  uint32[CONFIG_RING_BUFFER_SIZE] private s_configVersions;
+  /// @notice This array holds the digests of the configs, used for efficiency.
+  /// @dev Value i in this array is valid iff s_configVersions[i] != 0.
   bytes32[CONFIG_RING_BUFFER_SIZE] private s_configDigests;
+  /// @notice This array holds the configs.
+  /// @dev Value i in this array is valid iff s_configVersions[i] != 0.
   Config[CONFIG_RING_BUFFER_SIZE] private s_configs;
-  uint256 private s_latestConfigIndex;
+  /// @notice The index of the latest config in the ring buffer. Given a ring buffer of 2 this values will be 0 or 1.
+  /// @dev Since this value is packed with the config count, it won't flip the slot from 0 to 1 or vice versa, meaning
+  /// there's no gas impact in using 0 as a value.
+  uint32 private s_latestConfigIndex;
+  /// @notice The total number of configs set, used for generating the version of the configs.
   uint32 private s_configCount;
 
+  /// @notice Returns the current ring buffer size.
   function getRingBufferSize() external pure returns (uint256) {
     return CONFIG_RING_BUFFER_SIZE;
   }
 
+  /// @notice Sets a new config.
+  /// Setting a new config while the ring buffer is full will revoke the oldest config
+  /// @param newConfig The new config to set.
   function setConfig(Config calldata newConfig) external onlyOwner {
     // sanity checks
     {
@@ -109,8 +128,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
       }
     }
 
-    uint256 oldConfigIndex = s_latestConfigIndex;
-    uint256 newConfigIndex = (oldConfigIndex + 1) % CONFIG_RING_BUFFER_SIZE;
+    uint256 newConfigIndex = (s_latestConfigIndex + 1) % CONFIG_RING_BUFFER_SIZE;
 
     // are we going to overwrite a config?
     if (s_configVersions[newConfigIndex] > 0) {
@@ -123,7 +141,8 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     s_configs[newConfigIndex] = newConfig;
     s_configVersions[newConfigIndex] = newConfigCount;
     s_configDigests[newConfigIndex] = newConfigDigest;
-    s_latestConfigIndex = newConfigIndex;
+    s_latestConfigIndex = uint32(newConfigIndex);
+
     emit ConfigSet(newConfigDigest, newVersionedConfig);
   }
 
@@ -132,27 +151,36 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   /// will revoke _all_ configs.
   function revokeAllConfigsButLatest() external onlyOwner {
     for (uint256 i = 0; i < CONFIG_RING_BUFFER_SIZE; ++i) {
+      // Find all configs that are not the latest.
       if (s_latestConfigIndex != i && s_configVersions[i] > 0) {
         emit ConfigRevoked(_getConfigDigest(VersionedConfig({version: s_configVersions[i], config: s_configs[i]})));
+        // Delete only the version, as that's what's used to determine if a config is active. This means the actual
+        // config stays in storage which should significantly reduce the gas cost of overwriting that storage space in
+        // the future.
         delete s_configVersions[i];
       }
     }
   }
 
+  /// @notice Revokes a specific config by digest.
+  /// @param configDigest The digest of the config to revoke.
   function revokeConfig(bytes32 configDigest) external onlyOwner {
     for (uint256 i = 0; i < CONFIG_RING_BUFFER_SIZE; ++i) {
-      if (s_configVersions[i] > 0 && s_configDigests[i] == configDigest) {
+      if (s_configDigests[i] == configDigest && s_configVersions[i] > 0) {
         emit ConfigRevoked(configDigest);
+        // Delete only the version, as that's what's used to determine if a config is active. This means the actual
+        // config stays in storage which should significantly reduce the gas cost of overwriting that storage space in
+        // the future.
         delete s_configVersions[i];
         break;
       }
     }
   }
 
-  ///
-  /// Offchain getters
-  /// Only to be called by offchain code, efficiency is not a concern
-  ///
+  // ================================================================
+  // │                       Offchain getters                       |
+  // │            Gas is not a concern for these functions          |
+  // ================================================================
 
   /// @return configDigests ordered from oldest to latest set
   function getConfigDigests() external view returns (bytes32[] memory configDigests) {
@@ -178,11 +206,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
         }
       } while (i != s_latestConfigIndex);
     }
-  }
-
-  struct VersionedConfigWithDigest {
-    bytes32 configDigest;
-    VersionedConfig versionedConfig;
+    return configDigests;
   }
 
   /// @param offset setting to 0 will put the newest config in the last position of the returned array, setting to 1
@@ -225,6 +249,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
         i = i == 0 ? CONFIG_RING_BUFFER_SIZE - 1 : i - 1;
       } while (i != s_latestConfigIndex);
     }
+    return versionedConfigsWithDigests;
   }
 
   /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes. Use
