@@ -34,7 +34,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   error UnexpectedSigner();
   error ZeroValueNotAllowed();
 
-  event ConfigSet(VersionedConfig versionedConfig);
+  event ConfigSet(uint32 indexed version, Config config);
   event Cursed(bytes16[] subjects);
   event Uncursed(bytes16[] subjects);
 
@@ -52,12 +52,6 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     uint64 minSigners; // Threshold for the number of signers required to verify a report
   }
 
-  /// @dev the contract config + a version number
-  struct VersionedConfig {
-    uint32 version; // For tracking the version of the config
-    Config config; // The config
-  }
-
   /// @dev part of the payload that RMN nodes sign: keccak256(abi.encode(RMN_V1_6_ANY2EVM_REPORT, report))
   /// @dev this struct is only ever abi-encoded and hashed; it is never stored
   struct Report {
@@ -69,11 +63,11 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     Internal.MerkleRoot[] destLaneUpdates; //   The dest lane updates
   }
 
-  Config s_config;
-  uint32 s_configCount;
-
   string public constant override typeAndVersion = "RMNRemote 1.6.0-dev";
   uint64 internal immutable i_localChainSelector;
+
+  Config private s_config;
+  uint32 private s_configCount;
 
   bytes16[] private s_cursedSubjectsSequence;
   /// @dev the index+1 is stored to easily distinguish b/t non-cursed and cursed at the 0 index
@@ -119,6 +113,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     address prevAddress = address(0);
     for (uint256 i = 0; i < signatures.length; ++i) {
       Signature memory sig = signatures[i];
+      // The v value is bit-encoded into rawVs
       address signerAddress = ecrecover(signedHash, 27 + uint8(rawVs & 0x01 << i), sig.r, sig.s);
       // check for duplicates and also validates that no signature is 0
       if (prevAddress >= signerAddress) revert OutOfOrderSignatures();
@@ -171,13 +166,14 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
 
     s_config = newConfig;
     uint32 newConfigCount = ++s_configCount;
-    emit ConfigSet(VersionedConfig({version: newConfigCount, config: newConfig}));
+    emit ConfigSet(newConfigCount, newConfig);
   }
 
-  /// @notice Returns the current configuration of the contract + a version number
-  /// @return versionedConfig the current configuration + version
-  function getVersionedConfig() external view returns (VersionedConfig memory) {
-    return VersionedConfig({version: s_configCount, config: s_config});
+  /// @notice Returns the current configuration of the contract and a version number
+  /// @return version the current configs version
+  /// @return config the current config
+  function getVersionedConfig() external view returns (uint32 version, Config memory config) {
+    return (s_configCount, s_config);
   }
 
   /// @notice Returns the chain selector configured at deployment time

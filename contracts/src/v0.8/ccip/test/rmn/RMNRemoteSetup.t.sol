@@ -97,6 +97,7 @@ contract RMNRemoteSetup is BaseTest {
     Internal.MerkleRoot[] memory destLaneUpdates,
     Vm.Wallet memory wallet
   ) private returns (uint8 sigV, IRMNV2.Signature memory) {
+    (, RMNRemote.Config memory config) = s_rmnRemote.getVersionedConfig();
     bytes32 digest = keccak256(
       abi.encode(
         RMN_V1_6_ANY2EVM_REPORT,
@@ -105,13 +106,13 @@ contract RMNRemoteSetup is BaseTest {
           destChainSelector: s_rmnRemote.getLocalChainSelector(),
           rmnRemoteContractAddress: address(s_rmnRemote),
           offrampAddress: OFF_RAMP_ADDRESS,
-          rmnHomeContractConfigDigest: s_rmnRemote.getVersionedConfig().config.rmnHomeContractConfigDigest,
+          rmnHomeContractConfigDigest: config.rmnHomeContractConfigDigest,
           destLaneUpdates: destLaneUpdates
         })
       )
     );
     (uint8 v, bytes32 r, bytes32 s) = vm.sign(wallet, digest);
-    return (v, IRMNV2.Signature({r: r, s: s})); // only v==27 sigs are valid in RMN contract
+    return (v, IRMNV2.Signature({r: r, s: s}));
   }
 
   /// @notice bubble sort on a storage array of wallets

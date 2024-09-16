@@ -25,16 +25,17 @@ contract RMNRemote_setConfig is RMNRemoteSetup {
       RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 0});
 
     vm.expectEmit();
-    emit RMNRemote.ConfigSet(RMNRemote.VersionedConfig({version: ++currentConfigVersion, config: config}));
+    emit RMNRemote.ConfigSet(++currentConfigVersion, config);
 
     s_rmnRemote.setConfig(config);
 
-    RMNRemote.VersionedConfig memory versionedConfig = s_rmnRemote.getVersionedConfig();
-    assertEq(versionedConfig.config.minSigners, 0);
+    (uint32 version, RMNRemote.Config memory gotConfig) = s_rmnRemote.getVersionedConfig();
+    assertEq(gotConfig.minSigners, 0);
+    assertEq(version, currentConfigVersion);
 
     // A new config should increment the version
     vm.expectEmit();
-    emit RMNRemote.ConfigSet(RMNRemote.VersionedConfig({version: ++currentConfigVersion, config: config}));
+    emit RMNRemote.ConfigSet(++currentConfigVersion, config);
 
     s_rmnRemote.setConfig(config);
   }
@@ -46,7 +47,7 @@ contract RMNRemote_setConfig is RMNRemoteSetup {
       RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 0});
 
     vm.expectEmit();
-    emit RMNRemote.ConfigSet(RMNRemote.VersionedConfig({version: ++currentConfigVersion, config: config}));
+    emit RMNRemote.ConfigSet(++currentConfigVersion, config);
 
     s_rmnRemote.setConfig(config);
 
@@ -56,14 +57,15 @@ contract RMNRemote_setConfig is RMNRemoteSetup {
     config = RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 0});
 
     vm.expectEmit();
-    emit RMNRemote.ConfigSet(RMNRemote.VersionedConfig({version: ++currentConfigVersion, config: config}));
+    emit RMNRemote.ConfigSet(++currentConfigVersion, config);
 
     s_rmnRemote.setConfig(config);
 
-    RMNRemote.VersionedConfig memory versionedConfig = s_rmnRemote.getVersionedConfig();
-    assertEq(versionedConfig.config.signers.length, s_signers.length);
-    assertEq(versionedConfig.config.signers[numSigners].onchainPublicKey, newSigner);
-    assertEq(versionedConfig.config.signers[numSigners].nodeIndex, uint64(numSigners));
+    (uint32 version, RMNRemote.Config memory gotConfig) = s_rmnRemote.getVersionedConfig();
+    assertEq(gotConfig.signers.length, s_signers.length);
+    assertEq(gotConfig.signers[numSigners].onchainPublicKey, newSigner);
+    assertEq(gotConfig.signers[numSigners].nodeIndex, uint64(numSigners));
+    assertEq(version, currentConfigVersion);
 
     // remove two signers
     s_signers.pop();
@@ -71,12 +73,13 @@ contract RMNRemote_setConfig is RMNRemoteSetup {
     config = RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 0});
 
     vm.expectEmit();
-    emit RMNRemote.ConfigSet(RMNRemote.VersionedConfig({version: ++currentConfigVersion, config: config}));
+    emit RMNRemote.ConfigSet(++currentConfigVersion, config);
 
     s_rmnRemote.setConfig(config);
 
-    versionedConfig = s_rmnRemote.getVersionedConfig();
-    assertEq(versionedConfig.config.signers.length, s_signers.length);
+    (version, gotConfig) = s_rmnRemote.getVersionedConfig();
+    assertEq(gotConfig.signers.length, s_signers.length);
+    assertEq(version, currentConfigVersion);
   }
 
   function test_setConfig_invalidSignerOrder_reverts() public {
@@ -198,61 +201,61 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
 }
 
 contract RMNRemote_curse is RMNRemoteSetup {
-  bytes16 internal constant subj1 = bytes16(keccak256("subject 1"));
-  bytes16 internal constant subj2 = bytes16(keccak256("subject 2"));
-  bytes16[] public s_subjects;
+  bytes16 internal constant curseSubj1 = bytes16(keccak256("subject 1"));
+  bytes16 internal constant curseSubj2 = bytes16(keccak256("subject 2"));
+  bytes16[] public s_curseSubjects;
 
   function setUp() public override {
     super.setUp();
-    s_subjects.push(subj1);
-    s_subjects.push(subj2);
+    s_curseSubjects.push(curseSubj1);
+    s_curseSubjects.push(curseSubj2);
   }
 
   function test_curse_success() public {
     vm.expectEmit();
-    emit RMNRemote.Cursed(s_subjects);
+    emit RMNRemote.Cursed(s_curseSubjects);
 
-    s_rmnRemote.curse(s_subjects);
+    s_rmnRemote.curse(s_curseSubjects);
 
-    assertEq(abi.encode(s_rmnRemote.getCursedSubjects()), abi.encode(s_subjects));
-    assertTrue(s_rmnRemote.isCursed(subj1));
-    assertTrue(s_rmnRemote.isCursed(subj2));
+    assertEq(abi.encode(s_rmnRemote.getCursedSubjects()), abi.encode(s_curseSubjects));
+    assertTrue(s_rmnRemote.isCursed(curseSubj1));
+    assertTrue(s_rmnRemote.isCursed(curseSubj2));
     // Should not have cursed a random subject
     assertFalse(s_rmnRemote.isCursed(bytes16(keccak256("subject 3"))));
   }
 
   function test_curse_AlreadyCursed_duplicateSubject_reverts() public {
-    s_subjects.push(subj1);
+    s_curseSubjects.push(curseSubj1);
 
-    vm.expectRevert(abi.encodeWithSelector(RMNRemote.AlreadyCursed.selector, subj1));
-    s_rmnRemote.curse(s_subjects);
+    vm.expectRevert(abi.encodeWithSelector(RMNRemote.AlreadyCursed.selector, curseSubj1));
+    s_rmnRemote.curse(s_curseSubjects);
   }
 
   function test_curse_calledByNonOwner_reverts() public {
     vm.expectRevert("Only callable by owner");
     vm.stopPrank();
     vm.prank(STRANGER);
-    s_rmnRemote.curse(s_subjects);
+    s_rmnRemote.curse(s_curseSubjects);
   }
 }
 
 contract RMNRemote_uncurse is RMNRemoteSetup {
   bytes16 private constant curseSubj1 = bytes16(keccak256("subject 1"));
   bytes16 private constant curseSubj2 = bytes16(keccak256("subject 2"));
-  bytes16[] public s_subjects;
+  bytes16[] public s_curseSubjects;
 
   function setUp() public override {
     super.setUp();
-    s_subjects.push(curseSubj1);
-    s_subjects.push(curseSubj2);
-    s_rmnRemote.curse(s_subjects);
+    s_curseSubjects.push(curseSubj1);
+    s_curseSubjects.push(curseSubj2);
+    s_rmnRemote.curse(s_curseSubjects);
   }
 
   function test_uncurse_success() public {
     vm.expectEmit();
-    emit RMNRemote.Uncursed(s_subjects);
+    emit RMNRemote.Uncursed(s_curseSubjects);
 
-    s_rmnRemote.uncurse(s_subjects);
+    s_rmnRemote.uncurse(s_curseSubjects);
 
     assertEq(s_rmnRemote.getCursedSubjects().length, 0);
     assertFalse(s_rmnRemote.isCursed(curseSubj1));
@@ -260,17 +263,17 @@ contract RMNRemote_uncurse is RMNRemoteSetup {
   }
 
   function test_uncurse_NotCursed_duplicatedUncurseSubject_reverts() public {
-    s_subjects.push(curseSubj1);
+    s_curseSubjects.push(curseSubj1);
 
     vm.expectRevert(abi.encodeWithSelector(RMNRemote.NotCursed.selector, curseSubj1));
-    s_rmnRemote.uncurse(s_subjects);
+    s_rmnRemote.uncurse(s_curseSubjects);
   }
 
   function test_uncurse_calledByNonOwner_reverts() public {
     vm.expectRevert("Only callable by owner");
     vm.stopPrank();
     vm.prank(STRANGER);
-    s_rmnRemote.uncurse(s_subjects);
+    s_rmnRemote.uncurse(s_curseSubjects);
   }
 }
 
