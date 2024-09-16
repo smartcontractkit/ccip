@@ -1616,28 +1616,45 @@ func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 	return finalizedAt, finalizedBlockNum.Uint64(), nil
 }
 
-func (sourceCCIP *SourceCCIPModule) IsRequestTriggeredWithinTimeframe(timeframe *commonconfig.Duration) *time.Time {
+// IsRequestTriggeredWithinTimeframe finds the average block time and picks the block number based on given timeframe and FilterCCIPSendRequested
+func (sourceCCIP *SourceCCIPModule) IsRequestTriggeredWithinTimeframe(timeframe *commonconfig.Duration, ctx context.Context) (*time.Time, error) {
 	if timeframe == nil {
-		return nil
+		return nil, fmt.Errorf("nil timeframe")
 	}
-	var foundAt *time.Time
-	lastSeenTimestamp := time.Now().UTC().Add(-timeframe.Duration())
-	sourceCCIP.CCIPSendRequestedWatcher.Range(func(_, value any) bool {
-		if sendRequestedEvents, exists := value.([]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested); exists {
-			for _, sendRequestedEvent := range sendRequestedEvents {
-				raw := sendRequestedEvent.Raw
-				hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(raw.BlockNumber)))
-				if err == nil {
-					if hdr.Timestamp.After(lastSeenTimestamp) {
-						foundAt = pointer.ToTime(hdr.Timestamp)
-						return false
-					}
-				}
-			}
-		}
-		return true
+	//var foundAt *time.Time
+	latestBlock, err := sourceCCIP.Common.ChainClient.LatestBlockNumber(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error while getting latest source block number. Error: %v", err)
+	}
+	avgBlockTime, err := sourceCCIP.Common.ChainClient.AvgBlockTime(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error while getting average source block time. Error: %v", err)
+	}
+	filterFromBlock := latestBlock - uint64(timeframe.Duration()/avgBlockTime)
+
+	onRampContract, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress(sourceCCIP.OnRamp.EthAddress.Hex()),
+		sourceCCIP.Common.ChainClient.Backend())
+	if err != nil {
+		return nil, fmt.Errorf("error while on ramp contract. Error: %v", err)
+	}
+	iterator, err := onRampContract.FilterCCIPSendRequested(&bind.FilterOpts{
+		Start: filterFromBlock,
 	})
-	return foundAt
+	if err != nil {
+		return nil, fmt.Errorf("error while filtering CCIP send requested starting block number: %d. Error: %v", filterFromBlock, err)
+	}
+	defer func() {
+		_ = iterator.Close()
+	}()
+	if iterator.Next() {
+		hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(iterator.Event.Raw.BlockNumber)))
+		if err != nil {
+			return nil, fmt.Errorf("error getting header for block: %d, Error: %v", iterator.Event.Raw.BlockNumber, err)
+		}
+		return pointer.ToTime(hdr.Timestamp), nil
+	} else {
+		return nil, nil
+	}
 }
 
 func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(

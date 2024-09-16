@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
+
 	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -204,7 +206,13 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	res := &wasp.Response{}
 	sourceCCIP := c.Lane.Source
-	recentRequestFoundAt := sourceCCIP.IsRequestTriggeredWithinTimeframe(c.SkipRequestIfAnotherRequestTriggeredWithin)
+	recentRequestFoundAt, err := sourceCCIP.IsRequestTriggeredWithinTimeframe(c.SkipRequestIfAnotherRequestTriggeredWithin,
+		testcontext.Get(c.t))
+	if err != nil {
+		res.Failed = true
+		res.Error = fmt.Sprintf("error while checking if there is any recent transactions. Error: %v", err.Error())
+		return res
+	}
 	if recentRequestFoundAt != nil {
 		c.Lane.Logger.
 			Info().
