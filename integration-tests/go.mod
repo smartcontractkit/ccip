@@ -534,3 +534,5 @@ replace (
 
 	github.com/smartcontractkit/chainlink/integration-tests => ../integration-tests
 )
+
+exclude github.com/sourcegraph/sourcegraph/lib v0.0.0-20221216004406-749998a2ac74
