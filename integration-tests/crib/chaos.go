@@ -1,8 +1,9 @@
 package crib
 
 import (
-	"github.com/smartcontractkit/chainlink-testing-framework/havoc"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/havoc"
 
 	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

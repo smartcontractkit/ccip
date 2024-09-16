@@ -4,7 +4,6 @@ package testsetups
 import (
 	"context"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-testing-framework/havoc"
 	"math"
 	"math/big"
 	"math/rand"
@@ -15,6 +14,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/havoc"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/grafana"
 	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/lib/utils/seth"

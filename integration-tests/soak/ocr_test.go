@@ -2,8 +2,9 @@ package soak
 
 import (
 	"fmt"
-	"github.com/smartcontractkit/chainlink-testing-framework/havoc"
 	"testing"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/havoc"
 
 	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/lib/utils/seth"
 
