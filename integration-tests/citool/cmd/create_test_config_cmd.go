@@ -7,8 +7,8 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 
-	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
-	ctfconfigtypes "github.com/smartcontractkit/chainlink-testing-framework/config/types"
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
+	ctfconfigtypes "github.com/smartcontractkit/chainlink-testing-framework/lib/config/types"
 )
 
 var createTestConfigCmd = &cobra.Command{
