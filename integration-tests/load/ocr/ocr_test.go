@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/wasp"
+	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/crib"
 	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"

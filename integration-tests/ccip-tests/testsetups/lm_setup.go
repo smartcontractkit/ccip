@@ -42,10 +42,10 @@ import (
 
 	integrationactions "github.com/smartcontractkit/chainlink/integration-tests/actions"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
+	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/lib/client"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/config"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
