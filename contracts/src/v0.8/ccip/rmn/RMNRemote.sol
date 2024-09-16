@@ -5,6 +5,7 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {IRMNV2} from "../interfaces/IRMNV2.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
+import {EnumerableSet} from "../../shared/enumerable/EnumerableSetWithBytes16.sol";
 import {Internal} from "../libraries/Internal.sol";
 
 /// @dev this is included in the preimage of the digest that RMN nodes sign
@@ -22,6 +23,8 @@ bytes16 constant GLOBAL_CURSE_SUBJECT = 0x01000000000000000000000000000001;
 
 /// @notice This contract supports verification of RMN reports for any Any2EVM OffRamp.
 contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
+  using EnumerableSet for EnumerableSet.Bytes16Set;
+
   error AlreadyCursed(bytes16 subject);
   error ConfigNotSet();
   error DuplicateOnchainPublicKey();
@@ -66,14 +69,10 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   string public constant override typeAndVersion = "RMNRemote 1.6.0-dev";
   uint64 internal immutable i_localChainSelector;
 
-  /// @dev the set of cursed subjects
-  bytes16[] private s_cursedSubjects;
-
   Config private s_config;
   uint32 private s_configCount;
 
-  /// @dev the index+1 is stored to easily distinguish b/t non-cursed and cursed at the 0 index
-  mapping(bytes16 subject => uint256 indexPlusOne) private s_cursedSubjectsIndexPlusOne;
+  EnumerableSet.Bytes16Set s_cursedSubjects;
   mapping(address signer => bool exists) private s_signers; // for more gas efficient verify
 
   /// @param localChainSelector the chain selector of the chain this contract is deployed to
@@ -203,12 +202,9 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   /// @dev reverts if any of the subjects are already cursed or if there is a duplicate
   function curse(bytes16[] memory subjects) public onlyOwner {
     for (uint256 i = 0; i < subjects.length; ++i) {
-      bytes16 subjectToCurse = subjects[i];
-      if (s_cursedSubjectsIndexPlusOne[subjectToCurse] != 0) {
-        revert AlreadyCursed(subjectToCurse);
+      if (!s_cursedSubjects.add(subjects[i])) {
+        revert AlreadyCursed(subjects[i]);
       }
-      s_cursedSubjects.push(subjectToCurse);
-      s_cursedSubjectsIndexPlusOne[subjectToCurse] = s_cursedSubjects.length;
     }
     emit Cursed(subjects);
   }
@@ -226,42 +222,31 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   /// @dev reverts if any of the subjects are not cursed or if there is a duplicate
   function uncurse(bytes16[] memory subjects) public onlyOwner {
     for (uint256 i = 0; i < subjects.length; ++i) {
-      bytes16 toUncurseSubject = subjects[i];
-      uint256 toUncurseSubjectIndexPlusOne = s_cursedSubjectsIndexPlusOne[toUncurseSubject];
-      if (toUncurseSubjectIndexPlusOne == 0) {
-        revert NotCursed(toUncurseSubject);
+      if (!s_cursedSubjects.remove(subjects[i])) {
+        revert NotCursed(subjects[i]);
       }
-      uint256 toUncurseSubjectIndex = toUncurseSubjectIndexPlusOne - 1;
-      // copy the last subject to the position of the subject to uncurse
-      bytes16 lastSubject = s_cursedSubjects[s_cursedSubjects.length - 1];
-      s_cursedSubjects[toUncurseSubjectIndex] = lastSubject;
-      s_cursedSubjectsIndexPlusOne[lastSubject] = toUncurseSubjectIndexPlusOne;
-      // then pop, since we have the last subject also in toUncurseSubjectIndex
-      s_cursedSubjects.pop();
-      delete s_cursedSubjectsIndexPlusOne[toUncurseSubject];
     }
     emit Uncursed(subjects);
   }
 
   /// @inheritdoc IRMNV2
   function getCursedSubjects() external view returns (bytes16[] memory subjects) {
-    return s_cursedSubjects;
+    return s_cursedSubjects.values();
   }
 
   /// @inheritdoc IRMNV2
   function isCursed() external view returns (bool) {
-    if (s_cursedSubjects.length == 0) {
+    if (s_cursedSubjects.length() == 0) {
       return false;
     }
-    return
-      s_cursedSubjectsIndexPlusOne[LEGACY_CURSE_SUBJECT] > 0 || s_cursedSubjectsIndexPlusOne[GLOBAL_CURSE_SUBJECT] > 0;
+    return s_cursedSubjects.contains(LEGACY_CURSE_SUBJECT) || s_cursedSubjects.contains(GLOBAL_CURSE_SUBJECT);
   }
 
   /// @inheritdoc IRMNV2
   function isCursed(bytes16 subject) external view returns (bool) {
-    if (s_cursedSubjects.length == 0) {
+    if (s_cursedSubjects.length() == 0) {
       return false;
     }
-    return s_cursedSubjectsIndexPlusOne[subject] > 0 || s_cursedSubjectsIndexPlusOne[GLOBAL_CURSE_SUBJECT] > 0;
+    return s_cursedSubjects.contains(subject) || s_cursedSubjects.contains(GLOBAL_CURSE_SUBJECT);
   }
 }
