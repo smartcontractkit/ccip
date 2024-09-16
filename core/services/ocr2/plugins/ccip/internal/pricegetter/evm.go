@@ -171,19 +171,20 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 
 	// Bind contract reader to the contract addresses necessary for the batch calls
 	bindings := make([]types.BoundContract, 0)
-	for _, call := range batchCalls.decimalCalls {
+	for i, call := range batchCalls.decimalCalls {
 		bindings = append(bindings, types.BoundContract{
 			Address: string(ccipcalc.EvmAddrToGeneric(call.ContractAddress())),
-			Name:    OFFCHAIN_AGGREGATOR,
+			Name:    fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i),
 		})
 	}
 
-	for _, call := range batchCalls.latestRoundDataCalls {
-		bindings = append(bindings, types.BoundContract{
-			Address: string(ccipcalc.EvmAddrToGeneric(call.ContractAddress())),
-			Name:    OFFCHAIN_AGGREGATOR,
-		})
-	}
+	// Unecessary until merge in change so that you can bind new addresses to the same contract
+	//for i, call := range batchCalls.latestRoundDataCalls {
+	//	bindings = append(bindings, types.BoundContract{
+	//		Address: string(ccipcalc.EvmAddrToGeneric(call.ContractAddress())),
+	//		Name:    fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i),
+	//	})
+	//}
 
 	err = contractReader.Bind(ctx, bindings)
 	if err != nil {
@@ -193,21 +194,22 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	// Perform call
 	var decimalsReq uint8
 	batchGetLatestValuesRequest := make(map[string]types.ContractBatch)
-	for _, call := range calls {
-		if call.MethodName() == decimalsMethodName {
-			batchGetLatestValuesRequest[OFFCHAIN_AGGREGATOR] = append(batchGetLatestValuesRequest[OFFCHAIN_AGGREGATOR], types.BatchRead{
-				ReadName:  call.MethodName(),
-				ReturnVal: &decimalsReq,
-			})
-		} else if call.MethodName() == latestRoundDataMethodName {
-			batchGetLatestValuesRequest[OFFCHAIN_AGGREGATOR] = append(batchGetLatestValuesRequest[OFFCHAIN_AGGREGATOR], types.BatchRead{
-				ReadName:  call.MethodName(),
-				ReturnVal: &aggregator_v3_interface.LatestRoundData{},
-			})
-		} else {
-			return fmt.Errorf("unexpected method name in batchCalls: %v", call.MethodName())
-		}
+	for i, call := range batchCalls.decimalCalls {
+		contractName := fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i)
+		batchGetLatestValuesRequest[contractName] = append(batchGetLatestValuesRequest[contractName], types.BatchRead{
+			ReadName:  call.MethodName(),
+			ReturnVal: &decimalsReq,
+		})
 	}
+
+	for i, call := range batchCalls.latestRoundDataCalls {
+		contractName := fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i)
+		batchGetLatestValuesRequest[contractName] = append(batchGetLatestValuesRequest[contractName], types.BatchRead{
+			ReadName:  call.MethodName(),
+			ReturnVal: &aggregator_v3_interface.LatestRoundData{},
+		})
+	}
+
 	result, err2 := contractReader.BatchGetLatestValues(ctx, batchGetLatestValuesRequest)
 	if err2 != nil {
 		return fmt.Errorf("BatchGetLatestValues failed %w", err2)
@@ -215,30 +217,34 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 
 	// Extract results
 	// give result the method key and then you get slice of responses
-	offchainAggregatorRespSlice := result[OFFCHAIN_AGGREGATOR]
 	decimalsCR := make([]uint8, 0, nbDecimalCalls)
 	latestRoundCR := make([]aggregator_v3_interface.LatestRoundData, 0, nbDecimalCalls)
 	var respErr error
-	for i, read := range offchainAggregatorRespSlice {
-		val, readErr := read.GetResult()
-		if readErr != nil {
-			respErr = multierr.Append(respErr, fmt.Errorf("error with method call %v: %w", batchCalls.decimalCalls[i].MethodName(), readErr))
-			continue
-		}
-		if read.ReadName == decimalsMethodName {
-			decimal, ok := val.(*uint8)
-			if !ok {
-				return fmt.Errorf("expected type uint8 for method call %v on contract %v: %w", batchCalls.decimalCalls[i].MethodName(), batchCalls.decimalCalls[i].ContractAddress(), readErr)
-			}
+	for j := range result {
+		contractName := j
+		offchainAggregatorRespSlice := result[contractName]
 
-			decimalsCR = append(decimalsCR, *decimal)
-		} else if read.ReadName == latestRoundDataMethodName {
-			latestRoundDataRes, ok := val.(*aggregator_v3_interface.LatestRoundData)
-			if !ok {
-				return fmt.Errorf("expected type latestRoundDataConfig for method call %v on contract %v: %w", batchCalls.latestRoundDataCalls[i/2].MethodName(), batchCalls.latestRoundDataCalls[i/2].ContractAddress(), readErr)
+		for i, read := range offchainAggregatorRespSlice {
+			val, readErr := read.GetResult()
+			if readErr != nil {
+				respErr = multierr.Append(respErr, fmt.Errorf("error with method call %v: %w", batchCalls.decimalCalls[i].MethodName(), readErr))
+				continue
 			}
+			if read.ReadName == decimalsMethodName {
+				decimal, ok := val.(*uint8)
+				if !ok {
+					return fmt.Errorf("expected type uint8 for method call %v on contract %v: %w", batchCalls.decimalCalls[i].MethodName(), batchCalls.decimalCalls[i].ContractAddress(), readErr)
+				}
 
-			latestRoundCR = append(latestRoundCR, *latestRoundDataRes)
+				decimalsCR = append(decimalsCR, *decimal)
+			} else if read.ReadName == latestRoundDataMethodName {
+				latestRoundDataRes, ok := val.(*aggregator_v3_interface.LatestRoundData)
+				if !ok {
+					return fmt.Errorf("expected type latestRoundDataConfig for method call %v on contract %v: %w", batchCalls.latestRoundDataCalls[i/2].MethodName(), batchCalls.latestRoundDataCalls[i/2].ContractAddress(), readErr)
+				}
+
+				latestRoundCR = append(latestRoundCR, *latestRoundDataRes)
+			}
 		}
 	}
 	if respErr != nil {

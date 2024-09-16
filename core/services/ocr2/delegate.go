@@ -1669,6 +1669,28 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 							},
 						},
 					},
+					"OffchainAggregator_0": {
+						ContractABI: ccip.OffChainAggregatorABI,
+						Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
+							"decimals": { // CR consumers choose an alias
+								ChainSpecificName: "decimals",
+							},
+							"latestRoundData": {
+								ChainSpecificName: "latestRoundData",
+							},
+						},
+					},
+					"OffchainAggregator_1": {
+						ContractABI: ccip.OffChainAggregatorABI,
+						Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
+							"decimals": { // CR consumers choose an alias
+								ChainSpecificName: "decimals",
+							},
+							"latestRoundData": {
+								ChainSpecificName: "latestRoundData",
+							},
+						},
+					},
 				},
 			}
 
