@@ -838,7 +838,7 @@ func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.Lat
 		readRes := types.BatchReadResult{
 			ReadName: decimalsMethodName,
 		}
-		readRes.SetResult(d, nil)
+		readRes.SetResult(&d, nil)
 		bGLVR["OffchainAggregator"] = append(bGLVR["OffchainAggregator"], readRes)
 	}
 
@@ -846,7 +846,7 @@ func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.Lat
 		readRes := types.BatchReadResult{
 			ReadName: latestRoundDataMethodName,
 		}
-		readRes.SetResult(r, nil)
+		readRes.SetResult(&r, nil)
 		bGLVR["OffchainAggregator"] = append(bGLVR["OffchainAggregator"], readRes)
 	}
 
