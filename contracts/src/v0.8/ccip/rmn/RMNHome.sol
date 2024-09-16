@@ -35,7 +35,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     Node[] nodes;
     // No sorting requirement for source chains, it is most gas efficient to append new source chains to the right.
     SourceChain[] sourceChains;
-    // Offchain configuration
+    // Offchain configuration for RMN nodes
     bytes offchainConfig;
   }
 
@@ -47,7 +47,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   string public constant override typeAndVersion = "RMNHome 1.6.0-dev";
 
   /// @notice The max number of configs that can be active at the same time.
-  uint256 public constant CONFIG_RING_BUFFER_SIZE = 2;
+  uint256 private constant CONFIG_RING_BUFFER_SIZE = 2;
   uint256 private constant PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..00
   uint256 private constant PREFIX = 0x000b << (256 - 16); // 0x000b00..00
 
@@ -56,6 +56,10 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   Config[CONFIG_RING_BUFFER_SIZE] private s_configs;
   uint256 private s_latestConfigIndex;
   uint32 private s_configCount;
+
+  function getRingBufferSize() external pure returns (uint256) {
+    return CONFIG_RING_BUFFER_SIZE;
+  }
 
   function setConfig(Config calldata newConfig) external onlyOwner {
     // sanity checks
