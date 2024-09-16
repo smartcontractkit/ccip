@@ -66,7 +66,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     address rmnRemoteContractAddress; // ─────╯ The address of this contract
     address offrampAddress; //                  The address of the offramp on the same chain as this contract
     bytes32 rmnHomeContractConfigDigest; //     The digest of the RMNHome contract config
-    Internal.MerkleRoot[] destLaneUpdates; //   The dest lane updates
+    Internal.MerkleRoot[] merkleRoots; //   The dest lane updates
   }
 
   Config s_config;
@@ -93,7 +93,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   /// @inheritdoc IRMNV2
   function verify(
     address offrampAddress,
-    Internal.MerkleRoot[] memory destLaneUpdates,
+    Internal.MerkleRoot[] memory merkleRoots,
     Signature[] memory signatures
   ) external view {
     if (s_configCount == 0) {
@@ -111,7 +111,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
           rmnRemoteContractAddress: address(this),
           offrampAddress: offrampAddress,
           rmnHomeContractConfigDigest: s_config.rmnHomeContractConfigDigest,
-          destLaneUpdates: destLaneUpdates
+          merkleRoots: merkleRoots
         })
       )
     );

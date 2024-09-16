@@ -39,7 +39,7 @@ contract RMNRemoteSetup is BaseTest {
     }
   }
 
-  /// @notice generates n destLaneUpdates and matching valid signatures and populates them into
+  /// @notice generates n merkleRoots and matching valid signatures and populates them into
   /// the provided storage arrays
   /// @dev if tests are running out of gas, try reducing the number of sigs generated
   /// @dev important note here that ONLY v=27 sigs are valid in the RMN contract. Because there is
@@ -50,28 +50,28 @@ contract RMNRemoteSetup is BaseTest {
   function _generatePayloadAndSigs(
     uint256 numUpdates,
     uint256 numSigs,
-    Internal.MerkleRoot[] storage destLaneUpdates,
+    Internal.MerkleRoot[] storage merkleRoots,
     IRMNV2.Signature[] storage signatures
   ) internal {
     require(numUpdates > 0, "need at least 1 dest lane update");
     require(numSigs <= s_signerWallets.length, "cannot generate more sigs than signers");
 
     // remove any existing updates and sigs
-    for (uint256 i = 0; i < destLaneUpdates.length; i++) {
-      destLaneUpdates.pop();
+    for (uint256 i = 0; i < merkleRoots.length; i++) {
+      merkleRoots.pop();
     }
     for (uint256 i = 0; i < signatures.length; i++) {
       signatures.pop();
     }
 
     for (uint256 i = 0; i < numUpdates; i++) {
-      destLaneUpdates.push(_generateRandomDestLaneUpdate());
+      merkleRoots.push(_generateRandomDestLaneUpdate());
     }
 
     while (true) {
       bool allSigsValid = true;
       for (uint256 i = 0; i < numSigs; i++) {
-        (bool isValid, IRMNV2.Signature memory sig) = _signDestLaneUpdate(destLaneUpdates, s_signerWallets[i]);
+        (bool isValid, IRMNV2.Signature memory sig) = _signDestLaneUpdate(merkleRoots, s_signerWallets[i]);
         signatures.push(sig);
         allSigsValid = allSigsValid && isValid;
         if (!allSigsValid) {
@@ -83,8 +83,8 @@ contract RMNRemoteSetup is BaseTest {
         break;
       }
       // try again with a different payload if not all sigs are valid
-      destLaneUpdates.pop();
-      destLaneUpdates.push(_generateRandomDestLaneUpdate());
+      merkleRoots.pop();
+      merkleRoots.push(_generateRandomDestLaneUpdate());
       // clear existing sigs
       while (signatures.length > 0) {
         signatures.pop();
@@ -109,7 +109,7 @@ contract RMNRemoteSetup is BaseTest {
   /// @return valid true only if the v component of the signature == 27
   /// @return sig the signature
   function _signDestLaneUpdate(
-    Internal.MerkleRoot[] memory destLaneUpdates,
+    Internal.MerkleRoot[] memory merkleRoots,
     Vm.Wallet memory wallet
   ) private returns (bool valid, IRMNV2.Signature memory) {
     bytes32 digest = keccak256(
@@ -121,7 +121,7 @@ contract RMNRemoteSetup is BaseTest {
           rmnRemoteContractAddress: address(s_rmnRemote),
           offrampAddress: OFF_RAMP_ADDRESS,
           rmnHomeContractConfigDigest: s_rmnRemote.getVersionedConfig().config.rmnHomeContractConfigDigest,
-          destLaneUpdates: destLaneUpdates
+          merkleRoots: merkleRoots
         })
       )
     );

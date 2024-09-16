@@ -101,16 +101,16 @@ contract RMNRemote_setConfig is RMNRemoteSetup {
 
 contract RMNRemote_verify_withConfigNotSet is RMNRemoteSetup {
   function test_verify_reverts() public {
-    Internal.MerkleRoot[] memory destLaneUpdates = new Internal.MerkleRoot[](0);
+    Internal.MerkleRoot[] memory merkleRoots = new Internal.MerkleRoot[](0);
     IRMNV2.Signature[] memory signatures = new IRMNV2.Signature[](0);
 
     vm.expectRevert(RMNRemote.ConfigNotSet.selector);
-    s_rmnRemote.verify(OFF_RAMP_ADDRESS, destLaneUpdates, signatures);
+    s_rmnRemote.verify(OFF_RAMP_ADDRESS, merkleRoots, signatures);
   }
 }
 
 contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
-  Internal.MerkleRoot[] s_destLaneUpdates;
+  Internal.MerkleRoot[] s_merkleRoots;
   IRMNV2.Signature[] s_signatures;
 
   function setUp() public override {
@@ -118,11 +118,11 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     RMNRemote.Config memory config =
       RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 2});
     s_rmnRemote.setConfig(config);
-    _generatePayloadAndSigs(2, 2, s_destLaneUpdates, s_signatures);
+    _generatePayloadAndSigs(2, 2, s_merkleRoots, s_signatures);
   }
 
   function test_verify_success() public view {
-    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures);
+    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_merkleRoots, s_signatures);
   }
 
   function test_verify_minSignersIsZero_success() public {
@@ -134,7 +134,7 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
 
     vm.stopPrank();
     vm.prank(OFF_RAMP_ADDRESS);
-    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, new IRMNV2.Signature[](0));
+    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_merkleRoots, new IRMNV2.Signature[](0));
   }
 
   function test_verify_invalidSig_reverts() public {
@@ -144,7 +144,7 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     s_signatures.push(sig);
 
     vm.expectRevert(RMNRemote.InvalidSignature.selector);
-    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures);
+    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_merkleRoots, s_signatures);
   }
 
   function test_verify_outOfOrderSig_reverts() public {
@@ -156,7 +156,7 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     s_signatures.push(sig2);
 
     vm.expectRevert(RMNRemote.OutOfOrderSignatures.selector);
-    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures);
+    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_merkleRoots, s_signatures);
   }
 
   function test_verify_duplicateSignature_reverts() public {
@@ -165,22 +165,22 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     s_signatures.push(sig);
 
     vm.expectRevert(RMNRemote.OutOfOrderSignatures.selector);
-    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures);
+    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_merkleRoots, s_signatures);
   }
 
   function test_verify_unknownSigner_reverts() public {
     _setupSigners(2); // create 2 new signers that aren't configured on RMNRemote
-    _generatePayloadAndSigs(2, 2, s_destLaneUpdates, s_signatures);
+    _generatePayloadAndSigs(2, 2, s_merkleRoots, s_signatures);
 
     vm.expectRevert(RMNRemote.UnexpectedSigner.selector);
-    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures);
+    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_merkleRoots, s_signatures);
   }
 
   function test_verify_insufficientSignatures_reverts() public {
-    _generatePayloadAndSigs(2, 1, s_destLaneUpdates, s_signatures); // 1 sig requested, but 2 required
+    _generatePayloadAndSigs(2, 1, s_merkleRoots, s_signatures); // 1 sig requested, but 2 required
 
     vm.expectRevert(RMNRemote.ThresholdNotMet.selector);
-    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures);
+    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_merkleRoots, s_signatures);
   }
 }
 
