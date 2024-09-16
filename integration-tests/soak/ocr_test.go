@@ -2,23 +2,23 @@ package soak
 
 import (
 	"fmt"
+	"github.com/smartcontractkit/chainlink-testing-framework/havoc"
 	"testing"
 
-	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/utils/seth"
+	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/lib/utils/seth"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
 
 	"time"
 
 	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/havoc/k8schaos"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/networks"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/testsetups"
@@ -100,7 +100,7 @@ func TestOCRSoak_RPCDownForAllCLNodes(t *testing.T) {
 	require.NoError(t, err, "Error creating chaos")
 	ocrSoakTest, err := testsetups.NewOCRSoakTest(t, &config,
 		testsetups.WithNamespace(namespace),
-		testsetups.WithChaos([]*k8schaos.Chaos{chaos}),
+		testsetups.WithChaos([]*havoc.Chaos{chaos}),
 	)
 	require.NoError(t, err, "Error creating OCR soak test")
 	executeOCRSoakTest(t, ocrSoakTest, &config)
@@ -133,7 +133,7 @@ func TestOCRSoak_RPCDownForHalfCLNodes(t *testing.T) {
 	require.NoError(t, err, "Error creating chaos")
 	ocrSoakTest, err := testsetups.NewOCRSoakTest(t, &config,
 		testsetups.WithNamespace(namespace),
-		testsetups.WithChaos([]*k8schaos.Chaos{chaos}),
+		testsetups.WithChaos([]*havoc.Chaos{chaos}),
 	)
 	require.NoError(t, err, "Error creating OCR soak test")
 	executeOCRSoakTest(t, ocrSoakTest, &config)
@@ -181,12 +181,12 @@ type GethNetworkDownChaosOpts struct {
 	Duration       time.Duration
 }
 
-func gethNetworkDownChaos(opts GethNetworkDownChaosOpts) (*k8schaos.Chaos, error) {
-	k8sClient, err := k8schaos.NewChaosMeshClient()
+func gethNetworkDownChaos(opts GethNetworkDownChaosOpts) (*havoc.Chaos, error) {
+	k8sClient, err := havoc.NewChaosMeshClient()
 	if err != nil {
 		return nil, err
 	}
-	return k8schaos.NewChaos(k8schaos.ChaosOpts{
+	return havoc.NewChaos(havoc.ChaosOpts{
 		Description: opts.Description,
 		DelayCreate: opts.DelayCreate,
 		Object: &v1alpha1.NetworkChaos{
@@ -220,7 +220,7 @@ func gethNetworkDownChaos(opts GethNetworkDownChaosOpts) (*k8schaos.Chaos, error
 			},
 		},
 		Client: k8sClient,
-		Logger: &k8schaos.Logger,
+		Logger: &havoc.Logger,
 	})
 
 }
