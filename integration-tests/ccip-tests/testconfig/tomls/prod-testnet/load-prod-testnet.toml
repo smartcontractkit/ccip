@@ -199,7 +199,7 @@ NoOfTokensPerChain = 1
 RequestPerUnitTime = [12]
 TimeUnit = '1m'
 TestDuration = '1h'
-TestRunName = 'v2.12.0-ccip1.5.2-load'
+TestRunName = 'ccip-prod-testnet-stress'
 
 # There is slower exec rounds in Sepolia/Ethereum, therefore reducing the frequency
 # 1msg/12sec = 5msg/min
