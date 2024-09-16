@@ -89,15 +89,13 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   /// @inheritdoc IRMNV2
   function verify(
     address offrampAddress,
-    Internal.MerkleRoot[] memory merkleRoots,
-    Signature[] memory signatures,
+    Internal.MerkleRoot[] calldata merkleRoots,
+    Signature[] calldata signatures,
     uint256 rawVs
   ) external view {
     if (s_configCount == 0) {
       revert ConfigNotSet();
     }
-    if (signatures.length < s_config.minSigners) revert ThresholdNotMet();
-
     if (signatures.length < s_config.minSigners) revert ThresholdNotMet();
 
     bytes32 digest = keccak256(
@@ -116,8 +114,9 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
 
     address prevAddress;
     address signerAddress;
+    Signature memory sig;
     for (uint256 i = 0; i < signatures.length; ++i) {
-      Signature memory sig = signatures[i];
+      sig = signatures[i];
       // The v value is bit-encoded into rawVs
       signerAddress = ecrecover(digest, 27 + uint8(rawVs & 0x01 << i), sig.r, sig.s);
       if (signerAddress == address(0)) revert InvalidSignature();
