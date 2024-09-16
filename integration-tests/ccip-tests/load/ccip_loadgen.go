@@ -203,7 +203,6 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 	// It runs with out of date contract versions at first, then upgrades them. So transactions will assume that the new contracts are there
 	// before being deployed. So setting v2 args will break the test. This is a bit of a hack to get around that.
 	// The test will soon be deprecated, so a temporary solution is fine.
-	c.Lane.Logger.Info().Err(matchErr).Interface("Contract Versions", contracts.VersionMap).Bool("AllowOutOfOrder", c.Lane.Source.Common.AllowOutOfOrder).Msg("// DEBUG: matchErr")
 	if matchErr != nil || !c.Lane.Source.Common.AllowOutOfOrder {
 		extraArgs, err = testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)
 	} else {
