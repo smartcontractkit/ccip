@@ -122,7 +122,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
       Signature memory sig = signatures[i];
       signerAddress = ecrecover(digest, 27, sig.r, sig.s);
       if (signerAddress == address(0)) revert InvalidSignature();
-      if (!(prevAddress < signerAddress)) revert OutOfOrderSignatures();
+      if (prevAddress >= signerAddress) revert OutOfOrderSignatures();
       if (!s_signers[signerAddress]) revert UnexpectedSigner();
       prevAddress = signerAddress;
     }
@@ -134,7 +134,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
 
   /// @notice Sets the configuration of the contract
   /// @param newConfig the new configuration
-  /// @dev setting congig is atomic; we delete all pre-existing config and set everything from scratch
+  /// @dev setting config is atomic; we delete all pre-existing config and set everything from scratch
   function setConfig(Config calldata newConfig) external onlyOwner {
     // sanity checks
     {
