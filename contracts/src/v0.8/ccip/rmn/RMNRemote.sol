@@ -113,11 +113,9 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
 
     address prevAddress;
     address signerAddress;
-    Signature memory sig;
     for (uint256 i = 0; i < signatures.length; ++i) {
-      sig = signatures[i];
       // The v value is bit-encoded into rawVs
-      signerAddress = ecrecover(digest, 27 + uint8(rawVs & 0x01 << i), sig.r, sig.s);
+      signerAddress = ecrecover(digest, 27 + uint8(rawVs & 0x01 << i), signatures[i].r, signatures[i].s);
       if (signerAddress == address(0)) revert InvalidSignature();
       if (prevAddress >= signerAddress) revert OutOfOrderSignatures();
       if (!s_signers[signerAddress]) revert UnexpectedSigner();
