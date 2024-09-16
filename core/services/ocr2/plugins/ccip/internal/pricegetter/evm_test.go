@@ -831,15 +831,15 @@ func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.Lat
 	// Mock batch calls per chain: all decimals calls then all latestRoundData calls.
 	// bGLVR = batchGetLatestValueResult
 	var bGLVR types.BatchGetLatestValuesResult
-	bGLVR = make(map[string]types.ContractBatchResults, 2)
-	bGLVR[decimalsMethodName] = make([]types.BatchReadResult, 0, len(decimals))
-	bGLVR[latestRoundDataMethodName] = make([]types.BatchReadResult, 0, len(rounds))
+	bGLVR = make(map[string]types.ContractBatchResults, 1)
+
+	bGLVR["OffchainAggregator"] = make([]types.BatchReadResult, 0, len(decimals)+len(rounds))
 	for _, d := range decimals {
 		readRes := types.BatchReadResult{
 			ReadName: decimalsMethodName,
 		}
 		readRes.SetResult(d, nil)
-		bGLVR[decimalsMethodName] = append(bGLVR[decimalsMethodName], readRes)
+		bGLVR["OffchainAggregator"] = append(bGLVR["OffchainAggregator"], readRes)
 	}
 
 	for _, r := range rounds {
@@ -847,7 +847,7 @@ func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.Lat
 			ReadName: latestRoundDataMethodName,
 		}
 		readRes.SetResult(r, nil)
-		bGLVR[latestRoundDataMethodName] = append(bGLVR[latestRoundDataMethodName], readRes)
+		bGLVR["OffchainAggregator"] = append(bGLVR["OffchainAggregator"], readRes)
 	}
 
 	caller.On("Bind", mock.Anything, mock.Anything).Return(nil).Maybe()

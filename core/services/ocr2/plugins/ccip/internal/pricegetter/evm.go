@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
+
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -171,6 +173,9 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 
 	nbDecimalCalls := len(batchCalls.decimalCalls)
 	nbLatestRoundDataCalls := len(batchCalls.decimalCalls)
+	calls := make([]rpclib.EvmCall, 0, nbDecimalCalls+nbLatestRoundDataCalls)
+	calls = append(calls, batchCalls.decimalCalls...)
+	calls = append(calls, batchCalls.latestRoundDataCalls...)
 
 	// Retrieve contract reader for the chain
 	contractReader := d.contractReaders[chainID]
@@ -191,28 +196,33 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 
 	// Perform call
 	var decimalsReq uint8
-	var latestRoundData latestRoundDataConfig
-	result, err2 := contractReader.BatchGetLatestValues(ctx, types.BatchGetLatestValuesRequest{
-		OFFCHAIN_AGGREGATOR: types.ContractBatch{
-			{
-				ReadName:  decimalsMethodName,
+	var latestRoundData aggregator_v3_interface.LatestRoundData
+	batchGetLatestValuesRequest := make(map[string]types.ContractBatch)
+	for _, call := range calls {
+		if call.MethodName() == decimalsMethodName {
+			batchGetLatestValuesRequest[OFFCHAIN_AGGREGATOR] = append(batchGetLatestValuesRequest[OFFCHAIN_AGGREGATOR], types.BatchRead{
+				ReadName:  call.MethodName(),
 				ReturnVal: &decimalsReq,
-			},
-			{
-				ReadName:  latestRoundDataMethodName,
+			})
+		} else if call.MethodName() == latestRoundDataMethodName {
+			batchGetLatestValuesRequest[OFFCHAIN_AGGREGATOR] = append(batchGetLatestValuesRequest[OFFCHAIN_AGGREGATOR], types.BatchRead{
+				ReadName:  call.MethodName(),
 				ReturnVal: &latestRoundData,
-			},
-		},
-	})
+			})
+		} else {
+			fmt.Errorf("unexpected method name in batchCalls: %v", call.MethodName())
+		}
+	}
+	result, err2 := contractReader.BatchGetLatestValues(ctx, batchGetLatestValuesRequest)
 	if err2 != nil {
 		return fmt.Errorf("BatchGetLatestValues failed %w", err2)
 	}
 
 	// Extract results
 	// give result the method key and then you get slice of responses
-	offchainAggregatorRespSlice := result["OffchainAggregator"]
+	offchainAggregatorRespSlice := result[OFFCHAIN_AGGREGATOR]
 	decimalsCR := make([]uint8, 0, nbDecimalCalls)
-	latestRoundCR := make([]latestRoundDataConfig, 0, nbDecimalCalls)
+	latestRoundCR := make([]aggregator_v3_interface.LatestRoundData, 0, nbDecimalCalls)
 	var respErr error
 	for i, read := range offchainAggregatorRespSlice {
 		val, readErr := read.GetResult()
@@ -221,19 +231,19 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 			continue
 		}
 		if read.ReadName == decimalsMethodName {
-			decimal, ok := val.(uint8)
+			decimal, ok := val.(*uint8)
 			if !ok {
 				return fmt.Errorf("expected type uint8 for method call %v on contract %v: %w", batchCalls.decimalCalls[i].MethodName(), batchCalls.decimalCalls[i].ContractAddress(), readErr)
 			}
 
-			decimalsCR = append(decimalsCR, decimal)
+			decimalsCR = append(decimalsCR, *decimal)
 		} else if read.ReadName == latestRoundDataMethodName {
-			latestRoundDataRes, ok := val.(latestRoundDataConfig)
+			latestRoundDataRes, ok := val.(*aggregator_v3_interface.LatestRoundData)
 			if !ok {
-				return fmt.Errorf("expected type uint8 for method call %v on contract %v: %w", batchCalls.decimalCalls[i].MethodName(), batchCalls.decimalCalls[i].ContractAddress(), readErr)
+				return fmt.Errorf("expected type latestRoundDataConfig for method call %v on contract %v: %w", batchCalls.latestRoundDataCalls[i/2].MethodName(), batchCalls.latestRoundDataCalls[i/2].ContractAddress(), readErr)
 			}
 
-			latestRoundCR = append(latestRoundCR, latestRoundDataRes)
+			latestRoundCR = append(latestRoundCR, *latestRoundDataRes)
 		}
 	}
 	if respErr != nil {
@@ -241,10 +251,6 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	}
 
 	// Perform batched call (all decimals calls followed by latest round data calls).
-	calls := make([]rpclib.EvmCall, 0, nbDecimalCalls+nbLatestRoundDataCalls)
-	calls = append(calls, batchCalls.decimalCalls...)
-	calls = append(calls, batchCalls.latestRoundDataCalls...)
-
 	results, err := evmCaller.BatchCall(ctx, 0, calls)
 	if err != nil {
 		return fmt.Errorf("batch call on chain %d failed: %w", chainID, err)
