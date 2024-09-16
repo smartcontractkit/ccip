@@ -51,7 +51,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   string public constant override typeAndVersion = "RMNHome 1.6.0-dev";
 
   /// @notice The max number of configs that can be active at the same time.
-  uint256 private constant CONFIG_RING_BUFFER_SIZE = 2;
+  uint256 private constant CONFIG_RING_BUFFER_SIZE = 3;
   /// @notice Used for encoding the config digest prefix
   uint256 private constant PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..00
   uint256 private constant PREFIX = 0x000b << (256 - 16); // 0x000b00..00
