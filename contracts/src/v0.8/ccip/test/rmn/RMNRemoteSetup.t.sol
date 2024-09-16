@@ -28,6 +28,14 @@ contract RMNRemoteSetup is BaseTest {
   /// @dev signers do not have to be in order when configured, but they do when generating signatures
   /// rather than sort signers every time, we do it once here and store the sorted list
   function _setupSigners(uint256 numSigners) internal {
+    // remove any existing config
+    while (s_signerWallets.length > 0) {
+      s_signerWallets.pop();
+    }
+    while (s_signers.length > 0) {
+      s_signers.pop();
+    }
+
     for (uint256 i = 0; i < numSigners; i++) {
       s_signerWallets.push(vm.createWallet(_randomNum()));
     }
@@ -41,18 +49,12 @@ contract RMNRemoteSetup is BaseTest {
 
   /// @notice generates n merkleRoots and matching valid signatures and populates them into
   /// the provided storage arrays
-  /// @dev if tests are running out of gas, try reducing the number of sigs generated
-  /// @dev important note here that ONLY v=27 sigs are valid in the RMN contract. Because there is
-  /// very little control over how these sigs are generated in foundry, we have to "get lucky" with the
-  /// payload / signature combination. Therefore, we generate a payload and sigs together here in 1 function.
-  /// If we can't generate valid (v=27 for all signers) sigs we re-generate the payload and try again.
-  /// Warning: this is very annoying and clunky code. Tweak at your own risk.
   function _generatePayloadAndSigs(
     uint256 numUpdates,
     uint256 numSigs,
     Internal.MerkleRoot[] storage merkleRoots,
     IRMNV2.Signature[] storage signatures
-  ) internal {
+  ) internal returns (uint256 aggV) {
     require(numUpdates > 0, "need at least 1 dest lane update");
     require(numSigs <= s_signerWallets.length, "cannot generate more sigs than signers");
 
@@ -60,36 +62,25 @@ contract RMNRemoteSetup is BaseTest {
     for (uint256 i = 0; i < merkleRoots.length; i++) {
       merkleRoots.pop();
     }
-    for (uint256 i = 0; i < signatures.length; i++) {
-      signatures.pop();
-    }
 
     for (uint256 i = 0; i < numUpdates; i++) {
       merkleRoots.push(_generateRandomDestLaneUpdate());
     }
 
-    while (true) {
-      bool allSigsValid = true;
-      for (uint256 i = 0; i < numSigs; i++) {
-        (bool isValid, IRMNV2.Signature memory sig) = _signDestLaneUpdate(merkleRoots, s_signerWallets[i]);
-        signatures.push(sig);
-        allSigsValid = allSigsValid && isValid;
-        if (!allSigsValid) {
-          break;
-        }
-      }
-      // if all sigs are valid, don't change anything!!
-      if (allSigsValid) {
-        break;
-      }
-      // try again with a different payload if not all sigs are valid
-      merkleRoots.pop();
-      merkleRoots.push(_generateRandomDestLaneUpdate());
-      // clear existing sigs
-      while (signatures.length > 0) {
-        signatures.pop();
+    uint256 sigLength = signatures.length;
+    for (uint256 i = 0; i < sigLength; i++) {
+      signatures.pop();
+    }
+
+    for (uint256 i = 0; i < numSigs; i++) {
+      (uint8 v, IRMNV2.Signature memory sig) = _signDestLaneUpdate(merkleRoots, s_signerWallets[i]);
+      signatures.push(sig);
+      if (v == 28) {
+        aggV += 1 << i;
       }
     }
+
+    return aggV;
   }
 
   /// @notice generates a random dest lane update
@@ -106,12 +97,13 @@ contract RMNRemoteSetup is BaseTest {
   }
 
   /// @notice signs the provided payload with the provided wallet
-  /// @return valid true only if the v component of the signature == 27
+  /// @return sigV v, either 27 of 28
   /// @return sig the signature
   function _signDestLaneUpdate(
     Internal.MerkleRoot[] memory merkleRoots,
     Vm.Wallet memory wallet
-  ) private returns (bool valid, IRMNV2.Signature memory) {
+  ) private returns (uint8 sigV, IRMNV2.Signature memory) {
+    (, RMNRemote.Config memory config) = s_rmnRemote.getVersionedConfig();
     bytes32 digest = keccak256(
       abi.encode(
         RMN_V1_6_ANY2EVM_REPORT,
@@ -120,13 +112,13 @@ contract RMNRemoteSetup is BaseTest {
           destChainSelector: s_rmnRemote.getLocalChainSelector(),
           rmnRemoteContractAddress: address(s_rmnRemote),
           offrampAddress: OFF_RAMP_ADDRESS,
-          rmnHomeContractConfigDigest: s_rmnRemote.getVersionedConfig().config.rmnHomeContractConfigDigest,
+          rmnHomeContractConfigDigest: config.rmnHomeContractConfigDigest,
           merkleRoots: merkleRoots
         })
       )
     );
     (uint8 v, bytes32 r, bytes32 s) = vm.sign(wallet, digest);
-    return (v == 27, IRMNV2.Signature({r: r, s: s})); // only v==27 sigs are valid in RMN contract
+    return (v, IRMNV2.Signature({r: r, s: s}));
   }
 
   /// @notice bubble sort on a storage array of wallets
