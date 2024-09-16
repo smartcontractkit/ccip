@@ -23,6 +23,7 @@ HistoryDepth = 300
 
 [NodePool]
 SyncThreshold = 10
+NewHeadsPollInterval = '2s'
 
 [OCR]
 ContractConfirmations = 1

@@ -22,6 +22,7 @@ BlockHistorySize = 0
 
 [NodePool]
 SyncThreshold = 10
+NewHeadsPollInterval = '1s'
 
 [OCR2.Automation]
 GasLimit = 14500000
