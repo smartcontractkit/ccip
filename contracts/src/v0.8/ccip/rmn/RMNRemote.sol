@@ -205,12 +205,12 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   /// @dev reverts if any of the subjects are already cursed or if there is a duplicate
   function curse(bytes16[] memory subjects) public onlyOwner {
     for (uint256 i = 0; i < subjects.length; ++i) {
-      bytes16 toCurseSubject = subjects[i];
-      if (s_cursedSubjectsIndexPlusOne[toCurseSubject] != 0) {
-        revert AlreadyCursed(toCurseSubject);
+      bytes16 subjectToCurse = subjects[i];
+      if (s_cursedSubjectsIndexPlusOne[subjectToCurse] != 0) {
+        revert AlreadyCursed(subjectToCurse);
       }
-      s_cursedSubjects.push(toCurseSubject);
-      s_cursedSubjectsIndexPlusOne[toCurseSubject] = s_cursedSubjects.length;
+      s_cursedSubjects.push(subjectToCurse);
+      s_cursedSubjectsIndexPlusOne[subjectToCurse] = s_cursedSubjects.length;
     }
     emit Cursed(subjects);
   }
