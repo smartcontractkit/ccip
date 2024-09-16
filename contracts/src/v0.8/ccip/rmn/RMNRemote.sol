@@ -75,7 +75,8 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   string public constant override typeAndVersion = "RMNRemote 1.6.0-dev";
   uint64 internal immutable i_localChainSelector;
 
-  bytes16[] private s_cursedSubjectsSequence;
+  /// @dev the set of cursed subjects
+  bytes16[] private s_cursedSubjects;
   /// @dev the index+1 is stored to easily distinguish b/t noncursed and cursed at the 0 index
   mapping(bytes16 subject => uint256 indexPlusOne) private s_cursedSubjectsIndexPlusOne;
   mapping(address signer => bool exists) private s_signers; // for more gas efficient verify
@@ -208,8 +209,8 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
       if (s_cursedSubjectsIndexPlusOne[toCurseSubject] != 0) {
         revert AlreadyCursed(toCurseSubject);
       }
-      s_cursedSubjectsSequence.push(toCurseSubject);
-      s_cursedSubjectsIndexPlusOne[toCurseSubject] = s_cursedSubjectsSequence.length;
+      s_cursedSubjects.push(toCurseSubject);
+      s_cursedSubjectsIndexPlusOne[toCurseSubject] = s_cursedSubjects.length;
     }
     emit Cursed(subjects);
   }
@@ -234,11 +235,11 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
       }
       uint256 toUncurseSubjectIndex = toUncurseSubjectIndexPlusOne - 1;
       // copy the last subject to the position of the subject to uncurse
-      bytes16 lastSubject = s_cursedSubjectsSequence[s_cursedSubjectsSequence.length - 1];
-      s_cursedSubjectsSequence[toUncurseSubjectIndex] = lastSubject;
+      bytes16 lastSubject = s_cursedSubjects[s_cursedSubjects.length - 1];
+      s_cursedSubjects[toUncurseSubjectIndex] = lastSubject;
       s_cursedSubjectsIndexPlusOne[lastSubject] = toUncurseSubjectIndexPlusOne;
       // then pop, since we have the last subject also in toUncurseSubjectIndex
-      s_cursedSubjectsSequence.pop();
+      s_cursedSubjects.pop();
       delete s_cursedSubjectsIndexPlusOne[toUncurseSubject];
     }
     emit Uncursed(subjects);
@@ -246,12 +247,12 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
 
   /// @inheritdoc IRMNV2
   function getCursedSubjects() external view returns (bytes16[] memory subjects) {
-    return s_cursedSubjectsSequence;
+    return s_cursedSubjects;
   }
 
   /// @inheritdoc IRMNV2
   function isCursed() external view returns (bool) {
-    if (s_cursedSubjectsSequence.length == 0) {
+    if (s_cursedSubjects.length == 0) {
       return false;
     }
     return
@@ -260,7 +261,7 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
 
   /// @inheritdoc IRMNV2
   function isCursed(bytes16 subject) external view returns (bool) {
-    if (s_cursedSubjectsSequence.length == 0) {
+    if (s_cursedSubjects.length == 0) {
       return false;
     }
     return s_cursedSubjectsIndexPlusOne[subject] > 0 || s_cursedSubjectsIndexPlusOne[GLOBAL_CURSE_SUBJECT] > 0;
