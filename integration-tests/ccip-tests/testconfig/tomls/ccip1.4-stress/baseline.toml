@@ -140,6 +140,9 @@ HistoryDepth = 200
 PriceMax = '200 gwei'
 LimitDefault = 6000000
 FeeCapDefault = '200 gwei'
+
+[NodePool]
+NewHeadsPollInterval = '10s'
 """
 
 [CCIP.Groups]
@@ -163,7 +166,7 @@ DynamicPriceUpdateInterval = '15s'
 CCIPOwnerTokens = true
 
 [CCIP.Groups.load.LoadProfile]
-TestDuration = '6h'
+TestDuration = '1h'
 TimeUnit = '5s'
 RequestPerUnitTime = [1]
 OptimizeSpace = true
