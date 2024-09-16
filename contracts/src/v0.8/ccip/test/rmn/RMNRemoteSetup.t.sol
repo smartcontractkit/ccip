@@ -16,6 +16,10 @@ contract RMNRemoteSetup is BaseTest {
   RMNRemote.Signer[] public s_signers;
   Vm.Wallet[] public s_signerWallets;
 
+  Internal.MerkleRoot[] s_merkleRoots;
+  IRMNV2.Signature[] s_signatures;
+  uint256 internal s_v;
+
   bytes16 internal constant curseSubj1 = bytes16(keccak256("subject 1"));
   bytes16 internal constant curseSubj2 = bytes16(keccak256("subject 2"));
   bytes16[] internal s_curseSubjects;
@@ -53,39 +57,31 @@ contract RMNRemoteSetup is BaseTest {
   }
 
   /// @notice generates n merkleRoots and matching valid signatures and populates them into
-  /// the provided storage arrays
-  function _generatePayloadAndSigs(
-    uint256 numUpdates,
-    uint256 numSigs,
-    Internal.MerkleRoot[] storage merkleRoots,
-    IRMNV2.Signature[] storage signatures
-  ) internal returns (uint256 aggV) {
+  /// the shared storage vars
+  function _generatePayloadAndSigs(uint256 numUpdates, uint256 numSigs) internal {
     require(numUpdates > 0, "need at least 1 dest lane update");
     require(numSigs <= s_signerWallets.length, "cannot generate more sigs than signers");
 
-    // remove any existing updates and sigs
-    for (uint256 i = 0; i < merkleRoots.length; i++) {
-      merkleRoots.pop();
+    // remove any existing merkleRoots and sigs
+    while (s_merkleRoots.length > 0) {
+      s_merkleRoots.pop();
     }
+    while (s_signatures.length > 0) {
+      s_signatures.pop();
+    }
+    s_v = 0;
 
     for (uint256 i = 0; i < numUpdates; i++) {
-      merkleRoots.push(_generateRandomDestLaneUpdate());
-    }
-
-    uint256 sigLength = signatures.length;
-    for (uint256 i = 0; i < sigLength; i++) {
-      signatures.pop();
+      s_merkleRoots.push(_generateRandomDestLaneUpdate());
     }
 
     for (uint256 i = 0; i < numSigs; i++) {
-      (uint8 v, IRMNV2.Signature memory sig) = _signDestLaneUpdate(merkleRoots, s_signerWallets[i]);
-      signatures.push(sig);
+      (uint8 v, IRMNV2.Signature memory sig) = _signDestLaneUpdate(s_merkleRoots, s_signerWallets[i]);
+      s_signatures.push(sig);
       if (v == 28) {
-        aggV += 1 << i;
+        s_v += 1 << i;
       }
     }
-
-    return aggV;
   }
 
   /// @notice generates a random dest lane update

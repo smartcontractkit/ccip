@@ -123,16 +123,12 @@ contract RMNRemote_verify_withConfigNotSet is RMNRemoteSetup {
 }
 
 contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
-  Internal.MerkleRoot[] s_merkleRoots;
-  IRMNV2.Signature[] s_signatures;
-  uint256 internal s_v;
-
   function setUp() public override {
     super.setUp();
     RMNRemote.Config memory config =
       RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 2});
     s_rmnRemote.setConfig(config);
-    s_v = _generatePayloadAndSigs(2, 2, s_merkleRoots, s_signatures);
+    _generatePayloadAndSigs(2, 2);
   }
 
   function test_verify_success() public view {
@@ -184,17 +180,17 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
 
   function test_verify_UnexpectedSigner_reverts() public {
     _setupSigners(2); // create 2 new signers that aren't configured on RMNRemote
-    uint256 v = _generatePayloadAndSigs(2, 2, s_merkleRoots, s_signatures);
+    _generatePayloadAndSigs(2, 2);
 
     vm.expectRevert(RMNRemote.UnexpectedSigner.selector);
-    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_merkleRoots, s_signatures, v);
+    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_merkleRoots, s_signatures, s_v);
   }
 
   function test_verify_ThresholdNotMet_reverts() public {
-    uint256 v = _generatePayloadAndSigs(2, 1, s_merkleRoots, s_signatures); // 1 sig requested, but 2 required
+    _generatePayloadAndSigs(2, 1); // 1 sig requested, but 2 required
 
     vm.expectRevert(RMNRemote.ThresholdNotMet.selector);
-    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_merkleRoots, s_signatures, v);
+    s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_merkleRoots, s_signatures, s_v);
   }
 }
 
@@ -230,8 +226,6 @@ contract RMNRemote_curse is RMNRemoteSetup {
 contract RMNRemote_uncurse is RMNRemoteSetup {
   function setUp() public override {
     super.setUp();
-    s_curseSubjects.push(curseSubj1);
-    s_curseSubjects.push(curseSubj2);
     s_rmnRemote.curse(s_curseSubjects);
   }
 
