@@ -171,7 +171,14 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 
 	// Bind contract reader to the contract addresses necessary for the batch calls
 	bindings := make([]types.BoundContract, 0)
-	for _, call := range batchCalls.decimalCalls { // only need decimalCalls as addresses are same for latestRoundData
+	for _, call := range batchCalls.decimalCalls {
+		bindings = append(bindings, types.BoundContract{
+			Address: string(ccipcalc.EvmAddrToGeneric(call.ContractAddress())),
+			Name:    OFFCHAIN_AGGREGATOR,
+		})
+	}
+
+	for _, call := range batchCalls.latestRoundDataCalls {
 		bindings = append(bindings, types.BoundContract{
 			Address: string(ccipcalc.EvmAddrToGeneric(call.ContractAddress())),
 			Name:    OFFCHAIN_AGGREGATOR,
@@ -185,7 +192,6 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 
 	// Perform call
 	var decimalsReq uint8
-	var latestRoundData aggregator_v3_interface.LatestRoundData
 	batchGetLatestValuesRequest := make(map[string]types.ContractBatch)
 	for _, call := range calls {
 		if call.MethodName() == decimalsMethodName {
@@ -196,7 +202,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 		} else if call.MethodName() == latestRoundDataMethodName {
 			batchGetLatestValuesRequest[OFFCHAIN_AGGREGATOR] = append(batchGetLatestValuesRequest[OFFCHAIN_AGGREGATOR], types.BatchRead{
 				ReadName:  call.MethodName(),
-				ReturnVal: &latestRoundData,
+				ReturnVal: &aggregator_v3_interface.LatestRoundData{},
 			})
 		} else {
 			return fmt.Errorf("unexpected method name in batchCalls: %v", call.MethodName())
@@ -277,7 +283,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 
 	latestRoundAnswerCR := make([]*big.Int, 0, nbLatestRoundDataCalls)
 	for i := range nbLatestRoundDataCalls {
-		if latestRounds[i] != latestRoundCR[i].Answer {
+		if latestRounds[i].String() != latestRoundCR[i].Answer.String() {
 			panic(fmt.Sprintf("latestRoundCR != latestRounds, at index %v", i))
 		}
 		latestRoundAnswerCR = append(latestRoundAnswerCR, latestRoundCR[i].Answer)
