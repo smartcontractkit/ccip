@@ -19,54 +19,64 @@ contract RMNRemote_constructor is RMNRemoteSetup {
 
 contract RMNRemote_setConfig is RMNRemoteSetup {
   function test_setConfig_minSignersIs0_success() public {
+    // Initially there is no config, the version is 0
+    uint32 currentConfigVersion = 0;
     RMNRemote.Config memory config =
       RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 0});
-    // TODO event test
+
+    vm.expectEmit();
+    emit RMNRemote.ConfigSet(RMNRemote.VersionedConfig({version: ++currentConfigVersion, config: config}));
+
     s_rmnRemote.setConfig(config);
+
     RMNRemote.VersionedConfig memory versionedConfig = s_rmnRemote.getVersionedConfig();
     assertEq(versionedConfig.config.minSigners, 0);
-  }
 
-  function test_setConfig_versionIncreases_success() public {
-    RMNRemote.Config memory config =
-      RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 0});
-
+    // A new config should increment the version
     vm.expectEmit();
-    emit RMNRemote.ConfigSet(RMNRemote.VersionedConfig({version: 1, config: config}));
-    s_rmnRemote.setConfig(config);
-    assertEq(s_rmnRemote.getVersionedConfig().version, 1);
+    emit RMNRemote.ConfigSet(RMNRemote.VersionedConfig({version: ++currentConfigVersion, config: config}));
 
-    vm.expectEmit();
-    emit RMNRemote.ConfigSet(RMNRemote.VersionedConfig({version: 2, config: config}));
     s_rmnRemote.setConfig(config);
-    assertEq(s_rmnRemote.getVersionedConfig().version, 2);
-
-    vm.expectEmit();
-    emit RMNRemote.ConfigSet(RMNRemote.VersionedConfig({version: 3, config: config}));
-    s_rmnRemote.setConfig(config);
-    assertEq(s_rmnRemote.getVersionedConfig().version, 3);
   }
 
   function test_setConfig_addSigner_removeSigner_success() public {
+    uint32 currentConfigVersion = 0;
     uint256 numSigners = s_signers.length;
     RMNRemote.Config memory config =
       RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 0});
+
+    vm.expectEmit();
+    emit RMNRemote.ConfigSet(RMNRemote.VersionedConfig({version: ++currentConfigVersion, config: config}));
+
     s_rmnRemote.setConfig(config);
-    RMNRemote.VersionedConfig memory versionedConfig = s_rmnRemote.getVersionedConfig();
+
     // add a signer
-    s_signers.push(RMNRemote.Signer({onchainPublicKey: address(1), nodeIndex: uint64(numSigners)}));
+    address newSigner = makeAddr("new signer");
+    s_signers.push(RMNRemote.Signer({onchainPublicKey: newSigner, nodeIndex: uint64(numSigners)}));
     config = RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 0});
+
+    vm.expectEmit();
+    emit RMNRemote.ConfigSet(RMNRemote.VersionedConfig({version: ++currentConfigVersion, config: config}));
+
     s_rmnRemote.setConfig(config);
-    versionedConfig = s_rmnRemote.getVersionedConfig();
-    assertEq(versionedConfig.config.signers.length, numSigners + 1);
-    assertEq(versionedConfig.config.signers[numSigners].onchainPublicKey, address(1));
-    // remove signers
+
+    RMNRemote.VersionedConfig memory versionedConfig = s_rmnRemote.getVersionedConfig();
+    assertEq(versionedConfig.config.signers.length, s_signers.length);
+    assertEq(versionedConfig.config.signers[numSigners].onchainPublicKey, newSigner);
+    assertEq(versionedConfig.config.signers[numSigners].nodeIndex, uint64(numSigners));
+
+    // remove two signers
     s_signers.pop();
     s_signers.pop();
     config = RMNRemote.Config({rmnHomeContractConfigDigest: _randomBytes32(), signers: s_signers, minSigners: 0});
+
+    vm.expectEmit();
+    emit RMNRemote.ConfigSet(RMNRemote.VersionedConfig({version: ++currentConfigVersion, config: config}));
+
     s_rmnRemote.setConfig(config);
+
     versionedConfig = s_rmnRemote.getVersionedConfig();
-    assertEq(versionedConfig.config.signers.length, numSigners - 1);
+    assertEq(versionedConfig.config.signers.length, s_signers.length);
   }
 
   function test_setConfig_invalidSignerOrder_reverts() public {
@@ -138,7 +148,7 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, new IRMNV2.Signature[](0), s_v);
   }
 
-  function test_verify_invalidSig_reverts() public {
+  function test_verify_OutOfOrderSignatures_wrong_sig_reverts() public {
     IRMNV2.Signature memory sig = s_signatures[s_signatures.length - 1];
     sig.r = _randomBytes32();
     s_signatures.pop();
@@ -148,7 +158,7 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures, s_v);
   }
 
-  function test_verify_outOfOrderSig_reverts() public {
+  function test_verify_OutOfOrderSignatures_not_sorted_reverts() public {
     IRMNV2.Signature memory sig1 = s_signatures[s_signatures.length - 1];
     s_signatures.pop();
     IRMNV2.Signature memory sig2 = s_signatures[s_signatures.length - 1];
@@ -160,7 +170,7 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures, s_v);
   }
 
-  function test_verify_duplicateSignature_reverts() public {
+  function test_verify_OutOfOrderSignatures_duplicateSignature_reverts() public {
     IRMNV2.Signature memory sig = s_signatures[s_signatures.length - 2];
     s_signatures.pop();
     s_signatures.push(sig);
@@ -169,7 +179,7 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures, s_v);
   }
 
-  function test_verify_unknownSigner_reverts() public {
+  function test_verify_UnexpectedSigner_reverts() public {
     uint256 v = _generatePayloadAndSigs(2, 2, s_destLaneUpdates, s_signatures);
     // Set the first signer to be wrong
     s_signatures[0].r = _randomBytes32();
@@ -178,8 +188,9 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
     s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures, v);
   }
 
-  function test_verify_insufficientSignatures_reverts() public {
-    uint256 v = _generatePayloadAndSigs(2, 1, s_destLaneUpdates, s_signatures); // 1 sig requested, but 2 required
+  function test_verify_ThresholdNotMet_reverts() public {
+    // 1 sig requested, but 2 required
+    uint256 v = _generatePayloadAndSigs(2, 1, s_destLaneUpdates, s_signatures);
 
     vm.expectRevert(RMNRemote.ThresholdNotMet.selector);
     s_rmnRemote.verify(OFF_RAMP_ADDRESS, s_destLaneUpdates, s_signatures, v);
@@ -189,7 +200,6 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
 contract RMNRemote_curse is RMNRemoteSetup {
   bytes16 internal constant subj1 = bytes16(keccak256("subject 1"));
   bytes16 internal constant subj2 = bytes16(keccak256("subject 2"));
-  bytes16 internal constant subj3 = bytes16(keccak256("subject 3"));
   bytes16[] public s_subjects;
 
   function setUp() public override {
@@ -201,14 +211,17 @@ contract RMNRemote_curse is RMNRemoteSetup {
   function test_curse_success() public {
     vm.expectEmit();
     emit RMNRemote.Cursed(s_subjects);
+
     s_rmnRemote.curse(s_subjects);
+
     assertEq(abi.encode(s_rmnRemote.getCursedSubjects()), abi.encode(s_subjects));
     assertTrue(s_rmnRemote.isCursed(subj1));
     assertTrue(s_rmnRemote.isCursed(subj2));
-    assertFalse(s_rmnRemote.isCursed(subj3));
+    // Should not have cursed a random subject
+    assertFalse(s_rmnRemote.isCursed(bytes16(keccak256("subject 3"))));
   }
 
-  function test_curse_duplicateSubject_reverts() public {
+  function test_curse_AlreadyCursed_duplicateSubject_reverts() public {
     s_subjects.push(subj1);
 
     vm.expectRevert(abi.encodeWithSelector(RMNRemote.AlreadyCursed.selector, subj1));
@@ -224,31 +237,32 @@ contract RMNRemote_curse is RMNRemoteSetup {
 }
 
 contract RMNRemote_uncurse is RMNRemoteSetup {
-  bytes16 constant subj1 = bytes16(keccak256("subject 1"));
-  bytes16 constant subj2 = bytes16(keccak256("subject 2"));
-  bytes16 constant subj3 = bytes16(keccak256("subject 3"));
+  bytes16 private constant curseSubj1 = bytes16(keccak256("subject 1"));
+  bytes16 private constant curseSubj2 = bytes16(keccak256("subject 2"));
   bytes16[] public s_subjects;
 
   function setUp() public override {
     super.setUp();
-    s_subjects.push(subj1);
-    s_subjects.push(subj2);
+    s_subjects.push(curseSubj1);
+    s_subjects.push(curseSubj2);
     s_rmnRemote.curse(s_subjects);
   }
 
   function test_uncurse_success() public {
     vm.expectEmit();
     emit RMNRemote.Uncursed(s_subjects);
+
     s_rmnRemote.uncurse(s_subjects);
+
     assertEq(s_rmnRemote.getCursedSubjects().length, 0);
-    assertFalse(s_rmnRemote.isCursed(subj1));
-    assertFalse(s_rmnRemote.isCursed(subj2));
+    assertFalse(s_rmnRemote.isCursed(curseSubj1));
+    assertFalse(s_rmnRemote.isCursed(curseSubj2));
   }
 
-  function test_uncurse_duplicateSubject_reverts() public {
-    s_subjects.push(subj1);
+  function test_uncurse_NotCursed_duplicatedUncurseSubject_reverts() public {
+    s_subjects.push(curseSubj1);
 
-    vm.expectRevert(abi.encodeWithSelector(RMNRemote.NotCursed.selector, subj1));
+    vm.expectRevert(abi.encodeWithSelector(RMNRemote.NotCursed.selector, curseSubj1));
     s_rmnRemote.uncurse(s_subjects);
   }
 
