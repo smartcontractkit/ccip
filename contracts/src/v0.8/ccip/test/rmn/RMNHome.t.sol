@@ -11,5 +11,7 @@ contract RMNHomeTest is BaseTest {
   function setUp() public virtual override {
     super.setUp();
     s_rmnHome = new RMNHome();
+
+    s_rmnHome.revokeAllConfigsButLatest();
   }
 }
