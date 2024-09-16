@@ -199,16 +199,6 @@ contract RMNRemote_verify_withConfigSet is RMNRemoteSetup {
 }
 
 contract RMNRemote_curse is RMNRemoteSetup {
-  bytes16 internal constant curseSubj1 = bytes16(keccak256("subject 1"));
-  bytes16 internal constant curseSubj2 = bytes16(keccak256("subject 2"));
-  bytes16[] public s_curseSubjects;
-
-  function setUp() public override {
-    super.setUp();
-    s_curseSubjects.push(curseSubj1);
-    s_curseSubjects.push(curseSubj2);
-  }
-
   function test_curse_success() public {
     vm.expectEmit();
     emit RMNRemote.Cursed(s_curseSubjects);
@@ -238,10 +228,6 @@ contract RMNRemote_curse is RMNRemoteSetup {
 }
 
 contract RMNRemote_uncurse is RMNRemoteSetup {
-  bytes16 private constant curseSubj1 = bytes16(keccak256("subject 1"));
-  bytes16 private constant curseSubj2 = bytes16(keccak256("subject 2"));
-  bytes16[] public s_curseSubjects;
-
   function setUp() public override {
     super.setUp();
     s_curseSubjects.push(curseSubj1);

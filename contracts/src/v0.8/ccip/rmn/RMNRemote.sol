@@ -131,38 +131,29 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
   /// @param newConfig the new configuration
   /// @dev setting config is atomic; we delete all pre-existing config and set everything from scratch
   function setConfig(Config calldata newConfig) external onlyOwner {
-    // sanity checks
-    {
-      // signers are in ascending order of nodeIndex
-      for (uint256 i = 1; i < newConfig.signers.length; ++i) {
-        if (!(newConfig.signers[i - 1].nodeIndex < newConfig.signers[i].nodeIndex)) {
-          revert InvalidSignerOrder();
-        }
+    // signers are in ascending order of nodeIndex
+    for (uint256 i = 1; i < newConfig.signers.length; ++i) {
+      if (!(newConfig.signers[i - 1].nodeIndex < newConfig.signers[i].nodeIndex)) {
+        revert InvalidSignerOrder();
       }
+    }
 
-      // minSigners is tenable
-      if (!(newConfig.minSigners <= newConfig.signers.length)) {
-        revert MinSignersTooHigh();
-      }
+    // minSigners is tenable
+    if (!(newConfig.minSigners <= newConfig.signers.length)) {
+      revert MinSignersTooHigh();
     }
 
     // clear the old signers
-    {
-      Config storage oldConfig = s_config;
-      while (oldConfig.signers.length > 0) {
-        delete s_signers[oldConfig.signers[oldConfig.signers.length - 1].onchainPublicKey];
-        oldConfig.signers.pop();
-      }
+    for (uint256 i = s_config.signers.length; i > 0; --i) {
+      delete s_signers[s_config.signers[i - 1].onchainPublicKey];
     }
 
     // set the new signers
-    {
-      for (uint256 i = 0; i < newConfig.signers.length; ++i) {
-        if (s_signers[newConfig.signers[i].onchainPublicKey]) {
-          revert DuplicateOnchainPublicKey();
-        }
-        s_signers[newConfig.signers[i].onchainPublicKey] = true;
+    for (uint256 i = 0; i < newConfig.signers.length; ++i) {
+      if (s_signers[newConfig.signers[i].onchainPublicKey]) {
+        revert DuplicateOnchainPublicKey();
       }
+      s_signers[newConfig.signers[i].onchainPublicKey] = true;
     }
 
     s_config = newConfig;

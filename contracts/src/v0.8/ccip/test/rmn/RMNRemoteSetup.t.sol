@@ -16,10 +16,15 @@ contract RMNRemoteSetup is BaseTest {
   RMNRemote.Signer[] public s_signers;
   Vm.Wallet[] public s_signerWallets;
 
+  bytes16 internal constant curseSubj1 = bytes16(keccak256("subject 1"));
+  bytes16 internal constant curseSubj2 = bytes16(keccak256("subject 2"));
+  bytes16[] internal s_curseSubjects;
+
   function setUp() public virtual override {
     super.setUp();
     s_rmnRemote = new RMNRemote(1);
     OFF_RAMP_ADDRESS = makeAddr("OFF RAMP");
+    s_curseSubjects = [curseSubj1, curseSubj2];
 
     _setupSigners(10);
   }
