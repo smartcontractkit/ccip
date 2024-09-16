@@ -168,8 +168,12 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
         merkleRoot: merkleRoots[1]
       });
 
-      OffRamp.CommitReport memory report =
-        OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: rmnSignatures});
+      OffRamp.CommitReport memory report = OffRamp.CommitReport({
+        priceUpdates: _getEmptyPriceUpdates(),
+        merkleRoots: roots,
+        rmnSignatures: rmnSignatures,
+        rawVs: 0
+      });
 
       vm.resumeGasMetering();
       _commit(report, ++s_latestSequenceNumber);

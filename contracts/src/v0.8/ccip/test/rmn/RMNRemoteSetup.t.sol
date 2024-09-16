@@ -52,7 +52,7 @@ contract RMNRemoteSetup is BaseTest {
     uint256 numSigs,
     Internal.MerkleRoot[] storage destLaneUpdates,
     IRMNV2.Signature[] storage signatures
-  ) internal {
+  ) internal returns (uint256 aggV) {
     require(numUpdates > 0, "need at least 1 dest lane update");
     require(numSigs <= s_signerWallets.length, "cannot generate more sigs than signers");
 
@@ -68,28 +68,15 @@ contract RMNRemoteSetup is BaseTest {
       destLaneUpdates.push(_generateRandomDestLaneUpdate());
     }
 
-    while (true) {
-      bool allSigsValid = true;
-      for (uint256 i = 0; i < numSigs; i++) {
-        (bool isValid, IRMNV2.Signature memory sig) = _signDestLaneUpdate(destLaneUpdates, s_signerWallets[i]);
-        signatures.push(sig);
-        allSigsValid = allSigsValid && isValid;
-        if (!allSigsValid) {
-          break;
-        }
-      }
-      // if all sigs are valid, don't change anything!!
-      if (allSigsValid) {
-        break;
-      }
-      // try again with a different payload if not all sigs are valid
-      destLaneUpdates.pop();
-      destLaneUpdates.push(_generateRandomDestLaneUpdate());
-      // clear existing sigs
-      while (signatures.length > 0) {
-        signatures.pop();
+    for (uint256 i = 0; i < numSigs; i++) {
+      (uint8 v, IRMNV2.Signature memory sig) = _signDestLaneUpdate(destLaneUpdates, s_signerWallets[i]);
+      signatures.push(sig);
+      if (v == 28) {
+        aggV += 1 << i;
       }
     }
+
+    return aggV;
   }
 
   /// @notice generates a random dest lane update
@@ -106,12 +93,12 @@ contract RMNRemoteSetup is BaseTest {
   }
 
   /// @notice signs the provided payload with the provided wallet
-  /// @return valid true only if the v component of the signature == 27
+  /// @return sigV v, either 27 of 28
   /// @return sig the signature
   function _signDestLaneUpdate(
     Internal.MerkleRoot[] memory destLaneUpdates,
     Vm.Wallet memory wallet
-  ) private returns (bool valid, IRMNV2.Signature memory) {
+  ) private returns (uint8 sigV, IRMNV2.Signature memory) {
     bytes32 digest = keccak256(
       abi.encode(
         RMN_V1_6_ANY2EVM_REPORT,
@@ -126,7 +113,7 @@ contract RMNRemoteSetup is BaseTest {
       )
     );
     (uint8 v, bytes32 r, bytes32 s) = vm.sign(wallet, digest);
-    return (v == 27, IRMNV2.Signature({r: r, s: s})); // only v==27 sigs are valid in RMN contract
+    return (v, IRMNV2.Signature({r: r, s: s})); // only v==27 sigs are valid in RMN contract
   }
 
   /// @notice bubble sort on a storage array of wallets
