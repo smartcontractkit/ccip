@@ -220,8 +220,8 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	decimalsCR := make([]uint8, 0, nbDecimalCalls)
 	latestRoundCR := make([]aggregator_v3_interface.LatestRoundData, 0, nbDecimalCalls)
 	var respErr error
-	for j := range result {
-		contractName := j
+	for j := range nbDecimalCalls {
+		contractName := fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, j)
 		offchainAggregatorRespSlice := result[contractName]
 
 		for i, read := range offchainAggregatorRespSlice {
