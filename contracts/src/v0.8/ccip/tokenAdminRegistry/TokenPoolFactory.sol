@@ -1,8 +1,8 @@
 pragma solidity ^0.8.24;
 
+import {IOwnable} from "../../shared/interfaces/IOwnable.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
-import {IOwnable} from "../../shared/interfaces/IOwnable.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
@@ -21,17 +21,15 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
 
   struct RemoteTokenPoolInfo {
     uint64 remoteChainSelector; // The CCIP specific selector for the remote chain
-
     bytes remotePoolAddress; // The address of the remote pool to either deploy or use as is. If
       // the empty parameter flag is provided, the address will be predicted
     bytes remoteTokenAddress; // The address of the remote token to either deploy or use as is
       // If the empty parameter flag is provided, the address will be predicted
-
     bytes remoteTokenInitCode; // The init code for the remote token if it needs to be deployed
       // and includes all the constructor params already appended
-      
-    RateLimiter.Config outboundRateLimiterConfig; // The rate limiter config for token messages to be used in the pool. 
+    RateLimiter.Config outboundRateLimiterConfig; // The rate limiter config for token messages to be used in the pool.
       // The specified rate limit will also be applied to the token pool's inbound messages as well.
+  }
 
   /* solhint-disable gas-struct-packing */
   struct RemoteChainConfig {
@@ -40,10 +38,9 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     address remoteRouter;
     /// The router contract on the remote chain
     address remoteRMNProxy;
-    /// The RMNProxy contract on the remote chain
   }
+  /// The RMNProxy contract on the remote chain
   /* solhint-enable gas-struct-packing */
-
 
   ITokenAdminRegistry internal immutable i_tokenAdminRegistry;
   RegistryModuleOwnerCustom internal immutable i_registryModuleOwnerCustom;
@@ -172,8 +169,9 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
         if (bytes4(remoteTokenPools[i].remoteTokenAddress) == EMPTY_PARAMETER_FLAG) {
           // The user must provide the initCode for the remote token, so we can predict its address correctly. It's
           // provided in the remoteTokenInitCode field for the remoteTokenPool
-      
-          remoteTokenAddress = salt.computeAddress(keccak256(remoteTokenPools[i].remoteTokenInitCode), remoteChainConfig.remotePoolFactory);
+
+          remoteTokenAddress =
+            salt.computeAddress(keccak256(remoteTokenPools[i].remoteTokenInitCode), remoteChainConfig.remotePoolFactory);
 
           // The library returns an EVM-compatible address but chainUpdate takes bytes so we encode it
           chainUpdate.remoteTokenAddress = abi.encode(remoteTokenAddress);
@@ -196,16 +194,19 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
           // can be used.
 
           // Combine the initCode with the initArgs to create the full initCode
-          bytes memory remotePoolInitcode = abi.encodePacked(type(BurnMintTokenPool).creationCode, abi.encode(
-            remoteTokenAddress, new address[](0), remoteChainConfig.remoteRMNProxy, remoteChainConfig.remoteRouter));
-
-          // Predict the address of the undeployed contract on the destination chain
-          chainUpdate.remotePoolAddress = abi.encode(
-            salt.computeAddress(keccak256(remotePoolInitcode), remoteChainConfig.remotePoolFactory)
+          bytes memory remotePoolInitcode = abi.encodePacked(
+            type(BurnMintTokenPool).creationCode,
+            abi.encode(
+              remoteTokenAddress, new address[](0), remoteChainConfig.remoteRMNProxy, remoteChainConfig.remoteRouter
+            )
           );
 
-          chainUpdate.remotePoolAddress = abi.encode(salt.computeAddress(keccak256(remotePoolInitcode), remoteChainConfig.remotePoolFactory));
+          // Predict the address of the undeployed contract on the destination chain
+          chainUpdate.remotePoolAddress =
+            abi.encode(salt.computeAddress(keccak256(remotePoolInitcode), remoteChainConfig.remotePoolFactory));
 
+          chainUpdate.remotePoolAddress =
+            abi.encode(salt.computeAddress(keccak256(remotePoolInitcode), remoteChainConfig.remotePoolFactory));
         } else {
           // If the user already has a remote pool deployed, reuse the address.
           chainUpdate.remotePoolAddress = remoteTokenPools[i].remotePoolAddress;
