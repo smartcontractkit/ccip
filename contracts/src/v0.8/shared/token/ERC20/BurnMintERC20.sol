@@ -7,7 +7,6 @@ import {OwnerIsCreator} from "../../access/OwnerIsCreator.sol";
 
 import {ERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
 import {ERC20Burnable} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/ERC20Burnable.sol";
-
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
@@ -214,8 +213,8 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
   }
 
   /// @notice Transfers the CCIPAdmin role to a new address
-  /// @dev only the owner can call this function, NOT the current ccipAdmin, and 1-step ownership transfer is used
-  /// @param newAdmin The address to transfer the CCIPAdmin role to
+  /// @dev only the owner can call this function, NOT the current ccipAdmin, and 1-step ownership transfer is used. 
+  /// @param newAdmin The address to transfer the CCIPAdmin role to. Set to address(0) is a valid way to revoke the role
   function setCCIPAdmin(address newAdmin) public onlyOwner {
     address currentAdmin = s_ccipAdmin;
 
