@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/ccip/integration-tests/ccip-tests/contracts"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -132,8 +133,9 @@ func (c *CCIPE2ELoad) BeforeAllCall() {
 		c.EOAReceiver = c.msg.Receiver
 	}
 	if c.SendMaxDataIntermittentlyInMsgCount > 0 {
-		c.MaxDataBytes, err = sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
+		cfg, err := sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
 		require.NoError(c.t, err, "failed to fetch dynamic config")
+		c.MaxDataBytes = cfg.MaxDataBytes
 	}
 	// if the msg is sent via multicall, transfer the token transfer amount to multicall contract
 	if sourceCCIP.Common.MulticallEnabled &&
@@ -189,11 +191,28 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 	if !msgDetails.IsTokenTransfer() {
 		msg.TokenAmounts = []router.ClientEVMTokenAmount{}
 	}
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)
+
+	var (
+		extraArgs []byte
+		err       error
+	)
+	// v1.5.0 and later starts using V2 extra args
+	matchErr := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
+		contracts.OnRampContract: contracts.V1_5_0,
+	})
+	// TODO: The CCIP Offchain upgrade tests make the AllowOutOfOrder flag tricky in this case.
+	// It runs with out of date contract versions at first, then upgrades them. So transactions will assume that the new contracts are there
+	// before being deployed. So setting v2 args will break the test. This is a bit of a hack to get around that.
+	// The test will soon be deprecated, so a temporary solution is fine.
+	if matchErr != nil || !c.Lane.Source.Common.AllowOutOfOrder {
+		extraArgs, err = testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)
+	} else {
+		extraArgs, err = testhelpers.GetEVMExtraArgsV2(big.NewInt(gasLimit), c.Lane.Source.Common.AllowOutOfOrder)
+	}
 	if err != nil {
 		return router.ClientEVM2AnyMessage{}, stats, err
 	}
-	msg.ExtraArgs = extraArgsV1
+	msg.ExtraArgs = extraArgs
 	// if gaslimit is 0, set the receiver to EOA
 	if gasLimit == 0 {
 		msg.Receiver = c.EOAReceiver
