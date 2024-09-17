@@ -274,7 +274,6 @@ TimeUnit = '6m'
 TestDuration = '3h'
 TestRunName = 'BetaSoakTest_CCIPV1dot5'
 FailOnFirstErrorInLoad = true
-SkipRequestIfAnotherRequestTriggeredWithin = '40m'
 
 [[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
 MsgType = 'Data'

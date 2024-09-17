@@ -1004,7 +1004,6 @@ TimeUnit = '6m'
 TestDuration = '24h'
 TestRunName = 'SoakTest_prod_testnet'
 FailOnFirstErrorInLoad = true
-SkipRequestIfAnotherRequestTriggeredWithin = '5m'
 
 [[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
 MsgType = 'Data'
