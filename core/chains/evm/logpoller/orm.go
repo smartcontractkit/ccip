@@ -373,12 +373,13 @@ func (o *DSORM) DeleteExpiredLogs(ctx context.Context, limit int64) (int64, erro
 		WITH rows_to_delete AS (
 			SELECT l.id
 			FROM evm.logs l LEFT JOIN (
-				SELECT address, event, CASE WHEN MIN(retention) = 0 THEN 0 ELSE MAX(retention) END AS retention
+				SELECT evm_chain_id, address, event, CASE WHEN MIN(retention) = 0 THEN 0 ELSE MAX(retention) END AS retention
 				FROM evm.log_poller_filters
 				WHERE evm_chain_id = $1
 				GROUP BY evm_chain_id, address, event
-			) r ON l.evm_chain_id = $1 AND l.address = r.address AND l.event_sig = r.event
-			WHERE r.retention IS NULL OR (r.retention != 0 AND l.block_timestamp <= STATEMENT_TIMESTAMP() - (r.retention / 10^9 * interval '1 second''
+			) r ON l.evm_chain_id = r.evm_chain_id AND l.address = r.address AND l.event_sig = r.event
+			WHERE l.evm_chain_id = $1 AND -- needed because of LEFT JOIN
+				  r.retention IS NULL OR (r.retention != 0 AND l.block_timestamp <= STATEMENT_TIMESTAMP() - (r.retention / 10^9 * interval '1 second'))
 			%s
 		) DELETE FROM evm.logs WHERE id IN (SELECT id FROM rows_to_delete)`, limitClause)
 	result, err := o.ds.ExecContext(ctx, query, ubig.New(o.chainID))
