@@ -1650,7 +1650,7 @@ func (sourceCCIP *SourceCCIPModule) IsRequestTriggeredWithinTimeframe(timeframe 
 // within the specified timeframe. It then uses FilterCCIPSendRequested to identify the past events.
 func (sourceCCIP *SourceCCIPModule) IsPastRequestTriggeredWithinTimeframe(ctx context.Context, timeframe *commonconfig.Duration) (*time.Time, error) {
 	if timeframe == nil {
-		return nil, fmt.Errorf("nil timeframe")
+		return nil, nil
 	}
 	//var foundAt *time.Time
 	latestBlock, err := sourceCCIP.Common.ChainClient.LatestBlockNumber(ctx)
