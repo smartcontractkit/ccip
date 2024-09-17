@@ -6,8 +6,7 @@ import {IBurnMintERC20} from "../ERC20/IBurnMintERC20.sol";
 import {OwnerIsCreator} from "../../access/OwnerIsCreator.sol";
 
 import {ERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
-import {ERC20Burnable} from
-  "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import {ERC20Burnable} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
@@ -68,8 +67,10 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
   }
 
   function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
-    return interfaceId == type(IERC20).interfaceId || interfaceId == type(IBurnMintERC20).interfaceId
-      || interfaceId == type(IERC165).interfaceId;
+    return
+      interfaceId == type(IERC20).interfaceId ||
+      interfaceId == type(IBurnMintERC20).interfaceId ||
+      interfaceId == type(IERC165).interfaceId;
   }
 
   // ================================================================
