@@ -29,14 +29,18 @@ const (
 	// be able to bring back processing without replaying any logs from chain. You can read that param as
 	// "how long CCIP can be down and still be able to process all the messages after getting back to life".
 	// Breaching this threshold would require replaying chain using LogPoller from the beginning of the outage.
-	CommitExecLogsRetention = 30 * 24 * time.Hour // 30 days
+
+	CommitExecLogsRetention = 3 * time.Hour // 3 hours for testing TODO: REMOVE FOR PRODUCTION!
+
 	// CacheEvictionLogsRetention defines the duration for which logs used for caching on-chain data are kept.
 	// Restarting node clears the cache entirely and rebuilds it from scratch by fetching data from chain,
 	// so we don't need to keep these logs for very long. All events relying on cache.NewLogpollerEventsBased should use this retention.
-	CacheEvictionLogsRetention = 7 * 24 * time.Hour // 7 days
+
+	CacheEvictionLogsRetention = 1 * time.Hour // 1 hour for testing TODO: REMOVE FOR PRODUCTION!
+
 	// PriceUpdatesLogsRetention defines the duration for which logs with price updates are kept.
 	// These logs are emitted whenever the token price or gas price is updated and Commit scans very small time windows (e.g. 2 hours)
-	PriceUpdatesLogsRetention = 1 * 24 * time.Hour // 1 day
+	PriceUpdatesLogsRetention = 5 * time.Minute // 5 minutes for testing TODO: REMOVE FOR PRODUCTION!
 )
 
 type Event[T any] struct {
