@@ -266,6 +266,38 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 	require.NoError(l.t, err, "error received to validate no commit/execution is generated after lane is cursed")
 }
 
+func (l *LoadArgs) SimulateGasSpike() {
+	var lanes []*actions.CCIPLane
+	for _, lane := range l.TestSetupArgs.Lanes {
+		lanes = append(lanes, lane.ForwardLane)
+		lanes = append(lanes, lane.ReverseLane)
+	}
+	gConfig := &GrafanaConfig{
+		GrafanaURL:   *l.TestCfg.EnvInput.Logging.Grafana.BaseUrl,
+		GrafanaToken: *l.TestCfg.EnvInput.Logging.Grafana.BearerToken,
+		DashboardURL: *l.TestCfg.EnvInput.Logging.Grafana.DashboardUrl,
+	}
+	coveredNetworks := make(map[string]bool)
+	for _, lane := range lanes {
+		lane := lane
+		// if the network is already covered, skip
+		if _, exists := coveredNetworks[lane.DestChain.GetChainID().String()]; exists {
+			continue
+		}
+		coveredNetworks[lane.DestChain.GetChainID().String()] = true
+		require.GreaterOrEqualf(l.t, len(lane.DestChain.GetNetworkConfig().HTTPURLs), 1, "dest chain http url is not set for lane %s->%s", lane.SourceNetworkName, lane.DestNetworkName)
+		gs, err := NewGasSuite(l.t, *lane.Logger, &GasSuiteConfig{
+			NetworkName:   lane.DestNetworkName,
+			GethHTTPURL:   lane.DestChain.GetNetworkConfig().HTTPURLs[0],
+			GrafanaConfig: gConfig,
+			GasProfile:    l.TestCfg.TestGroupInput.LoadProfile.GasEnvironment,
+		})
+		require.NoError(l.t, err)
+		gs.ModulateBaseFeeOverDuration(l.Ctx)
+	}
+
+}
+
 func (l *LoadArgs) TriggerLoadByLane() {
 	l.TestSetupArgs.Reporter.SetDuration(l.TestCfg.TestGroupInput.LoadProfile.TestDuration.Duration())
 
@@ -335,6 +367,10 @@ func (l *LoadArgs) TriggerLoadByLane() {
 				startLoad(lane.ReverseLane)
 			}()
 		}
+	}
+	// if gas environment is specified, simulated gas spike/drop
+	if len(l.TestCfg.TestGroupInput.LoadProfile.GasEnvironment) > 0 {
+		l.SimulateGasSpike()
 	}
 }
 

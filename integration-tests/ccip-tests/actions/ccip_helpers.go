@@ -184,6 +184,7 @@ type CCIPCommon struct {
 	tokenPriceUpdateWatcher   map[common.Address]*big.Int // key - token; value - timestamp of update
 	gasUpdateWatcherMu        *sync.Mutex
 	gasUpdateWatcher          map[uint64]*big.Int // key - destchain id; value - timestamp of update
+	priceUpdateFound          chan struct{}
 	GasUpdateEvents           []contracts.GasUpdateEvent
 }
 
@@ -475,6 +476,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 			Uint64("dest chain", destChainId).
 			Str("source chain", ccipModule.ChainClient.GetNetworkName()).
 			Msg("Price already updated")
+		ccipModule.priceUpdateFound <- struct{}{}
 		return nil
 	}
 	// if not, wait for price update
@@ -513,6 +515,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 					Uint64("dest chain", destChainId).
 					Str("source chain", ccipModule.ChainClient.GetNetworkName()).
 					Msg("Price updated")
+				ccipModule.priceUpdateFound <- struct{}{}
 				return nil
 			}
 		case <-localCtx.Done():
@@ -586,6 +589,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr *ze
 			ccipModule.GasUpdateEvents = nil
 			ccipModule.tokenPriceUpdateWatcher = nil
 			ccipModule.tokenPriceUpdateWatcherMu = nil
+			ccipModule.priceUpdateFound = nil
 		}()
 		for {
 			select {
@@ -604,6 +608,8 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(ctx context.Context, lggr *ze
 					Str("price_registry", ccipModule.PriceRegistry.Address()).
 					Msg("UsdPerTokenUpdated event received")
 			case <-ctx.Done():
+				return
+			case <-ccipModule.priceUpdateFound:
 				return
 			}
 		}
@@ -1286,6 +1292,7 @@ func DefaultCCIPModule(
 		NoOfTokensNeedingDynamicPrice: pointer.GetInt(testGroupConf.TokenConfig.NoOfTokensWithDynamicPrice),
 		poolFunds:                     testhelpers.Link(5),
 		gasUpdateWatcherMu:            &sync.Mutex{},
+		priceUpdateFound:              make(chan struct{}),
 		gasUpdateWatcher:              make(map[uint64]*big.Int),
 		tokenPriceUpdateWatcherMu:     &sync.Mutex{},
 		tokenPriceUpdateWatcher:       make(map[common.Address]*big.Int),

@@ -210,6 +210,32 @@ type LoadFrequency struct {
 	StepDuration       []*config.Duration `toml:",omitempty"`
 }
 
+// GasProfile defines the gas spike/drop parameters for destination chain in a load profile
+// we always consider destination chain for gas spike/drop, as source chain gas variations do not affect CCIP performance
+type GasProfile struct {
+	StartGasPrice       *int64           `toml:",omitempty"`
+	DeviationPercentage *float64         `toml:",omitempty"`
+	Spike               *bool            `toml:",omitempty"` // if true, gas price will spike, else it will drop
+	Duration            *config.Duration `toml:",omitempty"` // duration for which the gas price will be steadily spiked/dropped
+}
+
+func (c *GasProfile) Validate() error {
+	if c == nil {
+		return fmt.Errorf("chaos gas profile should be set")
+	}
+	if c.StartGasPrice == nil {
+		return fmt.Errorf("start gas price should be set")
+	}
+	if c.DeviationPercentage == nil {
+		return fmt.Errorf("deviation percentage should be set")
+	}
+	if c.Duration == nil || c.Duration.Duration().Minutes() == 0 {
+		return fmt.Errorf("duration should be set")
+	}
+	return nil
+
+}
+
 type LoadProfile struct {
 	MsgProfile                                 *MsgProfile               `toml:",omitempty"`
 	FrequencyByDestination                     map[string]*LoadFrequency `toml:",omitempty"`
@@ -224,6 +250,7 @@ type LoadProfile struct {
 	FailOnFirstErrorInLoad                     *bool                     `toml:",omitempty"`
 	SendMaxDataInEveryMsgCount                 *int64                    `toml:",omitempty"`
 	TestRunName                                string                    `toml:",omitempty"`
+	GasEnvironment                             []*GasProfile             `toml:",omitempty"`
 }
 
 func (l *LoadProfile) Validate() error {
@@ -241,6 +268,13 @@ func (l *LoadProfile) Validate() error {
 	}
 	if l.TestDuration == nil || l.TestDuration.Duration().Minutes() == 0 {
 		return fmt.Errorf("test duration should be set")
+	}
+	if l.GasEnvironment != nil {
+		for _, gasProf := range l.GasEnvironment {
+			if err := gasProf.Validate(); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
