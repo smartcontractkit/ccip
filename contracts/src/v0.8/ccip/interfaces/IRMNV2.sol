@@ -14,7 +14,8 @@ interface IRMNV2 {
   /// @notice Verifies signatures of RMN nodes, on dest lane updates as provided in the CommitReport
   /// @param offRampAddress is not inferred by msg.sender, in case the call is made through ARMProxy
   /// @param merkleRoots must be well formed, and is a representation of the CommitReport received from the oracles
-  /// @param signatures must be sorted in ascending order by signer address
+  /// @param signatures rmnNodes ECDSA sigs, only r & s, must be sorted in ascending order by signer address
+  /// @param rawVs rmnNodes ECDSA sigs, part v bitmap
   /// @dev Will revert if verification fails
   function verify(
     address offRampAddress,
