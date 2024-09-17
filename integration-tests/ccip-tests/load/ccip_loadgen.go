@@ -231,7 +231,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	// within the specified timeframe for the first message. Subsequently, use the watcher method to monitor
 	// and detect any new events as they occur.
 	if c.CurrentMsgSerialNo.Load() == int64(1) {
-		recentRequestFoundAt, err = sourceCCIP.IsPastRequestTriggeredWithinTimeframe(c.SkipRequestIfAnotherRequestTriggeredWithin, testcontext.Get(c.t))
+		recentRequestFoundAt, err = sourceCCIP.IsPastRequestTriggeredWithinTimeframe(testcontext.Get(c.t), c.SkipRequestIfAnotherRequestTriggeredWithin)
 		require.NoError(c.t, err, "error while filtering past requests")
 	} else {
 		recentRequestFoundAt = sourceCCIP.IsRequestTriggeredWithinTimeframe(c.SkipRequestIfAnotherRequestTriggeredWithin)

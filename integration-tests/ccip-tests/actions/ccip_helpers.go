@@ -1648,31 +1648,31 @@ func (sourceCCIP *SourceCCIPModule) IsRequestTriggeredWithinTimeframe(timeframe 
 
 // IsPastRequestTriggeredWithinTimeframe determines the average block time and calculates the block numbers
 // within the specified timeframe. It then uses FilterCCIPSendRequested to identify the past events.
-func (sourceCCIP *SourceCCIPModule) IsPastRequestTriggeredWithinTimeframe(timeframe *commonconfig.Duration, ctx context.Context) (*time.Time, error) {
+func (sourceCCIP *SourceCCIPModule) IsPastRequestTriggeredWithinTimeframe(ctx context.Context, timeframe *commonconfig.Duration) (*time.Time, error) {
 	if timeframe == nil {
 		return nil, fmt.Errorf("nil timeframe")
 	}
 	//var foundAt *time.Time
 	latestBlock, err := sourceCCIP.Common.ChainClient.LatestBlockNumber(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error while getting latest source block number. Error: %v", err)
+		return nil, fmt.Errorf("error while getting latest source block number. Error: %w", err)
 	}
 	avgBlockTime, err := sourceCCIP.Common.ChainClient.AvgBlockTime(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error while getting average source block time. Error: %v", err)
+		return nil, fmt.Errorf("error while getting average source block time. Error: %w", err)
 	}
 	filterFromBlock := latestBlock - uint64(timeframe.Duration()/avgBlockTime)
 
 	onRampContract, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress(sourceCCIP.OnRamp.EthAddress.Hex()),
 		sourceCCIP.Common.ChainClient.Backend())
 	if err != nil {
-		return nil, fmt.Errorf("error while on ramp contract. Error: %v", err)
+		return nil, fmt.Errorf("error while on ramp contract. Error: %w", err)
 	}
 	iterator, err := onRampContract.FilterCCIPSendRequested(&bind.FilterOpts{
 		Start: filterFromBlock,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error while filtering CCIP send requested starting block number: %d. Error: %v", filterFromBlock, err)
+		return nil, fmt.Errorf("error while filtering CCIP send requested starting block number: %d. Error: %w", filterFromBlock, err)
 	}
 	defer func() {
 		_ = iterator.Close()
@@ -1680,12 +1680,12 @@ func (sourceCCIP *SourceCCIPModule) IsPastRequestTriggeredWithinTimeframe(timefr
 	if iterator.Next() {
 		hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(iterator.Event.Raw.BlockNumber)))
 		if err != nil {
-			return nil, fmt.Errorf("error getting header for block: %d, Error: %v", iterator.Event.Raw.BlockNumber, err)
+			return nil, fmt.Errorf("error getting header for block: %d, Error: %w", iterator.Event.Raw.BlockNumber, err)
 		}
 		return pointer.ToTime(hdr.Timestamp), nil
-	} else {
-		return nil, nil
 	}
+
+	return nil, nil
 }
 
 func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
