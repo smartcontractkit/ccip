@@ -1085,17 +1085,11 @@ selected_networks = [
   'AVALANCHE_MAINNET',
   'BSC_MAINNET',
   'BASE_MAINNET',
-  'BLAST_MAINNET',
-  'CELO_MAINNET',
   'ETHEREUM_MAINNET',
-  'GNOSIS_MAINNET',
   'KROMA_MAINNET',
-  'METIS_ANDROMEDA',
-  'MODE_MAINNET',
   'OPTIMISM_MAINNET',
   'POLYGON_MAINNET',
   'WEMIX_MAINNET',
-  'ZKSYNC_MAINNET'
   ]
 
 [CCIP.Groups.load]
@@ -1127,7 +1121,7 @@ NetworkPairs = [
   'AVALANCHE_MAINNET,WEMIX_MAINNET', # added as batch 2
   'POLYGON_MAINNET,WEMIX_MAINNET', # added as batch 2
   'WEMIX_MAINNET,ARBITRUM_MAINNET', # added as batch 2
-  'OPTIMISM_MAINNET,WEMIX_MAINNET', # added as batch 2
+  'OPTIMISM_MAINNET,WEMIX_MAINNET' # added as batch 2
 ]
 
 BiDirectionalLane = true
@@ -1182,7 +1176,7 @@ NetworkPairs = [
   'AVALANCHE_MAINNET,WEMIX_MAINNET', # added as batch 2
   'POLYGON_MAINNET,WEMIX_MAINNET', # added as batch 2
   'WEMIX_MAINNET,ARBITRUM_MAINNET', # added as batch 2
-  'OPTIMISM_MAINNET,WEMIX_MAINNET', # added as batch 2
+  'OPTIMISM_MAINNET,WEMIX_MAINNET' # added as batch 2
 ]
 
 BiDirectionalLane = true
