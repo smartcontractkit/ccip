@@ -3,6 +3,8 @@
 package mocks
 
 import (
+	big "math/big"
+
 	context "context"
 
 	mock "github.com/stretchr/testify/mock"
@@ -87,6 +89,54 @@ func (_c *FeeEstimatorConfigReader_GetDataAvailabilityConfig_Call) Return(destDA
 }
 
 func (_c *FeeEstimatorConfigReader_GetDataAvailabilityConfig_Call) RunAndReturn(run func(context.Context) (int64, int64, int64, error)) *FeeEstimatorConfigReader_GetDataAvailabilityConfig_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ModifyDAGasPrice provides a mock function with given fields: gasPrice
+func (_m *FeeEstimatorConfigReader) ModifyDAGasPrice(gasPrice *big.Int) *big.Int {
+	ret := _m.Called(gasPrice)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ModifyDAGasPrice")
+	}
+
+	var r0 *big.Int
+	if rf, ok := ret.Get(0).(func(*big.Int) *big.Int); ok {
+		r0 = rf(gasPrice)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*big.Int)
+		}
+	}
+
+	return r0
+}
+
+// FeeEstimatorConfigReader_ModifyDAGasPrice_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ModifyDAGasPrice'
+type FeeEstimatorConfigReader_ModifyDAGasPrice_Call struct {
+	*mock.Call
+}
+
+// ModifyDAGasPrice is a helper method to define mock.On call
+//   - gasPrice *big.Int
+func (_e *FeeEstimatorConfigReader_Expecter) ModifyDAGasPrice(gasPrice interface{}) *FeeEstimatorConfigReader_ModifyDAGasPrice_Call {
+	return &FeeEstimatorConfigReader_ModifyDAGasPrice_Call{Call: _e.mock.On("ModifyDAGasPrice", gasPrice)}
+}
+
+func (_c *FeeEstimatorConfigReader_ModifyDAGasPrice_Call) Run(run func(gasPrice *big.Int)) *FeeEstimatorConfigReader_ModifyDAGasPrice_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*big.Int))
+	})
+	return _c
+}
+
+func (_c *FeeEstimatorConfigReader_ModifyDAGasPrice_Call) Return(_a0 *big.Int) *FeeEstimatorConfigReader_ModifyDAGasPrice_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *FeeEstimatorConfigReader_ModifyDAGasPrice_Call) RunAndReturn(run func(*big.Int) *big.Int) *FeeEstimatorConfigReader_ModifyDAGasPrice_Call {
 	_c.Call.Return(run)
 	return _c
 }

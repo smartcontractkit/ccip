@@ -3,6 +3,7 @@ package estimatorconfig
 import (
 	"context"
 	"errors"
+	"math/big"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 )
@@ -13,11 +14,18 @@ import (
 // fields for the daGasEstimator from the encapsulated onRampReader.
 type FeeEstimatorConfigProvider interface {
 	SetOnRampReader(reader ccip.OnRampReader)
+	AddGasFeeInterceptor(gasPriceInterceptor)
+	ModifyDAGasPrice(gasPrice *big.Int) *big.Int
 	GetDataAvailabilityConfig(ctx context.Context) (destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64, err error)
 }
 
+type gasPriceInterceptor interface {
+	ModifyDAGasPrice(*big.Int) *big.Int
+}
+
 type FeeEstimatorConfigService struct {
-	onRampReader ccip.OnRampReader
+	onRampReader         ccip.OnRampReader
+	gasPriceInterceptors []gasPriceInterceptor
 }
 
 func NewFeeEstimatorConfigService() *FeeEstimatorConfigService {
@@ -46,4 +54,24 @@ func (c *FeeEstimatorConfigService) GetDataAvailabilityConfig(ctx context.Contex
 		int64(cfg.DestGasPerDataAvailabilityByte),
 		int64(cfg.DestDataAvailabilityMultiplierBps),
 		err
+}
+
+func (c *FeeEstimatorConfigService) AddGasFeeInterceptor(gpi gasPriceInterceptor) {
+	if gpi != nil {
+		c.gasPriceInterceptors = append(c.gasPriceInterceptors, gpi)
+	}
+}
+
+func (c *FeeEstimatorConfigService) ModifyDAGasPrice(gasPrice *big.Int) *big.Int {
+	if len(c.gasPriceInterceptors) == 0 {
+		return gasPrice
+	}
+
+	gp := new(big.Int).Set(gasPrice)
+
+	for _, interceptor := range c.gasPriceInterceptors {
+		gp = interceptor.ModifyDAGasPrice(gp)
+	}
+
+	return gp
 }

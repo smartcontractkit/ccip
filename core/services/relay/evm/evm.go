@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig/interceptors/interceptor/mantle"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
@@ -409,6 +410,13 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 
 	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
 
+	mantleInterceptor, err := mantle.NewInterceptor(ctx, r.chain.Client(), r.chain.Config().EVM().ChainType())
+	if err != nil {
+		return nil, err
+	}
+	feeEstimatorConfig.AddGasFeeInterceptor(mantleInterceptor)
+
+	//r.chain.Config().EVM().ChainType()
 	// The src chain implementation of this provider does not need a configWatcher or contractTransmitter;
 	// bail early.
 	if commitPluginConfig.IsSourceProvider {
