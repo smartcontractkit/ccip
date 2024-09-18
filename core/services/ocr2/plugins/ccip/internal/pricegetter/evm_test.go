@@ -1,15 +1,11 @@
 package pricegetter
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/targets/mocks"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
@@ -831,6 +827,7 @@ func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.Lat
 
 	// Mock batch calls per chain: all decimals calls then all latestRoundData calls.
 	// bGLVR = batchGetLatestValueResult
+	//nolint:all
 	var bGLVR types.BatchGetLatestValuesResult
 	bGLVR = make(map[string]types.ContractBatchResults, 1)
 
@@ -876,43 +873,4 @@ func mockErrCR(t *testing.T) *mocks.ChainReader {
 // multExp returns the result of multiplying x by 10^e.
 func multExp(x *big.Int, e int64) *big.Int {
 	return big.NewInt(0).Mul(x, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(e), nil))
-}
-
-type MockChainReader struct {
-}
-
-func (m MockChainReader) Start(ctx context.Context) error {
-	return nil
-}
-
-func (m MockChainReader) Close() error {
-	return nil
-}
-
-func (m MockChainReader) Ready() error {
-	return nil
-}
-
-func (m MockChainReader) HealthReport() map[string]error {
-	return map[string]error{}
-}
-
-func (m MockChainReader) Name() string {
-	return "MockChainReader"
-}
-
-func (m MockChainReader) GetLatestValue(ctx context.Context, contractName, method string, confidenceLevel primitives.ConfidenceLevel, params, returnVal any) error {
-	return nil
-}
-
-func (m MockChainReader) BatchGetLatestValues(ctx context.Context, request types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
-	return nil, nil
-}
-
-func (m MockChainReader) Bind(ctx context.Context, bindings []types.BoundContract) error {
-	return nil
-}
-
-func (m MockChainReader) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error) {
-	return nil, nil
 }

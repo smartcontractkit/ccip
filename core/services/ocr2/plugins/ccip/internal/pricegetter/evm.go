@@ -174,8 +174,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 
 	// Perform call
 	var decimalsReq uint8
-	var batchGetLatestValuesRequest types.BatchGetLatestValuesRequest
-	batchGetLatestValuesRequest = make(map[string]types.ContractBatch)
+	batchGetLatestValuesRequest := make(map[string]types.ContractBatch)
 	for i, call := range batchCalls.decimalCalls {
 		contractName := fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i)
 		batchGetLatestValuesRequest[contractName] = append(batchGetLatestValuesRequest[contractName], types.BatchRead{
