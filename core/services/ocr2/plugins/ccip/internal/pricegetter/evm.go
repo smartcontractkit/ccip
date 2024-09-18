@@ -153,18 +153,8 @@ func (d *DynamicPriceGetter) performBatchCalls(ctx context.Context, batchCallsPe
 
 // performBatchCall performs a batch call on a given chain to retrieve token prices.
 func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint64, batchCalls *batchCallsForChain, prices map[cciptypes.Address]*big.Int) (err error) {
-	// Retrieve the EVM caller for the chain.
-	client, exists := d.evmClients[chainID]
-	if !exists {
-		return fmt.Errorf("evm caller for chain %d not found", chainID)
-	}
-	evmCaller := client.BatchCaller
-
 	nbDecimalCalls := len(batchCalls.decimalCalls)
 	nbLatestRoundDataCalls := len(batchCalls.decimalCalls)
-	calls := make([]rpclib.EvmCall, 0, nbDecimalCalls+nbLatestRoundDataCalls)
-	calls = append(calls, batchCalls.decimalCalls...)
-	calls = append(calls, batchCalls.latestRoundDataCalls...)
 
 	// Retrieve contract reader for the chain
 	contractReader := d.contractReaders[chainID]
@@ -177,14 +167,6 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 			Name:    fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i),
 		})
 	}
-
-	// Unecessary until merge in change so that you can bind new addresses to the same contract
-	//for i, call := range batchCalls.latestRoundDataCalls {
-	//	bindings = append(bindings, types.BoundContract{
-	//		Address: string(ccipcalc.EvmAddrToGeneric(call.ContractAddress())),
-	//		Name:    fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i),
-	//	})
-	//}
 
 	err = contractReader.Bind(ctx, bindings)
 	if err != nil {
@@ -252,47 +234,8 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 		return respErr
 	}
 
-	// Perform batched call (all decimals calls followed by latest round data calls).
-	results, err := evmCaller.BatchCall(ctx, 0, calls)
-	if err != nil {
-		return fmt.Errorf("batch call on chain %d failed: %w", chainID, err)
-	}
-
-	// Extract results.
-	decimals := make([]uint8, 0, nbDecimalCalls)
-	latestRounds := make([]*big.Int, 0, nbLatestRoundDataCalls)
-
-	for i, res := range results[0:nbDecimalCalls] {
-		v, err1 := rpclib.ParseOutput[uint8](res, 0)
-		if err1 != nil {
-			callSignature := batchCalls.decimalCalls[i].String()
-			return fmt.Errorf("parse contract output while calling %v on chain %d: %w", callSignature, chainID, err1)
-		}
-		decimals = append(decimals, v)
-	}
-
-	for i, res := range results[nbDecimalCalls : nbDecimalCalls+nbLatestRoundDataCalls] {
-		// latestRoundData function has multiple outputs (roundId,answer,startedAt,updatedAt,answeredInRound).
-		// we want the second one (answer, at idx=1).
-		v, err1 := rpclib.ParseOutput[*big.Int](res, 1)
-		if err1 != nil {
-			callSignature := batchCalls.latestRoundDataCalls[i].String()
-			return fmt.Errorf("parse contract output while calling %v on chain %d: %w", callSignature, chainID, err1)
-		}
-		latestRounds = append(latestRounds, v)
-	}
-
-	for i := range nbDecimalCalls {
-		if decimals[i] != decimalsCR[i] {
-			panic(fmt.Sprintf("decimalsCR != decimals, at index %v", i))
-		}
-	}
-
 	latestRoundAnswerCR := make([]*big.Int, 0, nbLatestRoundDataCalls)
 	for i := range nbLatestRoundDataCalls {
-		if latestRounds[i].String() != latestRoundCR[i].Answer.String() {
-			panic(fmt.Sprintf("latestRoundCR != latestRounds, at index %v", i))
-		}
 		latestRoundAnswerCR = append(latestRoundAnswerCR, latestRoundCR[i].Answer)
 	}
 
