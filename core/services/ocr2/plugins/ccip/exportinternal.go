@@ -86,8 +86,8 @@ func NewDynamicPriceGetterClient(batchCaller rpclib.EvmBatchCaller) DynamicPrice
 	return pricegetter.NewDynamicPriceGetterClient(batchCaller)
 }
 
-func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[uint64]DynamicPriceGetterClient, contractReaders map[uint64]types.ContractReader) (*DynamicPriceGetter, error) {
-	return pricegetter.NewDynamicPriceGetter(cfg, evmClients, contractReaders)
+func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, contractReaders map[uint64]types.ContractReader) (*DynamicPriceGetter, error) {
+	return pricegetter.NewDynamicPriceGetter(cfg, contractReaders)
 }
 
 func NewDynamicLimitedBatchCaller(

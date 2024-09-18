@@ -1629,27 +1629,12 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 			return nil, fmt.Errorf("priceGetterConfig is nil")
 		}
 
-		// Build price getter clients for all chains specified in the aggregator configurations.
+		// Configure contract readers for all chains specified in the aggregator configurations.
 		// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
-		priceGetterClients := map[uint64]ccip.DynamicPriceGetterClient{}
 		contractReaders := map[uint64]types.ContractReader{}
 		for _, aggCfg := range pluginJobSpecConfig.PriceGetterConfig.AggregatorPrices {
 			chainID := aggCfg.ChainID
-			// Retrieve the chain.
-			chain, _, err2 := ccipconfig.GetChainByChainID(d.legacyChains, chainID)
-			if err2 != nil {
-				return nil, fmt.Errorf("retrieving chain for chainID %d: %w", chainID, err2)
-			}
-			caller := ccip.NewDynamicLimitedBatchCaller(
-				lggr,
-				chain.Client(),
-				uint(ccip.DefaultRpcBatchSizeLimit),
-				uint(ccip.DefaultRpcBatchBackOffMultiplier),
-				uint(ccip.DefaultMaxParallelRpcCalls),
-			)
-			priceGetterClients[chainID] = ccip.NewDynamicPriceGetterClient(caller)
 
-			// TRYING TO FIGURE OUT CONTRACT READER
 			relayID := types.RelayID{Network: spec.Relay, ChainID: strconv.FormatUint(chainID, 10)}
 			relay, rerr := d.RelayGetter.Get(relayID)
 			if rerr != nil {
@@ -1658,17 +1643,8 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 
 			contractReaderConfig := evmrelaytypes.ChainReaderConfig{
 				Contracts: map[string]evmrelaytypes.ChainContractReader{
-					"OffchainAggregator": {
-						ContractABI: ccip.OffChainAggregatorABI,
-						Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
-							"decimals": { // CR consumers choose an alias
-								ChainSpecificName: "decimals",
-							},
-							"latestRoundData": {
-								ChainSpecificName: "latestRoundData",
-							},
-						},
-					},
+					// TODO CCIP-3444 can bind multiple contract addresses to the same contract name after merge,
+					// removing the need to have indexed contract names
 					"OffchainAggregator_0": {
 						ContractABI: ccip.OffChainAggregatorABI,
 						Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
@@ -1705,10 +1681,9 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 			}
 
 			contractReaders[chainID] = contractReader
-			// -----
 		}
 
-		priceGetter, err = ccip.NewDynamicPriceGetter(*pluginJobSpecConfig.PriceGetterConfig, priceGetterClients, contractReaders)
+		priceGetter, err = ccip.NewDynamicPriceGetter(*pluginJobSpecConfig.PriceGetterConfig, contractReaders)
 		if err != nil {
 			return nil, fmt.Errorf("creating dynamic price getter: %w", err)
 		}

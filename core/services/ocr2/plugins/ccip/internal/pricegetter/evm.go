@@ -57,7 +57,6 @@ func NewDynamicPriceGetterClient(batchCaller rpclib.EvmBatchCaller) DynamicPrice
 
 type DynamicPriceGetter struct {
 	cfg             config.DynamicPriceGetterConfig
-	evmClients      map[uint64]DynamicPriceGetterClient
 	contractReaders map[uint64]types.ContractReader
 	aggregatorAbi   abi.ABI
 }
@@ -77,7 +76,7 @@ func NewDynamicPriceGetterConfig(configJson string) (config.DynamicPriceGetterCo
 
 // NewDynamicPriceGetter build a DynamicPriceGetter from a configuration and a map of chain ID to batch callers.
 // A batch caller should be provided for all retrieved prices.
-func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[uint64]DynamicPriceGetterClient, contractReaders map[uint64]types.ContractReader) (*DynamicPriceGetter, error) {
+func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, contractReaders map[uint64]types.ContractReader) (*DynamicPriceGetter, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("validating dynamic price getter config: %w", err)
 	}
@@ -85,13 +84,13 @@ func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[u
 	if err != nil {
 		return nil, fmt.Errorf("parsing offchainaggregator abi: %w", err)
 	}
-	priceGetter := DynamicPriceGetter{cfg, evmClients, contractReaders, aggregatorAbi}
+	priceGetter := DynamicPriceGetter{cfg, contractReaders, aggregatorAbi}
 	return &priceGetter, nil
 }
 
 // FilterConfiguredTokens implements the PriceGetter interface.
 // It filters a list of token addresses for only those that have a price resolution rule configured on the PriceGetterConfig
-func (d *DynamicPriceGetter) FilterConfiguredTokens(ctx context.Context, tokens []cciptypes.Address) (configured []cciptypes.Address, unconfigured []cciptypes.Address, err error) {
+func (d *DynamicPriceGetter) FilterConfiguredTokens(_ context.Context, tokens []cciptypes.Address) (configured []cciptypes.Address, unconfigured []cciptypes.Address, err error) {
 	configured = []cciptypes.Address{}
 	unconfigured = []cciptypes.Address{}
 	for _, tk := range tokens {
@@ -111,7 +110,7 @@ func (d *DynamicPriceGetter) FilterConfiguredTokens(ctx context.Context, tokens 
 	return configured, unconfigured, nil
 }
 
-// It returns the prices of all tokens defined in the price getter.
+// GetJobSpecTokenPricesUSD returns the prices of all tokens defined in the price getter.
 func (d *DynamicPriceGetter) GetJobSpecTokenPricesUSD(ctx context.Context) (map[cciptypes.Address]*big.Int, error) {
 	return d.TokenPricesUSD(ctx, d.getAllTokensDefined())
 }
