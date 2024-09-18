@@ -125,14 +125,17 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
     TokenPoolFactory.RemoteChainConfig memory remoteChainConfig =
       TokenPoolFactory.RemoteChainConfig(address(newTokenPoolFactory), address(s_destRouter), address(s_rmnProxy));
 
-    uint64[] memory chainIds = new uint64[](1);
-    chainIds[0] = DEST_CHAIN_SELECTOR;
+    {
+      TokenPoolFactory.RemoteChainConfig[] memory remoteChainConfigs = new TokenPoolFactory.RemoteChainConfig[](1);
+      remoteChainConfigs[0] = remoteChainConfig;
 
-    TokenPoolFactory.RemoteChainConfig[] memory remoteChainConfigs = new TokenPoolFactory.RemoteChainConfig[](1);
-    remoteChainConfigs[0] = remoteChainConfig;
+      TokenPoolFactory.RemoteChainConfigUpdate[] memory remoteChainConfigUpdates =
+        new TokenPoolFactory.RemoteChainConfigUpdate[](1);
+      remoteChainConfigUpdates[0] = TokenPoolFactory.RemoteChainConfigUpdate(DEST_CHAIN_SELECTOR, remoteChainConfig);
 
-    // Add the new token Factory to the remote chain config and set it for the simulated destination chain
-    s_tokenPoolFactory.updateRemoteChainConfig(chainIds, remoteChainConfigs);
+      // Add the new token Factory to the remote chain config and set it for the simulated destination chain
+      s_tokenPoolFactory.updateRemoteChainConfig(remoteChainConfigUpdates);
+    }
 
     // Create an array of remote pools where nothing exists yet, but we want to predict the address for
     // the new pool and token on DEST_CHAIN_SELECTOR
@@ -168,25 +171,27 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       "Token Address should have been predicted"
     );
 
-    // Create the constructor params for the predicted pool
-    // The predictedTokenAddress is NOT abi-encoded since the raw evm-address
-    // is used in the constructor params
-    bytes memory predictedPoolCreationParams =
-      abi.encode(predictedTokenAddress, new address[](0), s_rmnProxy, address(s_destRouter));
+    {
+      // Create the constructor params for the predicted pool
+      // The predictedTokenAddress is NOT abi-encoded since the raw evm-address
+      // is used in the constructor params
+      bytes memory predictedPoolCreationParams =
+        abi.encode(predictedTokenAddress, new address[](0), s_rmnProxy, address(s_destRouter));
 
-    // Take the init code and concat the destination params to it, the initCode shouldn't change
-    bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, predictedPoolCreationParams);
+      // Take the init code and concat the destination params to it, the initCode shouldn't change
+      bytes memory predictedPoolInitCode = abi.encodePacked(s_poolInitCode, predictedPoolCreationParams);
 
-    // Predict the address of the pool on the DESTINATION chain
-    address predictedPoolAddress =
-      dynamicSalt.computeAddress(keccak256(predictedPoolInitCode), address(newTokenPoolFactory));
+      // Predict the address of the pool on the DESTINATION chain
+      address predictedPoolAddress =
+        dynamicSalt.computeAddress(keccak256(predictedPoolInitCode), address(newTokenPoolFactory));
 
-    // Assert that the address set for the remote pool is the same as the predicted address
-    assertEq(
-      abi.encode(predictedPoolAddress),
-      TokenPool(poolAddress).getRemotePool(DEST_CHAIN_SELECTOR),
-      "Pool Address should have been predicted"
-    );
+      // Assert that the address set for the remote pool is the same as the predicted address
+      assertEq(
+        abi.encode(predictedPoolAddress),
+        TokenPool(poolAddress).getRemotePool(DEST_CHAIN_SELECTOR),
+        "Pool Address should have been predicted"
+      );
+    }
 
     // On the new token pool factory, representing a destination chain,
     // deploy a new token and a new pool
@@ -236,11 +241,12 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       TokenPoolFactory.RemoteChainConfig[] memory remoteChainConfigs = new TokenPoolFactory.RemoteChainConfig[](1);
       remoteChainConfigs[0] = remoteChainConfig;
 
-      uint64[] memory chainIds = new uint64[](1);
-      chainIds[0] = DEST_CHAIN_SELECTOR;
+      TokenPoolFactory.RemoteChainConfigUpdate[] memory remoteChainConfigUpdates =
+        new TokenPoolFactory.RemoteChainConfigUpdate[](1);
+      remoteChainConfigUpdates[0] = TokenPoolFactory.RemoteChainConfigUpdate(DEST_CHAIN_SELECTOR, remoteChainConfig);
 
       // Add the new token Factory to the remote chain config and set it for the simulated destination chain
-      s_tokenPoolFactory.updateRemoteChainConfig(chainIds, remoteChainConfigs);
+      s_tokenPoolFactory.updateRemoteChainConfig(remoteChainConfigUpdates);
     }
 
     // Create an array of remote pools where nothing exists yet, but we want to predict the address for
@@ -370,9 +376,6 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
   }
 
   function test_updateRemoteChainConfig_Success() public {
-    uint64[] memory chainIds = new uint64[](1);
-    chainIds[0] = DEST_CHAIN_SELECTOR;
-
     TokenPoolFactory.RemoteChainConfig[] memory remoteChainConfigs = new TokenPoolFactory.RemoteChainConfig[](1);
 
     TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig({
@@ -383,7 +386,11 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
 
     remoteChainConfigs[0] = remoteChainConfig;
 
-    s_tokenPoolFactory.updateRemoteChainConfig(chainIds, remoteChainConfigs);
+    TokenPoolFactory.RemoteChainConfigUpdate[] memory remoteChainConfigUpdates =
+      new TokenPoolFactory.RemoteChainConfigUpdate[](1);
+    remoteChainConfigUpdates[0] = TokenPoolFactory.RemoteChainConfigUpdate(DEST_CHAIN_SELECTOR, remoteChainConfig);
+
+    s_tokenPoolFactory.updateRemoteChainConfig(remoteChainConfigUpdates);
 
     TokenPoolFactory.RemoteChainConfig memory updatedRemoteChainConfig =
       s_tokenPoolFactory.getRemoteChainConfig(DEST_CHAIN_SELECTOR);

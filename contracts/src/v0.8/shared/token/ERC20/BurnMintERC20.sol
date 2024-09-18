@@ -27,11 +27,6 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
 
   event CCIPAdminTransferred(address indexed previousAdmin, address indexed newAdmin);
 
-  // @dev the allowed minter addresses
-  EnumerableSet.AddressSet internal s_minters;
-  // @dev the allowed burner addresses
-  EnumerableSet.AddressSet internal s_burners;
-
   /// @dev The number of decimals for the token
   uint8 internal immutable i_decimals;
 
@@ -41,6 +36,11 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
   /// @dev the CCIPAdmin can be used to register with the CCIP token admin registry, but has no other special powers,
   /// and can only be transferred by the owner.
   address internal s_ccipAdmin;
+
+  /// @dev the allowed minter addresses
+  EnumerableSet.AddressSet internal s_minters;
+  /// @dev the allowed burner addresses
+  EnumerableSet.AddressSet internal s_burners;
 
   constructor(
     string memory name,
@@ -214,7 +214,7 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
 
   /// @notice Transfers the CCIPAdmin role to a new address
   /// @dev only the owner can call this function, NOT the current ccipAdmin, and 1-step ownership transfer is used.
-  /// @param newAdmin The address to transfer the CCIPAdmin role to. Set to address(0) is a valid way to revoke the role
+  /// @param newAdmin The address to transfer the CCIPAdmin role to. Setting to address(0) is a valid way to revoke the role
   function setCCIPAdmin(address newAdmin) public onlyOwner {
     address currentAdmin = s_ccipAdmin;
 
