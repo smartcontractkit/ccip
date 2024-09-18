@@ -414,7 +414,7 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 	if err != nil {
 		return nil, err
 	}
-	feeEstimatorConfig.AddGasFeeInterceptor(mantleInterceptor)
+	feeEstimatorConfig.AddDAGasPriceInterceptor(mantleInterceptor)
 
 	//r.chain.Config().EVM().ChainType()
 	// The src chain implementation of this provider does not need a configWatcher or contractTransmitter;
