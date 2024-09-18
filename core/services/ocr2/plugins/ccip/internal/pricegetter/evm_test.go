@@ -108,7 +108,7 @@ func TestDynamicPriceGetterWithEmptyInput(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			pg, err := NewDynamicPriceGetter(test.param.cfg, test.param.evmClients, test.param.contractReaders)
+			pg, err := NewDynamicPriceGetter(test.param.cfg, test.param.contractReaders)
 			if test.param.invalidConfigErrorExpected {
 				require.Error(t, err)
 				return
