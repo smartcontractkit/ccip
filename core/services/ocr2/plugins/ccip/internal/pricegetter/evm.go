@@ -172,7 +172,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 		return fmt.Errorf("binding contracts failed: %w", err)
 	}
 
-	// Perform call
+	// Construct request, adding a decimals and latestRound req per contract name
 	var decimalsReq uint8
 	batchGetLatestValuesRequest := make(map[string]types.ContractBatch)
 	for i, call := range batchCalls.decimalCalls {
@@ -191,13 +191,15 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 		})
 	}
 
+	// Perform call
 	result, err2 := contractReader.BatchGetLatestValues(ctx, batchGetLatestValuesRequest)
 	if err2 != nil {
 		return fmt.Errorf("BatchGetLatestValues failed %w", err2)
 	}
 
 	// Extract results
-	// give result the method key and then you get slice of responses
+	// give result the contract name (key ordering not guaranteed to match that of the request)
+	// and then you get slice of responses
 	decimalsCR := make([]uint8, 0, nbDecimalCalls)
 	latestRoundCR := make([]aggregator_v3_interface.LatestRoundData, 0, nbDecimalCalls)
 	var respErr error
