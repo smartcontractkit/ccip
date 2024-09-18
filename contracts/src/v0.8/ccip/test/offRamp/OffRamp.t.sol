@@ -347,14 +347,14 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       messages[0].header.sourceChainSelector,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
 
     messages[0].header.nonce++;
     messages[0].header.sequenceNumber++;
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
 
     uint64 nonceBefore = s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender);
     vm.recordLogs();
@@ -365,7 +365,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       messages[0].header.sourceChainSelector,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -376,7 +376,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     Internal.Any2EVMRampMessage[] memory messages =
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     messages[0].header.nonce = 0;
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
 
     // Nonce never increments on unordered messages.
     uint64 nonceBefore = s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender);
@@ -388,7 +388,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       messages[0].header.sourceChainSelector,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -400,7 +400,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     );
 
     messages[0].header.sequenceNumber++;
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
 
     // Nonce never increments on unordered messages.
     nonceBefore = s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender);
@@ -412,7 +412,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       messages[0].header.sourceChainSelector,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -456,7 +456,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     s_reverting_receiver.setErr(realError1);
 
     messages[0].receiver = address(s_reverting_receiver);
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
 
     // Nonce should increment on non-strict
     assertEq(uint64(0), s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, abi.encode(OWNER)));
@@ -468,7 +468,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       messages[0].header.sourceChainSelector,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(
         OffRamp.ReceiverError.selector,
@@ -483,7 +483,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
 
     messages[0].header.nonce++;
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit NonceManager.SkippedIncorrectNonce(
@@ -500,7 +500,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
 
     messages[1].header.nonce++;
-    messages[1].header.messageId = Internal._hash(messages[1], ON_RAMP_ADDRESS_1);
+    messages[1].header.messageId = _hashMessage(messages[1], ON_RAMP_ADDRESS_1);
 
     vm.expectEmit();
     emit NonceManager.SkippedIncorrectNonce(SOURCE_CHAIN_SELECTOR_1, messages[1].header.nonce, messages[1].sender);
@@ -513,7 +513,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       messages[0].header.sourceChainSelector,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -531,7 +531,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -548,7 +548,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     Internal.Any2EVMRampMessage[] memory messages =
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     messages[0].header.nonce = 0;
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
 
     vm.recordLogs();
     s_offRamp.executeSingleReport(
@@ -558,7 +558,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -578,7 +578,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     MaybeRevertMessageReceiverNo165 newReceiver = new MaybeRevertMessageReceiverNo165(true);
     messages[0].receiver = address(newReceiver);
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
 
     vm.recordLogs();
     s_offRamp.executeSingleReport(
@@ -588,7 +588,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       messages[0].header.sourceChainSelector,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -608,7 +608,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       messages[0].header.sourceChainSelector,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -620,7 +620,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     // Set message 1 to use another receiver to simulate more fair gas costs
     messages[1].receiver = address(s_secondary_receiver);
-    messages[1].header.messageId = Internal._hash(messages[1], ON_RAMP_ADDRESS_1);
+    messages[1].header.messageId = _hashMessage(messages[1], ON_RAMP_ADDRESS_1);
 
     Internal.ExecutionReportSingleChain memory report = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
 
@@ -634,7 +634,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -644,7 +644,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[1].header.sequenceNumber,
       messages[1].header.messageId,
-      Internal._hash(messages[1], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[1], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -655,7 +655,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     // Set message 1 to use another receiver to simulate more fair gas costs
     messages[1].receiver = address(s_secondary_receiver);
-    messages[1].header.messageId = Internal._hash(messages[1], ON_RAMP_ADDRESS_1);
+    messages[1].header.messageId = _hashMessage(messages[1], ON_RAMP_ADDRESS_1);
 
     assertEq(uint64(0), s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, abi.encode(OWNER)));
 
@@ -671,7 +671,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -680,7 +680,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[1].header.sequenceNumber,
       messages[1].header.messageId,
-      Internal._hash(messages[1], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[1], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -703,7 +703,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       if (orderings[i]) {
         messages[i].header.nonce = ++expectedNonce;
       }
-      messages[i].header.messageId = Internal._hash(messages[i], ON_RAMP_ADDRESS_1);
+      messages[i].header.messageId = _hashMessage(messages[i], ON_RAMP_ADDRESS_1);
     }
 
     uint64 nonceBefore = s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, abi.encode(OWNER));
@@ -726,7 +726,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
         SOURCE_CHAIN_SELECTOR_1,
         messages[i].header.sequenceNumber,
         messages[i].header.messageId,
-        Internal._hash(messages[i], ON_RAMP_ADDRESS_1),
+        _hashMessage(messages[i], ON_RAMP_ADDRESS_1),
         Internal.MessageExecutionState.SUCCESS,
         ""
       );
@@ -743,8 +743,8 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       _generateMessagesWithTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     messages[0].tokenAmounts[0].sourcePoolAddress = abi.encode(fakePoolAddress);
 
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
-    messages[1].header.messageId = Internal._hash(messages[1], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
+    messages[1].header.messageId = _hashMessage(messages[1], ON_RAMP_ADDRESS_1);
 
     vm.recordLogs();
 
@@ -755,7 +755,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(
         OffRamp.TokenHandlingError.selector,
@@ -928,7 +928,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     // gas limit too high, Router's external call should revert
     messages[0].gasLimit = 1e36;
     messages[0].receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
 
     Internal.ExecutionReportSingleChain memory executionReport =
       _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
@@ -939,7 +939,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       messages[0].header.sourceChainSelector,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(CallWithExactGas.NotEnoughGasForCall.selector)
     );
@@ -955,7 +955,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     s_reverting_receiver.setErr(realError1);
 
     messages[0].receiver = address(s_reverting_receiver);
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
 
     vm.recordLogs();
     s_offRamp.executeSingleReport(
@@ -965,7 +965,7 @@ contract OffRamp_executeSingleReport is OffRampSetup {
       messages[0].header.sourceChainSelector,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(
         OffRamp.ReceiverError.selector,
@@ -995,7 +995,8 @@ contract OffRamp_executeSingleReport is OffRampSetup {
     return OffRamp.CommitReport({
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots,
-      rmnSignatures: s_rmnSignatures
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
     });
   }
 }
@@ -1026,7 +1027,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
           originalSender: message.sender,
           receiver: message.receiver,
           amount: message.tokenAmounts[0].amount,
-          localToken: abi.decode(message.tokenAmounts[0].destTokenAddress, (address)),
+          localToken: message.tokenAmounts[0].destTokenAddress,
           remoteChainSelector: SOURCE_CHAIN_SELECTOR_1,
           sourcePoolAddress: message.tokenAmounts[0].sourcePoolAddress,
           sourcePoolData: message.tokenAmounts[0].extraData,
@@ -1134,7 +1135,7 @@ contract OffRamp_executeSingleMessage is OffRampSetup {
     // Setup the receiver to a non-CCIP Receiver, which will skip the Router call (but should still perform the validation)
     MaybeRevertMessageReceiverNo165 newReceiver = new MaybeRevertMessageReceiverNo165(true);
     message.receiver = address(newReceiver);
-    message.header.messageId = Internal._hash(message, ON_RAMP_ADDRESS_1);
+    message.header.messageId = _hashMessage(message, ON_RAMP_ADDRESS_1);
 
     s_inboundMessageInterceptor.setMessageIdValidationState(message.header.messageId, true);
     vm.expectRevert(
@@ -1169,7 +1170,7 @@ contract OffRamp_batchExecute is OffRampSetup {
       messages[0].header.sourceChainSelector,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1199,7 +1200,7 @@ contract OffRamp_batchExecute is OffRampSetup {
       messages1[0].header.sourceChainSelector,
       messages1[0].header.sequenceNumber,
       messages1[0].header.messageId,
-      Internal._hash(messages1[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages1[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1209,7 +1210,7 @@ contract OffRamp_batchExecute is OffRampSetup {
       messages1[1].header.sourceChainSelector,
       messages1[1].header.sequenceNumber,
       messages1[1].header.messageId,
-      Internal._hash(messages1[1], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages1[1], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1219,7 +1220,7 @@ contract OffRamp_batchExecute is OffRampSetup {
       messages2[0].header.sourceChainSelector,
       messages2[0].header.sequenceNumber,
       messages2[0].header.messageId,
-      Internal._hash(messages2[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages2[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1250,7 +1251,7 @@ contract OffRamp_batchExecute is OffRampSetup {
       messages1[0].header.sourceChainSelector,
       messages1[0].header.sequenceNumber,
       messages1[0].header.messageId,
-      Internal._hash(messages1[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages1[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1260,7 +1261,7 @@ contract OffRamp_batchExecute is OffRampSetup {
       messages1[1].header.sourceChainSelector,
       messages1[1].header.sequenceNumber,
       messages1[1].header.messageId,
-      Internal._hash(messages1[1], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages1[1], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1270,7 +1271,7 @@ contract OffRamp_batchExecute is OffRampSetup {
       messages2[0].header.sourceChainSelector,
       messages2[0].header.sequenceNumber,
       messages2[0].header.messageId,
-      Internal._hash(messages2[0], ON_RAMP_ADDRESS_3),
+      _hashMessage(messages2[0], ON_RAMP_ADDRESS_3),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1316,7 +1317,7 @@ contract OffRamp_batchExecute is OffRampSetup {
         assertEq(logSourceChainSelector, messages2[0].header.sourceChainSelector);
         assertEq(logSequenceNumber, messages2[0].header.sequenceNumber);
         assertEq(logMessageId, messages2[0].header.messageId);
-        assertEq(logMessageHash, Internal._hash(messages2[0], ON_RAMP_ADDRESS_3));
+        assertEq(logMessageHash, _hashMessage(messages2[0], ON_RAMP_ADDRESS_3));
         assertEq(logState, uint8(Internal.MessageExecutionState.SUCCESS));
       }
     }
@@ -1339,7 +1340,7 @@ contract OffRamp_batchExecute is OffRampSetup {
       messages[0].header.sourceChainSelector,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1405,7 +1406,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     Internal.Any2EVMRampMessage[] memory messages =
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     messages[0].receiver = address(s_reverting_receiver);
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
     s_offRamp.batchExecute(
       _generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new OffRamp.GasLimitOverride[][](1)
     );
@@ -1421,7 +1422,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1431,7 +1432,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     Internal.Any2EVMRampMessage[] memory messages =
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     messages[0].receiver = address(s_reverting_receiver);
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
     s_offRamp.batchExecute(
       _generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new OffRamp.GasLimitOverride[][](1)
     );
@@ -1447,7 +1448,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1457,7 +1458,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     Internal.Any2EVMRampMessage[] memory messages =
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     messages[0].receiver = address(s_reverting_receiver);
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
 
     assertEq(
       messages[0].header.nonce - 1, s_inboundNonceManager.getInboundNonce(SOURCE_CHAIN_SELECTOR_1, messages[0].sender)
@@ -1474,7 +1475,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(
         OffRamp.ReceiverError.selector, abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, "")
@@ -1493,13 +1494,13 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     for (uint64 i = 0; i < 3; ++i) {
       messages1[i] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, i + 1);
       messages1[i].receiver = address(s_reverting_receiver);
-      messages1[i].header.messageId = Internal._hash(messages1[i], ON_RAMP_ADDRESS_1);
+      messages1[i].header.messageId = _hashMessage(messages1[i], ON_RAMP_ADDRESS_1);
     }
 
     for (uint64 i = 0; i < 2; ++i) {
       messages2[i] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_3, ON_RAMP_ADDRESS_3, i + 1);
       messages2[i].receiver = address(s_reverting_receiver);
-      messages2[i].header.messageId = Internal._hash(messages2[i], ON_RAMP_ADDRESS_3);
+      messages2[i].header.messageId = _hashMessage(messages2[i], ON_RAMP_ADDRESS_3);
     }
 
     Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](2);
@@ -1533,7 +1534,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
         SOURCE_CHAIN_SELECTOR_1,
         messages1[j].header.sequenceNumber,
         messages1[j].header.messageId,
-        Internal._hash(messages1[j], ON_RAMP_ADDRESS_1),
+        _hashMessage(messages1[j], ON_RAMP_ADDRESS_1),
         Internal.MessageExecutionState.SUCCESS,
         ""
       );
@@ -1545,7 +1546,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
         SOURCE_CHAIN_SELECTOR_3,
         messages2[k].header.sequenceNumber,
         messages2[k].header.messageId,
-        Internal._hash(messages2[k], ON_RAMP_ADDRESS_3),
+        _hashMessage(messages2[k], ON_RAMP_ADDRESS_3),
         Internal.MessageExecutionState.SUCCESS,
         ""
       );
@@ -1560,7 +1561,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     }
 
     messages[1].receiver = address(s_reverting_receiver);
-    messages[1].header.messageId = Internal._hash(messages[1], ON_RAMP_ADDRESS_1);
+    messages[1].header.messageId = _hashMessage(messages[1], ON_RAMP_ADDRESS_1);
 
     vm.recordLogs();
     s_offRamp.batchExecute(
@@ -1574,7 +1575,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1584,7 +1585,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[1].header.sequenceNumber,
       messages[1].header.messageId,
-      Internal._hash(messages[1], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[1], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(
         OffRamp.ReceiverError.selector,
@@ -1597,7 +1598,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[2].header.sequenceNumber,
       messages[2].header.messageId,
-      Internal._hash(messages[2], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[2], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1618,7 +1619,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1629,7 +1630,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
     messages[0].gasLimit = 1;
     messages[0].receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
 
     vm.recordLogs();
     s_offRamp.batchExecute(
@@ -1639,7 +1640,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(OffRamp.ReceiverError.selector, "")
     );
@@ -1657,7 +1658,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1829,7 +1830,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
 
     messages[0].receiver = address(s_reverting_receiver);
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
 
     s_offRamp.batchExecute(
       _generateBatchReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages), new OffRamp.GasLimitOverride[][](1)
@@ -1867,18 +1868,18 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     // send the message that they want to replay.
     Internal.Any2EVMRampMessage[] memory messages =
       _generateSingleBasicMessage(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1);
-    messages[0].tokenAmounts = new Internal.RampTokenAmount[](1);
-    messages[0].tokenAmounts[0] = Internal.RampTokenAmount({
+    messages[0].tokenAmounts = new Internal.Any2EVMTokenTransfer[](1);
+    messages[0].tokenAmounts[0] = Internal.Any2EVMTokenTransfer({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[s_sourceFeeToken]),
-      destTokenAddress: abi.encode(s_destTokenBySourceToken[s_sourceFeeToken]),
+      destTokenAddress: s_destTokenBySourceToken[s_sourceFeeToken],
       extraData: "",
       amount: tokenAmount,
-      destExecData: abi.encode(MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS)
+      destGasAmount: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS
     });
 
     messages[0].receiver = address(receiver);
 
-    messages[0].header.messageId = Internal._hash(messages[0], ON_RAMP_ADDRESS_1);
+    messages[0].header.messageId = _hashMessage(messages[0], ON_RAMP_ADDRESS_1);
 
     Internal.ExecutionReportSingleChain memory report = _generateReportFromMessages(SOURCE_CHAIN_SELECTOR_1, messages);
 
@@ -1902,7 +1903,7 @@ contract OffRamp_manuallyExecute is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -1918,13 +1919,13 @@ contract OffRamp_manuallyExecute is OffRampSetup {
     for (uint64 i = 0; i < 3; ++i) {
       messages1[i] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_1, ON_RAMP_ADDRESS_1, i + 1);
       messages1[i].receiver = address(s_reverting_receiver);
-      messages1[i].header.messageId = Internal._hash(messages1[i], ON_RAMP_ADDRESS_1);
+      messages1[i].header.messageId = _hashMessage(messages1[i], ON_RAMP_ADDRESS_1);
     }
 
     for (uint64 i = 0; i < 2; ++i) {
       messages2[i] = _generateAny2EVMMessageNoTokens(SOURCE_CHAIN_SELECTOR_3, ON_RAMP_ADDRESS_3, i + 1);
       messages2[i].receiver = address(s_reverting_receiver);
-      messages2[i].header.messageId = Internal._hash(messages2[i], ON_RAMP_ADDRESS_3);
+      messages2[i].header.messageId = _hashMessage(messages2[i], ON_RAMP_ADDRESS_3);
     }
 
     Internal.ExecutionReportSingleChain[] memory reports = new Internal.ExecutionReportSingleChain[](2);
@@ -1992,7 +1993,7 @@ contract OffRamp_execute is OffRampSetup {
       SOURCE_CHAIN_SELECTOR_1,
       messages[0].header.sequenceNumber,
       messages[0].header.messageId,
-      Internal._hash(messages[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -2025,7 +2026,7 @@ contract OffRamp_execute is OffRampSetup {
       messages1[0].header.sourceChainSelector,
       messages1[0].header.sequenceNumber,
       messages1[0].header.messageId,
-      Internal._hash(messages1[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages1[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -2035,7 +2036,7 @@ contract OffRamp_execute is OffRampSetup {
       messages1[1].header.sourceChainSelector,
       messages1[1].header.sequenceNumber,
       messages1[1].header.messageId,
-      Internal._hash(messages1[1], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages1[1], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -2045,7 +2046,7 @@ contract OffRamp_execute is OffRampSetup {
       messages2[0].header.sourceChainSelector,
       messages2[0].header.sequenceNumber,
       messages2[0].header.messageId,
-      Internal._hash(messages2[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages2[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -2079,7 +2080,7 @@ contract OffRamp_execute is OffRampSetup {
           reports[i].messages[j].header.sourceChainSelector,
           reports[i].messages[j].header.sequenceNumber,
           reports[i].messages[j].header.messageId,
-          Internal._hash(reports[i].messages[j], ON_RAMP_ADDRESS_1),
+          _hashMessage(reports[i].messages[j], ON_RAMP_ADDRESS_1),
           Internal.MessageExecutionState.SUCCESS,
           ""
         );
@@ -2119,7 +2120,7 @@ contract OffRamp_execute is OffRampSetup {
       messages1[0].header.sourceChainSelector,
       messages1[0].header.sequenceNumber,
       messages1[0].header.messageId,
-      Internal._hash(messages1[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages1[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(
         IMessageInterceptor.MessageValidationError.selector,
@@ -2132,7 +2133,7 @@ contract OffRamp_execute is OffRampSetup {
       messages1[1].header.sourceChainSelector,
       messages1[1].header.sequenceNumber,
       messages1[1].header.messageId,
-      Internal._hash(messages1[1], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages1[1], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
@@ -2142,7 +2143,7 @@ contract OffRamp_execute is OffRampSetup {
       messages2[0].header.sourceChainSelector,
       messages2[0].header.sequenceNumber,
       messages2[0].header.messageId,
-      Internal._hash(messages2[0], ON_RAMP_ADDRESS_1),
+      _hashMessage(messages2[0], ON_RAMP_ADDRESS_1),
       Internal.MessageExecutionState.FAILURE,
       abi.encodeWithSelector(
         IMessageInterceptor.MessageValidationError.selector,
@@ -2499,33 +2500,33 @@ contract OffRamp_trialExecute is OffRampSetup {
     // address 0 has no contract
     assertEq(address(0).code.length, 0);
 
-    message.tokenAmounts[0] = Internal.RampTokenAmount({
+    message.tokenAmounts[0] = Internal.Any2EVMTokenTransfer({
       sourcePoolAddress: abi.encode(address(0)),
-      destTokenAddress: abi.encode(address(0)),
+      destTokenAddress: address(0),
       extraData: "",
       amount: message.tokenAmounts[0].amount,
-      destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
-    message.header.messageId = Internal._hash(message, ON_RAMP_ADDRESS_1);
+    message.header.messageId = _hashMessage(message, ON_RAMP_ADDRESS_1);
 
     // Unhappy path, no revert but marked as failed.
     (newState, err) = s_offRamp.trialExecute(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
 
     assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(newState));
-    assertEq(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, abi.encode(address(0))), err);
+    assertEq(abi.encodeWithSelector(OffRamp.NotACompatiblePool.selector, address(0)), err);
 
     address notAContract = makeAddr("not_a_contract");
 
-    message.tokenAmounts[0] = Internal.RampTokenAmount({
+    message.tokenAmounts[0] = Internal.Any2EVMTokenTransfer({
       sourcePoolAddress: abi.encode(address(0)),
-      destTokenAddress: abi.encode(notAContract),
+      destTokenAddress: notAContract,
       extraData: "",
       amount: message.tokenAmounts[0].amount,
-      destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
-    message.header.messageId = Internal._hash(message, ON_RAMP_ADDRESS_1);
+    message.header.messageId = _hashMessage(message, ON_RAMP_ADDRESS_1);
 
     (newState, err) = s_offRamp.trialExecute(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
 
@@ -2549,12 +2550,12 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     IERC20 dstToken1 = IERC20(s_destTokenBySourceToken[token]);
     uint256 startingBalance = dstToken1.balanceOf(OWNER);
 
-    Internal.RampTokenAmount memory tokenAmount = Internal.RampTokenAmount({
+    Internal.Any2EVMTokenTransfer memory tokenAmount = Internal.Any2EVMTokenTransfer({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
-      destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
+      destTokenAddress: s_destTokenBySourceToken[token],
       extraData: "",
       amount: amount,
-      destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     vm.expectCall(
@@ -2583,12 +2584,12 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
 
-    Internal.RampTokenAmount memory tokenAmount = Internal.RampTokenAmount({
+    Internal.Any2EVMTokenTransfer memory tokenAmount = Internal.Any2EVMTokenTransfer({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
-      destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
+      destTokenAddress: s_destTokenBySourceToken[token],
       extraData: "",
       amount: amount,
-      destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     // Mock the call so returns 2 slots of data
@@ -2605,12 +2606,12 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     uint256 amount = 123123;
     address token = s_sourceTokens[0];
 
-    Internal.RampTokenAmount memory tokenAmount = Internal.RampTokenAmount({
+    Internal.Any2EVMTokenTransfer memory tokenAmount = Internal.Any2EVMTokenTransfer({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
-      destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
+      destTokenAddress: s_destTokenBySourceToken[token],
       extraData: "",
       amount: amount,
-      destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     bytes memory revertData = "failed to balanceOf";
@@ -2630,12 +2631,12 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     address token = s_sourceTokens[0];
     uint256 mockedStaticBalance = 50000;
 
-    Internal.RampTokenAmount memory tokenAmount = Internal.RampTokenAmount({
+    Internal.Any2EVMTokenTransfer memory tokenAmount = Internal.Any2EVMTokenTransfer({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
-      destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
+      destTokenAddress: s_destTokenBySourceToken[token],
       extraData: "",
       amount: amount,
-      destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     vm.mockCall(
@@ -2658,12 +2659,12 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     address token = s_sourceTokens[0];
     uint256 mockedStaticBalance = 50000;
 
-    Internal.RampTokenAmount memory tokenAmount = Internal.RampTokenAmount({
+    Internal.Any2EVMTokenTransfer memory tokenAmount = Internal.Any2EVMTokenTransfer({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
-      destTokenAddress: abi.encode(s_destTokenBySourceToken[token]),
+      destTokenAddress: s_destTokenBySourceToken[token],
       extraData: "",
       amount: amount,
-      destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     // This should make the call fail if it does not skip the check
@@ -2686,12 +2687,12 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     bytes memory originalSender = abi.encode(OWNER);
     bytes memory offchainTokenData = abi.encode(keccak256("offchainTokenData"));
 
-    Internal.RampTokenAmount memory tokenAmount = Internal.RampTokenAmount({
+    Internal.Any2EVMTokenTransfer memory tokenAmount = Internal.Any2EVMTokenTransfer({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
-      destTokenAddress: abi.encode(destToken),
+      destTokenAddress: destToken,
       extraData: "",
       amount: amount,
-      destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     // Address(0) should always revert
@@ -2729,12 +2730,12 @@ contract OffRamp_releaseOrMintSingleToken is OffRampSetup {
     bytes memory originalSender = abi.encode(OWNER);
     bytes memory offchainTokenData = abi.encode(keccak256("offchainTokenData"));
 
-    Internal.RampTokenAmount memory tokenAmount = Internal.RampTokenAmount({
+    Internal.Any2EVMTokenTransfer memory tokenAmount = Internal.Any2EVMTokenTransfer({
       sourcePoolAddress: abi.encode(s_sourcePoolByToken[token]),
-      destTokenAddress: abi.encode(destToken),
+      destTokenAddress: destToken,
       extraData: "",
       amount: amount,
-      destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     bytes memory revertData = "call reverted :o";
@@ -2764,7 +2765,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
     bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
     offchainTokenData[0] = abi.encode(0x12345678);
 
-    Internal.RampTokenAmount[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
+    Internal.Any2EVMTokenTransfer[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
 
     vm.expectCall(
       s_destPoolBySourceToken[srcTokenAmounts[0].token],
@@ -2800,7 +2801,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
     bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
     offchainTokenData[0] = abi.encode(0x12345678);
 
-    Internal.RampTokenAmount[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
+    Internal.Any2EVMTokenTransfer[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
 
     vm.expectCall(
       s_destPoolBySourceToken[srcTokenAmounts[0].token],
@@ -2838,7 +2839,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
 
     bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
 
-    Internal.RampTokenAmount[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
+    Internal.Any2EVMTokenTransfer[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
 
     address pool = s_destPoolBySourceToken[srcTokenAmounts[1].token];
     address destToken = s_destTokenBySourceToken[srcTokenAmounts[1].token];
@@ -2878,7 +2879,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
     srcTokenAmounts[0].amount = amount;
 
     bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
-    Internal.RampTokenAmount[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
+    Internal.Any2EVMTokenTransfer[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
 
     vm.mockCall(
       s_destPoolBySourceToken[srcTokenAmounts[0].token],
@@ -2906,33 +2907,17 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
     );
   }
 
-  function test_releaseOrMintTokens_InvalidEVMAddress_Revert() public {
-    Client.EVMTokenAmount[] memory srcTokenAmounts = _getCastedSourceEVMTokenAmountsWithZeroAmounts();
-
-    bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
-    Internal.RampTokenAmount[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
-    bytes memory wrongAddress = abi.encode(address(1000), address(10000), address(10000));
-
-    sourceTokenAmounts[0].destTokenAddress = wrongAddress;
-
-    vm.expectRevert(abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, wrongAddress));
-
-    s_offRamp.releaseOrMintTokens(
-      sourceTokenAmounts, abi.encode(OWNER), OWNER, SOURCE_CHAIN_SELECTOR_1, offchainTokenData, new uint32[](0)
-    );
-  }
-
   function test__releaseOrMintTokens_PoolIsNotAPool_Reverts() public {
     // The offRamp is a contract, but not a pool
     address fakePoolAddress = address(s_offRamp);
 
-    Internal.RampTokenAmount[] memory sourceTokenAmounts = new Internal.RampTokenAmount[](1);
-    sourceTokenAmounts[0] = Internal.RampTokenAmount({
+    Internal.Any2EVMTokenTransfer[] memory sourceTokenAmounts = new Internal.Any2EVMTokenTransfer[](1);
+    sourceTokenAmounts[0] = Internal.Any2EVMTokenTransfer({
       sourcePoolAddress: abi.encode(fakePoolAddress),
-      destTokenAddress: abi.encode(s_offRamp),
+      destTokenAddress: address(s_offRamp),
       extraData: "",
       amount: 1,
-      destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.NotACompatiblePool.selector, address(0)));
@@ -2949,7 +2934,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
     bytes[] memory offchainTokenData = new bytes[](srcTokenAmounts.length);
     offchainTokenData[0] = abi.encode(0x12345678);
 
-    Internal.RampTokenAmount[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
+    Internal.Any2EVMTokenTransfer[] memory sourceTokenAmounts = _getDefaultSourceTokenData(srcTokenAmounts);
 
     vm.expectCall(
       s_destPoolBySourceToken[srcTokenAmounts[0].token],
@@ -2976,18 +2961,18 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
   /// forge-config: default.fuzz.runs = 32
   /// forge-config: ccip.fuzz.runs = 1024
   // Uint256 gives a good range of values to test, both inside and outside of the eth address space.
-  function test_Fuzz__releaseOrMintTokens_AnyRevertIsCaught_Success(uint256 destPool) public {
+  function test_Fuzz__releaseOrMintTokens_AnyRevertIsCaught_Success(address destPool) public {
     // Input 447301751254033913445893214690834296930546521452, which is 0x4E59B44847B379578588920CA78FBF26C0B4956C
     // triggers some Create2Deployer and causes it to fail
-    vm.assume(destPool != 447301751254033913445893214690834296930546521452);
+    vm.assume(destPool != 0x4e59b44847b379578588920cA78FbF26c0B4956C);
     bytes memory unusedVar = abi.encode(makeAddr("unused"));
-    Internal.RampTokenAmount[] memory sourceTokenAmounts = new Internal.RampTokenAmount[](1);
-    sourceTokenAmounts[0] = Internal.RampTokenAmount({
+    Internal.Any2EVMTokenTransfer[] memory sourceTokenAmounts = new Internal.Any2EVMTokenTransfer[](1);
+    sourceTokenAmounts[0] = Internal.Any2EVMTokenTransfer({
       sourcePoolAddress: unusedVar,
-      destTokenAddress: abi.encode(destPool),
+      destTokenAddress: destPool,
       extraData: unusedVar,
       amount: 1,
-      destExecData: abi.encode(DEFAULT_TOKEN_DEST_GAS_OVERHEAD)
+      destGasAmount: DEFAULT_TOKEN_DEST_GAS_OVERHEAD
     });
 
     try s_offRamp.releaseOrMintTokens(
@@ -3002,7 +2987,7 @@ contract OffRamp_releaseOrMintTokens is OffRampSetup {
         "Expected TokenHandlingError or InvalidEVMAddress"
       );
 
-      if (destPool > type(uint160).max) {
+      if (uint160(destPool) > type(uint160).max) {
         assertEq(reason, abi.encodeWithSelector(Internal.InvalidEVMAddress.selector, abi.encode(destPool)));
       }
     }
@@ -3259,7 +3244,8 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
       OffRamp.CommitReport({
         priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
         merkleRoots: roots,
-        rmnSignatures: s_rmnSignatures
+        rmnSignatures: s_rmnSignatures,
+        rmnRawVs: 0
       }),
       s_latestSequenceNumber
     );
@@ -3312,8 +3298,12 @@ contract OffRamp_commit is OffRampSetup {
       merkleRoot: root
     });
 
-    OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
+    OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
+      priceUpdates: _getEmptyPriceUpdates(),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
+    });
 
     vm.expectEmit();
     emit OffRamp.CommitReportAccepted(commitReport.merkleRoots, commitReport.priceUpdates);
@@ -3340,8 +3330,12 @@ contract OffRamp_commit is OffRampSetup {
       maxSeqNr: maxSeq,
       merkleRoot: "stale report 1"
     });
-    OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
+    OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
+      priceUpdates: _getEmptyPriceUpdates(),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
+    });
 
     vm.expectEmit();
     emit OffRamp.CommitReportAccepted(commitReport.merkleRoots, commitReport.priceUpdates);
@@ -3379,7 +3373,8 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots,
-      rmnSignatures: s_rmnSignatures
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
     });
 
     vm.expectEmit();
@@ -3401,7 +3396,8 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots,
-      rmnSignatures: s_rmnSignatures
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
     });
 
     vm.expectEmit();
@@ -3419,7 +3415,8 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots,
-      rmnSignatures: s_rmnSignatures
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
     });
 
     vm.expectEmit();
@@ -3471,7 +3468,8 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, tokenPrice1),
       merkleRoots: roots,
-      rmnSignatures: s_rmnSignatures
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
     });
 
     vm.expectEmit();
@@ -3581,8 +3579,12 @@ contract OffRamp_commit is OffRampSetup {
       onRampAddress: abi.encode(ON_RAMP_ADDRESS_1)
     });
 
-    OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
+    OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
+      priceUpdates: _getEmptyPriceUpdates(),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
+    });
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.CursedByRMN.selector, roots[0].sourceChainSelector));
     _commit(commitReport, s_latestSequenceNumber);
@@ -3597,8 +3599,12 @@ contract OffRamp_commit is OffRampSetup {
       maxSeqNr: 4,
       merkleRoot: bytes32(0)
     });
-    OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
+    OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
+      priceUpdates: _getEmptyPriceUpdates(),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
+    });
 
     vm.expectRevert(OffRamp.InvalidRoot.selector);
     _commit(commitReport, s_latestSequenceNumber);
@@ -3613,8 +3619,12 @@ contract OffRamp_commit is OffRampSetup {
       maxSeqNr: 2,
       merkleRoot: bytes32(0)
     });
-    OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
+    OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
+      priceUpdates: _getEmptyPriceUpdates(),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
+    });
 
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -3634,8 +3644,12 @@ contract OffRamp_commit is OffRampSetup {
       maxSeqNr: 0,
       merkleRoot: bytes32(0)
     });
-    OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
+    OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
+      priceUpdates: _getEmptyPriceUpdates(),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
+    });
 
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -3650,7 +3664,8 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots,
-      rmnSignatures: s_rmnSignatures
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
     });
 
     vm.expectRevert(OffRamp.StaleCommitReport.selector);
@@ -3662,7 +3677,8 @@ contract OffRamp_commit is OffRampSetup {
     OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots,
-      rmnSignatures: s_rmnSignatures
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
     });
 
     vm.expectEmit();
@@ -3683,8 +3699,12 @@ contract OffRamp_commit is OffRampSetup {
       merkleRoot: "Only a single root"
     });
 
-    OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
+    OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
+      priceUpdates: _getEmptyPriceUpdates(),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
+    });
 
     vm.expectRevert(abi.encodeWithSelector(OffRamp.SourceChainNotEnabled.selector, 0));
     _commit(commitReport, s_latestSequenceNumber);
@@ -3699,8 +3719,12 @@ contract OffRamp_commit is OffRampSetup {
       maxSeqNr: 2,
       merkleRoot: "Only a single root"
     });
-    OffRamp.CommitReport memory commitReport =
-      OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: s_rmnSignatures});
+    OffRamp.CommitReport memory commitReport = OffRamp.CommitReport({
+      priceUpdates: _getEmptyPriceUpdates(),
+      merkleRoots: roots,
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
+    });
 
     _commit(commitReport, s_latestSequenceNumber);
     commitReport.merkleRoots[0].minSeqNr = 3;
@@ -3734,7 +3758,8 @@ contract OffRamp_commit is OffRampSetup {
     return OffRamp.CommitReport({
       priceUpdates: _getSingleTokenPriceUpdateStruct(s_sourceFeeToken, 4e18),
       merkleRoots: roots,
-      rmnSignatures: s_rmnSignatures
+      rmnSignatures: s_rmnSignatures,
+      rmnRawVs: 0
     });
   }
 }

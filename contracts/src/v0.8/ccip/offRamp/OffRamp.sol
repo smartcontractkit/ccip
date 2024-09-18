@@ -131,6 +131,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     Internal.PriceUpdates priceUpdates; // Collection of gas and price updates to commit
     Internal.MerkleRoot[] merkleRoots; // Collection of merkle roots per source chain to commit
     IRMNV2.Signature[] rmnSignatures; // RMN signatures on the merkle roots
+    uint256 rmnRawVs; // Raw v values of the RMN signatures
   }
 
   struct GasLimitOverride {
@@ -299,7 +300,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
         for (uint256 tokenIndex = 0; tokenIndex < message.tokenAmounts.length; ++tokenIndex) {
           uint256 tokenGasOverride = msgGasLimitOverrides[msgIndex].tokenGasOverrides[tokenIndex];
           if (tokenGasOverride != 0) {
-            uint32 destGasAmount = abi.decode(message.tokenAmounts[tokenIndex].destExecData, (uint32));
+            uint256 destGasAmount = message.tokenAmounts[tokenIndex].destGasAmount;
             if (tokenGasOverride < destGasAmount) {
               revert InvalidManualExecutionTokenGasOverride(
                 message.header.messageId, tokenIndex, destGasAmount, tokenGasOverride
@@ -393,7 +394,17 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       // over the same data, which increases gas cost.
       // Hashing all of the message fields ensures that the message being executed is correct and not tampered with.
       // Including the known OnRamp ensures that the message originates from the correct on ramp version
-      hashedLeaves[i] = Internal._hash(message, onRamp);
+      hashedLeaves[i] = Internal._hash(
+        message,
+        keccak256(
+          abi.encode(
+            Internal.ANY_2_EVM_MESSAGE_HASH,
+            message.header.sourceChainSelector,
+            message.header.destChainSelector,
+            keccak256(onRamp)
+          )
+        )
+      );
     }
 
     // SECURITY CRITICAL CHECK
@@ -610,7 +621,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @param offchainTokenData Data fetched offchain by the DON.
   /// @return destTokenAmount local token address with amount
   function _releaseOrMintSingleToken(
-    Internal.RampTokenAmount memory sourceTokenAmount,
+    Internal.Any2EVMTokenTransfer memory sourceTokenAmount,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
@@ -618,7 +629,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   ) internal returns (Client.EVMTokenAmount memory destTokenAmount) {
     // We need to safely decode the token address from the sourceTokenData, as it could be wrong,
     // in which case it doesn't have to be a valid EVM address.
-    address localToken = Internal._validateEVMAddress(sourceTokenAmount.destTokenAddress);
+    // We assume this destTokenAddress has already been fully validated by a (trusted) OnRamp.
+    address localToken = sourceTokenAmount.destTokenAddress;
     // We check with the token admin registry if the token has a pool on this chain.
     address localPoolAddress = ITokenAdminRegistry(i_tokenAdminRegistry).getPool(localToken);
     // This will call the supportsInterface through the ERC165Checker, and not directly on the pool address.
@@ -630,8 +642,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     }
 
     // We retrieve the local token balance of the receiver before the pool call.
-    (uint256 balancePre, uint256 gasLeft) =
-      _getBalanceOfReceiver(receiver, localToken, abi.decode(sourceTokenAmount.destExecData, (uint32)));
+    (uint256 balancePre, uint256 gasLeft) = _getBalanceOfReceiver(receiver, localToken, sourceTokenAmount.destGasAmount);
 
     // We determined that the pool address is a valid EVM address, but that does not mean the code at this
     // address is a (compatible) pool contract. _callWithExactGasSafeReturnData will check if the location
@@ -723,7 +734,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// any non-rate limiting errors that may occur. If we encounter a rate limiting related error
   /// we bubble it up. If we encounter a non-rate limiting error we wrap it in a TokenHandlingError.
   function _releaseOrMintTokens(
-    Internal.RampTokenAmount[] memory sourceTokenAmounts,
+    Internal.Any2EVMTokenTransfer[] memory sourceTokenAmounts,
     bytes memory originalSender,
     address receiver,
     uint64 sourceChainSelector,
@@ -735,7 +746,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       if (!isTokenGasOverridesEmpty) {
         if (tokenGasOverrides[i] != 0) {
-          sourceTokenAmounts[i].destExecData = abi.encode(tokenGasOverrides[i]);
+          sourceTokenAmounts[i].destGasAmount = tokenGasOverrides[i];
         }
       }
       destTokenAmounts[i] = _releaseOrMintSingleToken(
@@ -768,13 +779,13 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     bytes calldata report,
     bytes32[] calldata rs,
     bytes32[] calldata ss,
-    bytes32 rawVs // signatures
+    bytes32 rawVs
   ) external {
     CommitReport memory commitReport = abi.decode(report, (CommitReport));
 
     // Verify RMN signatures
     if (commitReport.merkleRoots.length > 0) {
-      i_rmn.verify(commitReport.merkleRoots, commitReport.rmnSignatures);
+      i_rmn.verify(address(this), commitReport.merkleRoots, commitReport.rmnSignatures, commitReport.rmnRawVs);
     }
 
     // Check if the report contains price updates
