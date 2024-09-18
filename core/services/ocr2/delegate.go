@@ -1670,14 +1670,14 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 				},
 			}
 
-			contractReaderConfigJsonBytes, err := json.Marshal(contractReaderConfig)
-			if err != nil {
-				return nil, err
+			contractReaderConfigJsonBytes, jerr := json.Marshal(contractReaderConfig)
+			if jerr != nil {
+				return nil, jerr
 			}
 
-			contractReader, err := relay.NewContractReader(ctx, contractReaderConfigJsonBytes)
-			if err != nil {
-				return nil, err
+			contractReader, cerr := relay.NewContractReader(ctx, contractReaderConfigJsonBytes)
+			if cerr != nil {
+				return nil, cerr
 			}
 
 			contractReaders[chainID] = contractReader
