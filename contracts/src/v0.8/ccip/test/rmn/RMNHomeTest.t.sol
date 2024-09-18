@@ -3,17 +3,16 @@ pragma solidity 0.8.24;
 
 import {Internal} from "../../libraries/Internal.sol";
 import {RMNHome} from "../../rmn/RMNHome.sol";
-import {BaseTest} from "../BaseTest.t.sol";
+import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-contract RMNHomeTest is BaseTest {
+contract RMNHomeTest is Test {
+  bytes32 internal constant ZERO_DIGEST = bytes32(uint256(0));
+
   RMNHome public s_rmnHome;
 
-  function setUp() public virtual override {
-    super.setUp();
+  function setUp() public virtual {
     s_rmnHome = new RMNHome();
-
-    s_rmnHome.revokeAllConfigsButLatest();
   }
 
   function _getBaseConfig() internal pure returns (RMNHome.Config memory) {
@@ -39,8 +38,8 @@ contract RMNHomeTest is BaseTest {
   }
 }
 
-contract RMNHome_setConfig is RMNHomeTest {
-  function test_setConfig_success() public {
+contract RMNHome_setSecondary is RMNHomeTest {
+  function test_setSecondary_success() public {
     RMNHome.Config memory config = _getBaseConfig();
     RMNHome.VersionedConfig memory versionedConfig = RMNHome.VersionedConfig({version: 1, config: config});
     bytes32 configDigest = _getConfigDigest(versionedConfig);
@@ -48,9 +47,9 @@ contract RMNHome_setConfig is RMNHomeTest {
     vm.expectEmit();
     emit RMNHome.ConfigSet(configDigest, versionedConfig);
 
-    s_rmnHome.setConfig(config);
+    s_rmnHome.setSecondary(config, ZERO_DIGEST);
 
-    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getVersionedConfig(configDigest);
+    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getConfig(configDigest);
     assertTrue(ok);
     assertEq(storedVersionedConfig.version, versionedConfig.version);
     assertEq(storedVersionedConfig.config.nodes.length, versionedConfig.config.nodes.length);
@@ -70,106 +69,71 @@ contract RMNHome_setConfig is RMNHomeTest {
     assertEq(storedVersionedConfig.config.offchainConfig, versionedConfig.config.offchainConfig);
   }
 
-  function test_setConfig_moreThanRingBuffer_success() public {
-    RMNHome.Config memory config = _getBaseConfig();
-    uint256 ringBufferSize = s_rmnHome.getRingBufferSize();
-
-    vm.recordLogs();
-
-    // Insert ring buffer size + 1 configs
-    for (uint256 i = 0; i < ringBufferSize + 1; i++) {
-      s_rmnHome.setConfig(config);
-    }
-
-    Vm.Log[] memory entries = vm.getRecordedLogs();
-    vm.assertEq(entries.length, ringBufferSize + 2);
-
-    for (uint256 i = 0; i < ringBufferSize; i++) {
-      Vm.Log memory entry = entries[i];
-      vm.assertEq(entry.topics[0], bytes32(uint256(RMNHome.ConfigSet.selector)));
-    }
-
-    // The last config should revoke the first config, which means it should emit a ConfigRevoked event
-    vm.assertEq(entries[ringBufferSize].topics[0], bytes32(uint256(RMNHome.ConfigRevoked.selector)));
-    vm.assertEq(entries[ringBufferSize + 1].topics[0], bytes32(uint256(RMNHome.ConfigSet.selector)));
-  }
-
-  function test_setConfig_OutOfBoundsNodesLength_reverts() public {
+  function test_setSecondary_OutOfBoundsNodesLength_reverts() public {
     RMNHome.Config memory config = _getBaseConfig();
     config.nodes = new RMNHome.Node[](257);
 
     vm.expectRevert(RMNHome.OutOfBoundsNodesLength.selector);
-    s_rmnHome.setConfig(config);
+    s_rmnHome.setSecondary(config, ZERO_DIGEST);
   }
 
-  function test_setConfig_DuplicatePeerId_reverts() public {
+  function test_setSecondary_DuplicatePeerId_reverts() public {
     RMNHome.Config memory config = _getBaseConfig();
     config.nodes[1].peerId = config.nodes[0].peerId;
 
     vm.expectRevert(RMNHome.DuplicatePeerId.selector);
-    s_rmnHome.setConfig(config);
+    s_rmnHome.setSecondary(config, ZERO_DIGEST);
   }
 
-  function test_setConfig_DuplicateOffchainPublicKey_reverts() public {
+  function test_setSecondary_DuplicateOffchainPublicKey_reverts() public {
     RMNHome.Config memory config = _getBaseConfig();
     config.nodes[1].offchainPublicKey = config.nodes[0].offchainPublicKey;
 
     vm.expectRevert(RMNHome.DuplicateOffchainPublicKey.selector);
-    s_rmnHome.setConfig(config);
+    s_rmnHome.setSecondary(config, ZERO_DIGEST);
   }
 
-  function test_setConfig_DuplicateSourceChain_reverts() public {
+  function test_setSecondary_DuplicateSourceChain_reverts() public {
     RMNHome.Config memory config = _getBaseConfig();
     config.sourceChains[1].chainSelector = config.sourceChains[0].chainSelector;
 
     vm.expectRevert(RMNHome.DuplicateSourceChain.selector);
-    s_rmnHome.setConfig(config);
+    s_rmnHome.setSecondary(config, ZERO_DIGEST);
   }
 
-  function test_setConfig_OutOfBoundsObserverNodeIndex_reverts() public {
+  function test_setSecondary_OutOfBoundsObserverNodeIndex_reverts() public {
     RMNHome.Config memory config = _getBaseConfig();
     config.sourceChains[0].observerNodesBitmap = 1 << config.nodes.length;
 
     vm.expectRevert(RMNHome.OutOfBoundsObserverNodeIndex.selector);
-    s_rmnHome.setConfig(config);
+    s_rmnHome.setSecondary(config, ZERO_DIGEST);
   }
 
-  function test_setConfig_MinObserversTooHigh_reverts() public {
+  function test_setSecondary_MinObserversTooHigh_reverts() public {
     RMNHome.Config memory config = _getBaseConfig();
     config.sourceChains[0].minObservers++;
 
     vm.expectRevert(RMNHome.MinObserversTooHigh.selector);
-    s_rmnHome.setConfig(config);
+    s_rmnHome.setSecondary(config, ZERO_DIGEST);
   }
 
-  function test_setConfig_OnlyOwner_reverts() public {
+  function test_setSecondary_OnlyOwner_reverts() public {
     RMNHome.Config memory config = _getBaseConfig();
 
     vm.startPrank(address(0));
 
     vm.expectRevert("Only callable by owner");
-    s_rmnHome.setConfig(config);
+    s_rmnHome.setSecondary(config, ZERO_DIGEST);
   }
 }
 
-contract RMNHome_revokeAllConfigsButLatest is RMNHomeTest {
-  function test_revokeAllConfigsButLatest_success() public {}
-
-  function test_setConfig_OnlyOwner_reverts() public {
-    vm.startPrank(address(0));
-
-    vm.expectRevert("Only callable by owner");
-    s_rmnHome.revokeAllConfigsButLatest();
-  }
-}
-
-contract RMNHome_revokeConfig is RMNHomeTest {
-  function test_revokeConfig_success() public {}
-
-  function test_setConfig_OnlyOwner_reverts() public {
-    vm.startPrank(address(0));
-
-    vm.expectRevert("Only callable by owner");
-    s_rmnHome.revokeConfig(keccak256("configDigest"));
-  }
-}
+//contract RMNHome_revokeConfig is RMNHomeTest {
+//  function test_revokeConfig_success() public {}
+//
+//  function test_setSecondary_OnlyOwner_reverts() public {
+//    vm.startPrank(address(0));
+//
+//    vm.expectRevert("Only callable by owner");
+//    s_rmnHome.revokeConfig(keccak256("configDigest"));
+//  }
+//}

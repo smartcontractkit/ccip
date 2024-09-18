@@ -15,6 +15,8 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   error OutOfBoundsObserverNodeIndex();
   error MinObserversTooHigh();
 
+  error ConfigDigestMismatch(bytes32 expectedConfigDigest, bytes32 gotConfigDigest);
+
   event ConfigSet(bytes32 configDigest, VersionedConfig versionedConfig);
   event ConfigRevoked(bytes32 configDigest);
 
@@ -51,36 +53,91 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   string public constant override typeAndVersion = "RMNHome 1.6.0-dev";
 
   /// @notice The max number of configs that can be active at the same time.
-  uint256 private constant CONFIG_RING_BUFFER_SIZE = 3;
+  uint256 private constant MAX_CONCURRENT_CONFIGS = 2;
   /// @notice Used for encoding the config digest prefix
   uint256 private constant PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..00
   uint256 private constant PREFIX = 0x000b << (256 - 16); // 0x000b00..00
+  bytes32 private constant ZERO_DIGEST = bytes32(uint256(0));
 
-  /// @notice This array holds just the versions of the configs, the actual configs are stored in s_configs.
-  /// s_configVersions[i] == 0 iff s_configs[i] is unusable, either never set or revoked.
-  uint32[CONFIG_RING_BUFFER_SIZE] private s_configVersions;
   /// @notice This array holds the digests of the configs, used for efficiency.
-  /// @dev Value i in this array is valid iff s_configVersions[i] != 0.
-  bytes32[CONFIG_RING_BUFFER_SIZE] private s_configDigests;
+  /// @dev Value i in this array is valid iff it's not 0.
+  bytes32[MAX_CONCURRENT_CONFIGS] private s_configDigests;
   /// @notice This array holds the configs.
-  /// @dev Value i in this array is valid iff s_configVersions[i] != 0.
-  Config[CONFIG_RING_BUFFER_SIZE] private s_configs;
-  /// @notice The index of the latest config in the ring buffer. Given a ring buffer of 2 this values will be 0 or 1.
-  /// @dev Since this value is packed with the config count, it won't flip the slot from 0 to 1 or vice versa, meaning
-  /// there's no gas impact in using 0 as a value.
-  uint32 private s_latestConfigIndex;
-  /// @notice The total number of configs set, used for generating the version of the configs.
-  uint32 private s_configCount;
+  /// @dev Value i in this array is valid iff s_configDigests[i] != 0.
+  Config[MAX_CONCURRENT_CONFIGS] private s_configs;
+  /// @notice This array holds the versions of the configs.
+  /// @dev Value i in this array is valid iff s_configDigests[i] != 0.
+  /// @dev Since Solidity doesn't support writing complex memory structs to storage, we have to make the config calldata
+  /// in setConfig and then copy it to storage. This does not allow us to modify it to add the version field, so we
+  /// store the version separately.
+  uint32[MAX_CONCURRENT_CONFIGS] private s_configVersions;
 
-  /// @notice Returns the current ring buffer size.
-  function getRingBufferSize() external pure returns (uint256) {
-    return CONFIG_RING_BUFFER_SIZE;
+  /// @notice The total number of configs ever set, used for generating the version of the configs.
+  uint32 private s_configCount = 0;
+  /// @notice The index of the primary config.
+  uint32 private s_primaryConfigIndex = 0;
+
+  /// @notice Returns the current primary and secondary config digests.
+  /// @dev Can be bytes32(0) if no config has been set yet or it has been revoked.
+  /// @return primaryConfigDigest The digest of the primary config.
+  /// @return secondaryConfigDigest The digest of the secondary config.
+  function getConfigDigests() external view returns (bytes32 primaryConfigDigest, bytes32 secondaryConfigDigest) {
+    return (s_configDigests[s_primaryConfigIndex], s_configDigests[s_primaryConfigIndex ^ 1]);
   }
 
-  /// @notice Sets a new config.
-  /// Setting a new config while the ring buffer is full will revoke the oldest config
+  /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes. Use
+  /// in case one of the configs is too large to be returnable by one of the other getters.
+  /// @param configDigest The digest of the config to fetch.
+  /// @return versionedConfig The config and its version.
+  /// @return ok True if the config was found, false otherwise.
+  function getConfig(bytes32 configDigest) external view returns (VersionedConfig memory versionedConfig, bool ok) {
+    for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
+      // We never want to return true for a zero digest, even if the caller is asking for it, as this can expose old
+      // config state that is invalid.
+      if (s_configDigests[i] == configDigest && configDigest != ZERO_DIGEST) {
+        return (VersionedConfig({config: s_configs[i], version: s_configVersions[i]}), true);
+      }
+    }
+    return (versionedConfig, false);
+  }
+
+  function getAllConfigs()
+    external
+    view
+    returns (VersionedConfigWithDigest memory primaryConfig, VersionedConfigWithDigest memory secondaryConfig)
+  {
+    // We need to explicitly check if the digest exists, because we don't clear out revoked config state. Not doing this
+    // check would result in potentially returning previous configs.
+    uint256 primaryConfigIndex = s_primaryConfigIndex;
+    bytes32 primaryConfigDigest = s_configDigests[primaryConfigIndex];
+    if (primaryConfigDigest != ZERO_DIGEST) {
+      primaryConfig = VersionedConfigWithDigest({
+        configDigest: primaryConfigDigest,
+        versionedConfig: (
+          VersionedConfig({config: s_configs[primaryConfigIndex], version: s_configVersions[primaryConfigIndex]})
+        )
+      });
+    }
+
+    uint256 secondaryConfigIndex = primaryConfigIndex ^ 1;
+    bytes32 secondaryConfigDigest = s_configDigests[secondaryConfigIndex];
+    if (secondaryConfigDigest != ZERO_DIGEST) {
+      secondaryConfig = VersionedConfigWithDigest({
+        configDigest: secondaryConfigDigest,
+        versionedConfig: (
+          VersionedConfig({config: s_configs[secondaryConfigIndex], version: s_configVersions[secondaryConfigIndex]})
+        )
+      });
+    }
+
+    return (primaryConfig, secondaryConfig);
+  }
+
+  /// @notice Sets a new config as the secondary config. Does not influence the primary config.
   /// @param newConfig The new config to set.
-  function setConfig(Config calldata newConfig) external onlyOwner {
+  /// @param digestToOverwrite The digest of the config to overwrite, or ZERO_DIGEST if no config is to be overwritten.
+  /// This is done to prevent accidental overwrites.
+  function setSecondary(Config calldata newConfig, bytes32 digestToOverwrite) external onlyOwner {
     // sanity checks
     {
       // Ensure that observerNodesBitmap can be bit-encoded into a uint256.
@@ -128,147 +185,71 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
       }
     }
 
-    uint256 newConfigIndex = (s_latestConfigIndex + 1) % CONFIG_RING_BUFFER_SIZE;
+    uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
 
-    // are we going to overwrite a config?
-    if (s_configVersions[newConfigIndex] > 0) {
-      emit ConfigRevoked(s_configDigests[newConfigIndex]);
+    if (s_configDigests[secondaryConfigIndex] != digestToOverwrite) {
+      revert ConfigDigestMismatch(s_configDigests[secondaryConfigIndex], digestToOverwrite);
     }
 
-    uint32 newConfigCount = ++s_configCount;
-    VersionedConfig memory newVersionedConfig = VersionedConfig({version: newConfigCount, config: newConfig});
+    // are we going to overwrite a config?
+    if (digestToOverwrite != ZERO_DIGEST) {
+      emit ConfigRevoked(digestToOverwrite);
+    }
+
+    VersionedConfig memory newVersionedConfig = VersionedConfig({version: ++s_configCount, config: newConfig});
     bytes32 newConfigDigest = _getConfigDigest(newVersionedConfig);
-    s_configs[newConfigIndex] = newConfig;
-    s_configVersions[newConfigIndex] = newConfigCount;
-    s_configDigests[newConfigIndex] = newConfigDigest;
-    s_latestConfigIndex = uint32(newConfigIndex);
+    s_configs[secondaryConfigIndex] = newConfig;
+    s_configVersions[secondaryConfigIndex] = newVersionedConfig.version;
+    s_configDigests[secondaryConfigIndex] = newConfigDigest;
 
     emit ConfigSet(newConfigDigest, newVersionedConfig);
   }
 
-  /// @notice Revokes past configs, so that only the latest config remains. Call to promote staging to production. If
-  /// the latest config that was set through setConfig, was subsequently revoked through revokeConfig, this function
-  /// will revoke _all_ configs.
-  function revokeAllConfigsButLatest() external onlyOwner {
-    for (uint256 i = 0; i < CONFIG_RING_BUFFER_SIZE; ++i) {
-      // Find all configs that are not the latest.
-      if (s_latestConfigIndex != i && s_configVersions[i] > 0) {
-        emit ConfigRevoked(_getConfigDigest(VersionedConfig({version: s_configVersions[i], config: s_configs[i]})));
-        // Delete only the version, as that's what's used to determine if a config is active. This means the actual
-        // config stays in storage which should significantly reduce the gas cost of overwriting that storage space in
-        // the future.
-        delete s_configVersions[i];
-      }
+  /// @notice Revokes a specific config by digest.
+  /// @param configDigest The digest of the config to revoke. This is done to prevent accidental revokes.
+  function revokeSecondary(bytes32 configDigest) external onlyOwner {
+    uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
+    if (s_configDigests[secondaryConfigIndex] != configDigest) {
+      revert ConfigDigestMismatch(s_configDigests[secondaryConfigIndex], configDigest);
     }
+
+    emit ConfigRevoked(configDigest);
+    // Delete only the digest, as that's what's used to determine if a config is active. This means the actual
+    // config stays in storage which should significantly reduce the gas cost of overwriting that storage space in
+    // the future.
+    delete s_configDigests[secondaryConfigIndex];
   }
 
-  /// @notice Revokes a specific config by digest.
-  /// @param configDigest The digest of the config to revoke.
-  function revokeConfig(bytes32 configDigest) external onlyOwner {
-    for (uint256 i = 0; i < CONFIG_RING_BUFFER_SIZE; ++i) {
-      if (s_configDigests[i] == configDigest && s_configVersions[i] > 0) {
-        emit ConfigRevoked(configDigest);
-        // Delete only the version, as that's what's used to determine if a config is active. This means the actual
-        // config stays in storage which should significantly reduce the gas cost of overwriting that storage space in
-        // the future.
-        delete s_configVersions[i];
-        break;
-      }
+  /// @notice Promotes the secondary config to the primary config. This demotes the primary to be the secondary but does
+  /// not revoke it. To revoke the primary, use `promoteSecondaryAndRevokePrimary` instead.
+  function promoteSecondary(bytes32 digestToPromote) external onlyOwner {
+    uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
+    if (s_configDigests[secondaryConfigIndex] != digestToPromote) {
+      revert ConfigDigestMismatch(s_configDigests[secondaryConfigIndex], digestToPromote);
     }
+
+    s_primaryConfigIndex ^= 1;
+  }
+
+  /// @notice Promotes the secondary config to the primary config and revokes the primary config.
+  function promoteSecondaryAndRevokePrimary(bytes32 digestToPromote, bytes32 digestToRevoke) external onlyOwner {
+    uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
+    if (s_configDigests[secondaryConfigIndex] != digestToPromote) {
+      revert ConfigDigestMismatch(s_configDigests[secondaryConfigIndex], digestToPromote);
+    }
+
+    uint256 primaryConfigIndex = s_primaryConfigIndex;
+    if (s_configDigests[primaryConfigIndex] != digestToRevoke) {
+      revert ConfigDigestMismatch(s_configDigests[primaryConfigIndex], digestToRevoke);
+    }
+
+    delete s_configDigests[primaryConfigIndex];
+
+    s_primaryConfigIndex ^= 1;
+    emit ConfigRevoked(digestToRevoke);
   }
 
   function _getConfigDigest(VersionedConfig memory versionedConfig) internal pure returns (bytes32) {
     return bytes32((PREFIX & PREFIX_MASK) | (uint256(keccak256(abi.encode(versionedConfig))) & ~PREFIX_MASK));
-  }
-
-  // ================================================================
-  // │                       Offchain getters                       |
-  // │            Gas is not a concern for these functions          |
-  // ================================================================
-
-  /// @return configDigests ordered from oldest to latest set
-  function getConfigDigests() external view returns (bytes32[] memory configDigests) {
-    uint256 len = 0;
-    for (uint256 act = 0; act <= 1; ++act) {
-      if (act == 1) {
-        configDigests = new bytes32[](len);
-      }
-
-      uint256 i = s_latestConfigIndex;
-      do {
-        if (s_configVersions[i] > 0) {
-          if (act == 0) {
-            ++len;
-          } else if (act == 1) {
-            configDigests[--len] = s_configDigests[i];
-          }
-        }
-        if (i == 0) {
-          i = CONFIG_RING_BUFFER_SIZE - 1;
-        } else {
-          --i;
-        }
-      } while (i != s_latestConfigIndex);
-    }
-    return configDigests;
-  }
-
-  /// @param offset setting to 0 will put the newest config in the last position of the returned array, setting to 1
-  /// will put the second newest config in the last position, and so on
-  /// @param limit len(versionedConfigsWithDigests) <= limit, set to 1 to get just the latest config,
-  /// set to CONFIG_RING_BUFFER_SIZE to ensure that all configs are returned
-  /// @return versionedConfigsWithDigests ordered from oldest to latest set
-  function getVersionedConfigsWithDigests(
-    uint256 offset,
-    uint256 limit
-  ) external view returns (VersionedConfigWithDigest[] memory versionedConfigsWithDigests) {
-    uint256[2] memory ignored;
-    uint256[2] memory accounted;
-    uint256 len; // clobbered by the end of the loop
-    for (uint256 act = 0; act <= 1; ++act) {
-      if (act == 1) {
-        len = accounted[0];
-        versionedConfigsWithDigests = new VersionedConfigWithDigest[](len);
-      }
-
-      uint256 i = s_latestConfigIndex;
-      do {
-        if (accounted[act] >= limit) {
-          break;
-        }
-
-        if (s_configVersions[i] > 0) {
-          if (ignored[act] < offset) {
-            ++ignored[act];
-          } else {
-            ++accounted[act];
-            if (act == 1) {
-              versionedConfigsWithDigests[--len] = VersionedConfigWithDigest({
-                configDigest: s_configDigests[i],
-                versionedConfig: VersionedConfig({version: s_configVersions[i], config: s_configs[i]})
-              });
-            }
-          }
-        }
-        i = i == 0 ? CONFIG_RING_BUFFER_SIZE - 1 : i - 1;
-      } while (i != s_latestConfigIndex);
-    }
-    return versionedConfigsWithDigests;
-  }
-
-  /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes. Use
-  /// in case one of the configs is too large to be returnable by one of the other getters.
-  /// @param configDigest The digest of the config to fetch.
-  /// @return versionedConfig The config and its version.
-  /// @return ok True if the config was found, false otherwise.
-  function getVersionedConfig(
-    bytes32 configDigest
-  ) external view returns (VersionedConfig memory versionedConfig, bool ok) {
-    for (uint256 i = 0; i < CONFIG_RING_BUFFER_SIZE; ++i) {
-      if (s_configVersions[i] > 0 && s_configDigests[i] == configDigest) {
-        return (VersionedConfig({version: s_configVersions[i], config: s_configs[i]}), true);
-      }
-    }
-    return (versionedConfig, false);
   }
 }
