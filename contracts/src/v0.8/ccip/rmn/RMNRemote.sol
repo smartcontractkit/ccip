@@ -174,7 +174,9 @@ contract RMNRemote is OwnerIsCreator, ITypeAndVersion, IRMNV2 {
     return i_localChainSelector;
   }
 
-  function getReportDigestHeader() external pure returns (bytes32) {
+  /// @notice Returns the 32 byte header used in computing the report digest
+  /// @return digestHeader the digest header
+  function getReportDigestHeader() external pure returns (bytes32 disgestHeader) {
     return RMN_V1_6_ANY2EVM_REPORT;
   }
 
