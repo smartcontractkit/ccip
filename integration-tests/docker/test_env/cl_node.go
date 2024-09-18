@@ -54,6 +54,7 @@ type ClNode struct {
 	UserEmail             string                  `json:"userEmail"`
 	UserPassword          string                  `json:"userPassword"`
 	AlwaysPullImage       bool                    `json:"-"`
+	RemoteDebugger        bool                    `json:"-"`
 	t                     *testing.T
 	l                     zerolog.Logger
 }
@@ -145,6 +146,8 @@ func NewClNode(networks []string, imageName, imageVersion string, nodeConfig *ch
 		NodeConfig:   nodeConfig,
 		PostgresDb:   pgDb,
 		l:            log.Logger,
+		// TODO CCIP-3447 drill user specified config through to set RemoteDebugger
+		RemoteDebugger: false,
 	}
 	n.SetDefaultHooks()
 	for _, opt := range opts {
@@ -442,30 +445,43 @@ func (n *ClNode) getContainerRequest(secrets string) (
 	adminCredsPath := "/home/admin-credentials.txt"
 	apiCredsPath := "/home/api-credentials.txt"
 
-	return &tc.ContainerRequest{
-		Name:            n.ContainerName,
-		AlwaysPullImage: n.AlwaysPullImage,
-		Image:           fmt.Sprintf("%s:%s", n.ContainerImage, n.ContainerVersion),
-		ExposedPorts:    []string{"6688/tcp", test_env.NatPortFormat("40000")},
-		Env:             n.ContainerEnvs,
-		Entrypoint: []string{
-			//"/home/chainlink/go/bin/dlv",
-			//"exec",
-			//"/usr/local/bin/chainlink",
-			//"--accept-multiclient",
-			//"--headless",
-			//"--listen=0.0.0.0:40000",
-			//"--api-version=2",
-			//"--continue",
-			//"--",
+	entrypoint := []string{
+		"chainlink",
+		"-c", configPath,
+		"-s", secretsPath,
+		"node", "start", "-d",
+		"-p", adminCredsPath,
+		"-a", apiCredsPath,
+	}
+
+	if n.RemoteDebugger {
+		entrypoint = []string{
+			"/home/chainlink/go/bin/dlv",
+			"exec",
+			"/usr/local/bin/chainlink",
+			"--accept-multiclient",
+			"--headless",
+			"--listen=0.0.0.0:40000",
+			"--api-version=2",
+			"--continue",
+			"--",
 			"chainlink",
 			"-c", configPath,
 			"-s", secretsPath,
 			"node", "start", "-d",
 			"-p", adminCredsPath,
 			"-a", apiCredsPath,
-		},
-		Networks: append(n.Networks, "tracing"),
+		}
+	}
+
+	return &tc.ContainerRequest{
+		Name:            n.ContainerName,
+		AlwaysPullImage: n.AlwaysPullImage,
+		Image:           fmt.Sprintf("%s:%s", n.ContainerImage, n.ContainerVersion),
+		ExposedPorts:    []string{"6688/tcp", test_env.NatPortFormat("40000")},
+		Env:             n.ContainerEnvs,
+		Entrypoint:      entrypoint,
+		Networks:        append(n.Networks, "tracing"),
 		WaitingFor: tcwait.ForHTTP("/readyz").
 			WithPort("6688/tcp").
 			WithStartupTimeout(n.StartupTimeout).

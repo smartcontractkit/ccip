@@ -154,6 +154,7 @@ func (d *DynamicPriceGetter) performBatchCalls(ctx context.Context, batchCallsPe
 func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint64, batchCalls *batchCallsForChain, prices map[cciptypes.Address]*big.Int) (err error) {
 	nbDecimalCalls := len(batchCalls.decimalCalls)
 	nbLatestRoundDataCalls := len(batchCalls.decimalCalls)
+	nbCalls := len(batchCalls.decimalCalls)
 
 	// Retrieve contract reader for the chain
 	contractReader := d.contractReaders[chainID]
@@ -203,7 +204,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	decimalsCR := make([]uint8, 0, nbDecimalCalls)
 	latestRoundCR := make([]aggregator_v3_interface.LatestRoundData, 0, nbDecimalCalls)
 	var respErr error
-	for j := range nbDecimalCalls {
+	for j := range nbCalls {
 		contractName := fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, j)
 		offchainAggregatorRespSlice := result[contractName]
 
