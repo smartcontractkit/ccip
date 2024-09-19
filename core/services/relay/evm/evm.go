@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig/interceptors/mantle"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
@@ -409,14 +410,14 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 	destStartBlock := commitPluginConfig.DestStartBlock
 
 	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
-
-	mantleInterceptor, err := mantle.NewInterceptor(ctx, r.chain.Client(), r.chain.Config().EVM().ChainType())
-	if err != nil {
-		return nil, err
+	if r.chain.Config().EVM().ChainType() == chaintype.ChainMantle && commitPluginConfig.IsSourceProvider {
+		mantleInterceptor, err := mantle.NewInterceptor(ctx, r.chain.Client())
+		if err != nil {
+			return nil, err
+		}
+		feeEstimatorConfig.AddDAGasPriceInterceptor(mantleInterceptor)
 	}
-	feeEstimatorConfig.AddDAGasPriceInterceptor(mantleInterceptor)
 
-	//r.chain.Config().EVM().ChainType()
 	// The src chain implementation of this provider does not need a configWatcher or contractTransmitter;
 	// bail early.
 	if commitPluginConfig.IsSourceProvider {
@@ -487,6 +488,14 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 	usdcConfig := execPluginConfig.USDCConfig
 
 	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
+
+	if r.chain.Config().EVM().ChainType() == chaintype.ChainMantle && !execPluginConfig.IsSourceProvider {
+		mantleInterceptor, err := mantle.NewInterceptor(ctx, r.chain.Client())
+		if err != nil {
+			return nil, err
+		}
+		feeEstimatorConfig.AddDAGasPriceInterceptor(mantleInterceptor)
+	}
 
 	// The src chain implementation of this provider does not need a configWatcher or contractTransmitter;
 	// bail early.

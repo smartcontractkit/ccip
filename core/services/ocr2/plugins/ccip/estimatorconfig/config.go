@@ -15,12 +15,12 @@ import (
 type FeeEstimatorConfigProvider interface {
 	SetOnRampReader(reader ccip.OnRampReader)
 	AddDAGasPriceInterceptor(gasPriceInterceptor)
-	ModifyDAGasPrice(gasPrice *big.Int) *big.Int
+	ModifyGasPriceComponents(ctx context.Context, gasPrice, daGasPrice *big.Int) (*big.Int, *big.Int, error)
 	GetDataAvailabilityConfig(ctx context.Context) (destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64, err error)
 }
 
 type gasPriceInterceptor interface {
-	ModifyDAGasPrice(*big.Int) *big.Int
+	ModifyGasPriceComponents(ctx context.Context, gasPrice, daGasPrice *big.Int) (modGasPrice, modDAGasPrice *big.Int, err error)
 }
 
 type FeeEstimatorConfigService struct {
@@ -56,22 +56,29 @@ func (c *FeeEstimatorConfigService) GetDataAvailabilityConfig(ctx context.Contex
 		err
 }
 
+// AddDAGasPriceInterceptor adds price interceptors that can modify gas price.
 func (c *FeeEstimatorConfigService) AddDAGasPriceInterceptor(gpi gasPriceInterceptor) {
 	if gpi != nil {
 		c.gasPriceInterceptors = append(c.gasPriceInterceptors, gpi)
 	}
 }
 
-func (c *FeeEstimatorConfigService) ModifyDAGasPrice(gasPrice *big.Int) *big.Int {
+// ModifyGasPriceComponents applies gasPrice interceptors and returns modified gasPrice.
+func (c *FeeEstimatorConfigService) ModifyGasPriceComponents(ctx context.Context, gasPrice, daGasPrice *big.Int) (*big.Int, *big.Int, error) {
 	if len(c.gasPriceInterceptors) == 0 {
-		return gasPrice
+		return gasPrice, daGasPrice, nil
 	}
 
-	gp := new(big.Int).Set(gasPrice)
+	// values are mutable, it is necessary to copy the values to protect the arguments from modification.
+	cpGasPrice := new(big.Int).Set(gasPrice)
+	cpDAGasPrice := new(big.Int).Set(daGasPrice)
 
+	var err error
 	for _, interceptor := range c.gasPriceInterceptors {
-		gp = interceptor.ModifyDAGasPrice(gp)
+		if cpGasPrice, cpDAGasPrice, err = interceptor.ModifyGasPriceComponents(ctx, cpGasPrice, cpDAGasPrice); err != nil {
+			return nil, nil, err
+		}
 	}
 
-	return gp
+	return cpGasPrice, cpDAGasPrice, nil
 }

@@ -3,7 +3,6 @@ package mantle
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/big"
 	"strings"
 	"time"
@@ -14,28 +13,26 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	evmClient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/rollups"
 )
 
 const (
+	// tokenRatio is not volatile and can be requested not often.
+	tokenRatioUpdateInterval = 60 * time.Minute
 	// tokenRatio fetches the tokenRatio used for Mantle's gas price calculation
 	// tokenRatio is a hex encoded call to:
-	// `function tokenRatio() public pure returns (uint256);`
 	tokenRatioMethod          = "tokenRatio"
 	mantleTokenRatioAbiString = `[{"inputs":[],"name":"tokenRatio","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}]`
 )
 
 type Interceptor struct {
-	client     evmClient.Client
-	callData   []byte
-	tokenRatio *big.Int
+	client               evmClient.Client
+	callData             []byte
+	tokenRatio           *big.Int
+	tokenRatioLastUpdate time.Time
 }
 
-func NewInterceptor(ctx context.Context, client evmClient.Client, chainType chaintype.ChainType) (*Interceptor, error) {
-	if chainType != chaintype.ChainMantle { // TODO: change to mantle when it will be available from chainlink repo
-		return nil, nil
-	}
+func NewInterceptor(ctx context.Context, client evmClient.Client) (*Interceptor, error) {
 	// Encode calldata for tokenRatio method
 	tokenRatioMethodAbi, err := abi.JSON(strings.NewReader(mantleTokenRatioAbiString))
 	if err != nil {
@@ -56,34 +53,24 @@ func NewInterceptor(ctx context.Context, client evmClient.Client, chainType chai
 		return nil, fmt.Errorf("could not get token ratio from the Mantle oracle %v", err)
 	}
 
-	go interceptor.processUpdate(ctx)
-
 	return interceptor, nil
 }
 
-func (i *Interceptor) ModifyDAGasPrice(gasPrice *big.Int) *big.Int {
-	return new(big.Int).Mul(gasPrice, i.tokenRatio)
-}
-
-func (i *Interceptor) processUpdate(ctx context.Context) {
-	ticker := time.NewTicker(time.Minute * 10) // TODO: get from constant
-
-	for {
-		select {
-		case <-ticker.C:
-			tokenRatio, err := i.getMantleGasPrice(ctx)
-			if err != nil {
-				log.Printf("could not get token ratio from the Mantle oracle %v", err)
-				continue
-			}
-			i.tokenRatio = tokenRatio
-		case <-ctx.Done():
-			return
+// ModifyGasPriceComponents returns modified gasPrice.
+func (i *Interceptor) ModifyGasPriceComponents(ctx context.Context, gasPrice, daGasPrice *big.Int) (*big.Int, *big.Int, error) {
+	if time.Since(i.tokenRatioLastUpdate) > tokenRatioUpdateInterval {
+		var err error
+		if i.tokenRatio, err = i.getMantleGasPrice(ctx); err != nil {
+			return nil, nil, err
 		}
 	}
+
+	newGasPrice := new(big.Int).Add(gasPrice, daGasPrice)
+
+	return new(big.Int).Mul(newGasPrice, i.tokenRatio), daGasPrice, nil
 }
 
-// Returns the gas price for Mantle. The formula is the same as Optimism Bedrock (getV1GasPrice), but the tokenRatio parameter is multiplied
+// Request and returns the token ratio for Mantle.
 func (i *Interceptor) getMantleGasPrice(ctx context.Context) (*big.Int, error) {
 	// call oracle to get l1BaseFee and tokenRatio
 	rpcBatchCalls := []rpc.BatchElem{

@@ -38,10 +38,6 @@ func NewDAGasPriceEstimator(
 }
 
 func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (gasPrice *big.Int, err error) {
-	defer func() {
-		gasPrice = g.feeEstimatorConfig.ModifyDAGasPrice(gasPrice)
-	}()
-
 	gasPrice, err = g.execEstimator.GetGasPrice(ctx)
 	if err != nil {
 		return nil, err
@@ -65,8 +61,18 @@ func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (gasPrice *big.Int
 			return nil, fmt.Errorf("data availability gas price exceeded max range %+v", daGasPrice)
 		}
 
+		gasPrice, daGasPrice, err = g.feeEstimatorConfig.ModifyGasPriceComponents(ctx, gasPrice, daGasPrice)
+		if err != nil {
+			return nil, fmt.Errorf("gasPrice modification failed: %v", err)
+		}
+
 		daGasPrice = new(big.Int).Lsh(daGasPrice, g.priceEncodingLength)
 		gasPrice = new(big.Int).Add(gasPrice, daGasPrice)
+	} else {
+		gasPrice, _, err = g.feeEstimatorConfig.ModifyGasPriceComponents(ctx, gasPrice, new(big.Int))
+		if err != nil {
+			return nil, fmt.Errorf("gasPrice modification failed: %v", err)
+		}
 	}
 
 	return gasPrice, nil
