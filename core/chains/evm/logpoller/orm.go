@@ -33,9 +33,11 @@ type ORM interface {
 	LoadFilters(ctx context.Context) (map[string]Filter, error)
 	DeleteFilter(ctx context.Context, name string) error
 
+	DeleteLogsByRowId(ctx context.Context, rowIds []uint64) (int64, error)
 	InsertBlock(ctx context.Context, blockHash common.Hash, blockNumber int64, blockTimestamp time.Time, finalizedBlock int64) error
 	DeleteBlocksBefore(ctx context.Context, end int64, limit int64) (int64, error)
 	DeleteLogsAndBlocksAfter(ctx context.Context, start int64) error
+	SelectUnmatchedLogIds(ctx context.Context, limit int64) (ids []uint64, err error)
 	DeleteExpiredLogs(ctx context.Context, limit int64) (int64, error)
 
 	GetBlocksRange(ctx context.Context, start int64, end int64) ([]LogPollerBlock, error)
@@ -294,27 +296,46 @@ func (o *DSORM) SelectLatestLogByEventSigWithConfs(ctx context.Context, eventSig
 // DeleteBlocksBefore delete blocks before and including end. When limit is set, it will delete at most limit blocks.
 // Otherwise, it will delete all blocks at once.
 func (o *DSORM) DeleteBlocksBefore(ctx context.Context, end int64, limit int64) (int64, error) {
-	if limit > 0 {
-		result, err := o.ds.ExecContext(ctx,
-			`DELETE FROM evm.log_poller_blocks
-        				WHERE block_number IN (
-            				SELECT block_number FROM evm.log_poller_blocks
-            				WHERE block_number <= $1
-            				AND evm_chain_id = $2
-							LIMIT $3
-						) AND evm_chain_id = $2`,
-			end, ubig.New(o.chainID), limit)
+	var result sql.Result
+	var err error
+
+	if limit == 0 {
+		result, err = o.ds.ExecContext(ctx, `DELETE FROM evm.log_poller_blocks
+			WHERE block_number <= $1 AND evm_chain_id = $2`, end, ubig.New(o.chainID))
 		if err != nil {
 			return 0, err
 		}
 		return result.RowsAffected()
 	}
-	result, err := o.ds.ExecContext(ctx, `DELETE FROM evm.log_poller_blocks
-       WHERE block_number <= $1 AND evm_chain_id = $2`, end, ubig.New(o.chainID))
+
+	var limitBlock int64
+	err = o.ds.GetContext(ctx, &limitBlock, `SELECT MIN(block_number) FROM evm.log_poller_blocks`)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+
+	// Remove up to limit blocks at a time, until we've reached the limit or removed everything eligible for deletion
+	var deleted, rows int64
+	for limitBlock += (limit - 1); deleted < limit; limitBlock += limit {
+		if limitBlock > end {
+			limitBlock = end
+		}
+		result, err = o.ds.ExecContext(ctx, `DELETE FROM evm.log_poller_blocks WHERE block_number <= $1 AND evm_chain_id = $2`, limitBlock, ubig.New(o.chainID))
+		if err != nil {
+			return deleted, err
+		}
+
+		if rows, err = result.RowsAffected(); err != nil {
+			return deleted, err
+		}
+
+		deleted += rows
+
+		if limitBlock == end {
+			break
+		}
+	}
+	return deleted, err
 }
 
 func (o *DSORM) DeleteLogsAndBlocksAfter(ctx context.Context, start int64) error {
@@ -328,8 +349,8 @@ func (o *DSORM) DeleteLogsAndBlocksAfter(ctx context.Context, start int64) error
 		// Latency without upper bound filter can be orders of magnitude higher for large number of logs.
 		_, err := o.ds.ExecContext(ctx, `DELETE FROM evm.log_poller_blocks
        						WHERE evm_chain_id = $1
-       						AND block_number >= $2
-       						AND block_number <= (SELECT MAX(block_number)
+							AND block_number >= $2
+							AND block_number <= (SELECT MAX(block_number)
 						 		FROM evm.log_poller_blocks
 						 		WHERE evm_chain_id = $1)`,
 			ubig.New(o.chainID), start)
@@ -359,6 +380,26 @@ type Exp struct {
 	ShouldDelete bool
 }
 
+func (o *DSORM) SelectUnmatchedLogIds(ctx context.Context, limit int64) (ids []uint64, err error) {
+	query := `
+		SELECT l.id FROM evm.logs l JOIN (
+			SELECT evm_chain_id, address, event
+			FROM evm.log_poller_filters
+				WHERE evm_chain_id = $1
+				GROUP BY evm_chain_id, address, event
+		) r ON l.evm_chain_id = r.evm_chain_id AND l.address = r.address AND l.event_sig = r.event
+		WHERE l.evm_chain_id = $1 AND r.id IS NULL
+	`
+
+	if limit == 0 {
+		err = o.ds.SelectContext(ctx, &ids, query, ubig.New(o.chainID))
+		return ids, err
+	}
+	err = o.ds.SelectContext(ctx, &ids, fmt.Sprintf("%s LIMIT %d", query, limit))
+
+	return ids, err
+}
+
 // DeleteExpiredLogs removes any logs which either:
 //   - don't match any currently registered filters, or
 //   - have a timestamp older than any matching filter's retention, UNLESS there is at
@@ -372,14 +413,14 @@ func (o *DSORM) DeleteExpiredLogs(ctx context.Context, limit int64) (int64, erro
 	query := fmt.Sprintf(`
 		WITH rows_to_delete AS (
 			SELECT l.id
-			FROM evm.logs l LEFT JOIN (
-				SELECT evm_chain_id, address, event, CASE WHEN MIN(retention) = 0 THEN 0 ELSE MAX(retention) END AS retention
+			FROM evm.logs l JOIN (
+				SELECT evm_chain_id, address, event, MAX(retention) AS retention
 				FROM evm.log_poller_filters
 				WHERE evm_chain_id = $1
 				GROUP BY evm_chain_id, address, event
-			) r ON l.evm_chain_id = r.evm_chain_id AND l.address = r.address AND l.event_sig = r.event
-			WHERE l.evm_chain_id = $1 AND -- Must be WHERE rather than ON due to LEFT JOIN
-				r.retention IS NULL OR (r.retention != 0 AND l.block_timestamp <= STATEMENT_TIMESTAMP() - (r.retention / 10^9 * interval '1 second')) %s
+				HAVING MIN(retention) > 0
+			) r ON l.evm_chain_id = r.evm_chain_id AND l.address = r.address AND l.event_sig = r.event AND
+				l.block_timestamp <= STATEMENT_TIMESTAMP() - (r.retention / 10^9 * interval '1 second') %s
 		) DELETE FROM evm.logs WHERE id IN (SELECT id FROM rows_to_delete)`, limitClause)
 	result, err := o.ds.ExecContext(ctx, query, ubig.New(o.chainID))
 	if err != nil {
@@ -1007,4 +1048,13 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, lim
 	}
 
 	return logs, nil
+}
+
+// DeleteLogsByRowId accepts a list of log row id's to delete
+func (o *DSORM) DeleteLogsByRowId(ctx context.Context, rowIds []uint64) (int64, error) {
+	result, err := o.ds.ExecContext(ctx, `DELETE FROM evm.logs WHERE id = ANY($1)`, rowIds)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
