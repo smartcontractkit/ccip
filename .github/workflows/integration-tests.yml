@@ -69,7 +69,7 @@ jobs:
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/mod-version@fc3e0df622521019f50d772726d6bf8dc919dd38 # v2.3.19
         with:
           go-project-path: ./integration-tests
-          module-name: github.com/smartcontractkit/chainlink-testing-framework
+          module-name: github.com/smartcontractkit/chainlink-testing-framework/lib
           enforce-semantic-tag: "true"
 
   changes:
@@ -373,21 +373,21 @@ jobs:
             file: ccip
             run: -run ^TestSmokeCCIPForBidirectionalLane$
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/leader-lane.toml
-          - name: ccip-smoke-reorg
+          - name: ccip-smoke-reorg-bidirectional
             nodes: 1
             dir: ccip-tests/smoke
             os: ubuntu-latest
             file: ccip
             run: -run ^TestSmokeCCIPReorgBelowFinality$ -v
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-reorg.toml
-          - name: ccip-smoke-reorg
+          - name: ccip-smoke-reorg-below-finality
             nodes: 1
             dir: ccip-tests/smoke
             os: ubuntu-latest
             file: ccip
             run: -run ^TestSmokeCCIPReorgAboveFinalityAtDestination$ -v
             config_path: ./integration-tests/ccip-tests/testconfig/tomls/ccip-reorg.toml
-          - name: ccip-smoke-reorg
+          - name: ccip-smoke-reorg-above-finality
             nodes: 1
             dir: ccip-tests/smoke
             os: ubuntu-latest

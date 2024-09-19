@@ -73,6 +73,10 @@ func (g *TestGasEstimatorConfig) BlockHistory() evmconfig.BlockHistory {
 	return &TestBlockHistoryConfig{}
 }
 
+func (g *TestGasEstimatorConfig) FeeHistory() evmconfig.FeeHistory {
+	return &TestFeeHistoryConfig{}
+}
+
 func (g *TestGasEstimatorConfig) EIP1559DynamicFees() bool   { return false }
 func (g *TestGasEstimatorConfig) LimitDefault() uint64       { return 42 }
 func (g *TestGasEstimatorConfig) BumpPercent() uint16        { return 42 }
@@ -89,6 +93,7 @@ func (g *TestGasEstimatorConfig) LimitTransfer() uint64      { return 42 }
 func (g *TestGasEstimatorConfig) PriceMax() *assets.Wei      { return assets.NewWeiI(42) }
 func (g *TestGasEstimatorConfig) PriceMin() *assets.Wei      { return assets.NewWeiI(42) }
 func (g *TestGasEstimatorConfig) Mode() string               { return "FixedPrice" }
+func (g *TestGasEstimatorConfig) EstimateLimit() bool        { return false }
 func (g *TestGasEstimatorConfig) LimitJobType() evmconfig.LimitJobType {
 	return &TestLimitJobTypeConfig{}
 }
@@ -119,6 +124,12 @@ func (b *TestBlockHistoryConfig) BlockDelay() uint16                { return 42 
 func (b *TestBlockHistoryConfig) BlockHistorySize() uint16          { return 42 }
 func (b *TestBlockHistoryConfig) EIP1559FeeCapBufferBlocks() uint16 { return 42 }
 func (b *TestBlockHistoryConfig) TransactionPercentile() uint16     { return 42 }
+
+type TestFeeHistoryConfig struct {
+	evmconfig.FeeHistory
+}
+
+func (b *TestFeeHistoryConfig) CacheTimeout() time.Duration { return 0 * time.Second }
 
 type transactionsConfig struct {
 	evmconfig.Transactions

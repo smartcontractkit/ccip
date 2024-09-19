@@ -31,19 +31,19 @@ import (
 	"golang.org/x/exp/rand"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
-	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/foundry"
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver"
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/reorg"
-	"github.com/smartcontractkit/chainlink-testing-framework/networks"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
+	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/lib/client"
+	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/foundry"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/mockserver"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/reorg"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
@@ -61,6 +61,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
@@ -185,6 +186,7 @@ type CCIPCommon struct {
 	gasUpdateWatcherMu        *sync.Mutex
 	gasUpdateWatcher          map[uint64]*big.Int // key - destchain id; value - timestamp of update
 	GasUpdateEvents           []contracts.GasUpdateEvent
+	AllowOutOfOrder           bool
 }
 
 // FreeUpUnusedSpace sets nil to various elements of ccipModule which are only used
@@ -273,6 +275,9 @@ func (ccipModule *CCIPCommon) CurseARM() (*types.Transaction, error) {
 
 func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig, noOfTokens *int) {
 	if conf != nil {
+		if conf.AllowOutOfOrder {
+			ccipModule.AllowOutOfOrder = true
+		}
 		if common.IsHexAddress(conf.FeeToken) {
 			ccipModule.FeeToken = &contracts.LinkToken{
 				EthAddress: common.HexToAddress(conf.FeeToken),
@@ -725,17 +730,16 @@ func (ccipModule *CCIPCommon) WriteLaneConfig(conf *laneconfig.LaneConfig) {
 	for k, v := range ccipModule.PriceAggregators {
 		priceAggrs[k.Hex()] = v.ContractAddress.Hex()
 	}
-	conf.CommonContracts = laneconfig.CommonContracts{
-		FeeToken:         ccipModule.FeeToken.Address(),
-		BridgeTokens:     btAddresses,
-		BridgeTokenPools: btpAddresses,
-		ARM:              ccipModule.RMNContract.Hex(),
-		Router:           ccipModule.Router.Address(),
-		PriceRegistry:    ccipModule.PriceRegistry.Address(),
-		PriceAggregators: priceAggrs,
-		WrappedNative:    ccipModule.WrappedNative.Hex(),
-		Multicall:        ccipModule.MulticallContract.Hex(),
-	}
+	conf.CommonContracts.FeeToken = ccipModule.FeeToken.Address()
+	conf.CommonContracts.BridgeTokens = btAddresses
+	conf.CommonContracts.BridgeTokenPools = btpAddresses
+	conf.CommonContracts.ARM = ccipModule.RMNContract.Hex()
+	conf.CommonContracts.Router = ccipModule.Router.Address()
+	conf.CommonContracts.PriceRegistry = ccipModule.PriceRegistry.Address()
+	conf.CommonContracts.PriceAggregators = priceAggrs
+	conf.CommonContracts.WrappedNative = ccipModule.WrappedNative.Hex()
+	conf.CommonContracts.Multicall = ccipModule.MulticallContract.Hex()
+
 	if ccipModule.TokenAdminRegistry != nil {
 		conf.CommonContracts.TokenAdminRegistry = ccipModule.TokenAdminRegistry.Address()
 	}
@@ -1616,6 +1620,8 @@ func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 	return finalizedAt, finalizedBlockNum.Uint64(), nil
 }
 
+// IsRequestTriggeredWithinTimeframe monitors for live events occurring within the specified timeframe.
+// Live events refer to those that are triggered after subscribing to the CCIP Send Requested event.
 func (sourceCCIP *SourceCCIPModule) IsRequestTriggeredWithinTimeframe(timeframe *commonconfig.Duration) *time.Time {
 	if timeframe == nil {
 		return nil
@@ -1626,7 +1632,7 @@ func (sourceCCIP *SourceCCIPModule) IsRequestTriggeredWithinTimeframe(timeframe 
 		if sendRequestedEvents, exists := value.([]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested); exists {
 			for _, sendRequestedEvent := range sendRequestedEvents {
 				raw := sendRequestedEvent.Raw
-				hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(raw.BlockNumber)))
+				hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), new(big.Int).SetUint64(raw.BlockNumber))
 				if err == nil {
 					if hdr.Timestamp.After(lastSeenTimestamp) {
 						foundAt = pointer.ToTime(hdr.Timestamp)
@@ -1638,6 +1644,48 @@ func (sourceCCIP *SourceCCIPModule) IsRequestTriggeredWithinTimeframe(timeframe 
 		return true
 	})
 	return foundAt
+}
+
+// IsPastRequestTriggeredWithinTimeframe determines the average block time and calculates the block numbers
+// within the specified timeframe. It then uses FilterCCIPSendRequested to identify the past events.
+func (sourceCCIP *SourceCCIPModule) IsPastRequestTriggeredWithinTimeframe(ctx context.Context, timeframe *commonconfig.Duration) (*time.Time, error) {
+	if timeframe == nil {
+		return nil, nil
+	}
+	//var foundAt *time.Time
+	latestBlock, err := sourceCCIP.Common.ChainClient.LatestBlockNumber(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error while getting latest source block number. Error: %w", err)
+	}
+	avgBlockTime, err := sourceCCIP.Common.ChainClient.AvgBlockTime(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error while getting average source block time. Error: %w", err)
+	}
+	filterFromBlock := latestBlock - uint64(timeframe.Duration()/avgBlockTime)
+
+	onRampContract, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress(sourceCCIP.OnRamp.EthAddress.Hex()),
+		sourceCCIP.Common.ChainClient.Backend())
+	if err != nil {
+		return nil, fmt.Errorf("error while on ramp contract. Error: %w", err)
+	}
+	iterator, err := onRampContract.FilterCCIPSendRequested(&bind.FilterOpts{
+		Start: filterFromBlock,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error while filtering CCIP send requested starting block number: %d. Error: %w", filterFromBlock, err)
+	}
+	defer func() {
+		_ = iterator.Close()
+	}()
+	if iterator.Next() {
+		hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(iterator.Event.Raw.BlockNumber)))
+		if err != nil {
+			return nil, fmt.Errorf("error getting header for block: %d, Error: %w", iterator.Event.Raw.BlockNumber, err)
+		}
+		return pointer.ToTime(hdr.Timestamp), nil
+	}
+
+	return nil, nil
 }
 
 func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
@@ -1709,6 +1757,7 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 // CCIPMsg constructs the message for a CCIP request
 func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 	receiver common.Address,
+	allowOutOfOrder bool,
 	gasLimit *big.Int,
 ) (router.ClientEVM2AnyMessage, error) {
 	length := sourceCCIP.MsgDataLength
@@ -1750,7 +1799,15 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 		return router.ClientEVM2AnyMessage{}, fmt.Errorf("failed encoding the receiver address: %w", err)
 	}
 
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(gasLimit, false)
+	var extraArgs []byte
+	matchErr := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
+		contracts.OnRampContract: contracts.V1_5_0,
+	})
+	if matchErr != nil {
+		extraArgs, err = testhelpers.GetEVMExtraArgsV1(gasLimit, false)
+	} else {
+		extraArgs, err = testhelpers.GetEVMExtraArgsV2(gasLimit, allowOutOfOrder)
+	}
 	if err != nil {
 		return router.ClientEVM2AnyMessage{}, fmt.Errorf("failed encoding the options field: %w", err)
 	}
@@ -1760,22 +1817,19 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 		Data:         []byte(data),
 		TokenAmounts: tokenAndAmounts,
 		FeeToken:     common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-		ExtraArgs:    extraArgsV1,
+		ExtraArgs:    extraArgs,
 	}, nil
 }
 
 // SendRequest sends a CCIP request to the source chain's router contract
-func (sourceCCIP *SourceCCIPModule) SendRequest(
-	receiver common.Address,
-	gasLimit *big.Int,
-) (common.Hash, time.Duration, *big.Int, error) {
+func (sourceCCIP *SourceCCIPModule) SendRequest(receiver common.Address, gasLimit *big.Int) (common.Hash, time.Duration, *big.Int, error) {
 	var d time.Duration
 	destChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed getting the chain selector: %w", err)
 	}
 	// form the message for transfer
-	msg, err := sourceCCIP.CCIPMsg(receiver, gasLimit)
+	msg, err := sourceCCIP.CCIPMsg(receiver, sourceCCIP.Common.AllowOutOfOrder, gasLimit)
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed forming the ccip msg: %w", err)
 	}
@@ -2218,7 +2272,7 @@ func (destCCIP *DestCCIPModule) AssertNoReportAcceptedEventReceived(lggr *zerolo
 				e, exists := value.(*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
 				if exists {
 					vLogs := e.Raw
-					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(vLogs.BlockNumber)))
+					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, new(big.Int).SetUint64(vLogs.BlockNumber))
 					if err != nil {
 						return true
 					}
@@ -2259,7 +2313,7 @@ func (destCCIP *DestCCIPModule) AssertNoExecutionStateChangedEventReceived(
 				e, exists := value.(*contracts.EVM2EVMOffRampExecutionStateChanged)
 				if exists {
 					vLogs := e.LogInfo
-					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(vLogs.BlockNumber)))
+					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, new(big.Int).SetUint64(vLogs.BlockNumber))
 					if err != nil {
 						return true
 					}
@@ -2288,7 +2342,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 	reqStat *testreporters.RequestStat,
 	execState testhelpers.MessageExecutionState,
 ) (uint8, error) {
-	lggr.Info().Int64("seqNum", int64(seqNum)).Str("Timeout", timeout.String()).Msg("Waiting for ExecutionStateChanged event")
+	lggr.Info().Uint64("seqNum", seqNum).Str("Timeout", timeout.String()).Msg("Waiting for ExecutionStateChanged event")
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	ticker := time.NewTicker(time.Second)
@@ -2306,7 +2360,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 					destCCIP.ExecStateChangedWatcher.Delete(seqNum)
 					vLogs := e.LogInfo
 					receivedAt := time.Now().UTC()
-					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(vLogs.BlockNumber)))
+					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(context.Background(), new(big.Int).SetUint64(vLogs.BlockNumber))
 					if err == nil {
 						receivedAt = hdr.Timestamp
 					}
@@ -2319,7 +2373,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 						gasUsed = receipt.GasUsed
 					}
 					if testhelpers.MessageExecutionState(e.State) == execState {
-						lggr.Info().Int64("seqNum", int64(seqNum)).Uint8("ExecutionState", e.State).Msg("ExecutionStateChanged event received")
+						lggr.Info().Uint64("seqNum", seqNum).Uint8("ExecutionState", e.State).Msg("ExecutionStateChanged event received")
 						reqStat.UpdateState(lggr, seqNum, testreporters.ExecStateChanged, receivedAt.Sub(timeNow),
 							testreporters.Success,
 							&testreporters.TransactionStats{
@@ -2363,7 +2417,7 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 	prevEventAt time.Time,
 	reqStat *testreporters.RequestStat,
 ) (*contracts.CommitStoreReportAccepted, time.Time, error) {
-	lggr.Info().Int64("seqNum", int64(seqNum)).Str("Timeout", timeout.String()).Msg("Waiting for ReportAccepted event")
+	lggr.Info().Uint64("seqNum", seqNum).Str("Timeout", timeout.String()).Msg("Waiting for ReportAccepted event")
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	resetTimerCount := 0
@@ -2379,7 +2433,7 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 					// if the value is processed, delete it from the map
 					destCCIP.ReportAcceptedWatcher.Delete(seqNum)
 					receivedAt := time.Now().UTC()
-					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(reportAccepted.LogInfo.BlockNumber)))
+					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(context.Background(), new(big.Int).SetUint64(reportAccepted.LogInfo.BlockNumber))
 					if err == nil {
 						receivedAt = hdr.Timestamp
 					}
@@ -2488,7 +2542,7 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 						// if the value is processed, delete it from the map
 						destCCIP.ReportBlessedBySeqNum.Delete(seqNum)
 					}
-					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(vLogs.BlockNumber)))
+					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(context.Background(), new(big.Int).SetUint64(vLogs.BlockNumber))
 					if err == nil {
 						receivedAt = hdr.Timestamp
 					}
@@ -2536,7 +2590,7 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 	timeNow time.Time,
 	reqStat *testreporters.RequestStat,
 ) error {
-	lggr.Info().Int64("seqNum", int64(seqNumberBefore)).Str("Timeout", timeout.String()).Msg("Waiting to be processed by commit store")
+	lggr.Info().Uint64("seqNum", seqNumberBefore).Str("Timeout", timeout.String()).Msg("Waiting to be processed by commit store")
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	resetTimerCount := 0
@@ -2793,7 +2847,8 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporter
 func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) error {
 	var ccipMultipleMsg []contracts.CCIPMsgData
 	feeToken := common.HexToAddress(lane.Source.Common.FeeToken.Address())
-	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, big.NewInt(DefaultDestinationGasLimit))
+	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, lane.Source.Common.AllowOutOfOrder,
+		big.NewInt(DefaultDestinationGasLimit))
 	if err != nil {
 		return fmt.Errorf("failed to form the ccip message: %w", err)
 	}
@@ -2885,10 +2940,7 @@ func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) 
 func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
 	for i := 1; i <= noOfRequests; i++ {
 		stat := testreporters.NewCCIPRequestStats(int64(lane.NumberOfReq+i), lane.SourceNetworkName, lane.DestNetworkName)
-		txHash, txConfirmationDur, fee, err := lane.Source.SendRequest(
-			lane.Dest.ReceiverDapp.EthAddress,
-			gasLimit,
-		)
+		txHash, txConfirmationDur, fee, err := lane.Source.SendRequest(lane.Dest.ReceiverDapp.EthAddress, gasLimit)
 		if err != nil {
 			stat.UpdateState(lane.Logger, 0, testreporters.TX, txConfirmationDur, testreporters.Failure, nil)
 			return fmt.Errorf("could not send request: %w", err)
@@ -3522,6 +3574,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		srcConf                = lane.SrcNetworkLaneCfg
 		destConf               = lane.DstNetworkLaneCfg
 		commitAndExecOnSameDON = pointer.GetBool(testConf.CommitAndExecuteOnSameDON)
+		allowOutOfOrder        = pointer.GetBool(testConf.AllowOutOfOrder)
 		withPipeline           = pointer.GetBool(testConf.TokenConfig.WithPipeline)
 		configureCLNodes       = !pointer.GetBool(testConf.ExistingDeployment)
 	)
@@ -3535,6 +3588,13 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create source module: %w", err)
+	}
+
+	// If AllowOutOfOrder is set globally in test config, then assumption is to set it for every lane.
+	//However, if this is set as false, and set as true for specific chain in lane_configs then apply it
+	//only for a lane where source network is of that chain.
+	if allowOutOfOrder {
+		lane.Source.Common.AllowOutOfOrder = true
 	}
 	lane.Dest, err = DefaultDestinationCCIPModule(
 		lane.Logger, testConf,
@@ -3787,6 +3847,12 @@ func SetOCR2Config(
 	if len(execNodes) > 0 {
 		nodes = execNodes
 	}
+
+	// Use out of order batching strategy if we expect to be sending out of order messages
+	batchingStrategyID := ccipexec.BestEffortBatchingStrategyID
+	if pointer.GetBool(testConf.AllowOutOfOrder) {
+		batchingStrategyID = ccipexec.ZKOverflowBatchingStrategyID
+	}
 	if destCCIP.OffRamp != nil {
 		execOffchainCfg, err := contracts.NewExecOffchainConfig(
 			1,
@@ -3794,6 +3860,7 @@ func SetOCR2Config(
 			0.7,
 			*inflightExpiryExec,
 			*commonconfig.MustNewDuration(RootSnoozeTime),
+			batchingStrategyID,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create exec offchain config: %w", err)

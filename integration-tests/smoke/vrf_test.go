@@ -13,9 +13,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/logging"
-	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/utils/seth"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
+	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/lib/utils/seth"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions/vrf/vrfv1"

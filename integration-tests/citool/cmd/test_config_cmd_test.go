@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 
-	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/config"
-	ctfconfigtypes "github.com/smartcontractkit/chainlink-testing-framework/config/types"
+	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
+	ctfconfigtypes "github.com/smartcontractkit/chainlink-testing-framework/lib/config/types"
 )
 
 func TestCreateTestConfigCmd(t *testing.T) {

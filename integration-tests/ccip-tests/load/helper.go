@@ -12,15 +12,16 @@ import (
 
 	"github.com/AlekSi/pointer"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/chaos"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/chaos"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
@@ -205,10 +206,7 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 		// try to send requests on lanes on which curse is applied on source RMN and the request should revert
 		// data-only transfer is sufficient
 		lane.Source.TransferAmount = []*big.Int{}
-		failedTx, _, _, err := lane.Source.SendRequest(
-			lane.Dest.ReceiverDapp.EthAddress,
-			big.NewInt(actions.DefaultDestinationGasLimit), // gas limit
-		)
+		failedTx, _, _, err := lane.Source.SendRequest(lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultDestinationGasLimit))
 		if lane.Source.Common.ChainClient.GetNetworkConfig().MinimumConfirmations > 0 {
 			require.Error(l.t, err)
 		} else {

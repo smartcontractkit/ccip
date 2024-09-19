@@ -14,7 +14,6 @@ on:
         description: 'Key to run tests with custom test secrets'
         required: false
         type: string        
-  pull_request: # DEBUG: Checking run conditions
 
 # Only run 1 of this workflow at a time per PR
 concurrency:
