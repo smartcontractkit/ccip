@@ -14,7 +14,7 @@ import (
 // fields for the daGasEstimator from the encapsulated onRampReader.
 type FeeEstimatorConfigProvider interface {
 	SetOnRampReader(reader ccip.OnRampReader)
-	AddDAGasPriceInterceptor(gasPriceInterceptor)
+	AddGasPriceInterceptor(gasPriceInterceptor)
 	ModifyGasPriceComponents(ctx context.Context, gasPrice, daGasPrice *big.Int) (*big.Int, *big.Int, error)
 	GetDataAvailabilityConfig(ctx context.Context) (destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64, err error)
 }
@@ -56,8 +56,8 @@ func (c *FeeEstimatorConfigService) GetDataAvailabilityConfig(ctx context.Contex
 		err
 }
 
-// AddDAGasPriceInterceptor adds price interceptors that can modify gas price.
-func (c *FeeEstimatorConfigService) AddDAGasPriceInterceptor(gpi gasPriceInterceptor) {
+// AddGasPriceInterceptor adds price interceptors that can modify gas price.
+func (c *FeeEstimatorConfigService) AddGasPriceInterceptor(gpi gasPriceInterceptor) {
 	if gpi != nil {
 		c.gasPriceInterceptors = append(c.gasPriceInterceptors, gpi)
 	}
