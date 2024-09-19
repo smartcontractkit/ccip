@@ -14,11 +14,12 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   error DuplicateSourceChain();
   error OutOfBoundsObserverNodeIndex();
   error MinObserversTooHigh();
-
   error ConfigDigestMismatch(bytes32 expectedConfigDigest, bytes32 gotConfigDigest);
+  error DigestNotFound(bytes32 configDigest);
 
   event ConfigSet(bytes32 configDigest, VersionedConfig versionedConfig);
   event ConfigRevoked(bytes32 configDigest);
+  event DynamicConfigSet(bytes32 indexed configDigest, DynamicConfig dynamicConfig);
 
   struct Node {
     bytes32 peerId; //            Used for p2p communication.
@@ -31,13 +32,22 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     uint256 observerNodesBitmap; // ObserverNodesBitmap & (1<<i) == (1<<i) iff nodes[i] is an observer for this source chain.
   }
 
-  struct Config {
+  struct StaticConfig {
     // No sorting requirement for nodes, but ensure that SourceChain.observerNodeIndices in the home chain config &
     // Signer.nodeIndex in the remote chain configs are appropriately updated when changing this field.
     Node[] nodes;
+    bytes offchainConfig; // Offchain configuration for RMN nodes.
+  }
+
+  struct DynamicConfig {
     // No sorting requirement for source chains, it is most gas efficient to append new source chains to the right.
     SourceChain[] sourceChains;
     bytes offchainConfig; // Offchain configuration for RMN nodes.
+  }
+
+  struct Config {
+    StaticConfig staticConfig;
+    DynamicConfig dynamicConfig;
   }
 
   struct VersionedConfig {
@@ -138,52 +148,8 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   /// @param digestToOverwrite The digest of the config to overwrite, or ZERO_DIGEST if no config is to be overwritten.
   /// This is done to prevent accidental overwrites.
   function setSecondary(Config calldata newConfig, bytes32 digestToOverwrite) external onlyOwner {
-    // sanity checks
-    {
-      // Ensure that observerNodesBitmap can be bit-encoded into a uint256.
-      if (newConfig.nodes.length > 256) {
-        revert OutOfBoundsNodesLength();
-      }
-
-      // Ensure no peerId or offchainPublicKey is duplicated.
-      for (uint256 i = 0; i < newConfig.nodes.length; ++i) {
-        for (uint256 j = i + 1; j < newConfig.nodes.length; ++j) {
-          if (newConfig.nodes[i].peerId == newConfig.nodes[j].peerId) {
-            revert DuplicatePeerId();
-          }
-          if (newConfig.nodes[i].offchainPublicKey == newConfig.nodes[j].offchainPublicKey) {
-            revert DuplicateOffchainPublicKey();
-          }
-        }
-      }
-
-      uint256 numberOfSourceChains = newConfig.sourceChains.length;
-      for (uint256 i = 0; i < numberOfSourceChains; ++i) {
-        // Ensure the source chain is unique.
-        for (uint256 j = i + 1; j < numberOfSourceChains; ++j) {
-          if (newConfig.sourceChains[i].chainSelector == newConfig.sourceChains[j].chainSelector) {
-            revert DuplicateSourceChain();
-          }
-        }
-
-        // all observer node indices are valid
-        uint256 bitmap = newConfig.sourceChains[i].observerNodesBitmap;
-        // Check if there are any bits set for indexes outside of the expected range.
-        if (bitmap & (type(uint256).max >> (256 - newConfig.nodes.length)) != bitmap) {
-          revert OutOfBoundsObserverNodeIndex();
-        }
-
-        uint256 observersCount = 0;
-        for (; bitmap != 0; ++observersCount) {
-          bitmap &= bitmap - 1;
-        }
-
-        // minObservers are tenable
-        if (newConfig.sourceChains[i].minObservers > observersCount) {
-          revert MinObserversTooHigh();
-        }
-      }
-    }
+    _validateStaticConfig(newConfig.staticConfig);
+    _validateDynamicConfig(newConfig.dynamicConfig, newConfig.staticConfig.nodes.length);
 
     uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
 
@@ -191,18 +157,35 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
       revert ConfigDigestMismatch(s_configDigests[secondaryConfigIndex], digestToOverwrite);
     }
 
-    // are we going to overwrite a config?
+    // are we going to overwrite a config? If so, emit an event.
     if (digestToOverwrite != ZERO_DIGEST) {
       emit ConfigRevoked(digestToOverwrite);
     }
 
-    VersionedConfig memory newVersionedConfig = VersionedConfig({version: ++s_configCount, config: newConfig});
-    bytes32 newConfigDigest = _getConfigDigest(newVersionedConfig);
+    uint32 newVersion = ++s_configCount;
+    bytes32 newConfigDigest = _getConfigDigest(newConfig.staticConfig, newVersion);
     s_configs[secondaryConfigIndex] = newConfig;
-    s_configVersions[secondaryConfigIndex] = newVersionedConfig.version;
+    s_configVersions[secondaryConfigIndex] = newVersion;
     s_configDigests[secondaryConfigIndex] = newConfigDigest;
 
-    emit ConfigSet(newConfigDigest, newVersionedConfig);
+    emit ConfigSet(newConfigDigest, VersionedConfig({version: newVersion, config: newConfig}));
+  }
+
+  function setDynamicConfig(DynamicConfig calldata newDynamicConfig, bytes32 digestToOverwrite) external onlyOwner {
+    for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
+      if (s_configDigests[i] == digestToOverwrite) {
+        Config memory currentConfig = s_configs[i];
+        _validateDynamicConfig(newDynamicConfig, currentConfig.staticConfig.nodes.length);
+
+        // Since the dynamic config doesn't change we don't have to update the digest or version.
+        s_configs[i].dynamicConfig = newDynamicConfig;
+
+        emit DynamicConfigSet(digestToOverwrite, newDynamicConfig);
+        return;
+      }
+    }
+
+    revert DigestNotFound(digestToOverwrite);
   }
 
   /// @notice Revokes a specific config by digest.
@@ -249,7 +232,62 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     emit ConfigRevoked(digestToRevoke);
   }
 
-  function _getConfigDigest(VersionedConfig memory versionedConfig) internal pure returns (bytes32) {
-    return bytes32((PREFIX & PREFIX_MASK) | (uint256(keccak256(abi.encode(versionedConfig))) & ~PREFIX_MASK));
+  function _validateStaticConfig(StaticConfig calldata newStaticConfig) internal pure {
+    // Ensure that observerNodesBitmap can be bit-encoded into a uint256.
+    if (newStaticConfig.nodes.length > 256) {
+      revert OutOfBoundsNodesLength();
+    }
+
+    // Ensure no peerId or offchainPublicKey is duplicated.
+    for (uint256 i = 0; i < newStaticConfig.nodes.length; ++i) {
+      for (uint256 j = i + 1; j < newStaticConfig.nodes.length; ++j) {
+        if (newStaticConfig.nodes[i].peerId == newStaticConfig.nodes[j].peerId) {
+          revert DuplicatePeerId();
+        }
+        if (newStaticConfig.nodes[i].offchainPublicKey == newStaticConfig.nodes[j].offchainPublicKey) {
+          revert DuplicateOffchainPublicKey();
+        }
+      }
+    }
+  }
+
+  function _validateDynamicConfig(DynamicConfig calldata dynamicConfig, uint256 numberOfNodes) internal pure {
+    uint256 numberOfSourceChains = dynamicConfig.sourceChains.length;
+    for (uint256 i = 0; i < numberOfSourceChains; ++i) {
+      SourceChain memory currentSourceChain = dynamicConfig.sourceChains[i];
+      // Ensure the source chain is unique.
+      for (uint256 j = i + 1; j < numberOfSourceChains; ++j) {
+        if (currentSourceChain.chainSelector == dynamicConfig.sourceChains[j].chainSelector) {
+          revert DuplicateSourceChain();
+        }
+      }
+
+      // all observer node indices are valid
+      uint256 bitmap = currentSourceChain.observerNodesBitmap;
+      // Check if there are any bits set for indexes outside of the expected range.
+      if (bitmap & (type(uint256).max >> (256 - numberOfNodes)) != bitmap) {
+        revert OutOfBoundsObserverNodeIndex();
+      }
+
+      uint256 observersCount = 0;
+      for (; bitmap != 0; ++observersCount) {
+        bitmap &= bitmap - 1;
+      }
+
+      // minObservers are tenable
+      if (currentSourceChain.minObservers > observersCount) {
+        revert MinObserversTooHigh();
+      }
+    }
+  }
+
+  function _getConfigDigest(StaticConfig memory staticConfig, uint32 version) internal view returns (bytes32) {
+    return bytes32(
+      (PREFIX & PREFIX_MASK)
+        | (
+          uint256(keccak256(abi.encode(bytes32("EVM"), block.chainid, address(this), version, staticConfig)))
+            & ~PREFIX_MASK
+        )
+    );
   }
 }

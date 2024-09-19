@@ -27,14 +27,23 @@ contract RMNHomeTest is Test {
     // Observers 1 and 2 for source chain 9001
     sourceChains[1] = RMNHome.SourceChain({chainSelector: 9001, minObservers: 2, observerNodesBitmap: 1 << 1 | 1 << 2});
 
-    return RMNHome.Config({nodes: nodes, sourceChains: sourceChains, offchainConfig: abi.encode("offchainConfig")});
+    return RMNHome.Config({
+      staticConfig: RMNHome.StaticConfig({nodes: nodes, offchainConfig: abi.encode("static_config")}),
+      dynamicConfig: RMNHome.DynamicConfig({sourceChains: sourceChains, offchainConfig: abi.encode("dynamic_config")})
+    });
   }
 
   uint256 private constant PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..00
   uint256 private constant PREFIX = 0x000b << (256 - 16); // 0x000b00..00
 
-  function _getConfigDigest(RMNHome.VersionedConfig memory versionedConfig) internal pure returns (bytes32) {
-    return bytes32((PREFIX & PREFIX_MASK) | (uint256(keccak256(abi.encode(versionedConfig))) & ~PREFIX_MASK));
+  function _getConfigDigest(RMNHome.StaticConfig memory staticConfig, uint32 version) internal view returns (bytes32) {
+    return bytes32(
+      (PREFIX & PREFIX_MASK)
+        | (
+          uint256(keccak256(abi.encode(bytes32("EVM"), block.chainid, address(s_rmnHome), version, staticConfig)))
+            & ~PREFIX_MASK
+        )
+    );
   }
 }
 
@@ -42,7 +51,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
   function test_setSecondary_success() public {
     RMNHome.Config memory config = _getBaseConfig();
     RMNHome.VersionedConfig memory versionedConfig = RMNHome.VersionedConfig({version: 1, config: config});
-    bytes32 configDigest = _getConfigDigest(versionedConfig);
+    bytes32 configDigest = _getConfigDigest(versionedConfig.config.staticConfig, versionedConfig.version);
 
     vm.expectEmit();
     emit RMNHome.ConfigSet(configDigest, versionedConfig);
@@ -52,26 +61,32 @@ contract RMNHome_setSecondary is RMNHomeTest {
     (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getConfig(configDigest);
     assertTrue(ok);
     assertEq(storedVersionedConfig.version, versionedConfig.version);
-    assertEq(storedVersionedConfig.config.nodes.length, versionedConfig.config.nodes.length);
-    for (uint256 i = 0; i < storedVersionedConfig.config.nodes.length; i++) {
-      RMNHome.Node memory storedNode = storedVersionedConfig.config.nodes[i];
-      assertEq(storedNode.peerId, versionedConfig.config.nodes[i].peerId);
-      assertEq(storedNode.offchainPublicKey, versionedConfig.config.nodes[i].offchainPublicKey);
+    RMNHome.StaticConfig memory storedStaticConfig = storedVersionedConfig.config.staticConfig;
+    RMNHome.DynamicConfig memory storedDynamicConfig = storedVersionedConfig.config.dynamicConfig;
+
+    assertEq(storedStaticConfig.nodes.length, versionedConfig.config.staticConfig.nodes.length);
+    for (uint256 i = 0; i < storedStaticConfig.nodes.length; i++) {
+      RMNHome.Node memory storedNode = storedStaticConfig.nodes[i];
+      assertEq(storedNode.peerId, versionedConfig.config.staticConfig.nodes[i].peerId);
+      assertEq(storedNode.offchainPublicKey, versionedConfig.config.staticConfig.nodes[i].offchainPublicKey);
     }
 
-    assertEq(storedVersionedConfig.config.sourceChains.length, versionedConfig.config.sourceChains.length);
-    for (uint256 i = 0; i < storedVersionedConfig.config.sourceChains.length; i++) {
-      RMNHome.SourceChain memory storedSourceChain = storedVersionedConfig.config.sourceChains[i];
-      assertEq(storedSourceChain.chainSelector, versionedConfig.config.sourceChains[i].chainSelector);
-      assertEq(storedSourceChain.minObservers, versionedConfig.config.sourceChains[i].minObservers);
-      assertEq(storedSourceChain.observerNodesBitmap, versionedConfig.config.sourceChains[i].observerNodesBitmap);
+    assertEq(storedDynamicConfig.sourceChains.length, versionedConfig.config.dynamicConfig.sourceChains.length);
+    for (uint256 i = 0; i < storedDynamicConfig.sourceChains.length; i++) {
+      RMNHome.SourceChain memory storedSourceChain = storedDynamicConfig.sourceChains[i];
+      assertEq(storedSourceChain.chainSelector, versionedConfig.config.dynamicConfig.sourceChains[i].chainSelector);
+      assertEq(storedSourceChain.minObservers, versionedConfig.config.dynamicConfig.sourceChains[i].minObservers);
+      assertEq(
+        storedSourceChain.observerNodesBitmap, versionedConfig.config.dynamicConfig.sourceChains[i].observerNodesBitmap
+      );
     }
-    assertEq(storedVersionedConfig.config.offchainConfig, versionedConfig.config.offchainConfig);
+    assertEq(storedDynamicConfig.offchainConfig, versionedConfig.config.dynamicConfig.offchainConfig);
+    assertEq(storedStaticConfig.offchainConfig, versionedConfig.config.staticConfig.offchainConfig);
   }
 
   function test_setSecondary_OutOfBoundsNodesLength_reverts() public {
     RMNHome.Config memory config = _getBaseConfig();
-    config.nodes = new RMNHome.Node[](257);
+    config.staticConfig.nodes = new RMNHome.Node[](257);
 
     vm.expectRevert(RMNHome.OutOfBoundsNodesLength.selector);
     s_rmnHome.setSecondary(config, ZERO_DIGEST);
@@ -79,7 +94,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
 
   function test_setSecondary_DuplicatePeerId_reverts() public {
     RMNHome.Config memory config = _getBaseConfig();
-    config.nodes[1].peerId = config.nodes[0].peerId;
+    config.staticConfig.nodes[1].peerId = config.staticConfig.nodes[0].peerId;
 
     vm.expectRevert(RMNHome.DuplicatePeerId.selector);
     s_rmnHome.setSecondary(config, ZERO_DIGEST);
@@ -87,7 +102,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
 
   function test_setSecondary_DuplicateOffchainPublicKey_reverts() public {
     RMNHome.Config memory config = _getBaseConfig();
-    config.nodes[1].offchainPublicKey = config.nodes[0].offchainPublicKey;
+    config.staticConfig.nodes[1].offchainPublicKey = config.staticConfig.nodes[0].offchainPublicKey;
 
     vm.expectRevert(RMNHome.DuplicateOffchainPublicKey.selector);
     s_rmnHome.setSecondary(config, ZERO_DIGEST);
@@ -95,7 +110,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
 
   function test_setSecondary_DuplicateSourceChain_reverts() public {
     RMNHome.Config memory config = _getBaseConfig();
-    config.sourceChains[1].chainSelector = config.sourceChains[0].chainSelector;
+    config.dynamicConfig.sourceChains[1].chainSelector = config.dynamicConfig.sourceChains[0].chainSelector;
 
     vm.expectRevert(RMNHome.DuplicateSourceChain.selector);
     s_rmnHome.setSecondary(config, ZERO_DIGEST);
@@ -103,7 +118,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
 
   function test_setSecondary_OutOfBoundsObserverNodeIndex_reverts() public {
     RMNHome.Config memory config = _getBaseConfig();
-    config.sourceChains[0].observerNodesBitmap = 1 << config.nodes.length;
+    config.dynamicConfig.sourceChains[0].observerNodesBitmap = 1 << config.staticConfig.nodes.length;
 
     vm.expectRevert(RMNHome.OutOfBoundsObserverNodeIndex.selector);
     s_rmnHome.setSecondary(config, ZERO_DIGEST);
@@ -111,7 +126,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
 
   function test_setSecondary_MinObserversTooHigh_reverts() public {
     RMNHome.Config memory config = _getBaseConfig();
-    config.sourceChains[0].minObservers++;
+    config.dynamicConfig.sourceChains[0].minObservers++;
 
     vm.expectRevert(RMNHome.MinObserversTooHigh.selector);
     s_rmnHome.setSecondary(config, ZERO_DIGEST);
@@ -127,13 +142,13 @@ contract RMNHome_setSecondary is RMNHomeTest {
   }
 }
 
-//contract RMNHome_revokeConfig is RMNHomeTest {
-//  function test_revokeConfig_success() public {}
-//
-//  function test_setSecondary_OnlyOwner_reverts() public {
-//    vm.startPrank(address(0));
-//
-//    vm.expectRevert("Only callable by owner");
-//    s_rmnHome.revokeConfig(keccak256("configDigest"));
-//  }
-//}
+contract RMNHome_revokeSecondary is RMNHomeTest {
+  function test_revokeSecondary_success() public {}
+
+  function test_revokeSecondary_OnlyOwner_reverts() public {
+    vm.startPrank(address(0));
+
+    vm.expectRevert("Only callable by owner");
+    s_rmnHome.revokeSecondary(keccak256("configDigest"));
+  }
+}
