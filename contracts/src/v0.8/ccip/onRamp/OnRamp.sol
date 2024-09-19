@@ -46,10 +46,9 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   event DestChainConfigSet(
     uint64 indexed destChainSelector, uint64 sequenceNumber, IRouter router, bool allowListEnabled
   );
-  event FeePaid(address indexed feeToken, uint256 feeValueJuels);
   event FeeTokenWithdrawn(address indexed feeAggregator, address indexed feeToken, uint256 amount);
   /// RMN depends on this event, if changing, please notify the RMN maintainers.
-  event CCIPMessageSent(uint64 indexed destChainSelector, Internal.EVM2AnyRampMessage message);
+  event CCIPMessageSent(uint64 indexed destChainSelector, Internal.EVM2AnyRampMessage message, uint256 feeValueJuels);
   event AllowListAdminSet(address indexed allowListAdmin);
   event AllowListSendersAdded(uint64 indexed destChainSelector, address[] senders);
   event AllowListSendersRemoved(uint64 indexed destChainSelector, address[] senders);
@@ -233,8 +232,6 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
       destChainSelector, message.feeToken, feeTokenAmount, message.extraArgs, newMessage.tokenAmounts, tokenAmounts
     );
 
-    emit FeePaid(message.feeToken, msgFeeJuels);
-
     newMessage.header.nonce = isOutOfOrderExecution
       ? 0
       : INonceManager(i_nonceManager).getIncrementedOutboundNonce(destChainSelector, originalSender);
@@ -255,7 +252,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
     // Emit message request
     // This must happen after any pool events as some tokens (e.g. USDC) emit events that we expect to precede this
     // event in the offchain code.
-    emit CCIPMessageSent(destChainSelector, newMessage);
+    emit CCIPMessageSent(destChainSelector, newMessage, msgFeeJuels);
 
     s_dynamicConfig.reentrancyGuardEntered = false;
 
