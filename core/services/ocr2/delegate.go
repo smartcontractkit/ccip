@@ -1631,43 +1631,40 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 
 		// Configure contract readers for all chains specified in the aggregator configurations.
 		// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
-		contractReaders := map[uint64]types.ContractReader{}
+		aggregatorChainsToContracts := make(map[uint64][]common.Address)
 		for _, aggCfg := range pluginJobSpecConfig.PriceGetterConfig.AggregatorPrices {
-			chainID := aggCfg.ChainID
+			if _, ok := aggregatorChainsToContracts[aggCfg.ChainID]; !ok {
+				aggregatorChainsToContracts[aggCfg.ChainID] = make([]common.Address, 0)
+			}
 
+			aggregatorChainsToContracts[aggCfg.ChainID] = append(aggregatorChainsToContracts[aggCfg.ChainID], aggCfg.AggregatorContractAddress)
+		}
+
+		contractReaders := map[uint64]types.ContractReader{}
+
+		for chainID, aggregatorContracts := range aggregatorChainsToContracts {
 			relayID := types.RelayID{Network: spec.Relay, ChainID: strconv.FormatUint(chainID, 10)}
 			relay, rerr := d.RelayGetter.Get(relayID)
 			if rerr != nil {
 				return nil, rerr
 			}
 
+			contractsConfig := make(map[string]evmrelaytypes.ChainContractReader, len(aggregatorContracts))
+			for i := range aggregatorContracts {
+				contractsConfig[fmt.Sprintf("%v_%v", "OffchainAggregator", i)] = evmrelaytypes.ChainContractReader{
+					ContractABI: ccip.OffChainAggregatorABI,
+					Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
+						"decimals": { // CR consumers choose an alias
+							ChainSpecificName: "decimals",
+						},
+						"latestRoundData": {
+							ChainSpecificName: "latestRoundData",
+						},
+					},
+				}
+			}
 			contractReaderConfig := evmrelaytypes.ChainReaderConfig{
-				Contracts: map[string]evmrelaytypes.ChainContractReader{
-					// TODO CCIP-3444 can bind multiple contract addresses to the same contract name after merge,
-					// removing the need to have indexed contract names
-					"OffchainAggregator_0": {
-						ContractABI: ccip.OffChainAggregatorABI,
-						Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
-							"decimals": { // CR consumers choose an alias
-								ChainSpecificName: "decimals",
-							},
-							"latestRoundData": {
-								ChainSpecificName: "latestRoundData",
-							},
-						},
-					},
-					"OffchainAggregator_1": {
-						ContractABI: ccip.OffChainAggregatorABI,
-						Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
-							"decimals": { // CR consumers choose an alias
-								ChainSpecificName: "decimals",
-							},
-							"latestRoundData": {
-								ChainSpecificName: "latestRoundData",
-							},
-						},
-					},
-				},
+				Contracts: contractsConfig,
 			}
 
 			contractReaderConfigJsonBytes, jerr := json.Marshal(contractReaderConfig)
