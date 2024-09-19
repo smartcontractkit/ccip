@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
+
 	evmClient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/rollups"
@@ -32,7 +33,7 @@ type Interceptor struct {
 }
 
 func NewInterceptor(ctx context.Context, client evmClient.Client, chainType chaintype.ChainType) (*Interceptor, error) {
-	if chainType != chaintype.ChainArbitrum { // TODO: change to mantle when it will be available from chainlink repo
+	if chainType != chaintype.ChainMantle { // TODO: change to mantle when it will be available from chainlink repo
 		return nil, nil
 	}
 	// Encode calldata for tokenRatio method
