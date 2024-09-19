@@ -63,6 +63,7 @@ func (i *Interceptor) ModifyGasPriceComponents(ctx context.Context, gasPrice, da
 		if i.tokenRatio, err = i.getMantleGasPrice(ctx); err != nil {
 			return nil, nil, err
 		}
+		i.tokenRatioLastUpdate = time.Now()
 	}
 
 	newGasPrice := new(big.Int).Add(gasPrice, daGasPrice)
