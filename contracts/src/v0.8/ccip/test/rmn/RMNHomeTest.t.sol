@@ -142,13 +142,155 @@ contract RMNHome_setSecondary is RMNHomeTest {
   }
 }
 
+contract RMNHome_setDynamicConfig is RMNHomeTest {
+  function setUp() public override {
+    super.setUp();
+    s_rmnHome.setSecondary(_getBaseConfig(), ZERO_DIGEST);
+  }
+
+  function test_setDynamicConfig_success() public {
+    (bytes32 priorPrimaryDigest,) = s_rmnHome.getConfigDigests();
+
+    RMNHome.Config memory config = _getBaseConfig();
+    config.dynamicConfig.sourceChains[0].minObservers--;
+
+    (, bytes32 secondaryConfigDigest) = s_rmnHome.getConfigDigests();
+
+    vm.expectEmit();
+    emit RMNHome.DynamicConfigSet(secondaryConfigDigest, config.dynamicConfig);
+
+    s_rmnHome.setDynamicConfig(config.dynamicConfig, secondaryConfigDigest);
+
+    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getConfig(secondaryConfigDigest);
+    assertTrue(ok);
+    assertEq(
+      storedVersionedConfig.config.dynamicConfig.sourceChains[0].minObservers,
+      config.dynamicConfig.sourceChains[0].minObservers
+    );
+
+    // Asser the digests don't change when updating the dynamic config
+    (bytes32 primaryDigest, bytes32 secondaryDigest) = s_rmnHome.getConfigDigests();
+    assertEq(primaryDigest, priorPrimaryDigest);
+    assertEq(secondaryDigest, secondaryConfigDigest);
+  }
+
+  // Asserts the validation function is being called
+  function test_setDynamicConfig_MinObserversTooHigh_reverts() public {
+    RMNHome.Config memory config = _getBaseConfig();
+    config.dynamicConfig.sourceChains[0].minObservers++;
+
+    vm.expectRevert(abi.encodeWithSelector(RMNHome.DigestNotFound.selector, ZERO_DIGEST));
+    s_rmnHome.setDynamicConfig(config.dynamicConfig, ZERO_DIGEST);
+  }
+
+  function test_setDynamicConfig_DigestNotFound_reverts() public {
+    // Zero always reverts
+    vm.expectRevert(abi.encodeWithSelector(RMNHome.DigestNotFound.selector, ZERO_DIGEST));
+    s_rmnHome.setDynamicConfig(_getBaseConfig().dynamicConfig, ZERO_DIGEST);
+
+    // Non-existent digest reverts
+    bytes32 nonExistentDigest = keccak256("nonExistentDigest");
+    vm.expectRevert(abi.encodeWithSelector(RMNHome.DigestNotFound.selector, nonExistentDigest));
+    s_rmnHome.setDynamicConfig(_getBaseConfig().dynamicConfig, nonExistentDigest);
+  }
+
+  function test_setDynamicConfig_OnlyOwner_reverts() public {
+    RMNHome.Config memory config = _getBaseConfig();
+
+    vm.startPrank(address(0));
+
+    vm.expectRevert("Only callable by owner");
+    s_rmnHome.setDynamicConfig(config.dynamicConfig, keccak256("configDigest"));
+  }
+}
+
 contract RMNHome_revokeSecondary is RMNHomeTest {
-  function test_revokeSecondary_success() public {}
+  // Sets two configs
+  function setUp() public override {
+    super.setUp();
+    bytes32 digest = s_rmnHome.setSecondary(_getBaseConfig(), ZERO_DIGEST);
+    s_rmnHome.promoteSecondary(digest);
+
+    RMNHome.Config memory config = _getBaseConfig();
+    config.dynamicConfig.sourceChains[0].minObservers--;
+    s_rmnHome.setSecondary(_getBaseConfig(), ZERO_DIGEST);
+  }
+
+  function test_revokeSecondary_success() public {
+    (bytes32 priorPrimaryDigest, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests();
+
+    vm.expectEmit();
+    emit RMNHome.ConfigRevoked(priorSecondaryDigest);
+
+    s_rmnHome.revokeSecondary(priorSecondaryDigest);
+
+    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getConfig(priorSecondaryDigest);
+    assertFalse(ok);
+    // Ensure no old data is returned, even though it's still in storage
+    assertEq(storedVersionedConfig.version, 0);
+    assertEq(storedVersionedConfig.config.staticConfig.nodes.length, 0);
+    assertEq(storedVersionedConfig.config.dynamicConfig.sourceChains.length, 0);
+
+    // Asser the primary digest is unaffected but the secondary digest is set to zero
+    (bytes32 primaryDigest, bytes32 secondaryDigest) = s_rmnHome.getConfigDigests();
+    assertEq(primaryDigest, priorPrimaryDigest);
+    assertTrue(secondaryDigest != priorSecondaryDigest);
+    assertEq(secondaryDigest, ZERO_DIGEST);
+  }
+
+  function test_revokeSecondary_ConfigDigestMismatch_reverts() public {
+    (, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests();
+
+    bytes32 wrongDigest = keccak256("wrong_digest");
+    vm.expectRevert(abi.encodeWithSelector(RMNHome.ConfigDigestMismatch.selector, priorSecondaryDigest, wrongDigest));
+    s_rmnHome.revokeSecondary(wrongDigest);
+  }
 
   function test_revokeSecondary_OnlyOwner_reverts() public {
     vm.startPrank(address(0));
 
     vm.expectRevert("Only callable by owner");
     s_rmnHome.revokeSecondary(keccak256("configDigest"));
+  }
+}
+
+contract RMNHome_promoteSecondary is RMNHomeTest {
+  function test_promoteSecondary_success() public {
+    (bytes32 priorPrimaryDigest, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests();
+
+    vm.expectEmit();
+    emit RMNHome.ConfigPromoted(priorSecondaryDigest);
+
+    s_rmnHome.promoteSecondary(priorSecondaryDigest);
+
+    (bytes32 primaryDigest, bytes32 secondaryDigest) = s_rmnHome.getConfigDigests();
+    assertEq(primaryDigest, priorSecondaryDigest);
+    assertEq(secondaryDigest, priorPrimaryDigest);
+  }
+
+  function test_promoteSecondary_ConfigDigestMismatch_reverts() public {
+    (, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests();
+
+    bytes32 wrongDigest = keccak256("wrong_digest");
+    vm.expectRevert(abi.encodeWithSelector(RMNHome.ConfigDigestMismatch.selector, priorSecondaryDigest, wrongDigest));
+    s_rmnHome.promoteSecondary(wrongDigest);
+  }
+
+  function test_promoteSecondary_OnlyOwner_reverts() public {
+    vm.startPrank(address(0));
+
+    vm.expectRevert("Only callable by owner");
+    s_rmnHome.promoteSecondary(keccak256("configDigest"));
+  }
+}
+
+contract RMNHome_promoteSecondaryAndRevokePrimary is RMNHomeTest {
+  function test_promoteSecondaryAndRevokePrimary_success() public {}
+
+  function test_promoteSecondaryAndRevokePrimary_OnlyOwner_reverts() public {
+    vm.startPrank(address(0));
+
+    vm.expectRevert("Only callable by owner");
+    s_rmnHome.promoteSecondaryAndRevokePrimary(keccak256("toPromote"), keccak256("ToRevoke"));
   }
 }

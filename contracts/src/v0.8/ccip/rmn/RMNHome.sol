@@ -20,6 +20,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   event ConfigSet(bytes32 configDigest, VersionedConfig versionedConfig);
   event ConfigRevoked(bytes32 configDigest);
   event DynamicConfigSet(bytes32 indexed configDigest, DynamicConfig dynamicConfig);
+  event ConfigPromoted(bytes32 configDigest);
 
   struct Node {
     bytes32 peerId; //            Used for p2p communication.
@@ -147,7 +148,10 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   /// @param newConfig The new config to set.
   /// @param digestToOverwrite The digest of the config to overwrite, or ZERO_DIGEST if no config is to be overwritten.
   /// This is done to prevent accidental overwrites.
-  function setSecondary(Config calldata newConfig, bytes32 digestToOverwrite) external onlyOwner {
+  function setSecondary(
+    Config calldata newConfig,
+    bytes32 digestToOverwrite
+  ) external onlyOwner returns (bytes32 newConfigDigest) {
     _validateStaticConfig(newConfig.staticConfig);
     _validateDynamicConfig(newConfig.dynamicConfig, newConfig.staticConfig.nodes.length);
 
@@ -163,29 +167,31 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     }
 
     uint32 newVersion = ++s_configCount;
-    bytes32 newConfigDigest = _getConfigDigest(newConfig.staticConfig, newVersion);
+    newConfigDigest = _getConfigDigest(newConfig.staticConfig, newVersion);
     s_configs[secondaryConfigIndex] = newConfig;
     s_configVersions[secondaryConfigIndex] = newVersion;
     s_configDigests[secondaryConfigIndex] = newConfigDigest;
 
     emit ConfigSet(newConfigDigest, VersionedConfig({version: newVersion, config: newConfig}));
+
+    return newConfigDigest;
   }
 
-  function setDynamicConfig(DynamicConfig calldata newDynamicConfig, bytes32 digestToOverwrite) external onlyOwner {
+  function setDynamicConfig(DynamicConfig calldata newDynamicConfig, bytes32 currentDigest) external onlyOwner {
     for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
-      if (s_configDigests[i] == digestToOverwrite) {
+      if (s_configDigests[i] == currentDigest && currentDigest != ZERO_DIGEST) {
         Config memory currentConfig = s_configs[i];
         _validateDynamicConfig(newDynamicConfig, currentConfig.staticConfig.nodes.length);
 
         // Since the dynamic config doesn't change we don't have to update the digest or version.
         s_configs[i].dynamicConfig = newDynamicConfig;
 
-        emit DynamicConfigSet(digestToOverwrite, newDynamicConfig);
+        emit DynamicConfigSet(currentDigest, newDynamicConfig);
         return;
       }
     }
 
-    revert DigestNotFound(digestToOverwrite);
+    revert DigestNotFound(currentDigest);
   }
 
   /// @notice Revokes a specific config by digest.
@@ -212,6 +218,8 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     }
 
     s_primaryConfigIndex ^= 1;
+
+    emit ConfigPromoted(digestToPromote);
   }
 
   /// @notice Promotes the secondary config to the primary config and revokes the primary config.
