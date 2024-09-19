@@ -70,7 +70,7 @@ func (i *Interceptor) ModifyGasPriceComponents(ctx context.Context, gasPrice, da
 	return new(big.Int).Mul(newGasPrice, i.tokenRatio), daGasPrice, nil
 }
 
-// Request and returns the token ratio for Mantle.
+// getMantleGasPrice Requests and returns the token ratio for Mantle.
 func (i *Interceptor) getMantleGasPrice(ctx context.Context) (*big.Int, error) {
 	// call oracle to get l1BaseFee and tokenRatio
 	rpcBatchCalls := []rpc.BatchElem{
