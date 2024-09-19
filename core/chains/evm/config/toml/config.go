@@ -554,6 +554,7 @@ type GasEstimator struct {
 	LimitMultiplier *decimal.Decimal
 	LimitTransfer   *uint64
 	LimitJobType    GasLimitJobType `toml:",omitempty"`
+	EstimateLimit   *bool
 
 	BumpMin       *assets.Wei
 	BumpPercent   *uint16
@@ -567,6 +568,7 @@ type GasEstimator struct {
 	TipCapMin     *assets.Wei
 
 	BlockHistory BlockHistoryEstimator `toml:",omitempty"`
+	FeeHistory   FeeHistoryEstimator   `toml:",omitempty"`
 }
 
 func (e *GasEstimator) ValidateConfig() (err error) {
@@ -641,6 +643,9 @@ func (e *GasEstimator) setFrom(f *GasEstimator) {
 	if v := f.LimitTransfer; v != nil {
 		e.LimitTransfer = v
 	}
+	if v := f.EstimateLimit; v != nil {
+		e.EstimateLimit = v
+	}
 	if v := f.PriceDefault; v != nil {
 		e.PriceDefault = v
 	}
@@ -658,6 +663,7 @@ func (e *GasEstimator) setFrom(f *GasEstimator) {
 	}
 	e.LimitJobType.setFrom(&f.LimitJobType)
 	e.BlockHistory.setFrom(&f.BlockHistory)
+	e.FeeHistory.setFrom(&f.FeeHistory)
 }
 
 type GasLimitJobType struct {
@@ -717,6 +723,16 @@ func (e *BlockHistoryEstimator) setFrom(f *BlockHistoryEstimator) {
 	}
 	if v := f.TransactionPercentile; v != nil {
 		e.TransactionPercentile = v
+	}
+}
+
+type FeeHistoryEstimator struct {
+	CacheTimeout *commonconfig.Duration
+}
+
+func (u *FeeHistoryEstimator) setFrom(f *FeeHistoryEstimator) {
+	if v := f.CacheTimeout; v != nil {
+		u.CacheTimeout = v
 	}
 }
 
