@@ -48,22 +48,18 @@ func NewInterceptor(ctx context.Context, client evmClient.Client) (*Interceptor,
 		callData: tokenRatioCallData,
 	}
 
-	interceptor.tokenRatio, err = interceptor.getMantleGasPrice(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("could not get token ratio from the Mantle oracle %v", err)
-	}
-
 	return interceptor, nil
 }
 
 // ModifyGasPriceComponents returns modified gasPrice.
 func (i *Interceptor) ModifyGasPriceComponents(ctx context.Context, gasPrice, daGasPrice *big.Int) (*big.Int, *big.Int, error) {
 	if time.Since(i.tokenRatioLastUpdate) > tokenRatioUpdateInterval {
-		var err error
-		if i.tokenRatio, err = i.getMantleGasPrice(ctx); err != nil {
+		mantleTokenRatio, err := i.getMantleGasPrice(ctx)
+		if err != nil {
 			return nil, nil, err
 		}
-		i.tokenRatioLastUpdate = time.Now()
+
+		i.tokenRatio, i.tokenRatioLastUpdate = mantleTokenRatio, time.Now()
 	}
 
 	newGasPrice := new(big.Int).Add(gasPrice, daGasPrice)
