@@ -50,7 +50,6 @@ type optimismL1Oracle struct {
 	blobBaseFeeCalldata       []byte
 	blobBaseFeeScalarCalldata []byte
 	decimalsCalldata          []byte
-	tokenRatioCalldata        []byte
 	isEcotoneCalldata         []byte
 	isEcotoneMethodAbi        abi.ABI
 	isFjordCalldata           []byte
