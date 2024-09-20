@@ -6,8 +6,9 @@ import (
 	"math/big"
 	"testing"
 
-	mocks2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig/mocks"
 	"github.com/stretchr/testify/require"
+
+	mocks2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig/mocks"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"

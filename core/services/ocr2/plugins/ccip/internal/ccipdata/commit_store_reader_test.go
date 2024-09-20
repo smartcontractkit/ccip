@@ -375,8 +375,8 @@ func TestCommitStoreReaders(t *testing.T) {
 
 			var execGasPrice, daGasPrice *big.Int
 			feeEstimatorConfig.On("ModifyGasPriceComponents", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-				execGasPrice = args.Get(0).(*big.Int)
-				daGasPrice = args.Get(1).(*big.Int)
+				execGasPrice = args.Get(1).(*big.Int)
+				daGasPrice = args.Get(2).(*big.Int)
 			}).Return(execGasPrice, daGasPrice, nil).Maybe()
 
 			gpe, err := cr.GasPriceEstimator(ctx)
