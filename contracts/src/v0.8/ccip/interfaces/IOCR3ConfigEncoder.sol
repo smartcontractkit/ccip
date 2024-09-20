@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {CCIPHome} from "../CCIPHome.sol";
+import {CCIPHome} from "../capability/CCIPHome.sol";
 
 /// @dev This is so that we can generate gethwrappers and easily encode/decode OCR3Config
 /// in the offchain integration tests.

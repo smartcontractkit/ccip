@@ -28,24 +28,24 @@ var (
 	_ = abi.ConvertType
 )
 
-type CCIPConfigTypesOCR3Config struct {
+type CCIPHomeOCR3Config struct {
 	PluginType            uint8
 	ChainSelector         uint64
 	FRoleDON              uint8
 	OffchainConfigVersion uint64
 	OfframpAddress        []byte
-	Nodes                 []CCIPConfigTypesOCR3Node
+	Nodes                 []CCIPHomeOCR3Node
 	OffchainConfig        []byte
 }
 
-type CCIPConfigTypesOCR3Node struct {
+type CCIPHomeOCR3Node struct {
 	P2pId          [32]byte
 	SignerKey      []byte
 	TransmitterKey []byte
 }
 
 var IOCR3ConfigEncoderMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"components\":[{\"internalType\":\"enumInternal.OCRPluginType\",\"name\":\"pluginType\",\"type\":\"uint8\"},{\"internalType\":\"uint64\",\"name\":\"chainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint8\",\"name\":\"FRoleDON\",\"type\":\"uint8\"},{\"internalType\":\"uint64\",\"name\":\"offchainConfigVersion\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"offrampAddress\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"signerKey\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"transmitterKey\",\"type\":\"bytes\"}],\"internalType\":\"structCCIPConfigTypes.OCR3Node[]\",\"name\":\"nodes\",\"type\":\"tuple[]\"},{\"internalType\":\"bytes\",\"name\":\"offchainConfig\",\"type\":\"bytes\"}],\"internalType\":\"structCCIPConfigTypes.OCR3Config[]\",\"name\":\"config\",\"type\":\"tuple[]\"}],\"name\":\"exposeOCR3Config\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"components\":[{\"internalType\":\"enumInternal.OCRPluginType\",\"name\":\"pluginType\",\"type\":\"uint8\"},{\"internalType\":\"uint64\",\"name\":\"chainSelector\",\"type\":\"uint64\"},{\"internalType\":\"uint8\",\"name\":\"FRoleDON\",\"type\":\"uint8\"},{\"internalType\":\"uint64\",\"name\":\"offchainConfigVersion\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"offrampAddress\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"p2pId\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"signerKey\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"transmitterKey\",\"type\":\"bytes\"}],\"internalType\":\"structCCIPHome.OCR3Node[]\",\"name\":\"nodes\",\"type\":\"tuple[]\"},{\"internalType\":\"bytes\",\"name\":\"offchainConfig\",\"type\":\"bytes\"}],\"internalType\":\"structCCIPHome.OCR3Config[]\",\"name\":\"config\",\"type\":\"tuple[]\"}],\"name\":\"exposeOCR3Config\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 var IOCR3ConfigEncoderABI = IOCR3ConfigEncoderMetaData.ABI
@@ -166,7 +166,7 @@ func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderTransactorRaw) Transact(opts *bind.
 	return _IOCR3ConfigEncoder.Contract.contract.Transact(opts, method, params...)
 }
 
-func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderCaller) ExposeOCR3Config(opts *bind.CallOpts, config []CCIPConfigTypesOCR3Config) ([]byte, error) {
+func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderCaller) ExposeOCR3Config(opts *bind.CallOpts, config []CCIPHomeOCR3Config) ([]byte, error) {
 	var out []interface{}
 	err := _IOCR3ConfigEncoder.contract.Call(opts, &out, "exposeOCR3Config", config)
 
@@ -180,11 +180,11 @@ func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderCaller) ExposeOCR3Config(opts *bind
 
 }
 
-func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderSession) ExposeOCR3Config(config []CCIPConfigTypesOCR3Config) ([]byte, error) {
+func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderSession) ExposeOCR3Config(config []CCIPHomeOCR3Config) ([]byte, error) {
 	return _IOCR3ConfigEncoder.Contract.ExposeOCR3Config(&_IOCR3ConfigEncoder.CallOpts, config)
 }
 
-func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderCallerSession) ExposeOCR3Config(config []CCIPConfigTypesOCR3Config) ([]byte, error) {
+func (_IOCR3ConfigEncoder *IOCR3ConfigEncoderCallerSession) ExposeOCR3Config(config []CCIPHomeOCR3Config) ([]byte, error) {
 	return _IOCR3ConfigEncoder.Contract.ExposeOCR3Config(&_IOCR3ConfigEncoder.CallOpts, config)
 }
 
@@ -193,7 +193,7 @@ func (_IOCR3ConfigEncoder *IOCR3ConfigEncoder) Address() common.Address {
 }
 
 type IOCR3ConfigEncoderInterface interface {
-	ExposeOCR3Config(opts *bind.CallOpts, config []CCIPConfigTypesOCR3Config) ([]byte, error)
+	ExposeOCR3Config(opts *bind.CallOpts, config []CCIPHomeOCR3Config) ([]byte, error)
 
 	Address() common.Address
 }
