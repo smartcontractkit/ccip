@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
-import {CCIPHome} from "../../capability/CCIPHome.sol";
+import {ICapabilityConfiguration} from "../../../keystone/interfaces/ICapabilityConfiguration.sol";
 import {ICapabilitiesRegistry} from "../../interfaces/ICapabilitiesRegistry.sol";
+
+import {CCIPHome} from "../../capability/CCIPHome.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {CCIPHomeHelper} from "../helpers/CCIPHomeHelper.sol";
 import {Test} from "forge-std/Test.sol";
@@ -1207,6 +1209,14 @@ contract CCIPHome_updatePluginConfig is CCIPHomeSetup {
     // 0 -> 2 is an invalid state transition.
     vm.expectRevert(abi.encodeWithSelector(CCIPHome.InvalidConfigStateTransition.selector, 0, 2));
     s_ccipCC.updatePluginConfig(donId, Internal.OCRPluginType.Commit, newConfig);
+  }
+}
+
+contract CCIPHome_supportsInterface is CCIPHomeSetup {
+  function test_supportsInterface_Success() public {
+    assertTrue(
+      s_ccipCC.supportsInterface(type(ICapabilityConfiguration).interfaceId), "supportsInterface must return true"
+    );
   }
 }
 

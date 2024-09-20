@@ -151,6 +151,8 @@ contract CCIPHome is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator, 
   }
 
   /// @inheritdoc IERC165
+  /// @dev The CapabilitiesRegistry contract will call this function with the `ICapabilityConfiguration` interface ID.
+  /// If that call doesn't succeed, no config can be set.
   function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
     return interfaceId == type(ICapabilityConfiguration).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
