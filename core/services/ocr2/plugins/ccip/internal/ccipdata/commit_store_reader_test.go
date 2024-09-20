@@ -372,8 +372,16 @@ func TestCommitStoreReaders(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, commonOffchain, c2)
 			// We should be able to query for gas prices now.
+
+			var execGasPrice, daGasPrice *big.Int
+			feeEstimatorConfig.On("ModifyGasPriceComponents", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+				execGasPrice = args.Get(0).(*big.Int)
+				daGasPrice = args.Get(1).(*big.Int)
+			}).Return(execGasPrice, daGasPrice, nil).Maybe()
+
 			gpe, err := cr.GasPriceEstimator(ctx)
 			require.NoError(t, err)
+
 			gp, err := gpe.GetGasPrice(context.Background())
 			require.NoError(t, err)
 			assert.True(t, gp.Cmp(big.NewInt(0)) > 0)

@@ -90,4 +90,19 @@ func TestModifyGasPriceComponents(t *testing.T) {
 		_, _, err := svc.ModifyGasPriceComponents(ctx, initialExecGasPrice, initialDaGasPrice)
 		require.Error(t, err)
 	})
+
+	t.Run("without interceptors", func(t *testing.T) {
+		svc := estimatorconfig.NewFeeEstimatorConfigService()
+		ctx := context.Background()
+
+		initialExecGasPrice, initialDaGasPrice := big.NewInt(10), big.NewInt(1)
+
+		// has to return second interceptor values
+		resGasPrice, resDAGasPrice, err := svc.ModifyGasPriceComponents(ctx, initialExecGasPrice, initialDaGasPrice)
+		require.NoError(t, err)
+
+		// values should not be modified
+		require.Equal(t, initialExecGasPrice, resGasPrice)
+		require.Equal(t, initialDaGasPrice, resDAGasPrice)
+	})
 }
