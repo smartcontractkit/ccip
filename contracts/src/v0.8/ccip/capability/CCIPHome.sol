@@ -8,6 +8,7 @@ import {ICapabilitiesRegistry} from "../interfaces/ICapabilitiesRegistry.sol";
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {Internal} from "../libraries/Internal.sol";
 
+import {IERC165} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice CCIPHome stores the configuration for the CCIP capability.
@@ -15,7 +16,7 @@ import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts
 /// Each chain will have a single configuration which includes information like the router address.
 /// Each CR DON will have up to four configurations: for each of (commit, exec), one blue and one green configuration.
 /// This is done in order to achieve "blue-green" deployments.
-contract CCIPHome is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator {
+contract CCIPHome is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator, IERC165 {
   using EnumerableSet for EnumerableSet.UintSet;
 
   /// @notice Emitted when a chain's configuration is set.
@@ -147,6 +148,11 @@ contract CCIPHome is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator {
       revert ZeroAddressNotAllowed();
     }
     i_capabilitiesRegistry = capabilitiesRegistry;
+  }
+
+  /// @inheritdoc IERC165
+  function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
+    return interfaceId == type(ICapabilityConfiguration).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
   // ================================================================
