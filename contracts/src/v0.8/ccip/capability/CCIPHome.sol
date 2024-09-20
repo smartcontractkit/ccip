@@ -283,16 +283,8 @@ contract CCIPHome is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator {
       ocr3Config.offrampAddress = newOcr3Config.offrampAddress;
       ocr3Config.offchainConfig = newOcr3Config.offchainConfig;
 
-      // Remove all excess nodes
-      while (ocr3Config.nodes.length > newOcr3Config.nodes.length) {
-        ocr3Config.nodes.pop();
-      }
-
-      // Assign nodes
       for (uint256 j = 0; j < newOcr3Config.nodes.length; ++j) {
-        if (j >= ocr3Config.nodes.length) {
-          ocr3Config.nodes.push(newOcr3Config.nodes[j]);
-        }
+        ocr3Config.nodes.push(newOcr3Config.nodes[j]);
       }
     }
 
