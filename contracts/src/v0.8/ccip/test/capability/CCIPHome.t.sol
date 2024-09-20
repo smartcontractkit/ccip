@@ -550,20 +550,6 @@ contract CCIPHome_validateConfig is CCIPHomeSetup {
 }
 
 contract CCIPHome_ConfigStateMachine is CCIPHomeSetup {
-  function test__stateFromConfigLength_Success() public view {
-    uint256 configLen = 0;
-    CCIPHome.ConfigState state = s_ccipCC.stateFromConfigLength(configLen);
-    assertEq(uint256(state), uint256(CCIPHome.ConfigState.Init));
-
-    configLen = 1;
-    state = s_ccipCC.stateFromConfigLength(configLen);
-    assertEq(uint256(state), uint256(CCIPHome.ConfigState.Running));
-
-    configLen = 2;
-    state = s_ccipCC.stateFromConfigLength(configLen);
-    assertEq(uint256(state), uint256(CCIPHome.ConfigState.Staging));
-  }
-
   function test__validateConfigStateTransition_Success() public view {
     s_ccipCC.validateConfigStateTransition(CCIPHome.ConfigState.Init, CCIPHome.ConfigState.Running);
 
@@ -633,10 +619,9 @@ contract CCIPHome_ConfigStateMachine is CCIPHomeSetup {
       offchainConfigVersion: 30,
       offchainConfig: bytes("commit")
     });
-    CCIPHome.ConfigState currentState = CCIPHome.ConfigState.Init;
-    CCIPHome.ConfigState newState = CCIPHome.ConfigState.Running;
+
     CCIPHome.OCR3ConfigWithMeta[] memory newConfigWithMeta =
-      s_ccipCC.computeNewConfigWithMeta(donId, currentConfig, newConfig, currentState, newState);
+      s_ccipCC.computeNewConfigWithMeta(donId, currentConfig, newConfig);
     assertEq(newConfigWithMeta.length, 1, "new config with meta length must be 1");
     assertEq(newConfigWithMeta[0].version, uint64(1), "config count must be 1");
     assertEq(uint8(newConfigWithMeta[0].config.pluginType), uint8(newConfig[0].pluginType), "plugin type must match");
@@ -686,11 +671,8 @@ contract CCIPHome_ConfigStateMachine is CCIPHomeSetup {
     // green config next.
     newConfig[1] = greenConfig;
 
-    CCIPHome.ConfigState currentState = CCIPHome.ConfigState.Running;
-    CCIPHome.ConfigState newState = CCIPHome.ConfigState.Staging;
-
     CCIPHome.OCR3ConfigWithMeta[] memory newConfigWithMeta =
-      s_ccipCC.computeNewConfigWithMeta(donId, currentConfig, newConfig, currentState, newState);
+      s_ccipCC.computeNewConfigWithMeta(donId, currentConfig, newConfig);
     assertEq(newConfigWithMeta.length, 2, "new config with meta length must be 2");
 
     assertEq(newConfigWithMeta[0].version, uint64(1), "config count of blue must be 1");
@@ -759,11 +741,8 @@ contract CCIPHome_ConfigStateMachine is CCIPHomeSetup {
     CCIPHome.OCR3Config[] memory newConfig = new CCIPHome.OCR3Config[](1);
     newConfig[0] = greenConfig;
 
-    CCIPHome.ConfigState currentState = CCIPHome.ConfigState.Staging;
-    CCIPHome.ConfigState newState = CCIPHome.ConfigState.Running;
-
     CCIPHome.OCR3ConfigWithMeta[] memory newConfigWithMeta =
-      s_ccipCC.computeNewConfigWithMeta(donId, currentConfig, newConfig, currentState, newState);
+      s_ccipCC.computeNewConfigWithMeta(donId, currentConfig, newConfig);
 
     assertEq(newConfigWithMeta.length, 1, "new config with meta length must be 1");
     assertEq(newConfigWithMeta[0].version, uint64(2), "config count must be 2");
@@ -890,12 +869,6 @@ contract CCIPHome_ConfigStateMachine is CCIPHomeSetup {
   }
 
   // Reverts.
-
-  function test_Fuzz__stateFromConfigLength_Reverts(uint256 configLen) public {
-    vm.assume(configLen > 2);
-    vm.expectRevert(abi.encodeWithSelector(CCIPHome.InvalidConfigLength.selector, configLen));
-    s_ccipCC.stateFromConfigLength(configLen);
-  }
 
   function test__validateConfigTransition_InitToRunning_WrongConfigCount_Reverts() public {
     uint32 donId = 1;

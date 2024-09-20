@@ -7,10 +7,6 @@ import {Internal} from "../../libraries/Internal.sol";
 contract CCIPHomeHelper is CCIPHome {
   constructor(address capabilitiesRegistry) CCIPHome(capabilitiesRegistry) {}
 
-  function stateFromConfigLength(uint256 configLength) public pure returns (CCIPHome.ConfigState) {
-    return _stateFromConfigLength(configLength);
-  }
-
   function validateConfigStateTransition(CCIPHome.ConfigState currentState, CCIPHome.ConfigState newState) public pure {
     _validateConfigStateTransition(currentState, newState);
   }
@@ -25,11 +21,9 @@ contract CCIPHomeHelper is CCIPHome {
   function computeNewConfigWithMeta(
     uint32 donId,
     CCIPHome.OCR3ConfigWithMeta[] memory currentConfig,
-    CCIPHome.OCR3Config[] memory newConfig,
-    CCIPHome.ConfigState currentState,
-    CCIPHome.ConfigState newState
+    CCIPHome.OCR3Config[] memory newConfig
   ) public view returns (CCIPHome.OCR3ConfigWithMeta[] memory) {
-    return _computeNewConfigWithMeta(donId, currentConfig, newConfig, currentState, newState);
+    return _computeNewConfigWithMeta(donId, currentConfig, newConfig);
   }
 
   function computeConfigDigest(

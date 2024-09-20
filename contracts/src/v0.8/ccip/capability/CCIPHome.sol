@@ -245,17 +245,14 @@ contract CCIPHome is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator {
   /// @param pluginType The plugin type.
   /// @param newConfig The new configuration.
   function _updatePluginConfig(uint32 donId, Internal.OCRPluginType pluginType, OCR3Config[] memory newConfig) internal {
+    // There can be at most MAX_OCR3_CONFIGS_PER_PLUGIN configurations per plugin type.
+    if (newConfig.length > MAX_OCR3_CONFIGS_PER_PLUGIN) {
+      revert InvalidConfigLength(newConfig.length);
+    }
     OCR3ConfigWithMeta[] memory currentConfig = s_ocr3Configs[donId][pluginType];
 
-    // Validate the state transition being proposed, which is implicitly defined by the combination
-    // of lengths of the current and new configurations.
-    ConfigState currentState = _stateFromConfigLength(currentConfig.length);
-    ConfigState proposedState = _stateFromConfigLength(newConfig.length);
-    _validateConfigStateTransition(currentState, proposedState);
-
     // Build the new configuration with metadata and validate that the transition is valid.
-    OCR3ConfigWithMeta[] memory newConfigWithMeta =
-      _computeNewConfigWithMeta(donId, currentConfig, newConfig, currentState, proposedState);
+    OCR3ConfigWithMeta[] memory newConfigWithMeta = _computeNewConfigWithMeta(donId, currentConfig, newConfig);
 
     _validateConfigTransition(currentConfig, newConfigWithMeta);
 
@@ -294,16 +291,6 @@ contract CCIPHome is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator {
   // ================================================================
   // │                    Config State Machine                      │
   // ================================================================
-
-  /// @notice Determine the config state of the configuration from the length of the config.
-  /// @param configLen The length of the configuration.
-  /// @return The config state.
-  function _stateFromConfigLength(uint256 configLen) internal pure returns (ConfigState) {
-    if (configLen > 2) {
-      revert InvalidConfigLength(configLen);
-    }
-    return ConfigState(configLen);
-  }
 
   /// @notice Validates the state transition between two config states.
   /// The only valid state transitions are the following:
@@ -373,16 +360,18 @@ contract CCIPHome is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator {
   /// @param donId The DON ID.
   /// @param currentConfig The current configuration, including metadata.
   /// @param newConfig The new configuration, without metadata.
-  /// @param currentState The current state of the configuration.
-  /// @param newState The new state of the configuration.
   /// @return The new configuration with metadata.
   function _computeNewConfigWithMeta(
     uint32 donId,
     OCR3ConfigWithMeta[] memory currentConfig,
-    OCR3Config[] memory newConfig,
-    ConfigState currentState,
-    ConfigState newState
+    OCR3Config[] memory newConfig
   ) internal view returns (OCR3ConfigWithMeta[] memory) {
+    ConfigState currentState = ConfigState(currentConfig.length);
+    ConfigState newState = ConfigState(newConfig.length);
+    // Validate the state transition being proposed, which is implicitly defined by the combination
+    // of lengths of the current and new configurations.
+    _validateConfigStateTransition(currentState, newState);
+
     uint64[] memory configCounts = new uint64[](newConfig.length);
 
     // Set config counts based on the only valid state transitions.
