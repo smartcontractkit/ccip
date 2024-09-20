@@ -15,8 +15,8 @@ on:
         required: false
         type: choice
         options:
-          - 'load'
           - 'smoke'
+          - 'load'
       test_secrets_override_key:
         description: 'Key to run tests with custom test secrets'
         required: false
@@ -41,19 +41,21 @@ env:
   E2E_TEST_GRAFANA_BASE_URL: ${{ vars.GRAFANA_URL }}
   # Default private key test secret loaded from Github Secret as only security team has access to it.
   # this key secrets.QA_SHARED_803C_KEY has a story behind it. To know more, see CCIP-2875 and SECHD-16575 tickets.
-  E2E_TEST_ETHEREUM_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_ARBITRUM_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
-  E2E_TEST_BASE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
-  E2E_TEST_WEMIX_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_AVALANCHE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
-  E2E_TEST_ZKSYNC_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
-  E2E_TEST_MODE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
-  E2E_TEST_METIS_ANDROMEDA_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
-  E2E_TEST_OPTIMISM_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
-  E2E_TEST_KROMA_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_BASE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_BLAST_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_CELO_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_ETHEREUM_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_GNOSIS_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_KROMA_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_METIS_ANDROMEDA_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_MODE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_OPTIMISM_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_POLYGON_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
-  E2E_TEST_BSC_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_WEMIX_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_ZKSYNC_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+
   
 jobs:
   build-chainlink:
@@ -133,8 +135,8 @@ jobs:
       matrix:
         config: [mainnet.toml]
     needs: [ build-chainlink, build-test-image ]
-    # if the event is a scheduled event or the test type is load and no previous job failed
-    if: ${{ (github.event_name == 'schedule' || inputs.test_type == 'load') && !contains(needs.*.result, 'failure') }}
+    # if the event is a workflow_dispatch event and the test type is load and no previous job failed
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_type == 'load' && !contains(needs.*.result, 'failure') }}
     permissions:
       issues: read
       checks: write
@@ -207,8 +209,8 @@ jobs:
           RR_CPU: 4
           DETACH_RUNNER: true
           TEST_TRIGGERED_BY: ccip-load-test-ci
-          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
-          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}          
+          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }},${{ steps.set_override_config.outputs.base_64_override }}
+          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }},${{ steps.set_override_config.outputs.base_64_override }}
           E2E_TEST_GRAFANA_DASHBOARD_URL: "/d/6vjVx-1V8/ccip-long-running-tests"
         with:
           test_command_to_run: cd ./integration-tests/ccip-tests && go test -v -timeout 70m -count=1 -json -run ^TestLoadCCIPStableRPS$ ./load 2>&1 | tee /tmp/gotest.log | gotestfmt
@@ -233,8 +235,8 @@ jobs:
     environment: integration
     runs-on: ubuntu-latest
     needs: [ build-chainlink, build-test-image ]
-    # if the event is a scheduled event or the test type is load and no previous job failed
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_type == 'smoke' && !contains(needs.*.result, 'failure') }}
+    # if the event is a scheduled event or the test type is smoke and no previous job failed
+    if: ${{ (github.event_name == 'schedule' || inputs.test_type == 'smoke') && !contains(needs.*.result, 'failure') }}
     permissions:
       issues: read
       checks: write
@@ -276,6 +278,12 @@ jobs:
             echo ::add-mask::$BASE64_CCIP_CONFIG_OVERRIDE
             echo "base_64_override=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_OUTPUT
           fi
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+             BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ./integration-tests/ccip-tests/testconfig/override/${{ matrix.config }})
+             echo ::add-mask::$BASE64_CCIP_CONFIG_OVERRIDE
+             echo "base_64_override=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_OUTPUT
+             echo "SLACK_USER=${{ secrets.QA_SLACK_USER }}" >> $GITHUB_ENV
+           fi
       - name: step summary
         shell: bash
         run: |
@@ -301,11 +309,11 @@ jobs:
           RR_MEM: 8Gi
           RR_CPU: 4
           TEST_TRIGGERED_BY: ccip-smoke-test-ci
-          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
-          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}                    
+          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }},${{ steps.set_override_config.outputs.base_64_override }}
+          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }},${{ steps.set_override_config.outputs.base_64_override }}
           E2E_TEST_GRAFANA_DASHBOARD_URL: "/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
         with:
-          test_command_to_run: cd ./integration-tests/ccip-tests && go test -v -timeout 70m -count=1 -p 30 -json -run ^TestSmokeCCIPForBidirectionalLane$ ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
+          test_command_to_run: cd ./integration-tests/ccip-tests && go test -v -timeout 3h -count=1 -p 30 -json -run ^TestSmokeCCIPForBidirectionalLane$ ./smoke 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           # Other default test secrets loaded from dotenv Github Secret.
           test_secrets_defaults_base64: ${{ secrets.CCIP_DEFAULT_TEST_SECRETS }}

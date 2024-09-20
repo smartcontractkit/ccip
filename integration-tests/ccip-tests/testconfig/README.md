@@ -657,6 +657,13 @@ Specifies the OCR parameters for the execute job. This is only valid if the test
 
 Specifies the value for the `InflightExpiry` in commit job's offchain config. This is only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
 
+### CCIP.Groups.[testgroup].SkipRequestIfAnotherRequestTriggeredWithin
+
+If there is CCIP Send requested event present within this duration, the test will skip sending another 
+request during load run or avoid sending request in smoke test in that lane. For Example,
+if `SkipRequestIfAnotherRequestTriggeredWithin` is set to `40m`, and a request is triggered at 0th second, the test will skip sending another request for another 40m.
+This particular field is used to avoid sending transaction when there is traffic already in that lane.
+
 ### CCIP.Groups.[testgroup].OffRampConfig
 
 Specifies the offramp configuration for the execution job. This is only valid if the test is not run on [existing deployments](#ccipgroupstestgroupexistingdeployment).
@@ -735,11 +742,6 @@ Specifies the duration network delay used for `NetworkChaos` experiment. This is
 #### CCIP.Groups.[testgroup].LoadProfile.WaitBetweenChaosDuringLoad
 
 If there are multiple chaos experiments, this specifies the duration to wait between each chaos experiment. This is only valid if the test is run on k8s and not on [existing deployments](#ccipgroupstestgroupexistingdeployment).
-
-#### CCIP.Groups.[testgroup].LoadProfile.SkipRequestIfAnotherRequestTriggeredWithin
-
-If a request is triggered within this duration, the test will skip sending another request during load run. For Example, if `SkipRequestIfAnotherRequestTriggeredWithin` is set to `40m`, and a request is triggered at 0th second, the test will skip sending another request for another 40m.
-This particular field is used to avoid sending multiple requests in a short duration during load run.
 
 #### CCIP.Groups.[testgroup].LoadProfile.OptimizeSpace
 

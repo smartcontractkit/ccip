@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/AlekSi/pointer"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -54,20 +56,40 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 		require.NoError(t, setUpOutput.TearDown())
 	})
 
-	// Create test definitions for each lane.
 	var tests []testDefinition
-	for _, lane := range setUpOutput.Lanes {
-		tests = append(tests, testDefinition{
-			testName: fmt.Sprintf("CCIP message transfer from network %s to network %s",
-				lane.ForwardLane.SourceNetworkName, lane.ForwardLane.DestNetworkName),
-			lane: lane.ForwardLane,
-		})
-		if lane.ReverseLane != nil {
+	lookBackDuration := TestCfg.TestGroupInput.SkipRequestIfAnotherRequestTriggeredWithin
+	var recentTxFound *types.Log
+	var err error
+
+	addLanesToTest := func(lane *actions.CCIPLane) {
+		// Create test definitions for given lane if no previous request has been triggered within the specified timeframe.
+		// By default, the timeframe is set to nil. To define a timeframe, assign a duration to the variable
+		// SkipRequestIfAnotherRequestTriggeredWithin.
+		if lookBackDuration != nil {
+			recentTxFound, err = lane.Source.IsPastRequestTriggeredWithinTimeframe(lane.Context, lookBackDuration)
+			require.NoError(t, err, "error while finding recent request for lane network %s to network %s",
+				lane.SourceNetworkName, lane.DestNetworkName)
+		}
+		if recentTxFound == nil {
 			tests = append(tests, testDefinition{
 				testName: fmt.Sprintf("CCIP message transfer from network %s to network %s",
-					lane.ReverseLane.SourceNetworkName, lane.ReverseLane.DestNetworkName),
-				lane: lane.ReverseLane,
+					lane.SourceNetworkName, lane.DestNetworkName),
+				lane: lane,
 			})
+		} else {
+			log.Info().
+				Str("TX", recentTxFound.TxHash.Hex()).
+				Uint64("Block Number", recentTxFound.BlockNumber).
+				Str("Source", lane.SourceNetworkName).
+				Str("Dest", lane.DestNetworkName).
+				Msgf("Lane Skipped. Recent request found within %v minutes.", lookBackDuration.Duration().Minutes())
+		}
+	}
+	for _, lane := range setUpOutput.Lanes {
+		addLanesToTest(lane.ForwardLane)
+		if lane.ReverseLane != nil {
+			recentTxFound = nil
+			addLanesToTest(lane.ReverseLane)
 		}
 	}
 
