@@ -197,23 +197,26 @@ func (r *rpcClient) Dial(callerCtx context.Context) error {
 	ctx, cancel := r.makeQueryCtx(callerCtx, r.rpcTimeout)
 	defer cancel()
 
+	if r.ws.uri.String() == "" && r.http == nil {
+		return errors.New("cannot dial rpc client when both ws and http info are missing")
+	}
+
 	promEVMPoolRPCNodeDials.WithLabelValues(r.chainID.String(), r.name).Inc()
-	lggr := r.rpcLog.With("wsuri", r.ws.uri.Redacted())
+	lggr := r.rpcLog
+	if r.ws.uri.String() != "" {
+		lggr = lggr.With("wsuri", r.ws.uri.Redacted())
+		wsrpc, err := rpc.DialWebsocket(ctx, r.ws.uri.String(), "")
+		if err != nil {
+			promEVMPoolRPCNodeDialsFailed.WithLabelValues(r.chainID.String(), r.name).Inc()
+			return r.wrapRPCClientError(pkgerrors.Wrapf(err, "error while dialing websocket: %v", r.ws.uri.Redacted()))
+		}
+
+		r.ws.rpc = wsrpc
+		r.ws.geth = ethclient.NewClient(wsrpc)
+	}
+
 	if r.http != nil {
 		lggr = lggr.With("httpuri", r.http.uri.Redacted())
-	}
-	lggr.Debugw("RPC dial: evmclient.Client#dial")
-
-	wsrpc, err := rpc.DialWebsocket(ctx, r.ws.uri.String(), "")
-	if err != nil {
-		promEVMPoolRPCNodeDialsFailed.WithLabelValues(r.chainID.String(), r.name).Inc()
-		return r.wrapRPCClientError(pkgerrors.Wrapf(err, "error while dialing websocket: %v", r.ws.uri.Redacted()))
-	}
-
-	r.ws.rpc = wsrpc
-	r.ws.geth = ethclient.NewClient(wsrpc)
-
-	if r.http != nil {
 		if err := r.DialHTTP(); err != nil {
 			return err
 		}
@@ -1229,6 +1232,9 @@ func (r *rpcClient) ClientVersion(ctx context.Context) (version string, err erro
 }
 
 func (r *rpcClient) SubscribeFilterLogs(ctx context.Context, q ethereum.FilterQuery, ch chan<- types.Log) (_ ethereum.Subscription, err error) {
+	if r.ws.uri.String() == "" {
+		return nil, errors.New("SubscribeFilterLogs is not allowed without ws url")
+	}
 	ctx, cancel, chStopInFlight, ws, _ := r.acquireQueryCtx(ctx, r.rpcTimeout)
 	defer cancel()
 	lggr := r.newRqLggr().With("q", q)

@@ -57,6 +57,12 @@ func TestRPCClient_SubscribeNewHead(t *testing.T) {
 		}
 		return
 	}
+	t.Run("WS and HTTP URL cannot be both empty", func(t *testing.T) {
+		// ws is optional when LogBroadcaster is disabled, however SubscribeFilterLogs will return error if ws is missing
+		observedLggr, _ := logger.TestObserved(t, zap.DebugLevel)
+		rpcClient := client.NewRPCClient(observedLggr, url.URL{}, nil, "rpc", 1, chainId, commonclient.Primary, 0, 0, commonclient.QueryTimeout, commonclient.QueryTimeout, "")
+		require.Equal(t, errors.New("cannot dial rpc client when both ws and http info are missing"), rpcClient.Dial(ctx))
+	})
 	t.Run("Updates chain info on new blocks", func(t *testing.T) {
 		server := testutils.NewWSServer(t, chainId, serverCallBack)
 		wsURL := server.WSURL()
@@ -209,6 +215,15 @@ func TestRPCClient_SubscribeFilterLogs(t *testing.T) {
 	lggr := logger.Test(t)
 	ctx, cancel := context.WithTimeout(tests.Context(t), tests.WaitTimeout(t))
 	defer cancel()
+	t.Run("Failed SubscribeFilterLogs when WSURL is empty", func(t *testing.T) {
+		// ws is optional when LogBroadcaster is disabled, however SubscribeFilterLogs will return error if ws is missing
+		observedLggr, _ := logger.TestObserved(t, zap.DebugLevel)
+		rpcClient := client.NewRPCClient(observedLggr, url.URL{}, &url.URL{}, "rpc", 1, chainId, commonclient.Primary, 0, 0, commonclient.QueryTimeout, commonclient.QueryTimeout, "")
+		require.Nil(t, rpcClient.Dial(ctx))
+
+		_, err := rpcClient.SubscribeFilterLogs(ctx, ethereum.FilterQuery{}, make(chan types.Log))
+		require.Equal(t, errors.New("SubscribeFilterLogs is not allowed without ws url"), err)
+	})
 	t.Run("Failed SubscribeFilterLogs logs and returns proper error", func(t *testing.T) {
 		server := testutils.NewWSServer(t, chainId, func(reqMethod string, reqParams gjson.Result) (resp testutils.JSONRPCResponse) {
 			return resp
