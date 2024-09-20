@@ -39,6 +39,9 @@ contract CCIPHome is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator {
   error FTooHigh();
   error FChainTooHigh(uint256 fChain, uint256 FRoleDON);
   error InvalidPluginType();
+  error PluginTypeMismatch(
+    bytes32 configDigest, Internal.OCRPluginType expectedPluginType, Internal.OCRPluginType gotPluginType
+  );
   error OfframpAddressCannotBeZero();
   error InvalidConfigLength(uint256 length);
   error InvalidConfigStateTransition(ConfigState currentState, ConfigState proposedState);
@@ -214,6 +217,7 @@ contract CCIPHome is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator {
   }
 
   /// @notice Called by the registry prior to the config being set for a particular DON.
+  /// @param config The configuration, abi encoded as (OCR3Config[] commitConfigs, OCR3Config[] execConfigs).
   /// @dev precondition Requires destination chain config to be set
   function beforeCapabilityConfigSet(
     bytes32[] calldata, // nodes
@@ -226,7 +230,8 @@ contract CCIPHome is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator {
     }
 
     (OCR3Config[] memory commitConfigs, OCR3Config[] memory execConfigs) =
-      _groupByPluginType(abi.decode(config, (OCR3Config[])));
+      abi.decode(config, (OCR3Config[], OCR3Config[]));
+
     if (commitConfigs.length > 0) {
       _updatePluginConfig(donId, Internal.OCRPluginType.Commit, commitConfigs);
     }
@@ -251,12 +256,19 @@ contract CCIPHome is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator {
     // Build the new configuration with metadata and validate that the transition is valid.
     OCR3ConfigWithMeta[] memory newConfigWithMeta =
       _computeNewConfigWithMeta(donId, currentConfig, newConfig, currentState, proposedState);
+
     _validateConfigTransition(currentConfig, newConfigWithMeta);
 
     // Update contract state with new configuration if its valid.
     // We won't run out of gas from this delete since the array is at most 2 elements long.
     delete s_ocr3Configs[donId][pluginType];
     for (uint256 i = 0; i < newConfigWithMeta.length; ++i) {
+      OCR3Config memory newOcr3Config = newConfigWithMeta[i].config;
+
+      if (newOcr3Config.pluginType != pluginType) {
+        revert PluginTypeMismatch(newConfigWithMeta[i].configDigest, pluginType, newOcr3Config.pluginType);
+      }
+
       // Struct has to be manually copied since there is a nested OCR3Node array. Direct assignment
       // will result in Unimplemented Feature issue.
       OCR3ConfigWithMeta storage ocr3ConfigWithMeta = s_ocr3Configs[donId][pluginType].push();
@@ -264,7 +276,6 @@ contract CCIPHome is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator {
       ocr3ConfigWithMeta.version = newConfigWithMeta[i].version;
 
       OCR3Config storage ocr3Config = ocr3ConfigWithMeta.config;
-      OCR3Config memory newOcr3Config = newConfigWithMeta[i].config;
       ocr3Config.pluginType = newOcr3Config.pluginType;
       ocr3Config.chainSelector = newOcr3Config.chainSelector;
       ocr3Config.FRoleDON = newOcr3Config.FRoleDON;
@@ -411,44 +422,6 @@ contract CCIPHome is ITypeAndVersion, ICapabilityConfiguration, OwnerIsCreator {
     }
 
     return newConfigWithMeta;
-  }
-
-  /// @notice Group the OCR3 configurations by plugin type for further processing.
-  /// @param ocr3Configs The OCR3 configurations to group.
-  /// @return commitConfigs The commit configurations.
-  /// @return execConfigs The execution configurations.
-  function _groupByPluginType(
-    OCR3Config[] memory ocr3Configs
-  ) internal pure returns (OCR3Config[] memory commitConfigs, OCR3Config[] memory execConfigs) {
-    if (ocr3Configs.length > MAX_OCR3_CONFIGS_PER_DON) {
-      revert TooManyOCR3Configs();
-    }
-
-    // Declare with size 2 since we have a maximum of two configs per plugin type (blue, green).
-    // If we have less we will adjust the length later using mstore.
-    // If the caller provides more than 2 configs per plugin type, we will revert due to out of bounds
-    // access in the for loop below.
-    commitConfigs = new OCR3Config[](MAX_OCR3_CONFIGS_PER_PLUGIN);
-    execConfigs = new OCR3Config[](MAX_OCR3_CONFIGS_PER_PLUGIN);
-    uint256 commitCount = 0;
-    uint256 execCount = 0;
-    for (uint256 i = 0; i < ocr3Configs.length; ++i) {
-      if (ocr3Configs[i].pluginType == Internal.OCRPluginType.Commit) {
-        commitConfigs[commitCount] = ocr3Configs[i];
-        ++commitCount;
-      } else {
-        execConfigs[execCount] = ocr3Configs[i];
-        ++execCount;
-      }
-    }
-
-    // Adjust the length of the arrays to the actual number of configs.
-    assembly {
-      mstore(commitConfigs, commitCount)
-      mstore(execConfigs, execCount)
-    }
-
-    return (commitConfigs, execConfigs);
   }
 
   /// @notice Validates an OCR3 configuration.

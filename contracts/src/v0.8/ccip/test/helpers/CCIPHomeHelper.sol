@@ -32,12 +32,6 @@ contract CCIPHomeHelper is CCIPHome {
     return _computeNewConfigWithMeta(donId, currentConfig, newConfig, currentState, newState);
   }
 
-  function groupByPluginType(
-    CCIPHome.OCR3Config[] memory ocr3Configs
-  ) public pure returns (CCIPHome.OCR3Config[] memory commitConfigs, CCIPHome.OCR3Config[] memory execConfigs) {
-    return _groupByPluginType(ocr3Configs);
-  }
-
   function computeConfigDigest(
     uint32 donId,
     uint64 configCount,

@@ -135,8 +135,6 @@ contract CCIPHomeSetup is Test {
 }
 
 contract CCIPHome_constructor is Test {
-  // Successes.
-
   function test_constructor_Success() public {
     address capabilitiesRegistry = makeAddr("capabilitiesRegistry");
     CCIPHomeHelper ccipCC = new CCIPHomeHelper(capabilitiesRegistry);
@@ -153,7 +151,6 @@ contract CCIPHome_constructor is Test {
 }
 
 contract CCIPHome_chainConfig is CCIPHomeSetup {
-  // Successes.
   function test_applyChainConfigUpdates_addChainConfigs_Success() public {
     bytes32[] memory chainReaders = new bytes32[](1);
     chainReaders[0] = keccak256(abi.encode(1));
@@ -384,8 +381,6 @@ contract CCIPHome_validateConfig is CCIPHomeSetup {
     return _getCorrectOCR3Config(4, 1);
   }
 
-  // Successes.
-
   function test__validateConfig_Success() public {
     s_ccipCC.validateConfig(_getCorrectOCR3Config());
   }
@@ -555,8 +550,6 @@ contract CCIPHome_validateConfig is CCIPHomeSetup {
 }
 
 contract CCIPHome_ConfigStateMachine is CCIPHomeSetup {
-  // Successful cases.
-
   function test__stateFromConfigLength_Success() public view {
     uint256 configLen = 0;
     CCIPHome.ConfigState state = s_ccipCC.stateFromConfigLength(configLen);
@@ -624,55 +617,6 @@ contract CCIPHome_ConfigStateMachine is CCIPHomeSetup {
 
     assertNotEq(configDigest2, configDigest3, "config digests 2 and 3 must not match");
     assertNotEq(configDigest2, configDigest4, "config digests 2 and 4 must not match");
-  }
-
-  function test_Fuzz__groupByPluginType_Success(uint256 numCommitCfgs, uint256 numExecCfgs) public view {
-    numCommitCfgs = bound(numCommitCfgs, 0, 2);
-    numExecCfgs = bound(numExecCfgs, 0, 2);
-
-    bytes32[] memory p2pIds = _makeBytes32Array(4, 0);
-    bytes[] memory signers = _makeBytesArray(4, 10);
-    bytes[] memory transmitters = _makeBytesArray(4, 20);
-    CCIPHome.OCR3Node[] memory nodes = new CCIPHome.OCR3Node[](4);
-    for (uint256 i = 0; i < 4; ++i) {
-      nodes[i] = CCIPHome.OCR3Node({p2pId: p2pIds[i], signerKey: signers[i], transmitterKey: transmitters[i]});
-    }
-
-    CCIPHome.OCR3Config[] memory cfgs = new CCIPHome.OCR3Config[](numCommitCfgs + numExecCfgs);
-    for (uint256 i = 0; i < numCommitCfgs; i++) {
-      cfgs[i] = CCIPHome.OCR3Config({
-        pluginType: Internal.OCRPluginType.Commit,
-        offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
-        chainSelector: 1,
-        nodes: nodes,
-        FRoleDON: 1,
-        offchainConfigVersion: 30,
-        offchainConfig: abi.encode("commit", i)
-      });
-    }
-    for (uint256 i = 0; i < numExecCfgs; i++) {
-      cfgs[numCommitCfgs + i] = CCIPHome.OCR3Config({
-        pluginType: Internal.OCRPluginType.Execution,
-        offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
-        chainSelector: 1,
-        nodes: nodes,
-        FRoleDON: 1,
-        offchainConfigVersion: 30,
-        offchainConfig: abi.encode("exec", numCommitCfgs + i)
-      });
-    }
-    (CCIPHome.OCR3Config[] memory commitCfgs, CCIPHome.OCR3Config[] memory execCfgs) = s_ccipCC.groupByPluginType(cfgs);
-
-    assertEq(commitCfgs.length, numCommitCfgs, "commitCfgs length must match");
-    assertEq(execCfgs.length, numExecCfgs, "execCfgs length must match");
-    for (uint256 i = 0; i < commitCfgs.length; i++) {
-      assertEq(uint8(commitCfgs[i].pluginType), uint8(Internal.OCRPluginType.Commit), "plugin type must be commit");
-      assertEq(commitCfgs[i].offchainConfig, abi.encode("commit", i), "offchain config must match");
-    }
-    for (uint256 i = 0; i < execCfgs.length; i++) {
-      assertEq(uint8(execCfgs[i].pluginType), uint8(Internal.OCRPluginType.Execution), "plugin type must be execution");
-      assertEq(execCfgs[i].offchainConfig, abi.encode("exec", numCommitCfgs + i), "offchain config must match");
-    }
   }
 
   function test__computeNewConfigWithMeta_InitToRunning_Success() public {
@@ -953,52 +897,6 @@ contract CCIPHome_ConfigStateMachine is CCIPHomeSetup {
     s_ccipCC.stateFromConfigLength(configLen);
   }
 
-  function test__groupByPluginType_threeCommitConfigs_Reverts() public {
-    bytes32[] memory p2pIds = _makeBytes32Array(4, 0);
-    bytes[] memory signers = _makeBytesArray(4, 10);
-    bytes[] memory transmitters = _makeBytesArray(4, 20);
-    CCIPHome.OCR3Config[] memory cfgs = new CCIPHome.OCR3Config[](3);
-    for (uint256 i = 0; i < 3; i++) {
-      cfgs[i] = CCIPHome.OCR3Config({
-        pluginType: Internal.OCRPluginType.Commit,
-        offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
-        chainSelector: 1,
-        nodes: _constructNodesArray(p2pIds, signers, transmitters),
-        FRoleDON: 1,
-        offchainConfigVersion: 30,
-        offchainConfig: abi.encode("commit", i)
-      });
-    }
-    vm.expectRevert();
-    s_ccipCC.groupByPluginType(cfgs);
-  }
-
-  function test__groupByPluginType_threeExecutionConfigs_Reverts() public {
-    bytes32[] memory p2pIds = _makeBytes32Array(4, 0);
-    bytes[] memory signers = _makeBytesArray(4, 10);
-    bytes[] memory transmitters = _makeBytesArray(4, 20);
-    CCIPHome.OCR3Config[] memory cfgs = new CCIPHome.OCR3Config[](3);
-    for (uint256 i = 0; i < 3; i++) {
-      cfgs[i] = CCIPHome.OCR3Config({
-        pluginType: Internal.OCRPluginType.Execution,
-        offrampAddress: abi.encodePacked(keccak256(abi.encode("offramp"))),
-        chainSelector: 1,
-        nodes: _constructNodesArray(p2pIds, signers, transmitters),
-        FRoleDON: 1,
-        offchainConfigVersion: 30,
-        offchainConfig: abi.encode("exec", i)
-      });
-    }
-    vm.expectRevert();
-    s_ccipCC.groupByPluginType(cfgs);
-  }
-
-  function test__groupByPluginType_TooManyOCR3Configs_Reverts() public {
-    CCIPHome.OCR3Config[] memory cfgs = new CCIPHome.OCR3Config[](5);
-    vm.expectRevert(CCIPHome.TooManyOCR3Configs.selector);
-    s_ccipCC.groupByPluginType(cfgs);
-  }
-
   function test__validateConfigTransition_InitToRunning_WrongConfigCount_Reverts() public {
     uint32 donId = 1;
     CCIPHome.OCR3Config memory blueConfig = CCIPHome.OCR3Config({
@@ -1182,8 +1080,6 @@ contract CCIPHome_ConfigStateMachine is CCIPHomeSetup {
 }
 
 contract CCIPHome_updatePluginConfig is CCIPHomeSetup {
-  // Successes.
-
   function test_updatePluginConfig_InitToRunning_Success() public {
     CCIPHome.OCR3Node[] memory nodes = _addChainConfig(4);
     uint32 donId = 1;
@@ -1342,12 +1238,11 @@ contract CCIPHome_updatePluginConfig is CCIPHomeSetup {
 }
 
 contract CCIPHome_beforeCapabilityConfigSet is CCIPHomeSetup {
-  // Successes.
   function test_beforeCapabilityConfigSet_ZeroLengthConfig_Success() public {
     changePrank(CAPABILITIES_REGISTRY);
 
     CCIPHome.OCR3Config[] memory configs = new CCIPHome.OCR3Config[](0);
-    bytes memory encodedConfigs = abi.encode(configs);
+    bytes memory encodedConfigs = abi.encode(configs, configs);
     s_ccipCC.beforeCapabilityConfigSet(new bytes32[](0), encodedConfigs, 1, 1);
   }
 
@@ -1368,8 +1263,8 @@ contract CCIPHome_beforeCapabilityConfigSet is CCIPHomeSetup {
     CCIPHome.OCR3Config[] memory configs = new CCIPHome.OCR3Config[](1);
     configs[0] = blueConfig;
 
-    bytes memory encoded = abi.encode(configs);
-    s_ccipCC.beforeCapabilityConfigSet(new bytes32[](0), encoded, 1, donId);
+    bytes memory commitAndExecConfig = abi.encode(configs, new CCIPHome.OCR3Config[](0));
+    s_ccipCC.beforeCapabilityConfigSet(new bytes32[](0), commitAndExecConfig, 1, donId);
 
     CCIPHome.OCR3ConfigWithMeta[] memory storedConfigs = s_ccipCC.getOCRConfig(donId, Internal.OCRPluginType.Commit);
     assertEq(storedConfigs.length, 1, "config length must be 1");
@@ -1393,10 +1288,10 @@ contract CCIPHome_beforeCapabilityConfigSet is CCIPHomeSetup {
       offchainConfigVersion: 30,
       offchainConfig: bytes("exec")
     });
-    CCIPHome.OCR3Config[] memory configs = new CCIPHome.OCR3Config[](1);
-    configs[0] = blueConfig;
+    CCIPHome.OCR3Config[] memory execConfigs = new CCIPHome.OCR3Config[](1);
+    execConfigs[0] = blueConfig;
 
-    bytes memory encoded = abi.encode(configs);
+    bytes memory encoded = abi.encode(new CCIPHome.OCR3Config[](0), execConfigs);
     s_ccipCC.beforeCapabilityConfigSet(new bytes32[](0), encoded, 1, donId);
 
     CCIPHome.OCR3ConfigWithMeta[] memory storedConfigs = s_ccipCC.getOCRConfig(donId, Internal.OCRPluginType.Execution);
@@ -1432,11 +1327,12 @@ contract CCIPHome_beforeCapabilityConfigSet is CCIPHomeSetup {
       offchainConfigVersion: 30,
       offchainConfig: bytes("exec")
     });
-    CCIPHome.OCR3Config[] memory configs = new CCIPHome.OCR3Config[](2);
-    configs[0] = blueExecConfig;
-    configs[1] = blueCommitConfig;
+    CCIPHome.OCR3Config[] memory commitConfigs = new CCIPHome.OCR3Config[](1);
+    CCIPHome.OCR3Config[] memory execConfigs = new CCIPHome.OCR3Config[](1);
+    commitConfigs[0] = blueCommitConfig;
+    execConfigs[0] = blueExecConfig;
 
-    bytes memory encoded = abi.encode(configs);
+    bytes memory encoded = abi.encode(commitConfigs, execConfigs);
     s_ccipCC.beforeCapabilityConfigSet(new bytes32[](0), encoded, 1, donId);
 
     CCIPHome.OCR3ConfigWithMeta[] memory storedExecConfigs =
