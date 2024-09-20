@@ -93,9 +93,9 @@ func (_c *FeeEstimatorConfigReader_GetDataAvailabilityConfig_Call) RunAndReturn(
 	return _c
 }
 
-// ModifyGasPriceComponents provides a mock function with given fields: ctx, gasPrice, daGasPrice
-func (_m *FeeEstimatorConfigReader) ModifyGasPriceComponents(ctx context.Context, gasPrice *big.Int, daGasPrice *big.Int) (*big.Int, *big.Int, error) {
-	ret := _m.Called(ctx, gasPrice, daGasPrice)
+// ModifyGasPriceComponents provides a mock function with given fields: ctx, execGasPrice, daGasPrice
+func (_m *FeeEstimatorConfigReader) ModifyGasPriceComponents(ctx context.Context, execGasPrice *big.Int, daGasPrice *big.Int) (*big.Int, *big.Int, error) {
+	ret := _m.Called(ctx, execGasPrice, daGasPrice)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ModifyGasPriceComponents")
@@ -105,10 +105,10 @@ func (_m *FeeEstimatorConfigReader) ModifyGasPriceComponents(ctx context.Context
 	var r1 *big.Int
 	var r2 error
 	if rf, ok := ret.Get(0).(func(context.Context, *big.Int, *big.Int) (*big.Int, *big.Int, error)); ok {
-		return rf(ctx, gasPrice, daGasPrice)
+		return rf(ctx, execGasPrice, daGasPrice)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, *big.Int, *big.Int) *big.Int); ok {
-		r0 = rf(ctx, gasPrice, daGasPrice)
+		r0 = rf(ctx, execGasPrice, daGasPrice)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*big.Int)
@@ -116,7 +116,7 @@ func (_m *FeeEstimatorConfigReader) ModifyGasPriceComponents(ctx context.Context
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, *big.Int, *big.Int) *big.Int); ok {
-		r1 = rf(ctx, gasPrice, daGasPrice)
+		r1 = rf(ctx, execGasPrice, daGasPrice)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).(*big.Int)
@@ -124,7 +124,7 @@ func (_m *FeeEstimatorConfigReader) ModifyGasPriceComponents(ctx context.Context
 	}
 
 	if rf, ok := ret.Get(2).(func(context.Context, *big.Int, *big.Int) error); ok {
-		r2 = rf(ctx, gasPrice, daGasPrice)
+		r2 = rf(ctx, execGasPrice, daGasPrice)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -139,21 +139,21 @@ type FeeEstimatorConfigReader_ModifyGasPriceComponents_Call struct {
 
 // ModifyGasPriceComponents is a helper method to define mock.On call
 //   - ctx context.Context
-//   - gasPrice *big.Int
+//   - execGasPrice *big.Int
 //   - daGasPrice *big.Int
-func (_e *FeeEstimatorConfigReader_Expecter) ModifyGasPriceComponents(ctx interface{}, gasPrice interface{}, daGasPrice interface{}) *FeeEstimatorConfigReader_ModifyGasPriceComponents_Call {
-	return &FeeEstimatorConfigReader_ModifyGasPriceComponents_Call{Call: _e.mock.On("ModifyGasPriceComponents", ctx, gasPrice, daGasPrice)}
+func (_e *FeeEstimatorConfigReader_Expecter) ModifyGasPriceComponents(ctx interface{}, execGasPrice interface{}, daGasPrice interface{}) *FeeEstimatorConfigReader_ModifyGasPriceComponents_Call {
+	return &FeeEstimatorConfigReader_ModifyGasPriceComponents_Call{Call: _e.mock.On("ModifyGasPriceComponents", ctx, execGasPrice, daGasPrice)}
 }
 
-func (_c *FeeEstimatorConfigReader_ModifyGasPriceComponents_Call) Run(run func(ctx context.Context, gasPrice *big.Int, daGasPrice *big.Int)) *FeeEstimatorConfigReader_ModifyGasPriceComponents_Call {
+func (_c *FeeEstimatorConfigReader_ModifyGasPriceComponents_Call) Run(run func(ctx context.Context, execGasPrice *big.Int, daGasPrice *big.Int)) *FeeEstimatorConfigReader_ModifyGasPriceComponents_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(*big.Int), args[2].(*big.Int))
 	})
 	return _c
 }
 
-func (_c *FeeEstimatorConfigReader_ModifyGasPriceComponents_Call) Return(_a0 *big.Int, _a1 *big.Int, _a2 error) *FeeEstimatorConfigReader_ModifyGasPriceComponents_Call {
-	_c.Call.Return(_a0, _a1, _a2)
+func (_c *FeeEstimatorConfigReader_ModifyGasPriceComponents_Call) Return(modExecGasPrice *big.Int, modDAGasPrice *big.Int, err error) *FeeEstimatorConfigReader_ModifyGasPriceComponents_Call {
+	_c.Call.Return(modExecGasPrice, modDAGasPrice, err)
 	return _c
 }
 

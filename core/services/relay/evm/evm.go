@@ -411,11 +411,7 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 
 	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
 	if r.chain.Config().EVM().ChainType() == chaintype.ChainMantle && commitPluginConfig.IsSourceProvider {
-		mantleInterceptor, err := mantle.NewInterceptor(ctx, r.chain.Client())
-		if err != nil {
-			return nil, err
-		}
-		feeEstimatorConfig.AddGasPriceInterceptor(mantleInterceptor)
+		feeEstimatorConfig.AddGasPriceInterceptor(mantle.NewInterceptor(ctx, r.chain.Client()))
 	}
 
 	// The src chain implementation of this provider does not need a configWatcher or contractTransmitter;
@@ -490,11 +486,7 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
 
 	if r.chain.Config().EVM().ChainType() == chaintype.ChainMantle && !execPluginConfig.IsSourceProvider {
-		mantleInterceptor, err := mantle.NewInterceptor(ctx, r.chain.Client())
-		if err != nil {
-			return nil, err
-		}
-		feeEstimatorConfig.AddGasPriceInterceptor(mantleInterceptor)
+		feeEstimatorConfig.AddGasPriceInterceptor(mantle.NewInterceptor(ctx, r.chain.Client()))
 	}
 
 	// The src chain implementation of this provider does not need a configWatcher or contractTransmitter;

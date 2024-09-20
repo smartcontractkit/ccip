@@ -37,18 +37,18 @@ func NewDAGasPriceEstimator(
 	}
 }
 
-func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (gasPrice *big.Int, err error) {
-	gasPrice, err = g.execEstimator.GetGasPrice(ctx)
+func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (execGasPrice *big.Int, err error) {
+	execGasPrice, err = g.execEstimator.GetGasPrice(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if gasPrice.BitLen() > int(g.priceEncodingLength) {
-		return nil, fmt.Errorf("native gas price exceeded max range %+v", gasPrice)
+	if execGasPrice.BitLen() > int(g.priceEncodingLength) {
+		return nil, fmt.Errorf("native gas price exceeded max range %+v", execGasPrice)
 	}
 
 	if g.l1Oracle == nil {
-		return gasPrice, nil
+		return execGasPrice, nil
 	}
 
 	daGasPriceWei, err := g.l1Oracle.GasPrice(ctx)
@@ -56,26 +56,23 @@ func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (gasPrice *big.Int
 		return nil, err
 	}
 
-	if daGasPrice := daGasPriceWei.ToInt(); daGasPrice.Cmp(big.NewInt(0)) > 0 {
+	daGasPrice := daGasPriceWei.ToInt()
+
+	execGasPrice, daGasPrice, err = g.feeEstimatorConfig.ModifyGasPriceComponents(ctx, execGasPrice, daGasPrice)
+	if err != nil {
+		return nil, fmt.Errorf("gasPrice modification failed: %v", err)
+	}
+
+	if daGasPrice.Cmp(big.NewInt(0)) > 0 {
 		if daGasPrice.BitLen() > int(g.priceEncodingLength) {
 			return nil, fmt.Errorf("data availability gas price exceeded max range %+v", daGasPrice)
 		}
 
-		gasPrice, daGasPrice, err = g.feeEstimatorConfig.ModifyGasPriceComponents(ctx, gasPrice, daGasPrice)
-		if err != nil {
-			return nil, fmt.Errorf("gasPrice modification failed: %v", err)
-		}
-
 		daGasPrice = new(big.Int).Lsh(daGasPrice, g.priceEncodingLength)
-		gasPrice = new(big.Int).Add(gasPrice, daGasPrice)
-	} else {
-		gasPrice, _, err = g.feeEstimatorConfig.ModifyGasPriceComponents(ctx, gasPrice, new(big.Int))
-		if err != nil {
-			return nil, fmt.Errorf("gasPrice modification failed: %v", err)
-		}
+		execGasPrice = new(big.Int).Add(execGasPrice, daGasPrice)
 	}
 
-	return gasPrice, nil
+	return execGasPrice, nil
 }
 
 func (g DAGasPriceEstimator) DenoteInUSD(p *big.Int, wrappedNativePrice *big.Int) (*big.Int, error) {
