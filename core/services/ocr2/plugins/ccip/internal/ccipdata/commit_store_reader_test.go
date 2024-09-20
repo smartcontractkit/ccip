@@ -194,7 +194,14 @@ func TestCommitStoreReaders(t *testing.T) {
 	ge.On("L1Oracle").Return(lm)
 
 	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
-
+	feeEstimatorConfig.On(
+		"ModifyGasPriceComponents",
+		mock.AnythingOfType("context.backgroundCtx"),
+		mock.AnythingOfType("*big.Int"),
+		mock.AnythingOfType("*big.Int"),
+	).Return(func(ctx context.Context, x, y *big.Int) (*big.Int, *big.Int, error) {
+		return x, y, nil
+	})
 	maxGasPrice := big.NewInt(1e8)
 	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp, feeEstimatorConfig) // ge, maxGasPrice
 	require.NoError(t, err)
@@ -372,12 +379,6 @@ func TestCommitStoreReaders(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, commonOffchain, c2)
 			// We should be able to query for gas prices now.
-
-			var execGasPrice, daGasPrice *big.Int
-			feeEstimatorConfig.On("ModifyGasPriceComponents", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-				execGasPrice = args.Get(1).(*big.Int)
-				daGasPrice = args.Get(2).(*big.Int)
-			}).Return(execGasPrice, daGasPrice, nil).Maybe()
 
 			gpe, err := cr.GasPriceEstimator(ctx)
 			require.NoError(t, err)
