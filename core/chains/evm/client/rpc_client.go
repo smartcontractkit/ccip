@@ -492,8 +492,20 @@ func isRequestingFinalizedBlock(el rpc.BatchElem) bool {
 func (r *rpcClient) SubscribeNewHead(ctx context.Context, channel chan<- *evmtypes.Head) (_ commontypes.Subscription, err error) {
 	ctx, cancel, chStopInFlight, ws, _ := r.acquireQueryCtx(ctx, r.rpcTimeout)
 	defer cancel()
+
 	args := []interface{}{"newHeads"}
 	lggr := r.newRqLggr().With("args", args)
+	if r.newHeadsPollInterval > 0 {
+		interval := r.newHeadsPollInterval
+		timeout := interval
+		poller, _ := commonclient.NewPoller[*evmtypes.Head](interval, r.LatestBlock, timeout, r.rpcLog)
+		if err = poller.Start(); err != nil {
+			return nil, err
+		}
+
+		lggr.Infof("Polling new heads over http ")
+		return &poller, nil
+	}
 
 	lggr.Debug("RPC call: evmclient.Client#EthSubscribe")
 	start := time.Now()
