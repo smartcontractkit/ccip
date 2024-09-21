@@ -25,14 +25,14 @@ func TestInterceptor(t *testing.T) {
 
 	modExecGasPrice, modDAGasPrice, err := interceptor.ModifyGasPriceComponents(ctx, big.NewInt(1), big.NewInt(1))
 	require.NoError(t, err)
-	require.Equal(t, modExecGasPrice.Int64(), int64(20))
-	require.Equal(t, modDAGasPrice.Int64(), int64(1))
+	require.Equal(t, modExecGasPrice.Int64(), int64(10))
+	require.Equal(t, modDAGasPrice.Int64(), int64(10))
 
 	// second call won't invoke eth client
 	modExecGasPrice, modDAGasPrice, err = interceptor.ModifyGasPriceComponents(ctx, big.NewInt(2), big.NewInt(1))
 	require.NoError(t, err)
-	require.Equal(t, modExecGasPrice.Int64(), int64(30))
-	require.Equal(t, modDAGasPrice.Int64(), int64(1))
+	require.Equal(t, modExecGasPrice.Int64(), int64(20))
+	require.Equal(t, modDAGasPrice.Int64(), int64(10))
 }
 
 func TestModifyGasPriceComponents(t *testing.T) {
@@ -41,24 +41,35 @@ func TestModifyGasPriceComponents(t *testing.T) {
 		daGasPrice         *big.Int
 		tokenRatio         *big.Int
 		resultExecGasPrice *big.Int
+		resultDAGasPrice   *big.Int
 	}{
 		"regular": {
 			execGasPrice:       big.NewInt(1),
 			daGasPrice:         big.NewInt(1),
 			tokenRatio:         big.NewInt(10),
-			resultExecGasPrice: big.NewInt(20),
+			resultExecGasPrice: big.NewInt(10),
+			resultDAGasPrice:   big.NewInt(10),
 		},
 		"zero DAGasPrice": {
 			execGasPrice:       big.NewInt(1),
 			daGasPrice:         big.NewInt(0),
-			tokenRatio:         big.NewInt(1),
-			resultExecGasPrice: big.NewInt(1),
+			tokenRatio:         big.NewInt(10),
+			resultExecGasPrice: big.NewInt(10),
+			resultDAGasPrice:   big.NewInt(0),
+		},
+		"zero ExecGasPrice": {
+			execGasPrice:       big.NewInt(0),
+			daGasPrice:         big.NewInt(1),
+			tokenRatio:         big.NewInt(10),
+			resultExecGasPrice: big.NewInt(0),
+			resultDAGasPrice:   big.NewInt(10),
 		},
 		"zero token ratio": {
 			execGasPrice:       big.NewInt(15),
 			daGasPrice:         big.NewInt(10),
 			tokenRatio:         big.NewInt(0),
 			resultExecGasPrice: big.NewInt(0),
+			resultDAGasPrice:   big.NewInt(0),
 		},
 	}
 
@@ -75,7 +86,7 @@ func TestModifyGasPriceComponents(t *testing.T) {
 			modExecGasPrice, modDAGasPrice, err := interceptor.ModifyGasPriceComponents(ctx, tc.execGasPrice, tc.daGasPrice)
 			require.NoError(t, err)
 			require.Equal(t, modExecGasPrice, tc.resultExecGasPrice)
-			require.Equal(t, modDAGasPrice, tc.daGasPrice)
+			require.Equal(t, modDAGasPrice, tc.resultDAGasPrice)
 		})
 	}
 }

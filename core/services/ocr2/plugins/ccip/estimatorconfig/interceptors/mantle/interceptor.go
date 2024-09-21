@@ -60,9 +60,9 @@ func (i *Interceptor) ModifyGasPriceComponents(ctx context.Context, execGasPrice
 		i.tokenRatio, i.tokenRatioLastUpdate = mantleTokenRatio, time.Now()
 	}
 
-	// returns result of (execGasPrice+daGasPrice)*i.tokenRatio as a execGasPrice, daGasPrice not modified.
-	newGasPrice := new(big.Int).Add(execGasPrice, daGasPrice)
-	return new(big.Int).Mul(newGasPrice, i.tokenRatio), daGasPrice, nil
+	newExecGasPrice := new(big.Int).Mul(execGasPrice, i.tokenRatio)
+	newDAGasPrice := new(big.Int).Mul(daGasPrice, i.tokenRatio)
+	return newExecGasPrice, newDAGasPrice, nil
 }
 
 // getMantleGasPrice Requests and returns the token ratio for Mantle.
