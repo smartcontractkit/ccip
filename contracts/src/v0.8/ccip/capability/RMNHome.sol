@@ -142,9 +142,9 @@ contract RMNHome is HomeBase {
     }
 
     uint32 newVersion = ++s_configCount;
-    newConfigDigest = _getConfigDigest(newConfig.staticConfig, newVersion);
-    s_configs[secondaryConfigIndex] =
-      StoredConfig(abi.encode(newConfig.staticConfig), abi.encode(newConfig.dynamicConfig));
+    bytes memory encodedStaticConfig = abi.encode(newConfig.staticConfig);
+    newConfigDigest = _calculateConfigDigest(encodedStaticConfig, newVersion, PREFIX);
+    s_configs[secondaryConfigIndex] = StoredConfig(encodedStaticConfig, abi.encode(newConfig.dynamicConfig));
     s_configVersions[secondaryConfigIndex] = newVersion;
     s_configDigests[secondaryConfigIndex] = newConfigDigest;
 
@@ -224,15 +224,5 @@ contract RMNHome is HomeBase {
         revert MinObserversTooHigh();
       }
     }
-  }
-
-  function _getConfigDigest(StaticConfig memory staticConfig, uint32 version) internal view returns (bytes32) {
-    return bytes32(
-      (PREFIX & PREFIX_MASK)
-        | (
-          uint256(keccak256(abi.encode(bytes32("EVM"), block.chainid, address(this), version, staticConfig)))
-            & ~PREFIX_MASK
-        )
-    );
   }
 }

@@ -37,12 +37,13 @@ contract RMNHomeTest is Test {
   uint256 private constant PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..00
   uint256 private constant PREFIX = 0x000b << (256 - 16); // 0x000b00..00
 
-  function _getConfigDigest(RMNHome.StaticConfig memory staticConfig, uint32 version) internal view returns (bytes32) {
+  function _getConfigDigest(bytes memory staticConfig, uint32 version) internal view returns (bytes32) {
     return bytes32(
       (PREFIX & PREFIX_MASK)
         | (
-          uint256(keccak256(abi.encode(bytes32("EVM"), block.chainid, address(s_rmnHome), version, staticConfig)))
-            & ~PREFIX_MASK
+          uint256(
+            keccak256(bytes.concat(abi.encode(bytes32("EVM"), block.chainid, address(s_rmnHome), version), staticConfig))
+          ) & ~PREFIX_MASK
         )
     );
   }
@@ -57,7 +58,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
       dynamicConfig: config.dynamicConfig,
       configDigest: ZERO_DIGEST
     });
-    versionedConfig.configDigest = _getConfigDigest(versionedConfig.staticConfig, versionedConfig.version);
+    versionedConfig.configDigest = _getConfigDigest(abi.encode(versionedConfig.staticConfig), versionedConfig.version);
 
     vm.expectEmit();
     emit RMNHome.ConfigSet(versionedConfig);

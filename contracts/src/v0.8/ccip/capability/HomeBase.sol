@@ -79,4 +79,19 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
     s_primaryConfigIndex ^= 1;
     emit ConfigRevoked(digestToRevoke);
   }
+
+  function _calculateConfigDigest(
+    bytes memory staticConfig,
+    uint32 version,
+    uint256 prefix
+  ) internal view returns (bytes32) {
+    return bytes32(
+      (prefix & PREFIX_MASK)
+        | (
+          uint256(
+            keccak256(bytes.concat(abi.encode(bytes32("EVM"), block.chainid, address(this), version), staticConfig))
+          ) & ~PREFIX_MASK
+        )
+    );
+  }
 }
