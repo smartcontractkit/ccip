@@ -959,11 +959,12 @@ func (n *Node) ValidateConfig() (err error) {
 
 	// relax the check here as WSURL can potentially be empty if LogBroadcaster is disabled (checked in EVMConfig Validation)
 	if n.WSURL != nil && !n.WSURL.IsZero() {
-		switch n.WSURL.Scheme {
-		case "ws", "wss":
-		default:
-			err = multierr.Append(err, commonconfig.ErrInvalid{Name: "WSURL", Value: n.WSURL.Scheme, Msg: "must be ws or wss"})
-		}
+		n.WSURL = nil
+		//switch n.WSURL.Scheme {
+		//case "ws", "wss":
+		//default:
+		//	err = multierr.Append(err, commonconfig.ErrInvalid{Name: "WSURL", Value: n.WSURL.Scheme, Msg: "must be ws or wss"})
+		//}
 	}
 
 	if n.HTTPURL == nil {
