@@ -201,7 +201,7 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
     uint8 pluginType,
     bytes calldata newDynamicConfig,
     bytes32 currentDigest
-  ) external onlyOwner {
+  ) external OnlyOwnerOrSelfCall {
     for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
       if (s_configs[donId][pluginType][i].configDigest == currentDigest && currentDigest != ZERO_DIGEST) {
         _validateDynamicConfig(s_configs[donId][pluginType][i].staticConfig, newDynamicConfig);
@@ -219,7 +219,7 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
 
   /// @notice Revokes a specific config by digest.
   /// @param configDigest The digest of the config to revoke. This is done to prevent accidental revokes.
-  function revokeSecondary(uint32 donId, uint8 pluginType, bytes32 configDigest) external onlyOwner {
+  function revokeSecondary(uint32 donId, uint8 pluginType, bytes32 configDigest) external OnlyOwnerOrSelfCall {
     uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
     if (s_configs[donId][pluginType][secondaryConfigIndex].configDigest != configDigest) {
       revert ConfigDigestMismatch(s_configs[donId][pluginType][secondaryConfigIndex].configDigest, configDigest);
@@ -238,7 +238,7 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
     uint8 pluginType,
     bytes32 digestToPromote,
     bytes32 digestToRevoke
-  ) external onlyOwner {
+  ) external OnlyOwnerOrSelfCall {
     uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
     if (s_configs[donId][pluginType][secondaryConfigIndex].configDigest != digestToPromote) {
       revert ConfigDigestMismatch(s_configs[donId][pluginType][secondaryConfigIndex].configDigest, digestToPromote);

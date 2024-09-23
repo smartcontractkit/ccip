@@ -50,7 +50,12 @@ contract RMNHomeTest is Test {
       (PREFIX & PREFIX_MASK)
         | (
           uint256(
-            keccak256(bytes.concat(abi.encode(bytes32("EVM"), block.chainid, address(s_rmnHome), version), staticConfig))
+            keccak256(
+              bytes.concat(
+                abi.encode(bytes32("EVM"), block.chainid, address(s_rmnHome), RMN_DON_ID, RMN_PLUGIN_TYPE, version),
+                staticConfig
+              )
+            )
           ) & ~PREFIX_MASK
         )
     );
@@ -242,7 +247,7 @@ contract RMNHome_setDynamicConfig is RMNHomeTest {
 
     vm.startPrank(address(0));
 
-    vm.expectRevert("Only callable by owner");
+    vm.expectRevert(HomeBase.OnlyOwnerOrSelfCallAllowed.selector);
     s_rmnHome.setDynamicConfig(RMN_DON_ID, RMN_PLUGIN_TYPE, abi.encode(config.dynamicConfig), keccak256("configDigest"));
   }
 }
@@ -296,7 +301,7 @@ contract RMNHome_revokeSecondary is RMNHomeTest {
   function test_revokeSecondary_OnlyOwner_reverts() public {
     vm.startPrank(address(0));
 
-    vm.expectRevert("Only callable by owner");
+    vm.expectRevert(HomeBase.OnlyOwnerOrSelfCallAllowed.selector);
     s_rmnHome.revokeSecondary(RMN_DON_ID, RMN_PLUGIN_TYPE, keccak256("configDigest"));
   }
 }
@@ -307,7 +312,7 @@ contract RMNHome_promoteSecondaryAndRevokePrimary is RMNHomeTest {
   function test_promoteSecondaryAndRevokePrimary_OnlyOwner_reverts() public {
     vm.startPrank(address(0));
 
-    vm.expectRevert("Only callable by owner");
+    vm.expectRevert(HomeBase.OnlyOwnerOrSelfCallAllowed.selector);
     s_rmnHome.promoteSecondaryAndRevokePrimary(
       RMN_DON_ID, RMN_PLUGIN_TYPE, keccak256("toPromote"), keccak256("ToRevoke")
     );
