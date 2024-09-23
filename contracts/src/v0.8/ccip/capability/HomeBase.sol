@@ -10,10 +10,11 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
 
   error ConfigDigestMismatch(bytes32 expectedConfigDigest, bytes32 gotConfigDigest);
 
+  /// @notice Used for encoding the config digest prefix
+  uint256 private constant PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..00
   /// @notice The max number of configs that can be active at the same time.
   uint256 internal constant MAX_CONCURRENT_CONFIGS = 2;
-  /// @notice Used for encoding the config digest prefix
-  uint256 internal constant PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..00
+  /// @notice Helper to identify the zero config digest with less casting.
   bytes32 internal constant ZERO_DIGEST = bytes32(uint256(0));
 
   /// @notice This array holds the digests of the configs, used for efficiency.
@@ -32,6 +33,27 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
     uint32 version;
     bytes staticConfig;
     bytes dynamicConfig;
+  }
+
+  /// @notice Returns the stored config for a given digest. Will always return an empty config if the digest is the zero
+  /// digest. This is done to prevent exposing old config state that is invalid.
+  function _getStoredConfig(bytes32 configDigest) internal view returns (StoredConfig memory storedConfig, bool ok) {
+    for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
+      // We never want to return true for a zero digest, even if the caller is asking for it, as this can expose old
+      // config state that is invalid.
+      if (s_configDigests[i] == configDigest && configDigest != ZERO_DIGEST) {
+        return (s_configs[i], true);
+      }
+    }
+    return (storedConfig, false);
+  }
+
+  function _getPrimaryStoredConfig() internal view returns (StoredConfig memory primaryConfig) {
+    return s_configs[s_primaryConfigIndex];
+  }
+
+  function _getSecondaryStoredConfig() internal view returns (StoredConfig memory secondaryConfig) {
+    return s_configs[s_primaryConfigIndex ^ 1];
   }
 
   /// @notice Returns the current primary and secondary config digests.

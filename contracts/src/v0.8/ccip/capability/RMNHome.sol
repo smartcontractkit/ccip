@@ -64,22 +64,19 @@ contract RMNHome is HomeBase {
   /// @return versionedConfig The config and its version.
   /// @return ok True if the config was found, false otherwise.
   function getConfig(bytes32 configDigest) external view returns (VersionedConfig memory versionedConfig, bool ok) {
-    for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
-      // We never want to return true for a zero digest, even if the caller is asking for it, as this can expose old
-      // config state that is invalid.
-      if (s_configDigests[i] == configDigest && configDigest != ZERO_DIGEST) {
-        StoredConfig memory config = s_configs[i];
-        return (
-          VersionedConfig({
-            version: config.version,
-            configDigest: configDigest,
-            staticConfig: abi.decode(config.staticConfig, (StaticConfig)),
-            dynamicConfig: abi.decode(config.dynamicConfig, (DynamicConfig))
-          }),
-          true
-        );
-      }
+    (StoredConfig memory storedConfig, bool ok) = _getStoredConfig(configDigest);
+    if (ok) {
+      return (
+        VersionedConfig({
+          version: storedConfig.version,
+          configDigest: configDigest,
+          staticConfig: abi.decode(storedConfig.staticConfig, (StaticConfig)),
+          dynamicConfig: abi.decode(storedConfig.dynamicConfig, (DynamicConfig))
+        }),
+        true
+      );
     }
+
     return (versionedConfig, false);
   }
 
