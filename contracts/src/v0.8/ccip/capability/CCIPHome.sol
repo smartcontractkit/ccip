@@ -38,35 +38,32 @@ contract RMNHome is HomeBase {
   error InvalidNode(CCIPConfigTypes.OCR3Node node);
   error NotEnoughTransmitters(uint256 got, uint256 minimum);
 
-  struct Node {
-    bytes32 peerId; //            Used for p2p communication.
-    bytes32 offchainPublicKey; // Observations are signed with this public key, and are only verified offchain.
+  /// @notice Represents an oracle node in OCR3 configs part of the role DON.
+  /// Every configured node should be a signer, but does not have to be a transmitter.
+  struct OCR3Node {
+    bytes32 p2pId; // Peer2Peer connection ID of the oracle
+    bytes signerKey; // On-chain signer public key
+    bytes transmitterKey; // On-chain transmitter public key. Can be set to empty bytes to represent that the node is a signer but not a transmitter.
   }
 
-  struct SourceChain {
-    uint64 chainSelector; // ─────╮ The Source chain selector.
-    uint64 minObservers; // ──────╯ Required number of observers to agree on an observation for this source chain.
-    uint256 observerNodesBitmap; // ObserverNodesBitmap & (1<<i) == (1<<i) iff nodes[i] is an observer for this source chain.
-  }
-
-  struct StaticConfig {
-    // No sorting requirement for nodes, but ensure that SourceChain.observerNodeIndices in the home chain config &
-    // Signer.nodeIndex in the remote chain configs are appropriately updated when changing this field.
-    Node[] nodes;
-    bytes offchainConfig; // Offchain configuration for RMN nodes.
-  }
-
-  struct DynamicConfig {
-    // No sorting requirement for source chains, it is most gas efficient to append new source chains to the right.
-    SourceChain[] sourceChains;
-    bytes offchainConfig; // Offchain configuration for RMN nodes.
+  /// @notice OCR3 configuration.
+  /// Note that FRoleDON >= fChain, since FRoleDON represents the role DON, and fChain represents sub-committees.
+  /// FRoleDON values are typically identical across multiple OCR3 configs since the chains pertain to one role DON,
+  /// but FRoleDON values can change across OCR3 configs to indicate role DON splits.
+  struct OCR3Config {
+    Internal.OCRPluginType pluginType; // ────────╮ The plugin that the configuration is for.
+    uint64 chainSelector; //                      | The (remote) chain that the configuration is for.
+    uint8 FRoleDON; //                            | The "big F" parameter for the role DON.
+    uint64 offchainConfigVersion; // ─────────────╯ The version of the offchain configuration.
+    bytes offrampAddress; // The remote chain offramp address.
+    OCR3Node[] nodes; // Keys & IDs of nodes part of the role DON
+    bytes offchainConfig; // The offchain configuration for the OCR3 protocol. Protobuf encoded.
   }
 
   struct VersionedConfig {
     uint32 version;
     bytes32 configDigest;
-    StaticConfig staticConfig;
-    DynamicConfig dynamicConfig;
+    OCR3Config staticConfig;
   }
 
   string public constant override typeAndVersion = "CCIPHome 1.6.0-dev";
@@ -102,8 +99,7 @@ contract RMNHome is HomeBase {
         VersionedConfig({
           version: storedConfig.version,
           configDigest: storedConfig.configDigest,
-          staticConfig: abi.decode(storedConfig.staticConfig, (StaticConfig)),
-          dynamicConfig: abi.decode(storedConfig.dynamicConfig, (DynamicConfig))
+          staticConfig: abi.decode(storedConfig.staticConfig, (OCR3Config))
         }),
         true
       );
@@ -123,8 +119,7 @@ contract RMNHome is HomeBase {
       primaryConfig = VersionedConfig({
         version: primaryStoredConfig.version,
         configDigest: primaryStoredConfig.configDigest,
-        staticConfig: abi.decode(primaryStoredConfig.staticConfig, (StaticConfig)),
-        dynamicConfig: abi.decode(primaryStoredConfig.dynamicConfig, (DynamicConfig))
+        staticConfig: abi.decode(primaryStoredConfig.staticConfig, (OCR3Config))
       });
     }
 
@@ -134,8 +129,7 @@ contract RMNHome is HomeBase {
       secondaryConfig = VersionedConfig({
         version: secondaryStoredConfig.version,
         configDigest: secondaryStoredConfig.configDigest,
-        staticConfig: abi.decode(secondaryStoredConfig.staticConfig, (StaticConfig)),
-        dynamicConfig: abi.decode(secondaryStoredConfig.dynamicConfig, (DynamicConfig))
+        staticConfig: abi.decode(secondaryStoredConfig.staticConfig, (OCR3Config))
       });
     }
 
