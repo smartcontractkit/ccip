@@ -60,6 +60,12 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
 
   function _getConfigDigestPrefix() internal pure virtual returns (uint256);
 
+  /// @notice Returns the capabilities registry address.
+  /// @return The capabilities registry address.
+  function getCapabilityRegistry() external view returns (address) {
+    return i_capabilitiesRegistry;
+  }
+
   /// @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
     return interfaceId == type(ICapabilityConfiguration).interfaceId || interfaceId == type(IERC165).interfaceId;
@@ -84,13 +90,13 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
 
   /// @inheritdoc ICapabilityConfiguration
   /// @dev The CCIP capability will fetch the configuration needed directly from this contract.
-  /// The offchain syncer will call this function, however, so its important that it doesn't revert.
+  /// The offchain syncer will call this function, so its important that it doesn't revert.
   function getCapabilityConfiguration(uint32 /* donId */ ) external pure override returns (bytes memory configuration) {
     return bytes("");
   }
+
   /// @notice Returns the stored config for a given digest. Will always return an empty config if the digest is the zero
   /// digest. This is done to prevent exposing old config state that is invalid.
-
   function _getStoredConfig(
     uint32 donId,
     uint8 pluginType,
@@ -174,7 +180,7 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
     }
 
     uint32 newVersion = ++s_configCount;
-    newConfigDigest = _calculateConfigDigest(encodedStaticConfig, newVersion);
+    newConfigDigest = _calculateConfigDigest(donId, pluginType, encodedStaticConfig, newVersion);
 
     StoredConfig memory newConfig = StoredConfig({
       configDigest: newConfigDigest,
@@ -252,12 +258,21 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
     emit ConfigPromoted(digestToPromote);
   }
 
-  function _calculateConfigDigest(bytes memory staticConfig, uint32 version) internal view returns (bytes32) {
+  function _calculateConfigDigest(
+    uint32 donId,
+    uint8 pluginType,
+    bytes memory staticConfig,
+    uint32 version
+  ) internal view returns (bytes32) {
     return bytes32(
       (_getConfigDigestPrefix() & PREFIX_MASK)
         | (
           uint256(
-            keccak256(bytes.concat(abi.encode(bytes32("EVM"), block.chainid, address(this), version), staticConfig))
+            keccak256(
+              bytes.concat(
+                abi.encode(bytes32("EVM"), block.chainid, address(this), donId, pluginType, version), staticConfig
+              )
+            )
           ) & ~PREFIX_MASK
         )
     );
