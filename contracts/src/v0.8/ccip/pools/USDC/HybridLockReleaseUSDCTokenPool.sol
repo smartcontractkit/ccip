@@ -34,8 +34,8 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   error LanePausedForCCTPMigration(uint64 remoteChainSelector);
   error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
 
-  /// bytes4(keccak256("NO_CTTP_USE_LOCK_RELEASE"))
-  bytes4 public constant LOCK_RELEASE_FLAG = 0xd43c7897;
+  /// bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
+  bytes4 public constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 
   /// @notice The address of the liquidity provider for a specific chain.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
@@ -114,7 +114,6 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
       s_lockedTokensByChainSelector[releaseOrMintIn.remoteChainSelector] -= releaseOrMintIn.amount;
     }
 
-    // Release to the offRamp, which forwards it to the recipient
     getToken().safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
     emit Released(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
@@ -171,6 +170,10 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   function provideLiquidity(uint64 remoteChainSelector, uint256 amount) external {
     if (s_liquidityProvider[remoteChainSelector] != msg.sender) revert TokenPool.Unauthorized(msg.sender);
 
+    if (remoteChainSelector == s_proposedUSDCMigrationChain) {
+      revert LanePausedForCCTPMigration(remoteChainSelector);
+    }
+
     s_lockedTokensByChainSelector[remoteChainSelector] += amount;
 
     i_token.safeTransferFrom(msg.sender, address(this), amount);
@@ -211,13 +214,6 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   /// @param from The address of the old pool.
   /// @param remoteChainSelector The chain for which liquidity is being transferred.
   function transferLiquidity(address from, uint64 remoteChainSelector) external onlyOwner {
-    // Prevent Liquidity Transfers when a migration is pending. This prevents requiring the new pool to manage
-    // token exclusions for edge-case messages and ensures that the migration is completed before any new liquidity
-    // is added to the pool.
-    if (HybridLockReleaseUSDCTokenPool(from).getCurrentProposedCCTPChainMigration() == remoteChainSelector) {
-      revert LanePausedForCCTPMigration(remoteChainSelector);
-    }
-
     OwnerIsCreator(from).acceptOwnership();
 
     // Withdraw all available liquidity from the old pool.

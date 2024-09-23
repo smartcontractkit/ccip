@@ -23,9 +23,8 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
 
   error onlyCircle();
   error ExistingMigrationProposal();
-  error NoExistingMigrationProposal();
   error NoMigrationProposalPending();
-  error InvalidChainSelector(uint64 remoteChainSelector);
+  error InvalidChainSelector();
 
   IBurnMintERC20 internal immutable i_USDC;
   Router internal immutable i_router;
@@ -49,9 +48,9 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   /// @dev proposeCCTPMigration must be called first on an approved lane to execute properly.
   /// @dev This function signature should NEVER be overwritten, otherwise it will be unable to be called by
   /// circle to properly migrate USDC over to CCTP.
-  function burnLockedUSDC() public {
+  function burnLockedUSDC() external {
     if (msg.sender != s_circleUSDCMigrator) revert onlyCircle();
-    if (s_proposedUSDCMigrationChain == 0) revert ExistingMigrationProposal();
+    if (s_proposedUSDCMigrationChain == 0) revert NoMigrationProposalPending();
 
     uint64 burnChainSelector = s_proposedUSDCMigrationChain;
 
@@ -84,6 +83,9 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
     // Prevent overwriting existing migration proposals until the current one is finished
     if (s_proposedUSDCMigrationChain != 0) revert ExistingMigrationProposal();
 
+    // Ensure that the chain is currently using lock/release and not CCTP
+    if (!s_shouldUseLockRelease[remoteChainSelector]) revert InvalidChainSelector();
+
     s_proposedUSDCMigrationChain = remoteChainSelector;
 
     emit CCTPMigrationProposed(remoteChainSelector);
@@ -92,7 +94,7 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   /// @notice Cancel an existing proposal to migrate a lane to CCTP.
   /// @notice This function will revert if no proposal is currently in progress.
   function cancelExistingCCTPMigrationProposal() external onlyOwner {
-    if (s_proposedUSDCMigrationChain == 0) revert NoExistingMigrationProposal();
+    if (s_proposedUSDCMigrationChain == 0) revert NoMigrationProposalPending();
 
     uint64 currentProposalChainSelector = s_proposedUSDCMigrationChain;
     delete s_proposedUSDCMigrationChain;
@@ -136,6 +138,8 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   /// @dev This function should ONLY be called on the home chain, where tokens are locked, NOT on the remote chain
   /// and strict scrutiny should be applied to ensure that the amount of tokens excluded is accurate.
   function excludeTokensFromBurn(uint64 remoteChainSelector, uint256 amount) external onlyOwner {
+    if (s_proposedUSDCMigrationChain != remoteChainSelector) revert NoMigrationProposalPending();
+
     s_tokensExcludedFromBurn[remoteChainSelector] += amount;
 
     uint256 burnableAmountAfterExclusion =
