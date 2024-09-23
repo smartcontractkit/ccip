@@ -27,7 +27,6 @@ const (
 type Interceptor struct {
 	client               evmClient.Client
 	tokenRatioCallData   []byte
-	decimalsCallData     []byte
 	tokenRatio           *big.Int
 	tokenRatioLastUpdate time.Time
 }
