@@ -32,7 +32,7 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
 
   /// @notice This array holds the configs.
   /// @dev Value i in this array is valid iff s_configs[i].configDigest != 0.
-  mapping(uint32 donId => mapping(uint8 pluginType => StoredConfig[MAX_CONCURRENT_CONFIGS])) private s_configs;
+  mapping(bytes32 pluginKey => StoredConfig[MAX_CONCURRENT_CONFIGS]) private s_configs;
 
   /// @notice The total number of configs ever set, used for generating the version of the configs.
   uint32 private s_configCount = 0;
@@ -108,60 +108,56 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
   /// @return primaryConfigDigest The digest of the primary config.
   /// @return secondaryConfigDigest The digest of the secondary config.
   function getConfigDigests(
-    uint32 donId,
-    uint8 pluginType
+    bytes32 pluginKey
   ) external view returns (bytes32 primaryConfigDigest, bytes32 secondaryConfigDigest) {
     return (
-      s_configs[donId][pluginType][s_primaryConfigIndex].configDigest,
-      s_configs[donId][pluginType][s_primaryConfigIndex ^ 1].configDigest
+      s_configs[pluginKey][s_primaryConfigIndex].configDigest,
+      s_configs[pluginKey][s_primaryConfigIndex ^ 1].configDigest
     );
   }
 
-  function getPrimaryDigest(uint32 donId, uint8 pluginType) public view returns (bytes32) {
-    return s_configs[donId][pluginType][s_primaryConfigIndex].configDigest;
+  function getPrimaryDigest(bytes32 pluginKey) public view returns (bytes32) {
+    return s_configs[pluginKey][s_primaryConfigIndex].configDigest;
   }
 
-  function getSecondaryDigest(uint32 donId, uint8 pluginType) public view returns (bytes32) {
-    return s_configs[donId][pluginType][s_primaryConfigIndex ^ 1].configDigest;
+  function getSecondaryDigest(bytes32 pluginKey) public view returns (bytes32) {
+    return s_configs[pluginKey][s_primaryConfigIndex ^ 1].configDigest;
   }
 
   /// @notice Returns the stored config for a given digest. Will always return an empty config if the digest is the zero
   /// digest. This is done to prevent exposing old config state that is invalid.
   function _getStoredConfig(
-    uint32 donId,
-    uint8 pluginType,
+    bytes32 pluginKey,
     bytes32 configDigest
   ) internal view returns (StoredConfig memory storedConfig, bool ok) {
     for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
       // We never want to return true for a zero digest, even if the caller is asking for it, as this can expose old
       // config state that is invalid.
-      if (s_configs[donId][pluginType][i].configDigest == configDigest && configDigest != ZERO_DIGEST) {
-        return (s_configs[donId][pluginType][i], true);
+      if (s_configs[pluginKey][i].configDigest == configDigest && configDigest != ZERO_DIGEST) {
+        return (s_configs[pluginKey][i], true);
       }
     }
     return (storedConfig, false);
   }
 
   function _getPrimaryStoredConfig(
-    uint32 donId,
-    uint8 pluginType
+    bytes32 pluginKey
   ) internal view returns (StoredConfig memory primaryConfig, bool ok) {
-    if (s_configs[donId][pluginType][s_primaryConfigIndex].configDigest == ZERO_DIGEST) {
+    if (s_configs[pluginKey][s_primaryConfigIndex].configDigest == ZERO_DIGEST) {
       return (StoredConfig(ZERO_DIGEST, 0, "", ""), false);
     }
 
-    return (s_configs[donId][pluginType][s_primaryConfigIndex], true);
+    return (s_configs[pluginKey][s_primaryConfigIndex], true);
   }
 
   function _getSecondaryStoredConfig(
-    uint32 donId,
-    uint8 pluginType
+    bytes32 pluginKey
   ) internal view returns (StoredConfig memory secondaryConfig, bool ok) {
-    if (s_configs[donId][pluginType][s_primaryConfigIndex ^ 1].configDigest == ZERO_DIGEST) {
+    if (s_configs[pluginKey][s_primaryConfigIndex ^ 1].configDigest == ZERO_DIGEST) {
       return (StoredConfig(ZERO_DIGEST, 0, "", ""), false);
     }
 
-    return (s_configs[donId][pluginType][s_primaryConfigIndex ^ 1], true);
+    return (s_configs[pluginKey][s_primaryConfigIndex ^ 1], true);
   }
 
   // ================================================================
@@ -172,15 +168,14 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
   /// @param digestToOverwrite The digest of the config to overwrite, or ZERO_DIGEST if no config is to be overwritten.
   /// This is done to prevent accidental overwrites.
   function setSecondary(
-    uint32 donId,
-    uint8 pluginType,
+    bytes32 pluginKey,
     bytes calldata encodedStaticConfig,
     bytes calldata encodedDynamicConfig,
     bytes32 digestToOverwrite
   ) external OnlyOwnerOrSelfCall returns (bytes32 newConfigDigest) {
     _validateStaticAndDynamicConfig(encodedStaticConfig, encodedDynamicConfig);
 
-    bytes32 existingDigest = getSecondaryDigest(donId, pluginType);
+    bytes32 existingDigest = getSecondaryDigest(pluginKey);
 
     if (existingDigest != digestToOverwrite) {
       revert ConfigDigestMismatch(existingDigest, digestToOverwrite);
@@ -192,7 +187,7 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
     }
 
     uint32 newVersion = ++s_configCount;
-    newConfigDigest = _calculateConfigDigest(donId, pluginType, encodedStaticConfig, newVersion);
+    newConfigDigest = _calculateConfigDigest(pluginKey, encodedStaticConfig, newVersion);
 
     StoredConfig memory newConfig = StoredConfig({
       configDigest: newConfigDigest,
@@ -201,7 +196,7 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
       dynamicConfig: encodedDynamicConfig
     });
 
-    s_configs[donId][pluginType][s_primaryConfigIndex ^ 1] = newConfig;
+    s_configs[pluginKey][s_primaryConfigIndex ^ 1] = newConfig;
 
     emit ConfigSet(newConfig);
 
@@ -210,37 +205,36 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
 
   /// @notice Revokes a specific config by digest.
   /// @param configDigest The digest of the config to revoke. This is done to prevent accidental revokes.
-  function revokeSecondary(uint32 donId, uint8 pluginType, bytes32 configDigest) external OnlyOwnerOrSelfCall {
+  function revokeSecondary(bytes32 pluginKey, bytes32 configDigest) external OnlyOwnerOrSelfCall {
     uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
-    if (s_configs[donId][pluginType][secondaryConfigIndex].configDigest != configDigest) {
-      revert ConfigDigestMismatch(s_configs[donId][pluginType][secondaryConfigIndex].configDigest, configDigest);
+    if (s_configs[pluginKey][secondaryConfigIndex].configDigest != configDigest) {
+      revert ConfigDigestMismatch(s_configs[pluginKey][secondaryConfigIndex].configDigest, configDigest);
     }
 
     emit ConfigRevoked(configDigest);
     // Delete only the digest, as that's what's used to determine if a config is active. This means the actual
     // config stays in storage which should significantly reduce the gas cost of overwriting that storage space in
     // the future.
-    delete s_configs[donId][pluginType][secondaryConfigIndex].configDigest;
+    delete s_configs[pluginKey][secondaryConfigIndex].configDigest;
   }
 
   /// @notice Promotes the secondary config to the primary config and revokes the primary config.
   function promoteSecondaryAndRevokePrimary(
-    uint32 donId,
-    uint8 pluginType,
+    bytes32 pluginKey,
     bytes32 digestToPromote,
     bytes32 digestToRevoke
   ) external OnlyOwnerOrSelfCall {
     uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
-    if (s_configs[donId][pluginType][secondaryConfigIndex].configDigest != digestToPromote) {
-      revert ConfigDigestMismatch(s_configs[donId][pluginType][secondaryConfigIndex].configDigest, digestToPromote);
+    if (s_configs[pluginKey][secondaryConfigIndex].configDigest != digestToPromote) {
+      revert ConfigDigestMismatch(s_configs[pluginKey][secondaryConfigIndex].configDigest, digestToPromote);
     }
 
     uint256 primaryConfigIndex = s_primaryConfigIndex;
-    if (s_configs[donId][pluginType][primaryConfigIndex].configDigest != digestToRevoke) {
-      revert ConfigDigestMismatch(s_configs[donId][pluginType][primaryConfigIndex].configDigest, digestToRevoke);
+    if (s_configs[pluginKey][primaryConfigIndex].configDigest != digestToRevoke) {
+      revert ConfigDigestMismatch(s_configs[pluginKey][primaryConfigIndex].configDigest, digestToRevoke);
     }
 
-    delete s_configs[donId][pluginType][primaryConfigIndex].configDigest;
+    delete s_configs[pluginKey][primaryConfigIndex].configDigest;
 
     s_primaryConfigIndex ^= 1;
     if (digestToRevoke != ZERO_DIGEST) {
@@ -250,17 +244,16 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
   }
 
   function setDynamicConfig(
-    uint32 donId,
-    uint8 pluginType,
+    bytes32 pluginKey,
     bytes calldata newDynamicConfig,
     bytes32 currentDigest
   ) external OnlyOwnerOrSelfCall {
     for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
-      if (s_configs[donId][pluginType][i].configDigest == currentDigest && currentDigest != ZERO_DIGEST) {
-        _validateDynamicConfig(s_configs[donId][pluginType][i].staticConfig, newDynamicConfig);
+      if (s_configs[pluginKey][i].configDigest == currentDigest && currentDigest != ZERO_DIGEST) {
+        _validateDynamicConfig(s_configs[pluginKey][i].staticConfig, newDynamicConfig);
 
         // Since the static config doesn't change we don't have to update the digest or version.
-        s_configs[donId][pluginType][i].dynamicConfig = newDynamicConfig;
+        s_configs[pluginKey][i].dynamicConfig = newDynamicConfig;
 
         emit DynamicConfigSet(currentDigest, newDynamicConfig);
         return;
@@ -271,8 +264,7 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
   }
 
   function _calculateConfigDigest(
-    uint32 donId,
-    uint8 pluginType,
+    bytes32 pluginKey,
     bytes memory staticConfig,
     uint32 version
   ) internal view returns (bytes32) {
@@ -281,9 +273,7 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
         | (
           uint256(
             keccak256(
-              bytes.concat(
-                abi.encode(bytes32("EVM"), block.chainid, address(this), donId, pluginType, version), staticConfig
-              )
+              bytes.concat(abi.encode(bytes32("EVM"), block.chainid, address(this), pluginKey, version), staticConfig)
             )
           ) & ~PREFIX_MASK
         )

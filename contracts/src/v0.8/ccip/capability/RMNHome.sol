@@ -56,11 +56,10 @@ contract RMNHome is HomeBase {
   /// @return versionedConfig The config and its version.
   /// @return ok True if the config was found, false otherwise.
   function getConfig(
-    uint32 donId,
-    uint8 pluginType,
+    bytes32 pluginKey,
     bytes32 configDigest
   ) external view returns (VersionedConfig memory versionedConfig, bool ok) {
-    (StoredConfig memory storedConfig, bool configOK) = _getStoredConfig(donId, pluginType, configDigest);
+    (StoredConfig memory storedConfig, bool configOK) = _getStoredConfig(pluginKey, configDigest);
     if (configOK) {
       return (
         VersionedConfig({
@@ -77,10 +76,9 @@ contract RMNHome is HomeBase {
   }
 
   function getAllConfigs(
-    uint32 donId,
-    uint8 pluginType
+    bytes32 pluginKey
   ) external view returns (VersionedConfig memory primaryConfig, VersionedConfig memory secondaryConfig) {
-    (StoredConfig memory primaryStoredConfig, bool primaryOk) = _getPrimaryStoredConfig(donId, pluginType);
+    (StoredConfig memory primaryStoredConfig, bool primaryOk) = _getPrimaryStoredConfig(pluginKey);
 
     if (primaryOk) {
       primaryConfig = VersionedConfig({
@@ -91,7 +89,7 @@ contract RMNHome is HomeBase {
       });
     }
 
-    (StoredConfig memory secondaryStoredConfig, bool secondaryOk) = _getSecondaryStoredConfig(donId, pluginType);
+    (StoredConfig memory secondaryStoredConfig, bool secondaryOk) = _getSecondaryStoredConfig(pluginKey);
 
     if (secondaryOk) {
       secondaryConfig = VersionedConfig({

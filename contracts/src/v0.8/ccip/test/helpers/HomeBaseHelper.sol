@@ -19,30 +19,25 @@ contract HomeBaseHelper is HomeBase {
   }
 
   function getStoredConfig(
-    uint32 donId,
-    uint8 pluginType,
+    bytes32 pluginKey,
     bytes32 configDigest
   ) external view returns (StoredConfig memory, bool ok) {
-    return _getStoredConfig(donId, pluginType, configDigest);
+    return _getStoredConfig(pluginKey, configDigest);
   }
 
-  function getPrimaryStoredConfig(uint32 donId, uint8 pluginType) external view returns (StoredConfig memory, bool ok) {
-    return _getPrimaryStoredConfig(donId, pluginType);
+  function getPrimaryStoredConfig(bytes32 pluginKey) external view returns (StoredConfig memory, bool ok) {
+    return _getPrimaryStoredConfig(pluginKey);
   }
 
-  function getSecondaryStoredConfig(
-    uint32 donId,
-    uint8 pluginType
-  ) external view returns (StoredConfig memory, bool ok) {
-    return _getSecondaryStoredConfig(donId, pluginType);
+  function getSecondaryStoredConfig(bytes32 pluginKey) external view returns (StoredConfig memory, bool ok) {
+    return _getSecondaryStoredConfig(pluginKey);
   }
 
   function calculateConfigDigest(
-    uint32 donId,
-    uint8 pluginType,
+    bytes32 pluginKey,
     bytes memory staticConfig,
     uint32 version
   ) external view returns (bytes32) {
-    return _calculateConfigDigest(donId, pluginType, staticConfig, version);
+    return _calculateConfigDigest(pluginKey, staticConfig, version);
   }
 }
