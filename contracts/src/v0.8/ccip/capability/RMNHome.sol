@@ -12,15 +12,16 @@ contract RMNHome is HomeBase {
   error DuplicateSourceChain();
   error OutOfBoundsObserverNodeIndex();
   error MinObserversTooHigh();
-  error DigestNotFound(bytes32 configDigest);
-
-  event ConfigSet(VersionedConfig versionedConfig);
-  event DynamicConfigSet(bytes32 indexed configDigest, DynamicConfig dynamicConfig);
-  event ConfigPromoted(bytes32 configDigest);
 
   struct Node {
     bytes32 peerId; //            Used for p2p communication.
     bytes32 offchainPublicKey; // Observations are signed with this public key, and are only verified offchain.
+  }
+
+  struct SourceChain {
+    uint64 chainSelector; // ─────╮ The Source chain selector.
+    uint64 minObservers; // ──────╯ Required number of observers to agree on an observation for this source chain.
+    uint256 observerNodesBitmap; // ObserverNodesBitmap & (1<<i) == (1<<i) iff nodes[i] is an observer for this source chain.
   }
 
   struct StaticConfig {
@@ -30,25 +31,14 @@ contract RMNHome is HomeBase {
     bytes offchainConfig; // Offchain configuration for RMN nodes.
   }
 
-  struct SourceChain {
-    uint64 chainSelector; // ─────╮ The Source chain selector.
-    uint64 minObservers; // ──────╯ Required number of observers to agree on an observation for this source chain.
-    uint256 observerNodesBitmap; // ObserverNodesBitmap & (1<<i) == (1<<i) iff nodes[i] is an observer for this source chain.
-  }
-
   struct DynamicConfig {
     // No sorting requirement for source chains, it is most gas efficient to append new source chains to the right.
     SourceChain[] sourceChains;
     bytes offchainConfig; // Offchain configuration for RMN nodes.
   }
 
-  struct Config {
-    StaticConfig staticConfig;
-    DynamicConfig dynamicConfig;
-  }
-
   struct VersionedConfig {
-    uint32 version; // The version of this config, starting from 1 it increments with each new config.
+    uint32 version;
     bytes32 configDigest;
     StaticConfig staticConfig;
     DynamicConfig dynamicConfig;
@@ -110,73 +100,10 @@ contract RMNHome is HomeBase {
     return (primaryConfig, secondaryConfig);
   }
 
-  /// @notice Sets a new config as the secondary config. Does not influence the primary config.
-  /// @param newConfig The new config to set.
-  /// @param digestToOverwrite The digest of the config to overwrite, or ZERO_DIGEST if no config is to be overwritten.
-  /// This is done to prevent accidental overwrites.
-  function setSecondary(
-    Config calldata newConfig,
-    bytes32 digestToOverwrite
-  ) external onlyOwner returns (bytes32 newConfigDigest) {
-    bytes memory encodedStaticConfig = abi.encode(newConfig.staticConfig);
-    bytes memory encodedDynamicConfig = abi.encode(newConfig.dynamicConfig);
-
-    _validateStaticAndDynamicConfig(encodedStaticConfig, encodedDynamicConfig);
-
-    bytes32 secondaryConfigDigest = getSecondaryDigest();
-
-    if (secondaryConfigDigest != digestToOverwrite) {
-      revert ConfigDigestMismatch(secondaryConfigDigest, digestToOverwrite);
-    }
-
-    // are we going to overwrite a config? If so, emit an event.
-    if (digestToOverwrite != ZERO_DIGEST) {
-      emit ConfigRevoked(digestToOverwrite);
-    }
-    uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
-
-    uint32 newVersion = ++s_configCount;
-    newConfigDigest = _calculateConfigDigest(encodedStaticConfig, newVersion, PREFIX);
-    s_configs[secondaryConfigIndex] = StoredConfig({
-      configDigest: newConfigDigest,
-      version: newVersion,
-      staticConfig: encodedStaticConfig,
-      dynamicConfig: encodedDynamicConfig
-    });
-
-    emit ConfigSet(
-      VersionedConfig({
-        version: newVersion,
-        configDigest: newConfigDigest,
-        staticConfig: newConfig.staticConfig,
-        dynamicConfig: newConfig.dynamicConfig
-      })
-    );
-
-    return newConfigDigest;
-  }
-
-  function setDynamicConfig(DynamicConfig calldata newDynamicConfig, bytes32 currentDigest) external onlyOwner {
-    for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
-      if (s_configs[i].configDigest == currentDigest && currentDigest != ZERO_DIGEST) {
-        bytes memory DynamicConfig = abi.encode(newDynamicConfig);
-        _validateDynamicConfig(s_configs[i].staticConfig, DynamicConfig);
-
-        // Since the static config doesn't change we don't have to update the digest or version.
-        s_configs[i].dynamicConfig = abi.encode(newDynamicConfig);
-
-        emit DynamicConfigSet(currentDigest, newDynamicConfig);
-        return;
-      }
-    }
-
-    revert DigestNotFound(currentDigest);
-  }
-
   function _validateStaticAndDynamicConfig(
     bytes memory encodedStaticConfig,
     bytes memory encodedDynamicConfig
-  ) internal view override {
+  ) internal pure override {
     StaticConfig memory staticConfig = abi.decode(encodedStaticConfig, (StaticConfig));
     // Ensure that observerNodesBitmap can be bit-encoded into a uint256.
     if (staticConfig.nodes.length > 256) {
@@ -236,5 +163,9 @@ contract RMNHome is HomeBase {
     DynamicConfig memory dynamicConfig = abi.decode(encodedDynamicConfig, (DynamicConfig));
 
     _validateDynamicConfigParsed(dynamicConfig, numberOfNodes);
+  }
+
+  function _getConfigDigestPrefix() internal pure override returns (uint256) {
+    return PREFIX;
   }
 }
