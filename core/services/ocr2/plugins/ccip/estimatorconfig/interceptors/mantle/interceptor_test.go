@@ -17,22 +17,28 @@ func TestInterceptor(t *testing.T) {
 	ethClient := mocks.NewClient(t)
 	ctx := context.Background()
 
-	tokenRatio := big.NewInt(10)
+	tokenRatio := big.NewInt(100)
+	decimals := big.NewInt(1)
 	interceptor := NewInterceptor(ctx, ethClient)
 
+	// request token ratio
 	ethClient.On("CallContract", ctx, mock.IsType(ethereum.CallMsg{}), mock.IsType(&big.Int{})).
-		Return(common.BigToHash(tokenRatio).Bytes(), nil)
+		Return(common.BigToHash(tokenRatio).Bytes(), nil).Once()
+
+	// request decimals
+	ethClient.On("CallContract", ctx, mock.IsType(ethereum.CallMsg{}), mock.IsType(&big.Int{})).
+		Return(common.BigToHash(decimals).Bytes(), nil).Once()
 
 	modExecGasPrice, modDAGasPrice, err := interceptor.ModifyGasPriceComponents(ctx, big.NewInt(1), big.NewInt(1))
 	require.NoError(t, err)
-	require.Equal(t, modExecGasPrice.Int64(), int64(10))
-	require.Equal(t, modDAGasPrice.Int64(), int64(10))
+	require.Equal(t, int64(10), modExecGasPrice.Int64())
+	require.Equal(t, int64(10), modDAGasPrice.Int64())
 
 	// second call won't invoke eth client
 	modExecGasPrice, modDAGasPrice, err = interceptor.ModifyGasPriceComponents(ctx, big.NewInt(2), big.NewInt(1))
 	require.NoError(t, err)
-	require.Equal(t, modExecGasPrice.Int64(), int64(20))
-	require.Equal(t, modDAGasPrice.Int64(), int64(10))
+	require.Equal(t, int64(20), modExecGasPrice.Int64())
+	require.Equal(t, int64(10), modDAGasPrice.Int64())
 }
 
 func TestModifyGasPriceComponents(t *testing.T) {
@@ -101,9 +107,11 @@ func TestModifyGasPriceComponents(t *testing.T) {
 
 			interceptor := NewInterceptor(ctx, ethClient)
 
+			// request token ratio
 			ethClient.On("CallContract", ctx, mock.IsType(ethereum.CallMsg{}), mock.IsType(&big.Int{})).
 				Return(common.BigToHash(tc.tokenRatio).Bytes(), nil).Once()
 
+			// request decimals
 			ethClient.On("CallContract", ctx, mock.IsType(ethereum.CallMsg{}), mock.IsType(&big.Int{})).
 				Return(common.BigToHash(tc.decimals).Bytes(), nil).Once()
 
