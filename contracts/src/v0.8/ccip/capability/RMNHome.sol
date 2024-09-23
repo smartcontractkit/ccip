@@ -48,13 +48,15 @@ contract RMNHome is HomeBase {
 
   uint256 private constant PREFIX = 0x000b << (256 - 16); // 0x000b00..00
 
+  constructor() HomeBase(address(1)) {}
+
   /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes. Use
   /// in case one of the configs is too large to be returnable by one of the other getters.
   /// @param configDigest The digest of the config to fetch.
   /// @return versionedConfig The config and its version.
   /// @return ok True if the config was found, false otherwise.
   function getConfig(bytes32 configDigest) external view returns (VersionedConfig memory versionedConfig, bool ok) {
-    (StoredConfig memory storedConfig, bool configOK) = _getStoredConfig(configDigest);
+    (StoredConfig memory storedConfig, bool configOK) = _getStoredConfig(0, 0, configDigest);
     if (configOK) {
       return (
         VersionedConfig({
@@ -75,7 +77,7 @@ contract RMNHome is HomeBase {
     view
     returns (VersionedConfig memory primaryConfig, VersionedConfig memory secondaryConfig)
   {
-    (StoredConfig memory primaryStoredConfig, bool primaryOk) = _getPrimaryStoredConfig();
+    (StoredConfig memory primaryStoredConfig, bool primaryOk) = _getPrimaryStoredConfig(0, 0);
 
     if (primaryOk) {
       primaryConfig = VersionedConfig({
@@ -86,7 +88,7 @@ contract RMNHome is HomeBase {
       });
     }
 
-    (StoredConfig memory secondaryStoredConfig, bool secondaryOk) = _getSecondaryStoredConfig();
+    (StoredConfig memory secondaryStoredConfig, bool secondaryOk) = _getSecondaryStoredConfig(0, 0);
 
     if (secondaryOk) {
       secondaryConfig = VersionedConfig({

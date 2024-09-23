@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {CCIPConfig} from "../../capability/CCIPConfig.sol";
+import {HomeBase} from "../../capability/HomeBase.sol";
 import {ICapabilitiesRegistry} from "../../capability/interfaces/ICapabilitiesRegistry.sol";
 import {CCIPConfigTypes} from "../../capability/libraries/CCIPConfigTypes.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -151,7 +152,7 @@ contract CCIPConfig_constructor is Test {
   // Reverts.
 
   function test_constructor_ZeroAddressNotAllowed_Revert() public {
-    vm.expectRevert(CCIPConfig.ZeroAddressNotAllowed.selector);
+    vm.expectRevert(HomeBase.ZeroAddressNotAllowed.selector);
     new CCIPConfigHelper(address(0));
   }
 }
