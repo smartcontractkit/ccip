@@ -5,20 +5,14 @@ import {ICapabilitiesRegistry} from "./interfaces/ICapabilitiesRegistry.sol";
 
 import {Internal} from "../libraries/Internal.sol";
 import {HomeBase} from "./HomeBase.sol";
-import {CCIPConfigTypes} from "./libraries/CCIPConfigTypes.sol";
 
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
-/// @notice Stores the home configuration for RMN, that is referenced by CCIP oracles, RMN nodes, and the RMNRemote
-/// contracts.
-contract RMNHome is HomeBase {
+contract CCIPHome is HomeBase {
   using EnumerableSet for EnumerableSet.UintSet;
 
   event ChainConfigRemoved(uint64 chainSelector);
-  /// @notice Emitted when a chain's configuration is set.
-  /// @param chainSelector The chain selector.
-  /// @param chainConfig The chain configuration.
-  event ChainConfigSet(uint64 chainSelector, CCIPConfigTypes.ChainConfig chainConfig);
+  event ChainConfigSet(uint64 chainSelector, ChainConfig chainConfig);
 
   error OutOfBoundsNodesLength();
   error DuplicatePeerId();
@@ -35,7 +29,7 @@ contract RMNHome is HomeBase {
   error FChainTooHigh(uint256 fChain, uint256 FRoleDON);
   error TooManySigners();
   error FTooHigh();
-  error InvalidNode(CCIPConfigTypes.OCR3Node node);
+  error InvalidNode(OCR3Node node);
   error NotEnoughTransmitters(uint256 got, uint256 minimum);
 
   /// @notice Represents an oracle node in OCR3 configs part of the role DON.
@@ -51,10 +45,10 @@ contract RMNHome is HomeBase {
   /// FRoleDON values are typically identical across multiple OCR3 configs since the chains pertain to one role DON,
   /// but FRoleDON values can change across OCR3 configs to indicate role DON splits.
   struct OCR3Config {
-    Internal.OCRPluginType pluginType; // ────────╮ The plugin that the configuration is for.
-    uint64 chainSelector; //                      | The (remote) chain that the configuration is for.
-    uint8 FRoleDON; //                            | The "big F" parameter for the role DON.
-    uint64 offchainConfigVersion; // ─────────────╯ The version of the offchain configuration.
+    Internal.OCRPluginType pluginType; // ─╮ The plugin that the configuration is for.
+    uint64 chainSelector; //               | The (remote) chain that the configuration is for.
+    uint8 FRoleDON; //                     | The "big F" parameter for the role DON.
+    uint64 offchainConfigVersion; // ──────╯ The version of the offchain configuration.
     bytes offrampAddress; // The remote chain offramp address.
     OCR3Node[] nodes; // Keys & IDs of nodes part of the role DON
     bytes offchainConfig; // The offchain configuration for the OCR3 protocol. Protobuf encoded.
@@ -66,6 +60,20 @@ contract RMNHome is HomeBase {
     OCR3Config staticConfig;
   }
 
+  /// @notice Chain configuration.
+  /// Changes to chain configuration are detected out-of-band in plugins and decoded offchain.
+  struct ChainConfig {
+    bytes32[] readers; // The P2P IDs of the readers for the chain. These IDs must be registered in the capabilities registry.
+    uint8 fChain; // The fault tolerance parameter of the chain.
+    bytes config; // The chain configuration. This is kept intentionally opaque so as to add fields in the future if needed.
+  }
+
+  /// @notice Chain configuration information struct used in applyChainConfigUpdates and getAllChainConfigs.
+  struct ChainConfigArgs {
+    uint64 chainSelector;
+    ChainConfig chainConfig;
+  }
+
   string public constant override typeAndVersion = "CCIPHome 1.6.0-dev";
 
   uint256 private constant PREFIX = 0x000a << (256 - 16); // 0x000a00..00
@@ -74,12 +82,12 @@ contract RMNHome is HomeBase {
   uint256 internal constant MAX_NUM_ORACLES = 256;
 
   /// @dev chain configuration for each chain that CCIP is deployed on.
-  mapping(uint64 chainSelector => CCIPConfigTypes.ChainConfig chainConfig) private s_chainConfigurations;
+  mapping(uint64 chainSelector => ChainConfig chainConfig) private s_chainConfigurations;
 
   /// @dev All chains that are configured.
   EnumerableSet.UintSet private s_remoteChainSelectors;
 
-  constructor() HomeBase(address(1)) {}
+  constructor(address capabilitiesRegistry) HomeBase(capabilitiesRegistry) {}
 
   /// @notice Returns the total number of chains configured.
   /// @return The total number of chains configured.
@@ -137,7 +145,7 @@ contract RMNHome is HomeBase {
   }
 
   function _validateStaticAndDynamicConfig(bytes memory encodedStaticConfig, bytes memory) internal view override {
-    CCIPConfigTypes.OCR3Config memory cfg = abi.decode(encodedStaticConfig, (CCIPConfigTypes.OCR3Config));
+    OCR3Config memory cfg = abi.decode(encodedStaticConfig, (OCR3Config));
 
     if (cfg.chainSelector == 0) revert ChainSelectorNotSet();
     if (cfg.pluginType != Internal.OCRPluginType.Commit && cfg.pluginType != Internal.OCRPluginType.Execution) {
@@ -166,7 +174,7 @@ contract RMNHome is HomeBase {
     uint256 nonZeroTransmitters = 0;
     bytes32[] memory p2pIds = new bytes32[](numberOfNodes);
     for (uint256 i = 0; i < numberOfNodes; ++i) {
-      CCIPConfigTypes.OCR3Node memory node = cfg.nodes[i];
+      OCR3Node memory node = cfg.nodes[i];
 
       // 3 * fChain + 1 <= nonZeroTransmitters <= 3 * FRoleDON + 1
       // Transmitters can be set to 0 since there can be more signers than transmitters,
@@ -208,13 +216,42 @@ contract RMNHome is HomeBase {
   // │                    Chain Configuration                       │
   // ================================================================
 
+  /// @notice Returns all the chain configurations.
+  /// @param pageIndex The page index.
+  /// @param pageSize The page size.
+  /// @return paginatedChainConfigs chain configurations.
+  function getAllChainConfigs(uint256 pageIndex, uint256 pageSize) external view returns (ChainConfigArgs[] memory) {
+    uint256 numberOfChains = s_remoteChainSelectors.length();
+    uint256 startIndex = pageIndex * pageSize;
+
+    if (pageSize == 0 || startIndex >= numberOfChains) {
+      return new ChainConfigArgs[](0); // Return an empty array if pageSize is 0 or pageIndex is out of bounds
+    }
+
+    uint256 endIndex = startIndex + pageSize;
+    if (endIndex > numberOfChains) {
+      endIndex = numberOfChains;
+    }
+
+    ChainConfigArgs[] memory paginatedChainConfigs = new ChainConfigArgs[](endIndex - startIndex);
+
+    uint256[] memory chainSelectors = s_remoteChainSelectors.values();
+    for (uint256 i = startIndex; i < endIndex; ++i) {
+      uint64 chainSelector = uint64(chainSelectors[i]);
+      paginatedChainConfigs[i - startIndex] =
+        ChainConfigArgs({chainSelector: chainSelector, chainConfig: s_chainConfigurations[chainSelector]});
+    }
+
+    return paginatedChainConfigs;
+  }
+
   /// @notice Sets and/or removes chain configurations.
   /// Does not validate that fChain <= FRoleDON and relies on OCR3Configs to be changed in case fChain becomes larger than the FRoleDON value.
   /// @param chainSelectorRemoves The chain configurations to remove.
   /// @param chainConfigAdds The chain configurations to add.
   function applyChainConfigUpdates(
     uint64[] calldata chainSelectorRemoves,
-    CCIPConfigTypes.ChainConfigInfo[] calldata chainConfigAdds
+    ChainConfigArgs[] calldata chainConfigAdds
   ) external onlyOwner {
     // Process removals first.
     for (uint256 i = 0; i < chainSelectorRemoves.length; ++i) {
@@ -231,7 +268,7 @@ contract RMNHome is HomeBase {
 
     // Process additions next.
     for (uint256 i = 0; i < chainConfigAdds.length; ++i) {
-      CCIPConfigTypes.ChainConfig memory chainConfig = chainConfigAdds[i].chainConfig;
+      ChainConfig memory chainConfig = chainConfigAdds[i].chainConfig;
       uint64 chainSelector = chainConfigAdds[i].chainSelector;
 
       // Verify that the provided readers are present in the capabilities registry.
