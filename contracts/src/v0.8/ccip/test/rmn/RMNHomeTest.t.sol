@@ -50,8 +50,9 @@ contract RMNHomeTest is Test {
 contract RMNHome_setSecondary is RMNHomeTest {
   function test_setSecondary_success() public {
     RMNHome.Config memory config = _getBaseConfig();
-    RMNHome.VersionedConfig memory versionedConfig = RMNHome.VersionedConfig({version: 1, config: config});
-    bytes32 configDigest = _getConfigDigest(versionedConfig.config.staticConfig, versionedConfig.version);
+    RMNHome.VersionedConfig memory versionedConfig =
+      RMNHome.VersionedConfig({version: 1, staticConfig: config.staticConfig, dynamicConfig: config.dynamicConfig});
+    bytes32 configDigest = _getConfigDigest(versionedConfig.staticConfig, versionedConfig.version);
 
     vm.expectEmit();
     emit RMNHome.ConfigSet(configDigest, versionedConfig);
@@ -61,27 +62,25 @@ contract RMNHome_setSecondary is RMNHomeTest {
     (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getConfig(configDigest);
     assertTrue(ok);
     assertEq(storedVersionedConfig.version, versionedConfig.version);
-    RMNHome.StaticConfig memory storedStaticConfig = storedVersionedConfig.config.staticConfig;
-    RMNHome.DynamicConfig memory storedDynamicConfig = storedVersionedConfig.config.dynamicConfig;
+    RMNHome.StaticConfig memory storedStaticConfig = storedVersionedConfig.staticConfig;
+    RMNHome.DynamicConfig memory storedDynamicConfig = storedVersionedConfig.dynamicConfig;
 
-    assertEq(storedStaticConfig.nodes.length, versionedConfig.config.staticConfig.nodes.length);
+    assertEq(storedStaticConfig.nodes.length, versionedConfig.staticConfig.nodes.length);
     for (uint256 i = 0; i < storedStaticConfig.nodes.length; i++) {
       RMNHome.Node memory storedNode = storedStaticConfig.nodes[i];
-      assertEq(storedNode.peerId, versionedConfig.config.staticConfig.nodes[i].peerId);
-      assertEq(storedNode.offchainPublicKey, versionedConfig.config.staticConfig.nodes[i].offchainPublicKey);
+      assertEq(storedNode.peerId, versionedConfig.staticConfig.nodes[i].peerId);
+      assertEq(storedNode.offchainPublicKey, versionedConfig.staticConfig.nodes[i].offchainPublicKey);
     }
 
-    assertEq(storedDynamicConfig.sourceChains.length, versionedConfig.config.dynamicConfig.sourceChains.length);
+    assertEq(storedDynamicConfig.sourceChains.length, versionedConfig.dynamicConfig.sourceChains.length);
     for (uint256 i = 0; i < storedDynamicConfig.sourceChains.length; i++) {
       RMNHome.SourceChain memory storedSourceChain = storedDynamicConfig.sourceChains[i];
-      assertEq(storedSourceChain.chainSelector, versionedConfig.config.dynamicConfig.sourceChains[i].chainSelector);
-      assertEq(storedSourceChain.minObservers, versionedConfig.config.dynamicConfig.sourceChains[i].minObservers);
-      assertEq(
-        storedSourceChain.observerNodesBitmap, versionedConfig.config.dynamicConfig.sourceChains[i].observerNodesBitmap
-      );
+      assertEq(storedSourceChain.chainSelector, versionedConfig.dynamicConfig.sourceChains[i].chainSelector);
+      assertEq(storedSourceChain.minObservers, versionedConfig.dynamicConfig.sourceChains[i].minObservers);
+      assertEq(storedSourceChain.observerNodesBitmap, versionedConfig.dynamicConfig.sourceChains[i].observerNodesBitmap);
     }
-    assertEq(storedDynamicConfig.offchainConfig, versionedConfig.config.dynamicConfig.offchainConfig);
-    assertEq(storedStaticConfig.offchainConfig, versionedConfig.config.staticConfig.offchainConfig);
+    assertEq(storedDynamicConfig.offchainConfig, versionedConfig.dynamicConfig.offchainConfig);
+    assertEq(storedStaticConfig.offchainConfig, versionedConfig.staticConfig.offchainConfig);
   }
 
   function test_setSecondary_OutOfBoundsNodesLength_reverts() public {
@@ -164,7 +163,7 @@ contract RMNHome_setDynamicConfig is RMNHomeTest {
     (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getConfig(secondaryConfigDigest);
     assertTrue(ok);
     assertEq(
-      storedVersionedConfig.config.dynamicConfig.sourceChains[0].minObservers,
+      storedVersionedConfig.dynamicConfig.sourceChains[0].minObservers,
       config.dynamicConfig.sourceChains[0].minObservers
     );
 
@@ -228,8 +227,8 @@ contract RMNHome_revokeSecondary is RMNHomeTest {
     assertFalse(ok);
     // Ensure no old data is returned, even though it's still in storage
     assertEq(storedVersionedConfig.version, 0);
-    assertEq(storedVersionedConfig.config.staticConfig.nodes.length, 0);
-    assertEq(storedVersionedConfig.config.dynamicConfig.sourceChains.length, 0);
+    assertEq(storedVersionedConfig.staticConfig.nodes.length, 0);
+    assertEq(storedVersionedConfig.dynamicConfig.sourceChains.length, 0);
 
     // Asser the primary digest is unaffected but the secondary digest is set to zero
     (bytes32 primaryDigest, bytes32 secondaryDigest) = s_rmnHome.getConfigDigests();

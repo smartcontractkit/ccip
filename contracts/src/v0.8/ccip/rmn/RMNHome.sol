@@ -51,9 +51,15 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     DynamicConfig dynamicConfig;
   }
 
+  struct StoredConfig {
+    bytes staticConfig;
+    bytes dynamicConfig;
+  }
+
   struct VersionedConfig {
     uint32 version; // The version of this config, starting from 1 it increments with each new config.
-    Config config;
+    StaticConfig staticConfig;
+    DynamicConfig dynamicConfig;
   }
 
   struct VersionedConfigWithDigest {
@@ -75,7 +81,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   bytes32[MAX_CONCURRENT_CONFIGS] private s_configDigests;
   /// @notice This array holds the configs.
   /// @dev Value i in this array is valid iff s_configDigests[i] != 0.
-  Config[MAX_CONCURRENT_CONFIGS] private s_configs;
+  StoredConfig[MAX_CONCURRENT_CONFIGS] private s_configs;
   /// @notice This array holds the versions of the configs.
   /// @dev Value i in this array is valid iff s_configDigests[i] != 0.
   /// @dev Since Solidity doesn't support writing complex memory structs to storage, we have to make the config calldata
@@ -106,7 +112,15 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
       // We never want to return true for a zero digest, even if the caller is asking for it, as this can expose old
       // config state that is invalid.
       if (s_configDigests[i] == configDigest && configDigest != ZERO_DIGEST) {
-        return (VersionedConfig({config: s_configs[i], version: s_configVersions[i]}), true);
+        StoredConfig memory config = s_configs[i];
+        return (
+          VersionedConfig({
+            staticConfig: abi.decode(config.staticConfig, (StaticConfig)),
+            dynamicConfig: abi.decode(config.dynamicConfig, (DynamicConfig)),
+            version: s_configVersions[i]
+          }),
+          true
+        );
       }
     }
     return (versionedConfig, false);
@@ -122,10 +136,16 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     uint256 primaryConfigIndex = s_primaryConfigIndex;
     bytes32 primaryConfigDigest = s_configDigests[primaryConfigIndex];
     if (primaryConfigDigest != ZERO_DIGEST) {
+      StoredConfig memory config = s_configs[primaryConfigIndex];
+
       primaryConfig = VersionedConfigWithDigest({
         configDigest: primaryConfigDigest,
         versionedConfig: (
-          VersionedConfig({config: s_configs[primaryConfigIndex], version: s_configVersions[primaryConfigIndex]})
+          VersionedConfig({
+            staticConfig: abi.decode(config.staticConfig, (StaticConfig)),
+            dynamicConfig: abi.decode(config.dynamicConfig, (DynamicConfig)),
+            version: s_configVersions[primaryConfigIndex]
+          })
         )
       });
     }
@@ -133,10 +153,16 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     uint256 secondaryConfigIndex = primaryConfigIndex ^ 1;
     bytes32 secondaryConfigDigest = s_configDigests[secondaryConfigIndex];
     if (secondaryConfigDigest != ZERO_DIGEST) {
+      StoredConfig memory config = s_configs[secondaryConfigIndex];
+
       secondaryConfig = VersionedConfigWithDigest({
         configDigest: secondaryConfigDigest,
         versionedConfig: (
-          VersionedConfig({config: s_configs[secondaryConfigIndex], version: s_configVersions[secondaryConfigIndex]})
+          VersionedConfig({
+            staticConfig: abi.decode(config.staticConfig, (StaticConfig)),
+            dynamicConfig: abi.decode(config.dynamicConfig, (DynamicConfig)),
+            version: s_configVersions[secondaryConfigIndex]
+          })
         )
       });
     }
@@ -168,11 +194,19 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
 
     uint32 newVersion = ++s_configCount;
     newConfigDigest = _getConfigDigest(newConfig.staticConfig, newVersion);
-    s_configs[secondaryConfigIndex] = newConfig;
+    s_configs[secondaryConfigIndex] =
+      StoredConfig(abi.encode(newConfig.staticConfig), abi.encode(newConfig.dynamicConfig));
     s_configVersions[secondaryConfigIndex] = newVersion;
     s_configDigests[secondaryConfigIndex] = newConfigDigest;
 
-    emit ConfigSet(newConfigDigest, VersionedConfig({version: newVersion, config: newConfig}));
+    emit ConfigSet(
+      newConfigDigest,
+      VersionedConfig({
+        version: newVersion,
+        staticConfig: newConfig.staticConfig,
+        dynamicConfig: newConfig.dynamicConfig
+      })
+    );
 
     return newConfigDigest;
   }
@@ -180,11 +214,11 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   function setDynamicConfig(DynamicConfig calldata newDynamicConfig, bytes32 currentDigest) external onlyOwner {
     for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
       if (s_configDigests[i] == currentDigest && currentDigest != ZERO_DIGEST) {
-        Config memory currentConfig = s_configs[i];
-        _validateDynamicConfig(newDynamicConfig, currentConfig.staticConfig.nodes.length);
+        StaticConfig memory staticConfig = abi.decode(s_configs[i].staticConfig, (StaticConfig));
+        _validateDynamicConfig(newDynamicConfig, staticConfig.nodes.length);
 
-        // Since the dynamic config doesn't change we don't have to update the digest or version.
-        s_configs[i].dynamicConfig = newDynamicConfig;
+        // Since the static config doesn't change we don't have to update the digest or version.
+        s_configs[i].dynamicConfig = abi.encode(newDynamicConfig);
 
         emit DynamicConfigSet(currentDigest, newDynamicConfig);
         return;
