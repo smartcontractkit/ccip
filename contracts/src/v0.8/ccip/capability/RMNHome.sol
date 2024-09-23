@@ -118,28 +118,30 @@ contract RMNHome is HomeBase {
     Config calldata newConfig,
     bytes32 digestToOverwrite
   ) external onlyOwner returns (bytes32 newConfigDigest) {
-    _validateStaticConfig(newConfig.staticConfig);
-    _validateDynamicConfig(newConfig.dynamicConfig, newConfig.staticConfig.nodes.length);
+    bytes memory encodedStaticConfig = abi.encode(newConfig.staticConfig);
+    bytes memory encodedDynamicConfig = abi.encode(newConfig.dynamicConfig);
 
-    uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
+    _validateStaticAndDynamicConfig(encodedStaticConfig, encodedDynamicConfig);
 
-    if (s_configs[secondaryConfigIndex].configDigest != digestToOverwrite) {
-      revert ConfigDigestMismatch(s_configs[secondaryConfigIndex].configDigest, digestToOverwrite);
+    bytes32 secondaryConfigDigest = getSecondaryDigest();
+
+    if (secondaryConfigDigest != digestToOverwrite) {
+      revert ConfigDigestMismatch(secondaryConfigDigest, digestToOverwrite);
     }
 
     // are we going to overwrite a config? If so, emit an event.
     if (digestToOverwrite != ZERO_DIGEST) {
       emit ConfigRevoked(digestToOverwrite);
     }
+    uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
 
     uint32 newVersion = ++s_configCount;
-    bytes memory encodedStaticConfig = abi.encode(newConfig.staticConfig);
     newConfigDigest = _calculateConfigDigest(encodedStaticConfig, newVersion, PREFIX);
     s_configs[secondaryConfigIndex] = StoredConfig({
       configDigest: newConfigDigest,
       version: newVersion,
       staticConfig: encodedStaticConfig,
-      dynamicConfig: abi.encode(newConfig.dynamicConfig)
+      dynamicConfig: encodedDynamicConfig
     });
 
     emit ConfigSet(
@@ -157,8 +159,8 @@ contract RMNHome is HomeBase {
   function setDynamicConfig(DynamicConfig calldata newDynamicConfig, bytes32 currentDigest) external onlyOwner {
     for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
       if (s_configs[i].configDigest == currentDigest && currentDigest != ZERO_DIGEST) {
-        StaticConfig memory staticConfig = abi.decode(s_configs[i].staticConfig, (StaticConfig));
-        _validateDynamicConfig(newDynamicConfig, staticConfig.nodes.length);
+        bytes memory DynamicConfig = abi.encode(newDynamicConfig);
+        _validateDynamicConfig(s_configs[i].staticConfig, DynamicConfig);
 
         // Since the static config doesn't change we don't have to update the digest or version.
         s_configs[i].dynamicConfig = abi.encode(newDynamicConfig);
@@ -171,26 +173,32 @@ contract RMNHome is HomeBase {
     revert DigestNotFound(currentDigest);
   }
 
-  function _validateStaticConfig(StaticConfig calldata newStaticConfig) internal pure {
+  function _validateStaticAndDynamicConfig(
+    bytes memory encodedStaticConfig,
+    bytes memory encodedDynamicConfig
+  ) internal view override {
+    StaticConfig memory staticConfig = abi.decode(encodedStaticConfig, (StaticConfig));
     // Ensure that observerNodesBitmap can be bit-encoded into a uint256.
-    if (newStaticConfig.nodes.length > 256) {
+    if (staticConfig.nodes.length > 256) {
       revert OutOfBoundsNodesLength();
     }
 
     // Ensure no peerId or offchainPublicKey is duplicated.
-    for (uint256 i = 0; i < newStaticConfig.nodes.length; ++i) {
-      for (uint256 j = i + 1; j < newStaticConfig.nodes.length; ++j) {
-        if (newStaticConfig.nodes[i].peerId == newStaticConfig.nodes[j].peerId) {
+    for (uint256 i = 0; i < staticConfig.nodes.length; ++i) {
+      for (uint256 j = i + 1; j < staticConfig.nodes.length; ++j) {
+        if (staticConfig.nodes[i].peerId == staticConfig.nodes[j].peerId) {
           revert DuplicatePeerId();
         }
-        if (newStaticConfig.nodes[i].offchainPublicKey == newStaticConfig.nodes[j].offchainPublicKey) {
+        if (staticConfig.nodes[i].offchainPublicKey == staticConfig.nodes[j].offchainPublicKey) {
           revert DuplicateOffchainPublicKey();
         }
       }
     }
+
+    _validateDynamicConfigParsed(abi.decode(encodedDynamicConfig, (DynamicConfig)), staticConfig.nodes.length);
   }
 
-  function _validateDynamicConfig(DynamicConfig calldata dynamicConfig, uint256 numberOfNodes) internal pure {
+  function _validateDynamicConfigParsed(DynamicConfig memory dynamicConfig, uint256 numberOfNodes) internal pure {
     uint256 numberOfSourceChains = dynamicConfig.sourceChains.length;
     for (uint256 i = 0; i < numberOfSourceChains; ++i) {
       SourceChain memory currentSourceChain = dynamicConfig.sourceChains[i];
@@ -218,5 +226,15 @@ contract RMNHome is HomeBase {
         revert MinObserversTooHigh();
       }
     }
+  }
+
+  function _validateDynamicConfig(
+    bytes memory encodedStaticConfig,
+    bytes memory encodedDynamicConfig
+  ) internal pure override {
+    uint256 numberOfNodes = abi.decode(encodedStaticConfig, (StaticConfig)).nodes.length;
+    DynamicConfig memory dynamicConfig = abi.decode(encodedDynamicConfig, (DynamicConfig));
+
+    _validateDynamicConfigParsed(dynamicConfig, numberOfNodes);
   }
 }

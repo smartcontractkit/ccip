@@ -33,6 +33,10 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
     bytes dynamicConfig;
   }
 
+  function _validateStaticAndDynamicConfig(bytes memory staticConfig, bytes memory dynamicConfig) internal view virtual;
+
+  function _validateDynamicConfig(bytes memory staticConfig, bytes memory dynamicConfig) internal view virtual;
+
   /// @notice Returns the stored config for a given digest. Will always return an empty config if the digest is the zero
   /// digest. This is done to prevent exposing old config state that is invalid.
   function _getStoredConfig(bytes32 configDigest) internal view returns (StoredConfig memory storedConfig, bool ok) {
@@ -60,6 +64,14 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
     }
 
     return (s_configs[s_primaryConfigIndex ^ 1], true);
+  }
+
+  function getPrimaryDigest() public view returns (bytes32) {
+    return s_configs[s_primaryConfigIndex].configDigest;
+  }
+
+  function getSecondaryDigest() public view returns (bytes32) {
+    return s_configs[s_primaryConfigIndex ^ 1].configDigest;
   }
 
   /// @notice Returns the current primary and secondary config digests.
