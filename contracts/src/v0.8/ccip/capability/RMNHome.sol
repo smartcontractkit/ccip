@@ -64,12 +64,12 @@ contract RMNHome is HomeBase {
   /// @return versionedConfig The config and its version.
   /// @return ok True if the config was found, false otherwise.
   function getConfig(bytes32 configDigest) external view returns (VersionedConfig memory versionedConfig, bool ok) {
-    (StoredConfig memory storedConfig, bool ok) = _getStoredConfig(configDigest);
-    if (ok) {
+    (StoredConfig memory storedConfig, bool configOK) = _getStoredConfig(configDigest);
+    if (configOK) {
       return (
         VersionedConfig({
           version: storedConfig.version,
-          configDigest: configDigest,
+          configDigest: storedConfig.configDigest,
           staticConfig: abi.decode(storedConfig.staticConfig, (StaticConfig)),
           dynamicConfig: abi.decode(storedConfig.dynamicConfig, (DynamicConfig))
         }),
@@ -85,31 +85,25 @@ contract RMNHome is HomeBase {
     view
     returns (VersionedConfig memory primaryConfig, VersionedConfig memory secondaryConfig)
   {
-    // We need to explicitly check if the digest exists, because we don't clear out revoked config state. Not doing this
-    // check would result in potentially returning previous configs.
-    uint256 primaryConfigIndex = s_primaryConfigIndex;
-    bytes32 primaryConfigDigest = s_configDigests[primaryConfigIndex];
-    if (primaryConfigDigest != ZERO_DIGEST) {
-      StoredConfig memory config = s_configs[primaryConfigIndex];
+    (StoredConfig memory primaryStoredConfig, bool primaryOk) = _getPrimaryStoredConfig();
 
+    if (primaryOk) {
       primaryConfig = VersionedConfig({
-        version: config.version,
-        configDigest: primaryConfigDigest,
-        staticConfig: abi.decode(config.staticConfig, (StaticConfig)),
-        dynamicConfig: abi.decode(config.dynamicConfig, (DynamicConfig))
+        version: primaryStoredConfig.version,
+        configDigest: primaryStoredConfig.configDigest,
+        staticConfig: abi.decode(primaryStoredConfig.staticConfig, (StaticConfig)),
+        dynamicConfig: abi.decode(primaryStoredConfig.dynamicConfig, (DynamicConfig))
       });
     }
 
-    uint256 secondaryConfigIndex = primaryConfigIndex ^ 1;
-    bytes32 secondaryConfigDigest = s_configDigests[secondaryConfigIndex];
-    if (secondaryConfigDigest != ZERO_DIGEST) {
-      StoredConfig memory config = s_configs[secondaryConfigIndex];
+    (StoredConfig memory secondaryStoredConfig, bool secondaryOk) = _getSecondaryStoredConfig();
 
+    if (secondaryOk) {
       secondaryConfig = VersionedConfig({
-        version: config.version,
-        configDigest: secondaryConfigDigest,
-        staticConfig: abi.decode(config.staticConfig, (StaticConfig)),
-        dynamicConfig: abi.decode(config.dynamicConfig, (DynamicConfig))
+        version: secondaryStoredConfig.version,
+        configDigest: secondaryStoredConfig.configDigest,
+        staticConfig: abi.decode(secondaryStoredConfig.staticConfig, (StaticConfig)),
+        dynamicConfig: abi.decode(secondaryStoredConfig.dynamicConfig, (DynamicConfig))
       });
     }
 
@@ -129,8 +123,8 @@ contract RMNHome is HomeBase {
 
     uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
 
-    if (s_configDigests[secondaryConfigIndex] != digestToOverwrite) {
-      revert ConfigDigestMismatch(s_configDigests[secondaryConfigIndex], digestToOverwrite);
+    if (s_configs[secondaryConfigIndex].configDigest != digestToOverwrite) {
+      revert ConfigDigestMismatch(s_configs[secondaryConfigIndex].configDigest, digestToOverwrite);
     }
 
     // are we going to overwrite a config? If so, emit an event.
@@ -142,11 +136,11 @@ contract RMNHome is HomeBase {
     bytes memory encodedStaticConfig = abi.encode(newConfig.staticConfig);
     newConfigDigest = _calculateConfigDigest(encodedStaticConfig, newVersion, PREFIX);
     s_configs[secondaryConfigIndex] = StoredConfig({
+      configDigest: newConfigDigest,
       version: newVersion,
       staticConfig: encodedStaticConfig,
       dynamicConfig: abi.encode(newConfig.dynamicConfig)
     });
-    s_configDigests[secondaryConfigIndex] = newConfigDigest;
 
     emit ConfigSet(
       VersionedConfig({
@@ -162,7 +156,7 @@ contract RMNHome is HomeBase {
 
   function setDynamicConfig(DynamicConfig calldata newDynamicConfig, bytes32 currentDigest) external onlyOwner {
     for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
-      if (s_configDigests[i] == currentDigest && currentDigest != ZERO_DIGEST) {
+      if (s_configs[i].configDigest == currentDigest && currentDigest != ZERO_DIGEST) {
         StaticConfig memory staticConfig = abi.decode(s_configs[i].staticConfig, (StaticConfig));
         _validateDynamicConfig(newDynamicConfig, staticConfig.nodes.length);
 
