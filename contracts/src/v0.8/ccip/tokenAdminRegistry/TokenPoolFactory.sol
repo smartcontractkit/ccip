@@ -56,7 +56,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
   address private immutable i_rmnProxy;
   address private immutable i_ccipRouter;
 
-  mapping(uint64 remoteChainSelector => RemoteChainConfig) internal s_remoteChainConfigs;
+  mapping(uint64 remoteChainSelector => RemoteChainConfig remoteConfig) internal s_remoteChainConfigs;
 
   constructor(address tokenAdminRegistry, address tokenAdminModule, address rmnProxy, address ccipRouter) {
     if (
@@ -92,8 +92,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     // Set the token pool for token in the token admin registry since this contract is the token and pool owner
     _setTokenPoolInTokenAdminRegistry(token, pool);
 
-    // Transfer the ownership of the token to the msg.sender.
-    // This is a 2 step process and must be accepted in a separate tx.
+    // Begin the 2 step ownership transfer of the newly deployed token to the msg.sender
     IOwnable(token).transferOwnership(msg.sender);
 
     return (token, pool);
@@ -153,7 +152,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
       // If the user provides the empty parameter flag, then the address of the token needs to be predicted
       // otherwise the address provided is used.
       if (bytes4(remoteTokenPool.remoteTokenAddress) == EMPTY_PARAMETER_FLAG) {
-        // The user must provide the initCode for the remote token, so we can predict its address correctly. It's
+        // The user must provide the initCode for the remote token, so its address can be predicted correctly. It's
         // provided in the remoteTokenInitCode field for the remoteTokenPool
         remoteTokenPool.remoteTokenAddress = abi.encode(
           salt.computeAddress(keccak256(remoteTokenPool.remoteTokenInitCode), remoteChainConfig.remotePoolFactory)
@@ -165,7 +164,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
         // Generate the initCode that will be used on the remote chain. It is assumed that tokenInitCode
         // will be the same on all chains, so it can be reused here.
 
-        // Combine the initCode with the initArgs to create the full initCode
+        // Combine the initCode with the initArgs to create the full deployment code
         bytes32 remotePoolInitcode = keccak256(
           bytes.concat(
             type(BurnMintTokenPool).creationCode,
@@ -179,7 +178,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
           )
         );
 
-        // Predict the address of the undeployed contract on the destination chain
+        // Abi encode the computed remote address so it can be used as bytes in the chain update
         remoteTokenPool.remotePoolAddress =
           abi.encode(salt.computeAddress(remotePoolInitcode, remoteChainConfig.remotePoolFactory));
       }
@@ -195,13 +194,13 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     }
 
     // If the user doesn't want to provide any special parameters which may be needed for a custom the token pool then
-    /// use the standard burn/mint token pool params. Since the user can provide custom token pool init code,
+    // use the standard burn/mint token pool params. Since the user can provide custom token pool init code,
     // they must also provide custom constructor args.
     if (bytes4(tokenPoolInitArgs) == EMPTY_PARAMETER_FLAG) {
       tokenPoolInitArgs = abi.encode(token, new address[](0), i_rmnProxy, i_ccipRouter);
     }
 
-    // Construct the code that will be deployed from the initCode and the initArgs
+    // Construct the deployment code from the initCode and the initArgs and then deploy
     address poolAddress = Create2.deploy(0, salt, abi.encodePacked(tokenPoolInitCode, tokenPoolInitArgs));
 
     // Apply the chain updates to the token pool
@@ -238,6 +237,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     for (uint256 i = 0; i < remoteChainConfigs.length; ++i) {
       RemoteChainConfig memory remoteConfig = remoteChainConfigs[i].remoteChainConfig;
 
+      // Zero address validation check
       if (
         remoteChainConfigs[i].remoteChainSelector == 0 || remoteConfig.remotePoolFactory == address(0)
           || remoteConfig.remoteRouter == address(0) || remoteConfig.remoteRMNProxy == address(0)

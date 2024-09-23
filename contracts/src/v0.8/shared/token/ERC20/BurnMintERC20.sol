@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {IBurnMintERC20} from "../ERC20/IBurnMintERC20.sol";
+import {IOwnable} from "../../interfaces/IOwnable.sol";
 
 import {OwnerIsCreator} from "../../access/OwnerIsCreator.sol";
 
@@ -69,7 +70,8 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
     return
       interfaceId == type(IERC20).interfaceId ||
       interfaceId == type(IBurnMintERC20).interfaceId ||
-      interfaceId == type(IERC165).interfaceId;
+      interfaceId == type(IERC165).interfaceId ||
+      interfaceId == type(IOwnable).interfaceId;
   }
 
   // ================================================================
@@ -99,11 +101,16 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
   }
 
   /// @dev Exists to be backwards compatible with the older naming convention.
+  /// @param spender the account being approved to spend on the users' behalf.
+  /// @param subtractedValue the amount being removed from the approval.
+  /// @return success Bool to return if the approval was successfully decreased.
   function decreaseApproval(address spender, uint256 subtractedValue) external returns (bool success) {
     return decreaseAllowance(spender, subtractedValue);
   }
 
   /// @dev Exists to be backwards compatible with the older naming convention.
+  /// @param spender the account being approved to spend on the users' behalf.
+  /// @param addedValue the amount being added to the approval.
   function increaseApproval(address spender, uint256 addedValue) external {
     increaseAllowance(spender, addedValue);
   }
@@ -132,6 +139,7 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
   /// @inheritdoc IBurnMintERC20
   /// @dev Alias for BurnFrom for compatibility with the older naming convention.
   /// @dev Uses burnFrom for all validation & logic.
+
   function burn(address account, uint256 amount) public virtual override {
     burnFrom(account, amount);
   }
@@ -175,6 +183,7 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
 
   /// @notice Grants burn role to the given address.
   /// @dev only the owner can call this function.
+  /// @param burner the address to grant the burner role to
   function grantBurnRole(address burner) public onlyOwner {
     if (s_burners.add(burner)) {
       emit BurnAccessGranted(burner);
@@ -183,6 +192,7 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
 
   /// @notice Revokes mint role for the given address.
   /// @dev only the owner can call this function.
+  /// @param minter the address to revoke the mint role from.
   function revokeMintRole(address minter) public onlyOwner {
     if (s_minters.remove(minter)) {
       emit MintAccessRevoked(minter);
@@ -191,6 +201,7 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
 
   /// @notice Revokes burn role from the given address.
   /// @dev only the owner can call this function
+  /// @param burner the address to revoke the burner role from
   function revokeBurnRole(address burner) public onlyOwner {
     if (s_burners.remove(burner)) {
       emit BurnAccessRevoked(burner);
@@ -214,7 +225,8 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
 
   /// @notice Transfers the CCIPAdmin role to a new address
   /// @dev only the owner can call this function, NOT the current ccipAdmin, and 1-step ownership transfer is used.
-  /// @param newAdmin The address to transfer the CCIPAdmin role to. Setting to address(0) is a valid way to revoke the role
+  /// @param newAdmin The address to transfer the CCIPAdmin role to. Setting to address(0) is a valid way to revoke 
+  /// the role
   function setCCIPAdmin(address newAdmin) public onlyOwner {
     address currentAdmin = s_ccipAdmin;
 
