@@ -72,12 +72,11 @@ contract RMNHome is HomeBase {
     return (versionedConfig, false);
   }
 
-  function getAllConfigs()
-    external
-    view
-    returns (VersionedConfig memory primaryConfig, VersionedConfig memory secondaryConfig)
-  {
-    (StoredConfig memory primaryStoredConfig, bool primaryOk) = _getPrimaryStoredConfig(0, 0);
+  function getAllConfigs(
+    uint32 donId,
+    uint8 pluginType
+  ) external view returns (VersionedConfig memory primaryConfig, VersionedConfig memory secondaryConfig) {
+    (StoredConfig memory primaryStoredConfig, bool primaryOk) = _getPrimaryStoredConfig(donId, pluginType);
 
     if (primaryOk) {
       primaryConfig = VersionedConfig({
@@ -88,7 +87,7 @@ contract RMNHome is HomeBase {
       });
     }
 
-    (StoredConfig memory secondaryStoredConfig, bool secondaryOk) = _getSecondaryStoredConfig(0, 0);
+    (StoredConfig memory secondaryStoredConfig, bool secondaryOk) = _getSecondaryStoredConfig(donId, pluginType);
 
     if (secondaryOk) {
       secondaryConfig = VersionedConfig({

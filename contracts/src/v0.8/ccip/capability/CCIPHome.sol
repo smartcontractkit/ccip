@@ -8,6 +8,11 @@ import {HomeBase} from "./HomeBase.sol";
 
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
+/// @notice CCIPHome stores the configuration for the CCIP capability.
+/// We have two classes of configuration: chain configuration and DON (in the CapabilitiesRegistry sense) configuration.
+/// Each chain will have a single configuration which includes information like the router address.
+/// Each CR DON will have up to four configurations: for each of (commit, exec), one blue and one green configuration.
+/// This is done in order to achieve "blue-green" deployments.
 contract CCIPHome is HomeBase {
   using EnumerableSet for EnumerableSet.UintSet;
 
@@ -116,12 +121,11 @@ contract CCIPHome is HomeBase {
     return (versionedConfig, false);
   }
 
-  function getAllConfigs()
-    external
-    view
-    returns (VersionedConfig memory primaryConfig, VersionedConfig memory secondaryConfig)
-  {
-    (StoredConfig memory primaryStoredConfig, bool primaryOk) = _getPrimaryStoredConfig(0, 0);
+  function getAllConfigs(
+    uint32 donId,
+    uint8 pluginType
+  ) external view returns (VersionedConfig memory primaryConfig, VersionedConfig memory secondaryConfig) {
+    (StoredConfig memory primaryStoredConfig, bool primaryOk) = _getPrimaryStoredConfig(donId, pluginType);
 
     if (primaryOk) {
       primaryConfig = VersionedConfig({
@@ -131,7 +135,7 @@ contract CCIPHome is HomeBase {
       });
     }
 
-    (StoredConfig memory secondaryStoredConfig, bool secondaryOk) = _getSecondaryStoredConfig(0, 0);
+    (StoredConfig memory secondaryStoredConfig, bool secondaryOk) = _getSecondaryStoredConfig(donId, pluginType);
 
     if (secondaryOk) {
       secondaryConfig = VersionedConfig({
