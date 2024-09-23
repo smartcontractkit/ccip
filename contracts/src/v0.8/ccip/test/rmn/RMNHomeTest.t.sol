@@ -209,7 +209,7 @@ contract RMNHome_revokeSecondary is RMNHomeTest {
   function setUp() public override {
     super.setUp();
     bytes32 digest = s_rmnHome.setSecondary(_getBaseConfig(), ZERO_DIGEST);
-    s_rmnHome.promoteSecondary(digest);
+    s_rmnHome.promoteSecondaryAndRevokePrimary(digest, ZERO_DIGEST);
 
     RMNHome.Config memory config = _getBaseConfig();
     config.dynamicConfig.sourceChains[0].minObservers--;
@@ -251,36 +251,6 @@ contract RMNHome_revokeSecondary is RMNHomeTest {
 
     vm.expectRevert("Only callable by owner");
     s_rmnHome.revokeSecondary(keccak256("configDigest"));
-  }
-}
-
-contract RMNHome_promoteSecondary is RMNHomeTest {
-  function test_promoteSecondary_success() public {
-    (bytes32 priorPrimaryDigest, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests();
-
-    vm.expectEmit();
-    emit RMNHome.ConfigPromoted(priorSecondaryDigest);
-
-    s_rmnHome.promoteSecondary(priorSecondaryDigest);
-
-    (bytes32 primaryDigest, bytes32 secondaryDigest) = s_rmnHome.getConfigDigests();
-    assertEq(primaryDigest, priorSecondaryDigest);
-    assertEq(secondaryDigest, priorPrimaryDigest);
-  }
-
-  function test_promoteSecondary_ConfigDigestMismatch_reverts() public {
-    (, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests();
-
-    bytes32 wrongDigest = keccak256("wrong_digest");
-    vm.expectRevert(abi.encodeWithSelector(RMNHome.ConfigDigestMismatch.selector, priorSecondaryDigest, wrongDigest));
-    s_rmnHome.promoteSecondary(wrongDigest);
-  }
-
-  function test_promoteSecondary_OnlyOwner_reverts() public {
-    vm.startPrank(address(0));
-
-    vm.expectRevert("Only callable by owner");
-    s_rmnHome.promoteSecondary(keccak256("configDigest"));
   }
 }
 

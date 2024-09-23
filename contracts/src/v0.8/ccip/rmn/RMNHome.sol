@@ -209,19 +209,6 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     delete s_configDigests[secondaryConfigIndex];
   }
 
-  /// @notice Promotes the secondary config to the primary config. This demotes the primary to be the secondary but does
-  /// not revoke it. To revoke the primary, use `promoteSecondaryAndRevokePrimary` instead.
-  function promoteSecondary(bytes32 digestToPromote) external onlyOwner {
-    uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
-    if (s_configDigests[secondaryConfigIndex] != digestToPromote) {
-      revert ConfigDigestMismatch(s_configDigests[secondaryConfigIndex], digestToPromote);
-    }
-
-    s_primaryConfigIndex ^= 1;
-
-    emit ConfigPromoted(digestToPromote);
-  }
-
   /// @notice Promotes the secondary config to the primary config and revokes the primary config.
   function promoteSecondaryAndRevokePrimary(bytes32 digestToPromote, bytes32 digestToRevoke) external onlyOwner {
     uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
