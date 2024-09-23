@@ -6,7 +6,9 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
-abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration {
+import {IERC165} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
+
+abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, IERC165 {
   event ConfigSet(StoredConfig versionedConfig);
   event ConfigRevoked(bytes32 indexed configDigest);
   event DynamicConfigSet(bytes32 indexed configDigest, bytes dynamicConfig);
@@ -58,26 +60,26 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
 
   function _getConfigDigestPrefix() internal pure virtual returns (uint256);
 
+  /// @inheritdoc IERC165
+  function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
+    return interfaceId == type(ICapabilityConfiguration).interfaceId || interfaceId == type(IERC165).interfaceId;
+  }
+
   /// @notice Called by the registry prior to the config being set for a particular DON.
   /// @dev precondition Requires destination chain config to be set
   function beforeCapabilityConfigSet(
-    bytes32[] calldata, /* nodes */
-    bytes calldata config,
-    uint64, /* configCount */
-    uint32 donId
+    bytes32[] calldata, // nodes
+    bytes calldata update,
+    uint64, // configCount
+    uint32 // donId
   ) external override {
     if (msg.sender != i_capabilitiesRegistry) {
       revert OnlyCapabilitiesRegistryCanCall();
     }
-    //
-    //    (CCIPConfigTypes.OCR3Config[] memory commitConfigs, CCIPConfigTypes.OCR3Config[] memory execConfigs) =
-    //      _groupByPluginType(abi.decode(config, (CCIPConfigTypes.OCR3Config[])));
-    //    if (commitConfigs.length > 0) {
-    //      _updatePluginConfig(donId, Internal.OCRPluginType.Commit, commitConfigs);
-    //    }
-    //    if (execConfigs.length > 0) {
-    //      _updatePluginConfig(donId, Internal.OCRPluginType.Execution, execConfigs);
-    //    }
+    (bool success, bytes memory errorData) = address(this).call(update);
+    if (!success) {
+      revert(string(errorData));
+    }
   }
 
   /// @inheritdoc ICapabilityConfiguration
@@ -157,7 +159,7 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
     bytes calldata encodedStaticConfig,
     bytes calldata encodedDynamicConfig,
     bytes32 digestToOverwrite
-  ) external onlyOwner returns (bytes32 newConfigDigest) {
+  ) external OnlyOwnerOrSelfCall returns (bytes32 newConfigDigest) {
     _validateStaticAndDynamicConfig(encodedStaticConfig, encodedDynamicConfig);
 
     bytes32 existingDigest = getSecondaryDigest(donId, pluginType);
@@ -259,5 +261,12 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
           ) & ~PREFIX_MASK
         )
     );
+  }
+
+  modifier OnlyOwnerOrSelfCall() {
+    if (msg.sender != owner() && msg.sender != address(this)) {
+      revert OnlyOwnerOrSelfCallAllowed();
+    }
+    _;
   }
 }
