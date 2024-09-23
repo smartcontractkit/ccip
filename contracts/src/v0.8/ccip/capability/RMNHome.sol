@@ -71,7 +71,7 @@ contract RMNHome is HomeBase {
         StoredConfig memory config = s_configs[i];
         return (
           VersionedConfig({
-            version: s_configVersions[i],
+            version: config.version,
             configDigest: configDigest,
             staticConfig: abi.decode(config.staticConfig, (StaticConfig)),
             dynamicConfig: abi.decode(config.dynamicConfig, (DynamicConfig))
@@ -96,7 +96,7 @@ contract RMNHome is HomeBase {
       StoredConfig memory config = s_configs[primaryConfigIndex];
 
       primaryConfig = VersionedConfig({
-        version: s_configVersions[primaryConfigIndex],
+        version: config.version,
         configDigest: primaryConfigDigest,
         staticConfig: abi.decode(config.staticConfig, (StaticConfig)),
         dynamicConfig: abi.decode(config.dynamicConfig, (DynamicConfig))
@@ -109,7 +109,7 @@ contract RMNHome is HomeBase {
       StoredConfig memory config = s_configs[secondaryConfigIndex];
 
       secondaryConfig = VersionedConfig({
-        version: s_configVersions[secondaryConfigIndex],
+        version: config.version,
         configDigest: secondaryConfigDigest,
         staticConfig: abi.decode(config.staticConfig, (StaticConfig)),
         dynamicConfig: abi.decode(config.dynamicConfig, (DynamicConfig))
@@ -144,8 +144,11 @@ contract RMNHome is HomeBase {
     uint32 newVersion = ++s_configCount;
     bytes memory encodedStaticConfig = abi.encode(newConfig.staticConfig);
     newConfigDigest = _calculateConfigDigest(encodedStaticConfig, newVersion, PREFIX);
-    s_configs[secondaryConfigIndex] = StoredConfig(encodedStaticConfig, abi.encode(newConfig.dynamicConfig));
-    s_configVersions[secondaryConfigIndex] = newVersion;
+    s_configs[secondaryConfigIndex] = StoredConfig({
+      version: newVersion,
+      staticConfig: encodedStaticConfig,
+      dynamicConfig: abi.encode(newConfig.dynamicConfig)
+    });
     s_configDigests[secondaryConfigIndex] = newConfigDigest;
 
     emit ConfigSet(

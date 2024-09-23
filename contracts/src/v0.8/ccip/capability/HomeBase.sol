@@ -22,12 +22,6 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
   /// @notice This array holds the configs.
   /// @dev Value i in this array is valid iff s_configDigests[i] != 0.
   StoredConfig[MAX_CONCURRENT_CONFIGS] internal s_configs;
-  /// @notice This array holds the versions of the configs.
-  /// @dev Value i in this array is valid iff s_configDigests[i] != 0.
-  /// @dev Since Solidity doesn't support writing complex memory structs to storage, we have to make the config calldata
-  /// in setConfig and then copy it to storage. This does not allow us to modify it to add the version field, so we
-  /// store the version separately.
-  uint32[MAX_CONCURRENT_CONFIGS] internal s_configVersions;
 
   /// @notice The total number of configs ever set, used for generating the version of the configs.
   uint32 internal s_configCount = 0;
@@ -35,6 +29,7 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
   uint32 internal s_primaryConfigIndex = 0;
 
   struct StoredConfig {
+    uint32 version;
     bytes staticConfig;
     bytes dynamicConfig;
   }
