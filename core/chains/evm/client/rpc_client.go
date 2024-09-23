@@ -550,6 +550,11 @@ func (r *rpcClient) SubscribeToHeads(ctx context.Context) (ch <-chan *evmtypes.H
 			return nil, nil, err
 		}
 
+		err = r.registerSub(&poller, chStopInFlight)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		lggr.Infof("Polling new heads over http ")
 		return channel, &poller, nil
 	}
@@ -581,7 +586,10 @@ func (r *rpcClient) SubscribeToHeads(ctx context.Context) (ch <-chan *evmtypes.H
 	return channel, forwarder, err
 }
 
-func (r *rpcClient) SubscribeToFinalizedHeads(_ context.Context) (<-chan *evmtypes.Head, commontypes.Subscription, error) {
+func (r *rpcClient) SubscribeToFinalizedHeads(ctx context.Context) (<-chan *evmtypes.Head, commontypes.Subscription, error) {
+	ctx, cancel, chStopInFlight, _, _ := r.acquireQueryCtx(ctx, r.rpcTimeout)
+	defer cancel()
+
 	interval := r.finalizedBlockPollInterval
 	if interval == 0 {
 		return nil, nil, errors.New("FinalizedBlockPollInterval is 0")
@@ -591,6 +599,12 @@ func (r *rpcClient) SubscribeToFinalizedHeads(_ context.Context) (<-chan *evmtyp
 	if err := poller.Start(); err != nil {
 		return nil, nil, err
 	}
+
+	err := r.registerSub(&poller, chStopInFlight)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return channel, &poller, nil
 }
 
