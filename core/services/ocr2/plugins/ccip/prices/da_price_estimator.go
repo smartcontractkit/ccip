@@ -37,18 +37,18 @@ func NewDAGasPriceEstimator(
 	}
 }
 
-func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (execGasPrice *big.Int, err error) {
-	execGasPrice, err = g.execEstimator.GetGasPrice(ctx)
+func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (*big.Int, error) {
+	gasPrice, err := g.execEstimator.GetGasPrice(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if execGasPrice.BitLen() > int(g.priceEncodingLength) {
-		return nil, fmt.Errorf("native gas price exceeded max range %+v", execGasPrice)
+	if gasPrice.BitLen() > int(g.priceEncodingLength) {
+		return nil, fmt.Errorf("native gas price exceeded max range %+v", gasPrice)
 	}
 
 	if g.l1Oracle == nil {
-		return execGasPrice, nil
+		return gasPrice, nil
 	}
 
 	daGasPriceWei, err := g.l1Oracle.GasPrice(ctx)
@@ -58,7 +58,7 @@ func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (execGasPrice *big
 
 	daGasPrice := daGasPriceWei.ToInt()
 
-	execGasPrice, daGasPrice, err = g.feeEstimatorConfig.ModifyGasPriceComponents(ctx, execGasPrice, daGasPrice)
+	gasPrice, daGasPrice, err = g.feeEstimatorConfig.ModifyGasPriceComponents(ctx, gasPrice, daGasPrice)
 	if err != nil {
 		return nil, fmt.Errorf("gasPrice modification failed: %v", err)
 	}
@@ -69,10 +69,10 @@ func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (execGasPrice *big
 		}
 
 		daGasPrice = new(big.Int).Lsh(daGasPrice, g.priceEncodingLength)
-		execGasPrice = new(big.Int).Add(execGasPrice, daGasPrice)
+		gasPrice = new(big.Int).Add(gasPrice, daGasPrice)
 	}
 
-	return execGasPrice, nil
+	return gasPrice, nil
 }
 
 func (g DAGasPriceEstimator) DenoteInUSD(p *big.Int, wrappedNativePrice *big.Int) (*big.Int, error) {

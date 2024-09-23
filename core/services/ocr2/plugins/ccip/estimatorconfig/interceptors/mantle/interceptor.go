@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/shopspring/decimal"
 
 	evmClient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/rollups"
@@ -21,14 +22,20 @@ const (
 	tokenRatioUpdateInterval = 60 * time.Minute
 	// tokenRatio fetches the tokenRatio used for Mantle's gas price calculation
 	// tokenRatio is a hex encoded call to:
-	tokenRatioMethod          = "tokenRatio"
+	tokenRatioMethod = "tokenRatio"
+	// chainDecimals fetches the number of chainDecimals used in the scalar for gas price calculation
+	// chainDecimals is a hex encoded call to:
+	// `function chainDecimals() public pure returns (uint256);`
+	decimalsMethod            = "decimals"
 	mantleTokenRatioAbiString = `[{"inputs":[],"name":"tokenRatio","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}]`
 )
 
 type Interceptor struct {
 	client               evmClient.Client
-	callData             []byte
-	tokenRatio           *big.Int
+	tokenRatioCallData   []byte
+	decimalsCallData     []byte
+	tokenRatio           decimal.Decimal
+	chainDecimals        *big.Int
 	tokenRatioLastUpdate time.Time
 }
 
@@ -43,16 +50,27 @@ func NewInterceptor(ctx context.Context, client evmClient.Client) *Interceptor {
 		log.Panicf("failed to parse GasPriceOracle %s() calldata for Mantle; %v", tokenRatioMethod, err)
 	}
 
+	// Encode calldata for chainDecimals method
+	decimalsMethodAbi, err := abi.JSON(strings.NewReader(rollups.OPDecimalsAbiString))
+	if err != nil {
+		log.Panicf("failed to parse GasPriceOracle %s() method ABI for Mantle; %v", decimalsMethod, err)
+	}
+	decimalsCallData, err := decimalsMethodAbi.Pack(decimalsMethod)
+	if err != nil {
+		log.Panicf("failed to parse GasPriceOracle %s() calldata for Mantle; %v", decimalsMethod, err)
+	}
+
 	return &Interceptor{
-		client:   client,
-		callData: tokenRatioCallData,
+		client:             client,
+		tokenRatioCallData: tokenRatioCallData,
+		decimalsCallData:   decimalsCallData,
 	}
 }
 
 // ModifyGasPriceComponents returns modified gasPrice.
 func (i *Interceptor) ModifyGasPriceComponents(ctx context.Context, execGasPrice, daGasPrice *big.Int) (*big.Int, *big.Int, error) {
 	if time.Since(i.tokenRatioLastUpdate) > tokenRatioUpdateInterval {
-		mantleTokenRatio, err := i.getMantleGasPrice(ctx)
+		mantleTokenRatio, err := i.getMantleTokenRatio(ctx)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -60,24 +78,60 @@ func (i *Interceptor) ModifyGasPriceComponents(ctx context.Context, execGasPrice
 		i.tokenRatio, i.tokenRatioLastUpdate = mantleTokenRatio, time.Now()
 	}
 
-	newExecGasPrice := new(big.Int).Mul(execGasPrice, i.tokenRatio)
-	newDAGasPrice := new(big.Int).Mul(daGasPrice, i.tokenRatio)
+	dExecGasPrice := decimal.NewFromBigInt(execGasPrice, 0)
+	newExecGasPrice := dExecGasPrice.Mul(i.tokenRatio).BigInt()
+
+	dDAGasPrice := decimal.NewFromBigInt(daGasPrice, 0)
+	newDAGasPrice := dDAGasPrice.Mul(i.tokenRatio).BigInt()
+
 	return newExecGasPrice, newDAGasPrice, nil
 }
 
-// getMantleGasPrice Requests and returns the token ratio for Mantle.
-func (i *Interceptor) getMantleGasPrice(ctx context.Context) (*big.Int, error) {
+// getMantleTokenRatio Requests and returns the token ratio for Mantle chain.
+func (i *Interceptor) getMantleTokenRatio(ctx context.Context) (decimal.Decimal, error) {
 	// call oracle to get l1BaseFee and tokenRatio
 	precompile := common.HexToAddress(rollups.OPGasOracleAddress)
 	tokenRatio, err := i.client.CallContract(ctx, ethereum.CallMsg{
 		To:   &precompile,
-		Data: i.callData,
+		Data: i.tokenRatioCallData,
 	}, nil)
 
 	if err != nil {
-		return nil, fmt.Errorf("fetch gas price parameters call failed: %w", err)
+		return decimal.Zero, fmt.Errorf("getMantleTokenRatio call failed: %w", err)
 	}
 
-	// Convert bytes to big int for calculations and return
-	return new(big.Int).SetBytes(tokenRatio), nil
+	bigIntTokenRatio := new(big.Int).SetBytes(tokenRatio)
+
+	// request chainDecimals value once, it rarely changed and use cached value during the app lifecycle
+	if i.chainDecimals == nil {
+		decimals, err := i.getMantleDecimals(ctx)
+		if err != nil {
+			return decimal.Zero, err
+		}
+
+		i.chainDecimals = decimals
+	}
+
+	// convert bigInt token ratio to the decimal format
+	// rawTokenRatio = bigIntTokenRatio * 10 ^ -i.chainDecimals
+	exp := int32(-1 * i.chainDecimals.Int64())
+	rawTokenRatio := decimal.NewFromBigInt(bigIntTokenRatio, exp)
+
+	return rawTokenRatio, nil
+}
+
+// getMantleDecimals Requests and returns the chainDecimals value for Mantle cahin.
+func (i *Interceptor) getMantleDecimals(ctx context.Context) (*big.Int, error) {
+	// call oracle to get l1BaseFee and tokenRatio
+	precompile := common.HexToAddress(rollups.OPGasOracleAddress)
+	decimals, err := i.client.CallContract(ctx, ethereum.CallMsg{
+		To:   &precompile,
+		Data: i.decimalsCallData,
+	}, nil)
+
+	if err != nil {
+		return nil, fmt.Errorf("getMantleDecimals call failed: %w", err)
+	}
+
+	return new(big.Int).SetBytes(decimals), nil
 }
