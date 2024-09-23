@@ -105,8 +105,12 @@ contract CCIPHome is HomeBase {
   /// @param configDigest The digest of the config to fetch.
   /// @return versionedConfig The config and its version.
   /// @return ok True if the config was found, false otherwise.
-  function getConfig(bytes32 configDigest) external view returns (VersionedConfig memory versionedConfig, bool ok) {
-    (StoredConfig memory storedConfig, bool configOK) = _getStoredConfig(0, 0, configDigest);
+  function getConfig(
+    uint32 donId,
+    uint8 pluginType,
+    bytes32 configDigest
+  ) external view returns (VersionedConfig memory versionedConfig, bool ok) {
+    (StoredConfig memory storedConfig, bool configOK) = _getStoredConfig(donId, pluginType, configDigest);
     if (configOK) {
       return (
         VersionedConfig({

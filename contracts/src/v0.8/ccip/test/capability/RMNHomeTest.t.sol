@@ -8,8 +8,8 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 contract RMNHomeTest is Test {
-  uint32 internal constant RMN_DON_ID = 0;
-  uint8 internal constant RMN_PLUGIN_TYPE = 0;
+  uint32 internal constant RMN_DON_ID = 593;
+  uint8 internal constant RMN_PLUGIN_TYPE = 244;
 
   struct Config {
     RMNHome.StaticConfig staticConfig;
@@ -88,7 +88,8 @@ contract RMNHome_setSecondary is RMNHomeTest {
       RMN_DON_ID, RMN_PLUGIN_TYPE, encodedConfig.staticConfig, encodedConfig.dynamicConfig, ZERO_DIGEST
     );
 
-    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getConfig(versionedConfig.configDigest);
+    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) =
+      s_rmnHome.getConfig(RMN_DON_ID, RMN_PLUGIN_TYPE, versionedConfig.configDigest);
     assertTrue(ok);
     assertEq(storedVersionedConfig.version, versionedConfig.version);
     RMNHome.StaticConfig memory storedStaticConfig = storedVersionedConfig.staticConfig;
@@ -194,12 +195,12 @@ contract RMNHome_setDynamicConfig is RMNHomeTest {
   }
 
   function test_setDynamicConfig_success() public {
-    (bytes32 priorPrimaryDigest,) = s_rmnHome.getConfigDigests(0, 0);
+    (bytes32 priorPrimaryDigest,) = s_rmnHome.getConfigDigests(RMN_DON_ID, RMN_PLUGIN_TYPE);
 
     Config memory config = _getBaseConfig();
     config.dynamicConfig.sourceChains[0].minObservers--;
 
-    (, bytes32 secondaryConfigDigest) = s_rmnHome.getConfigDigests(0, 0);
+    (, bytes32 secondaryConfigDigest) = s_rmnHome.getConfigDigests(RMN_DON_ID, RMN_PLUGIN_TYPE);
     bytes memory encodedConfig = abi.encode(config.dynamicConfig);
 
     vm.expectEmit();
@@ -207,7 +208,8 @@ contract RMNHome_setDynamicConfig is RMNHomeTest {
 
     s_rmnHome.setDynamicConfig(RMN_DON_ID, RMN_PLUGIN_TYPE, encodedConfig, secondaryConfigDigest);
 
-    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getConfig(secondaryConfigDigest);
+    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) =
+      s_rmnHome.getConfig(RMN_DON_ID, RMN_PLUGIN_TYPE, secondaryConfigDigest);
     assertTrue(ok);
     assertEq(
       storedVersionedConfig.dynamicConfig.sourceChains[0].minObservers,
@@ -215,7 +217,7 @@ contract RMNHome_setDynamicConfig is RMNHomeTest {
     );
 
     // Asser the digests don't change when updating the dynamic config
-    (bytes32 primaryDigest, bytes32 secondaryDigest) = s_rmnHome.getConfigDigests(0, 0);
+    (bytes32 primaryDigest, bytes32 secondaryDigest) = s_rmnHome.getConfigDigests(RMN_DON_ID, RMN_PLUGIN_TYPE);
     assertEq(primaryDigest, priorPrimaryDigest);
     assertEq(secondaryDigest, secondaryConfigDigest);
   }
@@ -269,14 +271,15 @@ contract RMNHome_revokeSecondary is RMNHomeTest {
   }
 
   function test_revokeSecondary_success() public {
-    (bytes32 priorPrimaryDigest, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests(0, 0);
+    (bytes32 priorPrimaryDigest, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests(RMN_DON_ID, RMN_PLUGIN_TYPE);
 
     vm.expectEmit();
     emit HomeBase.ConfigRevoked(priorSecondaryDigest);
 
     s_rmnHome.revokeSecondary(RMN_DON_ID, RMN_PLUGIN_TYPE, priorSecondaryDigest);
 
-    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getConfig(priorSecondaryDigest);
+    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) =
+      s_rmnHome.getConfig(RMN_DON_ID, RMN_PLUGIN_TYPE, priorSecondaryDigest);
     assertFalse(ok);
     // Ensure no old data is returned, even though it's still in storage
     assertEq(storedVersionedConfig.version, 0);
@@ -284,14 +287,14 @@ contract RMNHome_revokeSecondary is RMNHomeTest {
     assertEq(storedVersionedConfig.dynamicConfig.sourceChains.length, 0);
 
     // Asser the primary digest is unaffected but the secondary digest is set to zero
-    (bytes32 primaryDigest, bytes32 secondaryDigest) = s_rmnHome.getConfigDigests(0, 0);
+    (bytes32 primaryDigest, bytes32 secondaryDigest) = s_rmnHome.getConfigDigests(RMN_DON_ID, RMN_PLUGIN_TYPE);
     assertEq(primaryDigest, priorPrimaryDigest);
     assertEq(secondaryDigest, ZERO_DIGEST);
     assertTrue(secondaryDigest != priorSecondaryDigest);
   }
 
   function test_revokeSecondary_ConfigDigestMismatch_reverts() public {
-    (, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests(0, 0);
+    (, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests(RMN_DON_ID, RMN_PLUGIN_TYPE);
 
     bytes32 wrongDigest = keccak256("wrong_digest");
     vm.expectRevert(abi.encodeWithSelector(HomeBase.ConfigDigestMismatch.selector, priorSecondaryDigest, wrongDigest));
