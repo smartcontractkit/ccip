@@ -484,7 +484,6 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 	usdcConfig := execPluginConfig.USDCConfig
 
 	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
-
 	if r.chain.Config().EVM().ChainType() == chaintype.ChainMantle && !execPluginConfig.IsSourceProvider {
 		feeEstimatorConfig.AddGasPriceInterceptor(mantle.NewInterceptor(ctx, r.chain.Client()))
 	}
