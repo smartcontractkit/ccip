@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {RMNHome} from "../../capability/RMNHome.sol";
 import {Internal} from "../../libraries/Internal.sol";
-import {RMNHome} from "../../rmn/RMNHome.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 
 contract RMNHomeTest is BaseTest {

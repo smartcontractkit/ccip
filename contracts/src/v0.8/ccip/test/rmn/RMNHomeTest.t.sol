@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {HomeBase} from "../../capability/HomeBase.sol";
+import {RMNHome} from "../../capability/RMNHome.sol";
 import {Internal} from "../../libraries/Internal.sol";
-import {RMNHome} from "../../rmn/RMNHome.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
@@ -50,16 +51,20 @@ contract RMNHomeTest is Test {
 contract RMNHome_setSecondary is RMNHomeTest {
   function test_setSecondary_success() public {
     RMNHome.Config memory config = _getBaseConfig();
-    RMNHome.VersionedConfig memory versionedConfig =
-      RMNHome.VersionedConfig({version: 1, staticConfig: config.staticConfig, dynamicConfig: config.dynamicConfig});
-    bytes32 configDigest = _getConfigDigest(versionedConfig.staticConfig, versionedConfig.version);
+    RMNHome.VersionedConfig memory versionedConfig = RMNHome.VersionedConfig({
+      version: 1,
+      staticConfig: config.staticConfig,
+      dynamicConfig: config.dynamicConfig,
+      configDigest: ZERO_DIGEST
+    });
+    versionedConfig.configDigest = _getConfigDigest(versionedConfig.staticConfig, versionedConfig.version);
 
     vm.expectEmit();
-    emit RMNHome.ConfigSet(configDigest, versionedConfig);
+    emit RMNHome.ConfigSet(versionedConfig);
 
     s_rmnHome.setSecondary(config, ZERO_DIGEST);
 
-    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getConfig(configDigest);
+    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getConfig(versionedConfig.configDigest);
     assertTrue(ok);
     assertEq(storedVersionedConfig.version, versionedConfig.version);
     RMNHome.StaticConfig memory storedStaticConfig = storedVersionedConfig.staticConfig;
@@ -219,7 +224,7 @@ contract RMNHome_revokeSecondary is RMNHomeTest {
     (bytes32 priorPrimaryDigest, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests();
 
     vm.expectEmit();
-    emit RMNHome.ConfigRevoked(priorSecondaryDigest);
+    emit HomeBase.ConfigRevoked(priorSecondaryDigest);
 
     s_rmnHome.revokeSecondary(priorSecondaryDigest);
 
@@ -241,7 +246,7 @@ contract RMNHome_revokeSecondary is RMNHomeTest {
     (, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests();
 
     bytes32 wrongDigest = keccak256("wrong_digest");
-    vm.expectRevert(abi.encodeWithSelector(RMNHome.ConfigDigestMismatch.selector, priorSecondaryDigest, wrongDigest));
+    vm.expectRevert(abi.encodeWithSelector(HomeBase.ConfigDigestMismatch.selector, priorSecondaryDigest, wrongDigest));
     s_rmnHome.revokeSecondary(wrongDigest);
   }
 
