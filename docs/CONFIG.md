@@ -4640,16 +4640,16 @@ Enabled = false
 Enabled = true
 
 [GasEstimator]
-Mode = 'BlockHistory'
+Mode = 'FeeHistory'
 PriceDefault = '20 gwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
-PriceMin = '100 mwei'
+PriceMin = '0'
 LimitDefault = 8000000
 LimitMax = 8000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
 EstimateLimit = false
-BumpMin = '100 mwei'
+BumpMin = '5 gwei'
 BumpPercent = 40
 BumpThreshold = 3
 EIP1559DynamicFees = false
@@ -4659,13 +4659,13 @@ TipCapMin = '1 wei'
 
 [GasEstimator.BlockHistory]
 BatchSize = 25
-BlockHistorySize = 12
+BlockHistorySize = 8
 CheckInclusionBlocks = 12
 CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
 [GasEstimator.FeeHistory]
-CacheTimeout = '10s'
+CacheTimeout = '4s'
 
 [HeadTracker]
 HistoryDepth = 2000
@@ -5227,16 +5227,16 @@ Enabled = false
 Enabled = true
 
 [GasEstimator]
-Mode = 'BlockHistory'
+Mode = 'FeeHistory'
 PriceDefault = '20 gwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
-PriceMin = '1 mwei'
+PriceMin = '0'
 LimitDefault = 8000000
 LimitMax = 8000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
 EstimateLimit = false
-BumpMin = '20 mwei'
+BumpMin = '5 gwei'
 BumpPercent = 40
 BumpThreshold = 3
 EIP1559DynamicFees = false
@@ -5246,13 +5246,13 @@ TipCapMin = '1 wei'
 
 [GasEstimator.BlockHistory]
 BatchSize = 25
-BlockHistorySize = 12
+BlockHistorySize = 8
 CheckInclusionBlocks = 12
 CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
 [GasEstimator.FeeHistory]
-CacheTimeout = '10s'
+CacheTimeout = '4s'
 
 [HeadTracker]
 HistoryDepth = 2000
