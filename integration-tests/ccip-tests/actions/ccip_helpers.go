@@ -1651,37 +1651,40 @@ func (sourceCCIP *SourceCCIPModule) IsRequestTriggeredWithinTimeframe(timeframe 
 func (sourceCCIP *SourceCCIPModule) IsPastRequestTriggeredWithinTimeframe(
 	ctx context.Context,
 	timeframe *commonconfig.Duration,
-) (latestEvent *types.Log, err error) {
+) (*types.Log, error) {
 	if timeframe == nil {
 		return nil, nil
 	}
 	//var foundAt *time.Time
-	latestBlock, err1 := sourceCCIP.Common.ChainClient.LatestBlockNumber(ctx)
-	if err1 != nil {
-		return nil, fmt.Errorf("error while getting latest source block number. Error: %w", err1)
+	latestBlock, err := sourceCCIP.Common.ChainClient.LatestBlockNumber(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error while getting latest source block number. Error: %w", err)
 	}
-	avgBlockTime, err1 := sourceCCIP.Common.ChainClient.AvgBlockTime(ctx)
-	if err1 != nil {
-		return nil, fmt.Errorf("error while getting average source block time. Error: %w", err1)
+	avgBlockTime, err := sourceCCIP.Common.ChainClient.AvgBlockTime(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error while getting average source block time. Error: %w", err)
 	}
 	filterFromBlock := latestBlock - uint64(timeframe.Duration()/avgBlockTime)
 
-	onRampContract, err1 := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress(sourceCCIP.OnRamp.EthAddress.Hex()),
+	onRampContract, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress(sourceCCIP.OnRamp.EthAddress.Hex()),
 		sourceCCIP.Common.ChainClient.Backend())
-	if err1 != nil {
-		return nil, fmt.Errorf("error while on ramp contract. Error: %w", err1)
+	if err != nil {
+		return nil, fmt.Errorf("error while on ramp contract. Error: %w", err)
 	}
-	iterator, err1 := onRampContract.FilterCCIPSendRequested(&bind.FilterOpts{
+	iterator, err := onRampContract.FilterCCIPSendRequested(&bind.FilterOpts{
 		Start: filterFromBlock,
 	})
-	if err1 != nil {
-		return nil, fmt.Errorf("error while filtering CCIP send requested starting block number: %d. Error: %w", filterFromBlock, err1)
+	if err != nil {
+		return nil, fmt.Errorf("error while filtering CCIP send requested starting block number: %d. Error: %w", filterFromBlock, err)
 	}
 	defer func() {
-		err = iterator.Close()
+		iterErr := iterator.Close()
+		if iterErr != nil {
+			sourceCCIP.Common.Logger.Error().Err(iterErr).Msg("Error closing iterator")
+		}
 	}()
 	lastBlockNumber := uint64(0)
-	latestEvent = nil
+	var latestEvent *types.Log
 	for iterator.Next() {
 		blockNum := iterator.Event.Raw.BlockNumber
 		if blockNum > lastBlockNumber {
