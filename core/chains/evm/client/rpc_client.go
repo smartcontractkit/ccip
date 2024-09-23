@@ -756,7 +756,7 @@ func (r *rpcClient) LatestBlock(ctx context.Context) (head *evmtypes.Head, err e
 	}
 
 	head.EVMChainID = ubig.New(r.chainID)
-
+	r.rpcLog.Debugf("http new head polling request latest block, received new block for %v", head.BlockNumber())
 	r.onNewHead(ctx, chStopInFlight, head)
 	return
 }
