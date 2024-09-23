@@ -13,10 +13,9 @@ contract HomeBaseTest is Test {
   bytes32 internal constant ZERO_DIGEST = bytes32(uint256(0));
 
   HomeBaseHelper internal s_homeBase;
-  address internal constant CAPABILITIES_REGISTRY = address(1);
 
   function setUp() public virtual {
-    s_homeBase = new HomeBaseHelper(CAPABILITIES_REGISTRY);
+    s_homeBase = new HomeBaseHelper();
   }
 
   uint256 private constant PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..00
@@ -169,32 +168,32 @@ contract RMNHome_promoteSecondaryAndRevokePrimary is HomeBaseTest {
   }
 }
 
-contract RMNHome_beforeCapabilityConfigSet is HomeBaseTest {
-  function test_beforeCapabilityConfigSet_success() public {
-    vm.startPrank(CAPABILITIES_REGISTRY);
-
-    HomeBase.StoredConfig memory encodedConfig = HomeBase.StoredConfig({
-      configDigest: ZERO_DIGEST,
-      version: 1,
-      staticConfig: _getStaticConfig(),
-      dynamicConfig: _getDynamicConfig()
-    });
-    encodedConfig.configDigest = _getConfigDigest(encodedConfig.staticConfig, encodedConfig.version);
-
-    bytes memory callPayload = abi.encodeCall(
-      HomeBase.setSecondary, (DON_ID, encodedConfig.staticConfig, encodedConfig.dynamicConfig, ZERO_DIGEST)
-    );
-
-    vm.expectEmit();
-    emit HomeBase.ConfigSet(encodedConfig);
-
-    s_homeBase.beforeCapabilityConfigSet(new bytes32[](0), callPayload, 0, 0);
-  }
-
-  function test_beforeCapabilityConfigSet_OnlyCapabilitiesRegistryCanCall_reverts() public {
-    vm.startPrank(address(0));
-
-    vm.expectRevert(HomeBase.OnlyCapabilitiesRegistryCanCall.selector);
-    s_homeBase.beforeCapabilityConfigSet(new bytes32[](0), new bytes(0), 0, 0);
-  }
-}
+//contract RMNHome_beforeCapabilityConfigSet is HomeBaseTest {
+//  function test_beforeCapabilityConfigSet_success() public {
+//    vm.startPrank(CAPABILITIES_REGISTRY);
+//
+//    HomeBase.StoredConfig memory encodedConfig = HomeBase.StoredConfig({
+//      configDigest: ZERO_DIGEST,
+//      version: 1,
+//      staticConfig: _getStaticConfig(),
+//      dynamicConfig: _getDynamicConfig()
+//    });
+//    encodedConfig.configDigest = _getConfigDigest(encodedConfig.staticConfig, encodedConfig.version);
+//
+//    bytes memory callPayload = abi.encodeCall(
+//      HomeBase.setSecondary, (DON_ID, encodedConfig.staticConfig, encodedConfig.dynamicConfig, ZERO_DIGEST)
+//    );
+//
+//    vm.expectEmit();
+//    emit HomeBase.ConfigSet(encodedConfig);
+//
+//    s_homeBase.beforeCapabilityConfigSet(new bytes32[](0), callPayload, 0, 0);
+//  }
+//
+//  function test_beforeCapabilityConfigSet_OnlyCapabilitiesRegistryCanCall_reverts() public {
+//    vm.startPrank(address(0));
+//
+//    vm.expectRevert(HomeBase.OnlyCapabilitiesRegistryCanCall.selector);
+//    s_homeBase.beforeCapabilityConfigSet(new bytes32[](0), new bytes(0), 0, 0);
+//  }
+//}

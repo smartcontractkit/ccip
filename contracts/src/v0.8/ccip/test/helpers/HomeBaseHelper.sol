@@ -8,8 +8,6 @@ contract HomeBaseHelper is HomeBase {
 
   uint256 public constant PREFIX = 0x0c0c << (256 - 16);
 
-  constructor(address capabilitiesRegistry) HomeBase(capabilitiesRegistry) {}
-
   function _validateStaticAndDynamicConfig(bytes memory, bytes memory) internal view override {}
 
   function _validateDynamicConfig(bytes memory, bytes memory) internal view override {}

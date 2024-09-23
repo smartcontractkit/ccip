@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {ICapabilityConfiguration} from "../../keystone/interfaces/ICapabilityConfiguration.sol";
 import {ICapabilitiesRegistry} from "./interfaces/ICapabilitiesRegistry.sol";
 
 import {Internal} from "../libraries/Internal.sol";
 import {HomeBase} from "./HomeBase.sol";
 
+import {IERC165} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice CCIPHome stores the configuration for the CCIP capability.
@@ -13,7 +15,7 @@ import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts
 /// Each chain will have a single configuration which includes information like the router address.
 /// Each CR DON will have up to four configurations: for each of (commit, exec), one blue and one green configuration.
 /// This is done in order to achieve "blue-green" deployments.
-contract CCIPHome is HomeBase {
+contract CCIPHome is HomeBase, ICapabilityConfiguration, IERC165 {
   using EnumerableSet for EnumerableSet.UintSet;
 
   event ChainConfigRemoved(uint64 chainSelector);
@@ -86,19 +88,64 @@ contract CCIPHome is HomeBase {
   /// @dev 256 is the hard limit due to the bit encoding of their indexes into a uint256.
   uint256 internal constant MAX_NUM_ORACLES = 256;
 
+  /// @dev The canonical capabilities registry address.
+  address internal immutable i_capabilitiesRegistry;
+
   /// @dev chain configuration for each chain that CCIP is deployed on.
   mapping(uint64 chainSelector => ChainConfig chainConfig) private s_chainConfigurations;
 
   /// @dev All chains that are configured.
   EnumerableSet.UintSet private s_remoteChainSelectors;
 
-  constructor(address capabilitiesRegistry) HomeBase(capabilitiesRegistry) {}
-
-  /// @notice Returns the total number of chains configured.
-  /// @return The total number of chains configured.
-  function getNumChainConfigurations() external view returns (uint256) {
-    return s_remoteChainSelectors.length();
+  constructor(address capabilitiesRegistry) {
+    if (capabilitiesRegistry == address(0)) {
+      revert ZeroAddressNotAllowed();
+    }
+    i_capabilitiesRegistry = capabilitiesRegistry;
   }
+
+  // ================================================================
+  // │                    Capability Registry                       │
+  // ================================================================
+
+  /// @notice Returns the capabilities registry address.
+  /// @return The capabilities registry address.
+  function getCapabilityRegistry() external view returns (address) {
+    return i_capabilitiesRegistry;
+  }
+
+  /// @inheritdoc IERC165
+  function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
+    return interfaceId == type(ICapabilityConfiguration).interfaceId || interfaceId == type(IERC165).interfaceId;
+  }
+
+  /// @notice Called by the registry prior to the config being set for a particular DON.
+  /// @dev precondition Requires destination chain config to be set
+  function beforeCapabilityConfigSet(
+    bytes32[] calldata, // nodes
+    bytes calldata update,
+    uint64, // configCount
+    uint32 // donId
+  ) external override {
+    if (msg.sender != i_capabilitiesRegistry) {
+      revert OnlyCapabilitiesRegistryCanCall();
+    }
+    (bool success, bytes memory errorData) = address(this).call(update);
+    if (!success) {
+      revert(string(errorData));
+    }
+  }
+
+  /// @inheritdoc ICapabilityConfiguration
+  /// @dev The CCIP capability will fetch the configuration needed directly from this contract.
+  /// The offchain syncer will call this function, so its important that it doesn't revert.
+  function getCapabilityConfiguration(uint32 /* donId */ ) external pure override returns (bytes memory configuration) {
+    return bytes("");
+  }
+
+  // ================================================================
+  // │                          Getters                             │
+  // ================================================================
 
   /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes. Use
   /// in case one of the configs is too large to be returnable by one of the other getters.
@@ -149,6 +196,10 @@ contract CCIPHome is HomeBase {
 
     return (primaryConfig, secondaryConfig);
   }
+
+  // ================================================================
+  // │                         Validation                           │
+  // ================================================================
 
   function _validateStaticAndDynamicConfig(bytes memory encodedStaticConfig, bytes memory) internal view override {
     OCR3Config memory cfg = abi.decode(encodedStaticConfig, (OCR3Config));
@@ -221,6 +272,12 @@ contract CCIPHome is HomeBase {
   // ================================================================
   // │                    Chain Configuration                       │
   // ================================================================
+
+  /// @notice Returns the total number of chains configured.
+  /// @return The total number of chains configured.
+  function getNumChainConfigurations() external view returns (uint256) {
+    return s_remoteChainSelectors.length();
+  }
 
   /// @notice Returns all the chain configurations.
   /// @param pageIndex The page index.

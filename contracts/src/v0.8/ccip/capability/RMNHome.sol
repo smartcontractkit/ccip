@@ -48,8 +48,6 @@ contract RMNHome is HomeBase {
 
   uint256 private constant PREFIX = 0x000b << (256 - 16); // 0x000b00..00
 
-  constructor() HomeBase(address(1)) {}
-
   /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes. Use
   /// in case one of the configs is too large to be returnable by one of the other getters.
   /// @param configDigest The digest of the config to fetch.

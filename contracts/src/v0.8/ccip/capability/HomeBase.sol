@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {ICapabilityConfiguration} from "../../keystone/interfaces/ICapabilityConfiguration.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
-import {IERC165} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
-
-abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, IERC165 {
+abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
   event ConfigSet(StoredConfig versionedConfig);
   event ConfigRevoked(bytes32 indexed configDigest);
   event DynamicConfigSet(bytes32 indexed configDigest, bytes dynamicConfig);
@@ -27,9 +24,6 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
   /// @notice Helper to identify the zero config digest with less casting.
   bytes32 private constant ZERO_DIGEST = bytes32(uint256(0));
 
-  /// @dev The canonical capabilities registry address.
-  address internal immutable i_capabilitiesRegistry;
-
   /// @notice This array holds the configs.
   /// @dev Value i in this array is valid iff s_configs[i].configDigest != 0.
   mapping(bytes32 pluginKey => StoredConfig[MAX_CONCURRENT_CONFIGS]) private s_configs;
@@ -46,58 +40,11 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion, ICapabilityConfig
     bytes dynamicConfig;
   }
 
-  /// @param capabilitiesRegistry the canonical capabilities registry address.
-  constructor(address capabilitiesRegistry) {
-    if (capabilitiesRegistry == address(0)) {
-      revert ZeroAddressNotAllowed();
-    }
-    i_capabilitiesRegistry = capabilitiesRegistry;
-  }
-
   function _validateStaticAndDynamicConfig(bytes memory staticConfig, bytes memory dynamicConfig) internal view virtual;
 
   function _validateDynamicConfig(bytes memory staticConfig, bytes memory dynamicConfig) internal view virtual;
 
   function _getConfigDigestPrefix() internal pure virtual returns (uint256);
-
-  // ================================================================
-  // │                    Capability Registry                       │
-  // ================================================================
-
-  /// @notice Returns the capabilities registry address.
-  /// @return The capabilities registry address.
-  function getCapabilityRegistry() external view returns (address) {
-    return i_capabilitiesRegistry;
-  }
-
-  /// @inheritdoc IERC165
-  function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
-    return interfaceId == type(ICapabilityConfiguration).interfaceId || interfaceId == type(IERC165).interfaceId;
-  }
-
-  /// @notice Called by the registry prior to the config being set for a particular DON.
-  /// @dev precondition Requires destination chain config to be set
-  function beforeCapabilityConfigSet(
-    bytes32[] calldata, // nodes
-    bytes calldata update,
-    uint64, // configCount
-    uint32 // donId
-  ) external override {
-    if (msg.sender != i_capabilitiesRegistry) {
-      revert OnlyCapabilitiesRegistryCanCall();
-    }
-    (bool success, bytes memory errorData) = address(this).call(update);
-    if (!success) {
-      revert(string(errorData));
-    }
-  }
-
-  /// @inheritdoc ICapabilityConfiguration
-  /// @dev The CCIP capability will fetch the configuration needed directly from this contract.
-  /// The offchain syncer will call this function, so its important that it doesn't revert.
-  function getCapabilityConfiguration(uint32 /* donId */ ) external pure override returns (bytes memory configuration) {
-    return bytes("");
-  }
 
   // ================================================================
   // │                          Getters                             │
