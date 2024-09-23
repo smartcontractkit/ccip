@@ -28,6 +28,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
+const OFFCHAIN_AGGREGATOR = "OffchainAggregator"
+const DECIMALS_METHOD_NAME = "decimals"
+const LATEST_ROUND_DATA_METHOD_NAME = "latestRoundData"
+
 func GenericAddrToEvm(addr ccip.Address) (common.Address, error) {
 	return ccipcalc.GenericAddrToEvm(addr)
 }

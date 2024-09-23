@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
 
 	"go.uber.org/multierr"
@@ -25,18 +27,14 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 )
 
-const decimalsMethodName = "decimals"
-const latestRoundDataMethodName = "latestRoundData"
-const OFFCHAIN_AGGREGATOR = "OffchainAggregator"
-
 func init() {
 	// Ensure existence of latestRoundData method on the Aggregator contract.
 	aggregatorABI, err := abi.JSON(strings.NewReader(offchainaggregator.OffchainAggregatorABI))
 	if err != nil {
 		panic(err)
 	}
-	ensureMethodOnContract(aggregatorABI, decimalsMethodName)
-	ensureMethodOnContract(aggregatorABI, latestRoundDataMethodName)
+	ensureMethodOnContract(aggregatorABI, ccip.DECIMALS_METHOD_NAME)
+	ensureMethodOnContract(aggregatorABI, ccip.LATEST_ROUND_DATA_METHOD_NAME)
 }
 
 func ensureMethodOnContract(abi abi.ABI, methodName string) {
@@ -164,7 +162,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	for i, call := range batchCalls.decimalCalls {
 		bindings = append(bindings, types.BoundContract{
 			Address: string(ccipcalc.EvmAddrToGeneric(call.ContractAddress())),
-			Name:    fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i),
+			Name:    fmt.Sprintf("%v_%v", ccip.OFFCHAIN_AGGREGATOR, i),
 		})
 	}
 
@@ -177,7 +175,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	var decimalsReq uint8
 	batchGetLatestValuesRequest := make(map[string]types.ContractBatch)
 	for i, call := range batchCalls.decimalCalls {
-		contractName := fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i)
+		contractName := fmt.Sprintf("%v_%v", ccip.OFFCHAIN_AGGREGATOR, i)
 		batchGetLatestValuesRequest[contractName] = append(batchGetLatestValuesRequest[contractName], types.BatchRead{
 			ReadName:  call.MethodName(),
 			ReturnVal: &decimalsReq,
@@ -185,7 +183,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	}
 
 	for i, call := range batchCalls.latestRoundDataCalls {
-		contractName := fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i)
+		contractName := fmt.Sprintf("%v_%v", ccip.OFFCHAIN_AGGREGATOR, i)
 		batchGetLatestValuesRequest[contractName] = append(batchGetLatestValuesRequest[contractName], types.BatchRead{
 			ReadName:  call.MethodName(),
 			ReturnVal: &aggregator_v3_interface.LatestRoundData{},
@@ -205,7 +203,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	latestRoundCR := make([]aggregator_v3_interface.LatestRoundData, 0, nbDecimalCalls)
 	var respErr error
 	for j := range nbCalls {
-		contractName := fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, j)
+		contractName := fmt.Sprintf("%v_%v", ccip.OFFCHAIN_AGGREGATOR, j)
 		offchainAggregatorRespSlice := result[contractName]
 
 		for i, read := range offchainAggregatorRespSlice {
@@ -214,14 +212,14 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 				respErr = multierr.Append(respErr, fmt.Errorf("error with method call %v: %w", batchCalls.decimalCalls[i].MethodName(), readErr))
 				continue
 			}
-			if read.ReadName == decimalsMethodName {
+			if read.ReadName == ccip.DECIMALS_METHOD_NAME {
 				decimal, ok := val.(*uint8)
 				if !ok {
 					return fmt.Errorf("expected type uint8 for method call %v on contract %v: %w", batchCalls.decimalCalls[i].MethodName(), batchCalls.decimalCalls[i].ContractAddress(), readErr)
 				}
 
 				decimalsCR = append(decimalsCR, *decimal)
-			} else if read.ReadName == latestRoundDataMethodName {
+			} else if read.ReadName == ccip.LATEST_ROUND_DATA_METHOD_NAME {
 				latestRoundDataRes, ok := val.(*aggregator_v3_interface.LatestRoundData)
 				if !ok {
 					return fmt.Errorf("expected type latestRoundDataConfig for method call %v on contract %v: %w", batchCalls.latestRoundDataCalls[i/2].MethodName(), batchCalls.latestRoundDataCalls[i/2].ContractAddress(), readErr)
@@ -276,12 +274,12 @@ func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []cciptyp
 			chainCalls := batchCallsPerChain[aggCfg.ChainID]
 			chainCalls.decimalCalls = append(chainCalls.decimalCalls, rpclib.NewEvmCall(
 				d.aggregatorAbi,
-				decimalsMethodName,
+				ccip.DECIMALS_METHOD_NAME,
 				aggCfg.AggregatorContractAddress,
 			))
 			chainCalls.latestRoundDataCalls = append(chainCalls.latestRoundDataCalls, rpclib.NewEvmCall(
 				d.aggregatorAbi,
-				latestRoundDataMethodName,
+				ccip.LATEST_ROUND_DATA_METHOD_NAME,
 				aggCfg.AggregatorContractAddress,
 			))
 			chainCalls.tokenOrder = append(chainCalls.tokenOrder, tk)

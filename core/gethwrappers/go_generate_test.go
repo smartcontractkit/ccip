@@ -17,6 +17,7 @@ import (
 
 	cutils "github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	"github.com/stretchr/testify/assert"
@@ -57,7 +58,7 @@ func TestCheckContractHashesFromLastGoGenerate(t *testing.T) {
 }
 
 func isOCRContract(fullpath string) bool {
-	return strings.Contains(fullpath, "OffchainAggregator")
+	return strings.Contains(fullpath, ccip.OFFCHAIN_AGGREGATOR)
 }
 
 // VRFv2 currently uses revert error types which are not supported by abigen

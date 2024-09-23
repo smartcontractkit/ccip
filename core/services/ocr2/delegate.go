@@ -1646,12 +1646,12 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 			relayID := types.RelayID{Network: spec.Relay, ChainID: strconv.FormatUint(chainID, 10)}
 			relay, rerr := d.RelayGetter.Get(relayID)
 			if rerr != nil {
-				return nil, rerr
+				return nil, fmt.Errorf("get relay by id=%v: %w", relayID, err)
 			}
 
 			contractsConfig := make(map[string]evmrelaytypes.ChainContractReader, len(aggregatorContracts))
 			for i := range aggregatorContracts {
-				contractsConfig[fmt.Sprintf("%v_%v", "OffchainAggregator", i)] = evmrelaytypes.ChainContractReader{
+				contractsConfig[fmt.Sprintf("%v_%v", ccip.OFFCHAIN_AGGREGATOR, i)] = evmrelaytypes.ChainContractReader{
 					ContractABI: ccip.OffChainAggregatorABI,
 					Configs: map[string]*evmrelaytypes.ChainReaderDefinition{
 						"decimals": { // CR consumers choose an alias
@@ -1669,12 +1669,12 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 
 			contractReaderConfigJsonBytes, jerr := json.Marshal(contractReaderConfig)
 			if jerr != nil {
-				return nil, jerr
+				return nil, fmt.Errorf("marshal contract reader config: %w", jerr)
 			}
 
 			contractReader, cerr := relay.NewContractReader(ctx, contractReaderConfigJsonBytes)
 			if cerr != nil {
-				return nil, cerr
+				return nil, fmt.Errorf("new ccip commit contract reader %w", cerr)
 			}
 
 			contractReaders[chainID] = contractReader
