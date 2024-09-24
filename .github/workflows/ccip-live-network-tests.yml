@@ -299,6 +299,7 @@ jobs:
             phaseTimeout: 90m
     steps:
       - name: Collect Metrics
+        if: ${{ matrix.lanes.enabled == true }}
         id: collect-gha-metrics
         uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
         with:
@@ -309,10 +310,12 @@ jobs:
           this-job-name: CCIP Smoke Test
         continue-on-error: true
       - name: Checkout the repo
+        if: ${{ matrix.lanes.enabled == true }}
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           ref: ${{ env.REF_NAME }}
       - name: Prepare Base64 TOML override
+        if: ${{ matrix.lanes.enabled == true }}
         id: set_override_config
         shell: bash
         run: |
@@ -332,6 +335,7 @@ jobs:
              echo "SLACK_USER=${{ secrets.QA_SLACK_USER }}" >> $GITHUB_ENV
            fi
       - name: step summary
+        if: ${{ matrix.lanes.enabled == true }}
         shell: bash
         run: |
           echo "### chainlink image used for this test run :link:" >>$GITHUB_STEP_SUMMARY
@@ -339,6 +343,7 @@ jobs:
           echo "### chainlink-tests image tag for this test run :ship:" >>$GITHUB_STEP_SUMMARY
           echo "\`${{ env.CHAINLINK_TEST_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
       - name: Prepare Base64 TOML override for CCIP secrets
+        if: ${{ matrix.lanes.enabled == true }}
         uses: ./.github/actions/setup-create-base64-config-ccip
         id: setup_create_base64_config_ccip
         with:
@@ -378,4 +383,4 @@ jobs:
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           cache_key_id: ccip-smoke-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "true"
-          should_cleanup: false
+          should_cleanup: true
