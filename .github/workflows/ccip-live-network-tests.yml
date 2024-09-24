@@ -250,7 +250,52 @@ jobs:
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
       ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
-
+    strategy:
+      fail-fast: false
+      matrix:
+        lanes:
+          - name: 'ARBITRUM_MAINNET,BSC_MAINNET;ARBITRUM_MAINNET,OPTIMISM_MAINNET'
+            enabled: true
+            phaseTimeout: 20m
+          - name: 'AVALANCHE_MAINNET,ARBITRUM_MAINNET;AVALANCHE_MAINNET,BASE_MAINNET;AVALANCHE_MAINNET,BSC_MAINNET;AVALANCHE_MAINNET,OPTIMISM_MAINNET;AVALANCHE_MAINNET,POLYGON_MAINNET;AVALANCHE_MAINNET,WEMIX_MAINNET'
+            enabled: true
+            phaseTimeout: 20m
+          - name: 'BASE_MAINNET,ARBITRUM_MAINNET;BASE_MAINNET,BSC_MAINNET;BASE_MAINNET,OPTIMISM_MAINNET;BASE_MAINNET,POLYGON_MAINNET'
+            enabled: true
+            phaseTimeout: 20m
+          - name: 'BLAST_MAINNET,ARBITRUM_MAINNET;BLAST_MAINNET,BASE_MAINNET;BLAST_MAINNET,BSC_MAINNET'
+            enabled: true
+            phaseTimeout: 20m
+          - name: 'BSC_MAINNET,OPTIMISM_MAINNET;BSC_MAINNET,POLYGON_MAINNET;BSC_MAINNET,WEMIX_MAINNET'
+            enabled: true
+            phaseTimeout: 20m
+          - name: 'ETHEREUM_MAINNET,ARBITRUM_MAINNET;ETHEREUM_MAINNET,AVALANCHE_MAINNET;ETHEREUM_MAINNET,BASE_MAINNET;ETHEREUM_MAINNET,BLAST_MAINNET;ETHEREUM_MAINNET,BSC_MAINNET;ETHEREUM_MAINNET,CELO_MAINNET;ETHEREUM_MAINNET,GNOSIS_MAINNET;ETHEREUM_MAINNET,OPTIMISM_MAINNET;ETHEREUM_MAINNET,POLYGON_MAINNET;ETHEREUM_MAINNET,WEMIX_MAINNET'
+            enabled: true
+            phaseTimeout: 40m
+          - name: 'ETHEREUM_MAINNET,METIS_ANDROMEDA;ETHEREUM_MAINNET,ZKSYNC_MAINNET'
+            enabled: true
+            phaseTimeout: 90m
+          - name: 'GNOSIS_MAINNET,ARBITRUM_MAINNET;GNOSIS_MAINNET,AVALANCHE_MAINNET;GNOSIS_MAINNET,BASE_MAINNET;GNOSIS_MAINNET,BSC_MAINNET;GNOSIS_MAINNET,OPTIMISM_MAINNET;GNOSIS_MAINNET,POLYGON_MAINNET'
+            enabled: true
+            phaseTimeout: 20m
+          - name: 'METIS_ANDROMEDA,ARBITRUM_MAINNET'
+            enabled: true
+            phaseTimeout: 60m
+          - name: 'MODE_MAINNET,OPTIMISM_MAINNET;MODE_MAINNET,ARBITRUM_MAINNET;MODE_MAINNET,BASE_MAINNET;MODE_MAINNET,BSC_MAINNET'
+            enabled: true
+            phaseTimeout: 20m
+          - name: 'OPTIMISM_MAINNET,POLYGON_MAINNET;OPTIMISM_MAINNET,WEMIX_MAINNET'
+            enabled: true
+            phaseTimeout: 20m
+          - name: 'POLYGON_MAINNET,ARBITRUM_MAINNET;POLYGON_MAINNET,WEMIX_MAINNET'
+            enabled: true
+            phaseTimeout: 20m
+          - name: 'WEMIX_MAINNET,ARBITRUM_MAINNET;WEMIX_MAINNET,KROMA_MAINNET'
+            enabled: true
+            phaseTimeout: 20m
+          - name: 'ZKSYNC_MAINNET,ARBITRUM_MAINNET'
+            enabled: true
+            phaseTimeout: 90m
     steps:
       - name: Collect Metrics
         id: collect-gha-metrics
@@ -301,6 +346,7 @@ jobs:
           logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@94cb11f4bd545607a2f221c6685052b3abee723d # v2.3.32
+        if: ${{ matrix.lanes.enabled == true }}
         env:
           TEST_SUITE: smoke
           TEST_ARGS: -test.timeout 900h
@@ -312,8 +358,10 @@ jobs:
           BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }},${{ steps.set_override_config.outputs.base_64_override }}
           TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }},${{ steps.set_override_config.outputs.base_64_override }}
           E2E_TEST_GRAFANA_DASHBOARD_URL: "/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
+          OVERRIDE_NETWORK_PAIRS: ${{ matrix.lanes.name }}
+          OVERRIDE_PHASE_TIMEOUT: ${{ matrix.lanes.phaseTimeout }}
         with:
-          test_command_to_run: cd ./integration-tests/ccip-tests && go test -v -timeout 3h -count=1 -p 30 -json -run ^TestSmokeCCIPForBidirectionalLane$ ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage -hidepassingtests=false
+          test_command_to_run: cd ./integration-tests/ccip-tests && go test -v -timeout 3h -count=1 -p 30 -json -run ^TestSmokeCCIPForGivenNetworkPairs$ ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage -hidepassingtests=false
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           # Other default test secrets loaded from dotenv Github Secret.
           test_secrets_defaults_base64: ${{ secrets.CCIP_DEFAULT_TEST_SECRETS }}
