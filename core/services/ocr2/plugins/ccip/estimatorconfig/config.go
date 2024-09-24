@@ -3,6 +3,7 @@ package estimatorconfig
 import (
 	"context"
 	"errors"
+	"math/big"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 )
@@ -13,11 +14,18 @@ import (
 // fields for the daGasEstimator from the encapsulated onRampReader.
 type FeeEstimatorConfigProvider interface {
 	SetOnRampReader(reader ccip.OnRampReader)
+	AddGasPriceInterceptor(GasPriceInterceptor)
+	ModifyGasPriceComponents(ctx context.Context, execGasPrice, daGasPrice *big.Int) (modExecGasPrice, modDAGasPrice *big.Int, err error)
 	GetDataAvailabilityConfig(ctx context.Context) (destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64, err error)
 }
 
+type GasPriceInterceptor interface {
+	ModifyGasPriceComponents(ctx context.Context, execGasPrice, daGasPrice *big.Int) (modExecGasPrice, modDAGasPrice *big.Int, err error)
+}
+
 type FeeEstimatorConfigService struct {
-	onRampReader ccip.OnRampReader
+	onRampReader         ccip.OnRampReader
+	gasPriceInterceptors []GasPriceInterceptor
 }
 
 func NewFeeEstimatorConfigService() *FeeEstimatorConfigService {
@@ -46,4 +54,31 @@ func (c *FeeEstimatorConfigService) GetDataAvailabilityConfig(ctx context.Contex
 		int64(cfg.DestGasPerDataAvailabilityByte),
 		int64(cfg.DestDataAvailabilityMultiplierBps),
 		err
+}
+
+// AddGasPriceInterceptor adds price interceptors that can modify gas price.
+func (c *FeeEstimatorConfigService) AddGasPriceInterceptor(gpi GasPriceInterceptor) {
+	if gpi != nil {
+		c.gasPriceInterceptors = append(c.gasPriceInterceptors, gpi)
+	}
+}
+
+// ModifyGasPriceComponents applies gasPrice interceptors and returns modified gasPrice.
+func (c *FeeEstimatorConfigService) ModifyGasPriceComponents(ctx context.Context, gasPrice, daGasPrice *big.Int) (*big.Int, *big.Int, error) {
+	if len(c.gasPriceInterceptors) == 0 {
+		return gasPrice, daGasPrice, nil
+	}
+
+	// values are mutable, it is necessary to copy the values to protect the arguments from modification.
+	cpGasPrice := new(big.Int).Set(gasPrice)
+	cpDAGasPrice := new(big.Int).Set(daGasPrice)
+
+	var err error
+	for _, interceptor := range c.gasPriceInterceptors {
+		if cpGasPrice, cpDAGasPrice, err = interceptor.ModifyGasPriceComponents(ctx, cpGasPrice, cpDAGasPrice); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return cpGasPrice, cpDAGasPrice, nil
 }
