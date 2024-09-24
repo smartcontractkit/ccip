@@ -837,7 +837,7 @@ func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.Lat
 	for i, d := range decimals {
 		contractName := fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i)
 		readRes := types.BatchReadResult{
-			ReadName: decimalsMethodName,
+			ReadName: DECIMALS_METHOD_NAME,
 		}
 		readRes.SetResult(&d, nil)
 		bGLVR[contractName] = append(bGLVR[contractName], readRes)
@@ -846,7 +846,7 @@ func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.Lat
 	for i, r := range rounds {
 		contractName := fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i)
 		readRes := types.BatchReadResult{
-			ReadName: latestRoundDataMethodName,
+			ReadName: LATEST_ROUND_DATA_METHOD_NAME,
 		}
 		readRes.SetResult(&r, nil)
 		bGLVR[contractName] = append(bGLVR[contractName], readRes)
