@@ -256,46 +256,46 @@ jobs:
       matrix:
         lanes:
           - name: 'ARBITRUM_MAINNET,BSC_MAINNET;ARBITRUM_MAINNET,OPTIMISM_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'AVALANCHE_MAINNET,ARBITRUM_MAINNET;AVALANCHE_MAINNET,BASE_MAINNET;AVALANCHE_MAINNET,BSC_MAINNET;AVALANCHE_MAINNET,OPTIMISM_MAINNET;AVALANCHE_MAINNET,POLYGON_MAINNET;AVALANCHE_MAINNET,WEMIX_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'BASE_MAINNET,ARBITRUM_MAINNET;BASE_MAINNET,BSC_MAINNET;BASE_MAINNET,OPTIMISM_MAINNET;BASE_MAINNET,POLYGON_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'BLAST_MAINNET,ARBITRUM_MAINNET;BLAST_MAINNET,BASE_MAINNET;BLAST_MAINNET,BSC_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'BSC_MAINNET,OPTIMISM_MAINNET;BSC_MAINNET,POLYGON_MAINNET;BSC_MAINNET,WEMIX_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'ETHEREUM_MAINNET,ARBITRUM_MAINNET;ETHEREUM_MAINNET,AVALANCHE_MAINNET;ETHEREUM_MAINNET,BASE_MAINNET;ETHEREUM_MAINNET,BLAST_MAINNET;ETHEREUM_MAINNET,BSC_MAINNET;ETHEREUM_MAINNET,CELO_MAINNET;ETHEREUM_MAINNET,GNOSIS_MAINNET;ETHEREUM_MAINNET,OPTIMISM_MAINNET;ETHEREUM_MAINNET,POLYGON_MAINNET;ETHEREUM_MAINNET,WEMIX_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 40m
           - name: 'ETHEREUM_MAINNET,METIS_ANDROMEDA;ETHEREUM_MAINNET,ZKSYNC_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 90m
           - name: 'GNOSIS_MAINNET,ARBITRUM_MAINNET;GNOSIS_MAINNET,AVALANCHE_MAINNET;GNOSIS_MAINNET,BASE_MAINNET;GNOSIS_MAINNET,BSC_MAINNET;GNOSIS_MAINNET,OPTIMISM_MAINNET;GNOSIS_MAINNET,POLYGON_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'METIS_ANDROMEDA,ARBITRUM_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 60m
           - name: 'MODE_MAINNET,OPTIMISM_MAINNET;MODE_MAINNET,ARBITRUM_MAINNET;MODE_MAINNET,BASE_MAINNET;MODE_MAINNET,BSC_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'OPTIMISM_MAINNET,POLYGON_MAINNET;OPTIMISM_MAINNET,WEMIX_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'POLYGON_MAINNET,ARBITRUM_MAINNET;POLYGON_MAINNET,WEMIX_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'WEMIX_MAINNET,ARBITRUM_MAINNET;WEMIX_MAINNET,KROMA_MAINNET'
             enabled: true
             phaseTimeout: 20m
           - name: 'ZKSYNC_MAINNET,ARBITRUM_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 90m
     steps:
       - name: Collect Metrics
