@@ -45,6 +45,10 @@ func NewPoller[
 
 var _ types.Subscription = &Poller[any]{}
 
+func (p *Poller[T]) UpdateChannel(c chan<- T) {
+	p.channel = c
+}
+
 func (p *Poller[T]) Start() error {
 	return p.StartOnce("Poller", func() error {
 		p.wg.Add(1)
