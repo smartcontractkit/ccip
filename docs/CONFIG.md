@@ -6590,13 +6590,12 @@ LinkContractAddress = '0xDEE94506570cA186BC1e3516fCf4fd719C312cCD'
 LogBackfillBatchSize = 1000
 LogPollInterval = '2s'
 LogKeepBlocksDepth = 100000
-LogPrunePageSize = 0
+LogPrunePageSize = 10000
 BackupLogPollerBlockDelay = 100
 MinIncomingConfirmations = 3
 MinContractPayment = '0.00001 link'
 NonceAutoSync = true
 NoNewHeadsThreshold = '40s'
-LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
@@ -6623,8 +6622,8 @@ Mode = 'BlockHistory'
 PriceDefault = '20 gwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
 PriceMin = '1 wei'
-LimitDefault = 500000
-LimitMax = 500000
+LimitDefault = 8000000
+LimitMax = 8000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
 EstimateLimit = false
@@ -6663,7 +6662,6 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
-NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -6676,9 +6674,6 @@ ObservationGracePeriod = '1s'
 [OCR2]
 [OCR2.Automation]
 GasLimit = 6500000
-
-[Workflow]
-GasLimitDefault = 400000
 ```
 
 </p></details>
@@ -6696,13 +6691,12 @@ LinkContractAddress = '0x5D6d033B4FbD2190D99D930719fAbAcB64d2439a'
 LogBackfillBatchSize = 1000
 LogPollInterval = '2s'
 LogKeepBlocksDepth = 100000
-LogPrunePageSize = 0
+LogPrunePageSize = 10000
 BackupLogPollerBlockDelay = 100
 MinIncomingConfirmations = 3
 MinContractPayment = '0.00001 link'
 NonceAutoSync = true
 NoNewHeadsThreshold = '40s'
-LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
@@ -6729,8 +6723,8 @@ Mode = 'BlockHistory'
 PriceDefault = '20 gwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
 PriceMin = '1 wei'
-LimitDefault = 500000
-LimitMax = 500000
+LimitDefault = 8000000
+LimitMax = 8000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
 EstimateLimit = false
@@ -6769,7 +6763,6 @@ NodeIsSyncingEnabled = false
 FinalizedBlockPollInterval = '5s'
 EnforceRepeatableRead = false
 DeathDeclarationDelay = '10s'
-NewHeadsPollInterval = '0s'
 
 [OCR]
 ContractConfirmations = 1
@@ -6782,9 +6775,6 @@ ObservationGracePeriod = '1s'
 [OCR2]
 [OCR2.Automation]
 GasLimit = 6500000
-
-[Workflow]
-GasLimitDefault = 400000
 ```
 
 </p></details>
