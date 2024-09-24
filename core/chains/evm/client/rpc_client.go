@@ -501,6 +501,8 @@ func (r *rpcClient) SubscribeNewHead(ctx context.Context, channel chan<- *evmtyp
 			return nil, err
 		}
 
+		poller.UpdateChannel(channel)
+		poller.Start()
 		err = r.registerSub(&poller, chStopInFlight)
 		if err != nil {
 			return nil, err

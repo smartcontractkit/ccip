@@ -53,6 +53,10 @@ func (p *Poller[T]) Start() error {
 	})
 }
 
+func (p *Poller[T]) UpdateChannel(channel chan<- T) {
+	p.channel = channel
+}
+
 // Unsubscribe cancels the sending of events to the data channel
 func (p *Poller[T]) Unsubscribe() {
 	_ = p.StopOnce("Poller", func() error {
