@@ -216,10 +216,10 @@ func withConfs(query string, tableAlias string, confs evmtypes.Confirmations) st
 		lastConfirmedBlock = `block_number - :confs`
 	}
 	return fmt.Sprintf(`%s %sblock_number <= (
-			SELECT %s
-			FROM evm.log_poller_blocks
-			WHERE evm_chain_id = :evm_chain_id
-			ORDER BY block_number DESC LIMIT 1)`, query, tablePrefix, lastConfirmedBlock)
+		SELECT %s
+		FROM evm.log_poller_blocks
+		WHERE evm_chain_id = :evm_chain_id
+		ORDER BY block_number DESC LIMIT 1)`, query, tablePrefix, lastConfirmedBlock)
 }
 
 func logsQueryWithConfs(clause string, confs evmtypes.Confirmations) string {
@@ -278,7 +278,7 @@ func (o *DSORM) SelectLatestLogByEventSigWithConfs(ctx context.Context, eventSig
 		`WHERE evm_chain_id = :evm_chain_id
 			AND event_sig = :event_sig
 			AND address = :address AND `, confs) +
-		` ORDER BY block_number desc, log_index DESC LIMIT 1`
+		`ORDER BY block_number desc, log_index DESC LIMIT 1`
 	var l Log
 
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -651,6 +651,7 @@ func (o *DSORM) SelectLatestBlockByEventSigsAddrsWithConfs(ctx context.Context, 
 	if err != nil {
 		return 0, err
 	}
+
 	query := withConfs(`SELECT COALESCE(MAX(block_number), 0) FROM evm.logs
 		WHERE evm_chain_id = :evm_chain_id
 		AND event_sig = ANY(:event_sig_array)
@@ -709,7 +710,8 @@ func (o *DSORM) SelectLogsDataWordGreaterThan(ctx context.Context, address commo
 		return nil, err
 	}
 
-	query := logsQueryWithConfs(`WHERE evm_chain_id = :evm_chain_id
+	query := logsQueryWithConfs(`
+		WHERE evm_chain_id = :evm_chain_id
 		AND address = :address
 		AND event_sig = :event_sig
 		AND substring(data from 32*:word_index+1 for 32) >= :word_value_min AND `, confs) +
@@ -737,7 +739,9 @@ func (o *DSORM) SelectLogsDataWordBetween(ctx context.Context, address common.Ad
 	if err != nil {
 		return nil, err
 	}
-	query := logsQueryWithConfs(`WHERE evm_chain_id = :evm_chain_id
+
+	query := logsQueryWithConfs(`
+		WHERE evm_chain_id = :evm_chain_id
 		AND address = :address
 		AND event_sig = :event_sig
 		AND substring(data from 32*:word_index_min+1 for 32) <= :word_value
@@ -856,13 +860,13 @@ func (o *DSORM) SelectIndexedLogsByBlockRange(ctx context.Context, start, end in
 	}
 
 	query := logsQuery(`
-				WHERE evm_chain_id = :evm_chain_id
-				AND address = :address
-				AND event_sig = :event_sig
-				AND topics[:topic_index] = ANY(:topic_values)
-				AND block_number >= :start_block
-				AND block_number <= :end_block
-				ORDER BY block_number, log_index`)
+		WHERE evm_chain_id = :evm_chain_id
+		AND address = :address
+		AND event_sig = :event_sig
+		AND topics[:topic_index] = ANY(:topic_values)
+		AND block_number >= :start_block
+		AND block_number <= :end_block
+		ORDER BY block_number, log_index`)
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
@@ -919,11 +923,11 @@ func (o *DSORM) SelectIndexedLogsByTxHash(ctx context.Context, address common.Ad
 	}
 
 	query := logsQuery(`
-			WHERE evm_chain_id = :evm_chain_id
-			AND address = :address
-			AND event_sig = :event_sig
-			AND tx_hash = :tx_hash
-			ORDER BY block_number, log_index`)
+		WHERE evm_chain_id = :evm_chain_id
+		AND address = :address
+		AND event_sig = :event_sig
+		AND tx_hash = :tx_hash
+		ORDER BY block_number, log_index`)
 
 	var logs []Log
 	query, sqlArgs, err := o.ds.BindNamed(query, args)
