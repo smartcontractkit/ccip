@@ -414,9 +414,9 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 	// CCIPCommit reads only when source chain is Mantle, then reports to dest chain
 	// to minimize misconfigure risk, might make sense to wire Mantle only when Commit + Mantle + IsSourceProvider
 	if r.chain.Config().EVM().ChainType() == chaintype.ChainMantle && commitPluginConfig.IsSourceProvider {
-		mantleInterceptor, err := mantle.NewInterceptor(ctx, r.chain.Client())
-		if err != nil {
-			return nil, err
+		mantleInterceptor, iErr := mantle.NewInterceptor(ctx, r.chain.Client())
+		if iErr != nil {
+			return nil, iErr
 		}
 		feeEstimatorConfig.AddGasPriceInterceptor(mantleInterceptor)
 	}
@@ -495,9 +495,9 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 	// CCIPExec reads when dest chain is mantle, and uses it to calc boosting in batching
 	// to minimize misconfigure risk, make sense to wire Mantle only when Exec + Mantle + !IsSourceProvider
 	if r.chain.Config().EVM().ChainType() == chaintype.ChainMantle && !execPluginConfig.IsSourceProvider {
-		mantleInterceptor, err := mantle.NewInterceptor(ctx, r.chain.Client())
-		if err != nil {
-			return nil, err
+		mantleInterceptor, iErr := mantle.NewInterceptor(ctx, r.chain.Client())
+		if iErr != nil {
+			return nil, iErr
 		}
 		feeEstimatorConfig.AddGasPriceInterceptor(mantleInterceptor)
 	}
