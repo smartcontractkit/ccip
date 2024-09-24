@@ -120,7 +120,8 @@ func TestSmokeCCIPForGivenNetworkPairs(t *testing.T) {
 			}
 		}
 	}
-
+	log.Info().Int("Pairs", len(temp)).Msg("**** Number of lanes overridden in the test. ****")
+	log.Info().Interface("Lanes", networkPairs).Msg("Lanes under test")
 	TestCfg.NetworkPairs = temp
 	phaseTimeout, err := osutil.GetEnv("OVERRIDE_PHASE_TIMEOUT")
 	require.NoError(t, err, "Error getting OVERRIDE_PHASE_TIMEOUT environment variable")
