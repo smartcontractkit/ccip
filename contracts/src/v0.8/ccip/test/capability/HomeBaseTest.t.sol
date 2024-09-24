@@ -67,10 +67,10 @@ contract RMNHome_setSecondary is HomeBaseTest {
     assertEq(storedConfig.dynamicConfig, encodedConfig.dynamicConfig);
   }
 
-  function test_setSecondary_OnlyOwner_reverts() public {
+  function test_setSecondary_InvalidCaller_reverts() public {
     vm.startPrank(address(0));
 
-    vm.expectRevert(HomeBase.OnlyOwnerOrSelfCallAllowed.selector);
+    vm.expectRevert(HomeBaseHelper.InvalidCaller.selector);
     s_homeBase.setSecondary(DON_ID, _getStaticConfig(), _getDynamicConfig(), ZERO_DIGEST);
   }
 }
@@ -101,10 +101,10 @@ contract RMNHome_setDynamicConfig is HomeBaseTest {
     assertEq(secondaryDigest, secondaryConfigDigest);
   }
 
-  function test_setDynamicConfig_OnlyOwner_reverts() public {
+  function test_setDynamicConfig_InvalidCaller_reverts() public {
     vm.startPrank(address(0));
 
-    vm.expectRevert(HomeBase.OnlyOwnerOrSelfCallAllowed.selector);
+    vm.expectRevert(HomeBaseHelper.InvalidCaller.selector);
     s_homeBase.setDynamicConfig(DON_ID, _getDynamicConfig(), keccak256("configDigest"));
   }
 }
@@ -149,10 +149,10 @@ contract RMNHome_revokeSecondary is HomeBaseTest {
     s_homeBase.revokeSecondary(DON_ID, wrongDigest);
   }
 
-  function test_revokeSecondary_OnlyOwner_reverts() public {
+  function test_revokeSecondary_InvalidCaller_reverts() public {
     vm.startPrank(address(0));
 
-    vm.expectRevert(HomeBase.OnlyOwnerOrSelfCallAllowed.selector);
+    vm.expectRevert(HomeBaseHelper.InvalidCaller.selector);
     s_homeBase.revokeSecondary(DON_ID, keccak256("configDigest"));
   }
 }
@@ -160,10 +160,10 @@ contract RMNHome_revokeSecondary is HomeBaseTest {
 contract RMNHome_promoteSecondaryAndRevokePrimary is HomeBaseTest {
   function test_promoteSecondaryAndRevokePrimary_success() public {}
 
-  function test_promoteSecondaryAndRevokePrimary_OnlyOwner_reverts() public {
+  function test_promoteSecondaryAndRevokePrimary_InvalidCaller_reverts() public {
     vm.startPrank(address(0));
 
-    vm.expectRevert(HomeBase.OnlyOwnerOrSelfCallAllowed.selector);
+    vm.expectRevert(HomeBaseHelper.InvalidCaller.selector);
     s_homeBase.promoteSecondaryAndRevokePrimary(DON_ID, keccak256("toPromote"), keccak256("ToRevoke"));
   }
 }

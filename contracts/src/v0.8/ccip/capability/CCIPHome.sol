@@ -38,6 +38,7 @@ contract CCIPHome is HomeBase, ICapabilityConfiguration, IERC165 {
   error FTooHigh();
   error InvalidNode(OCR3Node node);
   error NotEnoughTransmitters(uint256 got, uint256 minimum);
+  error OnlySelfCallAllowed();
 
   /// @notice Represents an oracle node in OCR3 configs part of the role DON.
   /// Every configured node should be a signer, but does not have to be a transmitter.
@@ -132,7 +133,9 @@ contract CCIPHome is HomeBase, ICapabilityConfiguration, IERC165 {
     }
     (bool success, bytes memory errorData) = address(this).call(update);
     if (!success) {
-      revert(string(errorData));
+      assembly {
+        revert(add(errorData, 32), errorData)
+      }
     }
   }
 
@@ -267,6 +270,12 @@ contract CCIPHome is HomeBase, ICapabilityConfiguration, IERC165 {
 
   function _getConfigDigestPrefix() internal pure override returns (uint256) {
     return PREFIX;
+  }
+
+  function _validateCaller() internal view override {
+    if (msg.sender != address(this)) {
+      revert OnlySelfCallAllowed();
+    }
   }
 
   // ================================================================

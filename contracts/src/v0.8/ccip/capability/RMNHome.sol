@@ -166,6 +166,10 @@ contract RMNHome is HomeBase {
     _validateDynamicConfigParsed(dynamicConfig, numberOfNodes);
   }
 
+  function _validateCaller() internal view override {
+    _validateOwnership();
+  }
+
   function _getConfigDigestPrefix() internal pure override returns (uint256) {
     return PREFIX;
   }

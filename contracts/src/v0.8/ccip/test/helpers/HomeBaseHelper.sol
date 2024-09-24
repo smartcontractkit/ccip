@@ -4,6 +4,8 @@ pragma solidity 0.8.24;
 import {HomeBase} from "../../capability/HomeBase.sol";
 
 contract HomeBaseHelper is HomeBase {
+  error InvalidCaller();
+
   string public constant override typeAndVersion = "HomeBaseHelper 1.6.0-dev";
 
   uint256 public constant PREFIX = 0x0c0c << (256 - 16);
@@ -14,6 +16,12 @@ contract HomeBaseHelper is HomeBase {
 
   function _getConfigDigestPrefix() internal pure override returns (uint256) {
     return PREFIX;
+  }
+
+  function _validateCaller() internal view override {
+    if (msg.sender != owner()) {
+      revert InvalidCaller();
+    }
   }
 
   function getStoredConfig(

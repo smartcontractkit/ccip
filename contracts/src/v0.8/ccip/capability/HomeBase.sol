@@ -15,7 +15,6 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
   error DigestNotFound(bytes32 configDigest);
   error ZeroAddressNotAllowed();
   error OnlyCapabilitiesRegistryCanCall();
-  error OnlyOwnerOrSelfCallAllowed();
 
   /// @notice Used for encoding the config digest prefix
   uint256 private constant PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..00
@@ -43,6 +42,8 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
   function _validateStaticAndDynamicConfig(bytes memory staticConfig, bytes memory dynamicConfig) internal view virtual;
 
   function _validateDynamicConfig(bytes memory staticConfig, bytes memory dynamicConfig) internal view virtual;
+
+  function _validateCaller() internal view virtual;
 
   function _getConfigDigestPrefix() internal pure virtual returns (uint256);
 
@@ -84,7 +85,7 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
         return (s_configs[pluginKey][i], true);
       }
     }
-    return (storedConfig, false);
+    return (StoredConfig(ZERO_DIGEST, 0, "", ""), false);
   }
 
   function _getPrimaryStoredConfig(
@@ -119,7 +120,8 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
     bytes calldata encodedStaticConfig,
     bytes calldata encodedDynamicConfig,
     bytes32 digestToOverwrite
-  ) external OnlyOwnerOrSelfCall returns (bytes32 newConfigDigest) {
+  ) external returns (bytes32 newConfigDigest) {
+    _validateCaller();
     _validateStaticAndDynamicConfig(encodedStaticConfig, encodedDynamicConfig);
 
     bytes32 existingDigest = getSecondaryDigest(pluginKey);
@@ -152,7 +154,9 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
 
   /// @notice Revokes a specific config by digest.
   /// @param configDigest The digest of the config to revoke. This is done to prevent accidental revokes.
-  function revokeSecondary(bytes32 pluginKey, bytes32 configDigest) external OnlyOwnerOrSelfCall {
+  function revokeSecondary(bytes32 pluginKey, bytes32 configDigest) external {
+    _validateCaller();
+
     uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
     if (s_configs[pluginKey][secondaryConfigIndex].configDigest != configDigest) {
       revert ConfigDigestMismatch(s_configs[pluginKey][secondaryConfigIndex].configDigest, configDigest);
@@ -170,7 +174,9 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
     bytes32 pluginKey,
     bytes32 digestToPromote,
     bytes32 digestToRevoke
-  ) external OnlyOwnerOrSelfCall {
+  ) external {
+    _validateCaller();
+
     uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
     if (s_configs[pluginKey][secondaryConfigIndex].configDigest != digestToPromote) {
       revert ConfigDigestMismatch(s_configs[pluginKey][secondaryConfigIndex].configDigest, digestToPromote);
@@ -190,11 +196,9 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
     emit ConfigPromoted(digestToPromote);
   }
 
-  function setDynamicConfig(
-    bytes32 pluginKey,
-    bytes calldata newDynamicConfig,
-    bytes32 currentDigest
-  ) external OnlyOwnerOrSelfCall {
+  function setDynamicConfig(bytes32 pluginKey, bytes calldata newDynamicConfig, bytes32 currentDigest) external {
+    _validateCaller();
+
     for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
       if (s_configs[pluginKey][i].configDigest == currentDigest && currentDigest != ZERO_DIGEST) {
         _validateDynamicConfig(s_configs[pluginKey][i].staticConfig, newDynamicConfig);
@@ -225,12 +229,5 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
           ) & ~PREFIX_MASK
         )
     );
-  }
-
-  modifier OnlyOwnerOrSelfCall() {
-    if (msg.sender != owner() && msg.sender != address(this)) {
-      revert OnlyOwnerOrSelfCallAllowed();
-    }
-    _;
   }
 }
