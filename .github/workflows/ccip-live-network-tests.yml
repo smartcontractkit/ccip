@@ -336,11 +336,7 @@ jobs:
           echo ::add-mask::$SLACK_USER
           echo "SLACK_USER=$SLACK_USER" >> "$GITHUB_ENV"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            if [[ -z "${{ input.base64_test_input }}" ]]; then
-              BASE64_CCIP_CONFIG_OVERRIDE=$(jq -r '.inputs.base64_test_input' $GITHUB_EVENT_PATH)
-            else
-              BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ./integration-tests/ccip-tests/testconfig/override/mainnet.toml)
-            fi
+            BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ./integration-tests/ccip-tests/testconfig/override/mainnet.toml)
             echo ::add-mask::$BASE64_CCIP_CONFIG_OVERRIDE
             echo "base_64_override=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_OUTPUT
           fi
