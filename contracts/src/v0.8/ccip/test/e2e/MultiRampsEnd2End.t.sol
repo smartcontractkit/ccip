@@ -168,8 +168,12 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
         merkleRoot: merkleRoots[1]
       });
 
-      OffRamp.CommitReport memory report =
-        OffRamp.CommitReport({priceUpdates: _getEmptyPriceUpdates(), merkleRoots: roots, rmnSignatures: rmnSignatures});
+      OffRamp.CommitReport memory report = OffRamp.CommitReport({
+        priceUpdates: _getEmptyPriceUpdates(),
+        merkleRoots: roots,
+        rmnSignatures: rmnSignatures,
+        rmnRawVs: 0
+      });
 
       vm.resumeGasMetering();
       _commit(report, ++s_latestSequenceNumber);
@@ -247,6 +251,8 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
     IERC20(s_sourceTokens[0]).approve(address(router), i_tokenAmount0 + router.getFee(DEST_CHAIN_SELECTOR, message));
     IERC20(s_sourceTokens[1]).approve(address(router), i_tokenAmount1);
 
+    uint256 feeAmount = router.getFee(DEST_CHAIN_SELECTOR, message);
+
     message.receiver = abi.encode(address(s_receiver));
     Internal.EVM2AnyRampMessage memory msgEvent = _messageToEvent(
       message,
@@ -254,7 +260,8 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
       DEST_CHAIN_SELECTOR,
       expectedSeqNum,
       nonce,
-      router.getFee(DEST_CHAIN_SELECTOR, message),
+      feeAmount,
+      feeAmount,
       OWNER,
       metadataHash,
       tokenAdminRegistry
@@ -269,6 +276,7 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
 
     Internal.Any2EVMTokenTransfer[] memory any2EVMTokenTransfer =
       new Internal.Any2EVMTokenTransfer[](message.tokenAmounts.length);
+
     for (uint256 i = 0; i < msgEvent.tokenAmounts.length; ++i) {
       any2EVMTokenTransfer[i] = Internal.Any2EVMTokenTransfer({
         sourcePoolAddress: abi.encode(msgEvent.tokenAmounts[i].sourcePoolAddress),
