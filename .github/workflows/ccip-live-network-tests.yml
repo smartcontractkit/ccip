@@ -234,7 +234,7 @@ jobs:
     name: CCIP smoke Test
     environment: integration
     runs-on: ubuntu-latest
-    needs: [ build-chainlink, build-test-image ]
+    needs: [ build-chainlink ]
     # if the event is a scheduled event or the test type is smoke and no previous job failed
     if: ${{ (github.event_name == 'schedule' || inputs.test_type == 'smoke') && !contains(needs.*.result, 'failure') }}
     permissions:
@@ -320,11 +320,14 @@ jobs:
           echo "SLACK_USER=$SLACK_USER" >> "$GITHUB_ENV"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             BASE64_CCIP_CONFIG_OVERRIDE=$(jq -r '.inputs.base64_test_input' $GITHUB_EVENT_PATH)
+            if [[ -z "$BASE64_CCIP_CONFIG_OVERRIDE" ]]; then
+              BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ./integration-tests/ccip-tests/testconfig/override/mainnet.toml)
+            fi
             echo ::add-mask::$BASE64_CCIP_CONFIG_OVERRIDE
             echo "base_64_override=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_OUTPUT
           fi
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-             BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ./integration-tests/ccip-tests/testconfig/override/${{ matrix.config }})
+             BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ./integration-tests/ccip-tests/testconfig/override/mainnet.toml)
              echo ::add-mask::$BASE64_CCIP_CONFIG_OVERRIDE
              echo "base_64_override=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_OUTPUT
              echo "SLACK_USER=${{ secrets.QA_SLACK_USER }}" >> $GITHUB_ENV
