@@ -498,11 +498,20 @@ func (r *rpcClient) SubscribeNewHead(ctx context.Context, channel chan<- *evmtyp
 	if r.newHeadsPollInterval > 0 {
 		interval := r.newHeadsPollInterval
 		timeout := interval
-		poller, _ := commonclient.NewPoller[*evmtypes.Head](interval, r.LatestBlock, timeout, r.rpcLog)
-		poller.UpdateChannel(channel)
+		poller, pollerCh := commonclient.NewPoller[*evmtypes.Head](interval, r.LatestBlock, timeout, r.rpcLog)
 		if err = poller.Start(); err != nil {
 			return nil, err
 		}
+
+		go func() {
+			for head := range pollerCh {
+				select {
+				case channel <- head:
+				case <-poller.Err():
+					return
+				}
+			}
+		}()
 
 		lggr.Infof("Polling new heads over http ")
 		return &poller, nil
