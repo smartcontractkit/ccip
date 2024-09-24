@@ -2,13 +2,14 @@ package smoke
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/osutil"
 	"math/big"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/osutil"
 
 	"github.com/AlekSi/pointer"
 	"github.com/rs/zerolog"
