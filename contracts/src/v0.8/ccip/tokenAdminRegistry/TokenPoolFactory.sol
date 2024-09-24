@@ -149,9 +149,9 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
       RemoteTokenPoolInfo memory remoteTokenPool = remoteTokenPools[i];
       RemoteChainConfig memory remoteChainConfig = s_remoteChainConfigs[remoteTokenPool.remoteChainSelector];
 
-      // If the user provides the empty parameter flag, then the address of the token needs to be predicted
-      // otherwise the address provided is used.
-      if (bytes4(remoteTokenPool.remoteTokenAddress) == EMPTY_PARAMETER_FLAG) {
+      // If the user provides an empty byte string, indicated no token has already been deployed,
+      // then the address of the token needs to be predicted. Otherwise the address provided will be used.
+      if (remoteTokenPool.remoteTokenAddress.length == 0) {
         // The user must provide the initCode for the remote token, so its address can be predicted correctly. It's
         // provided in the remoteTokenInitCode field for the remoteTokenPool
         remoteTokenPool.remoteTokenAddress = abi.encode(
@@ -159,8 +159,9 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
         );
       }
 
-      // If the user provides the empty parameter flag, the address of the pool should be predicted
-      if (bytes4(remoteTokenPool.remotePoolAddress) == EMPTY_PARAMETER_FLAG) {
+      // If the user provides an empty byte string parameter, indicating the pool has not been deployed yet,
+      // the address of the pool should be predicted. Otherwise use the provided address.
+      if (remoteTokenPool.remotePoolAddress.length == 0) {
         // Generate the initCode that will be used on the remote chain. It is assumed that tokenInitCode
         // will be the same on all chains, so it can be reused here.
 
@@ -196,7 +197,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     // If the user doesn't want to provide any special parameters which may be needed for a custom the token pool then
     // use the standard burn/mint token pool params. Since the user can provide custom token pool init code,
     // they must also provide custom constructor args.
-    if (bytes4(tokenPoolInitArgs) == EMPTY_PARAMETER_FLAG) {
+    if (tokenPoolInitArgs.length == 0) {
       tokenPoolInitArgs = abi.encode(token, new address[](0), i_rmnProxy, i_ccipRouter);
     }
 

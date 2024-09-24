@@ -144,11 +144,7 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
     // The only field that matters is DEST_CHAIN_SELECTOR because we dont want any existing token pool or token
     // on the remote chain
     remoteTokenPools[0] = TokenPoolFactory.RemoteTokenPoolInfo(
-      DEST_CHAIN_SELECTOR,
-      abi.encode(s_tokenPoolFactory.EMPTY_PARAMETER_FLAG()),
-      abi.encode(s_tokenPoolFactory.EMPTY_PARAMETER_FLAG()),
-      s_tokenInitCode,
-      RateLimiter.Config(false, 0, 0)
+      DEST_CHAIN_SELECTOR, "", "", s_tokenInitCode, RateLimiter.Config(false, 0, 0)
     );
 
     // Predict the address of the token and pool on the DESTINATION chain
@@ -156,13 +152,8 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
 
     // Since the remote chain information was provided, we should be able to get the information from the newly
     // deployed token pool using the available getter functions
-    (, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
-      remoteTokenPools,
-      s_tokenInitCode,
-      s_poolInitCode,
-      abi.encode(s_tokenPoolFactory.EMPTY_PARAMETER_FLAG()),
-      FAKE_SALT
-    );
+    (, address poolAddress) =
+      s_tokenPoolFactory.deployTokenAndTokenPool(remoteTokenPools, s_tokenInitCode, s_poolInitCode, "", FAKE_SALT);
 
     // Ensure that the remote Token was set to the one we predicted
     assertEq(
@@ -196,11 +187,7 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
     // On the new token pool factory, representing a destination chain,
     // deploy a new token and a new pool
     (address newTokenAddress, address newPoolAddress) = newTokenPoolFactory.deployTokenAndTokenPool(
-      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
-      s_tokenInitCode,
-      s_poolInitCode,
-      abi.encode(s_tokenPoolFactory.EMPTY_PARAMETER_FLAG()),
-      FAKE_SALT
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0), s_tokenInitCode, s_poolInitCode, "", FAKE_SALT
     );
 
     assertEq(
@@ -256,22 +243,13 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
     // The only field that matters is DEST_CHAIN_SELECTOR because we dont want any existing token pool or token
     // on the remote chain
     remoteTokenPools[0] = TokenPoolFactory.RemoteTokenPoolInfo(
-      DEST_CHAIN_SELECTOR,
-      abi.encode(s_tokenPoolFactory.EMPTY_PARAMETER_FLAG()),
-      abi.encode(address(newRemoteToken)),
-      s_tokenInitCode,
-      RateLimiter.Config(false, 0, 0)
+      DEST_CHAIN_SELECTOR, "", abi.encode(address(newRemoteToken)), s_tokenInitCode, RateLimiter.Config(false, 0, 0)
     );
 
     // Since the remote chain information was provided, we should be able to get the information from the newly
     // deployed token pool using the available getter functions
-    (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
-      remoteTokenPools,
-      s_tokenInitCode,
-      s_poolInitCode,
-      abi.encode(s_tokenPoolFactory.EMPTY_PARAMETER_FLAG()),
-      FAKE_SALT
-    );
+    (address tokenAddress, address poolAddress) =
+      s_tokenPoolFactory.deployTokenAndTokenPool(remoteTokenPools, s_tokenInitCode, s_poolInitCode, "", FAKE_SALT);
 
     assertEq(address(TokenPool(poolAddress).getToken()), tokenAddress, "Token Address should have been set locally");
 
@@ -305,11 +283,7 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
     // On the new token pool factory, representing a destination chain,
     // deploy a new token and a new pool
     address newPoolAddress = newTokenPoolFactory.deployTokenPoolWithExistingToken(
-      address(newRemoteToken),
-      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
-      s_poolInitCode,
-      abi.encode(s_tokenPoolFactory.EMPTY_PARAMETER_FLAG()),
-      FAKE_SALT
+      address(newRemoteToken), new TokenPoolFactory.RemoteTokenPoolInfo[](0), s_poolInitCode, "", FAKE_SALT
     );
 
     assertEq(
