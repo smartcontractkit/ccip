@@ -30,8 +30,6 @@ concurrency:
 env:
   CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   CHAINLINK_VERSION: ${{ github.sha }}
-  CHAINLINK_TEST_VERSION: ${{ github.sha }}
-  ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:${{ github.sha }}
   INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
   AWS_ECR_REPO_PUBLIC_REGISTRY: public.ecr.aws
   E2E_TEST_CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
@@ -150,6 +148,8 @@ jobs:
       SLACK_CHANNEL: ${{ secrets.QA_SLACK_CHANNEL }}
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
+      CHAINLINK_TEST_VERSION: ${{ github.sha }}
+      ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:${{ github.sha }}
       ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
 
     steps:
