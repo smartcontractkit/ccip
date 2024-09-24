@@ -232,7 +232,7 @@ jobs:
           should_cleanup: false
           
   ccip-smoke-test:
-    name: CCIP smoke Test
+    name: CCIP smoke Test ${{ matrix.lanes.name }}
     environment: integration
     runs-on: ubuntu-latest
     needs: [ build-chainlink ]
@@ -250,53 +250,65 @@ jobs:
       SLACK_CHANNEL: ${{ secrets.QA_SLACK_CHANNEL }}
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
-      ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
+#      ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
     strategy:
       fail-fast: false
       matrix:
         lanes:
-          - id: 'ARBITRUM_MAINNET'
-            name: 'ARBITRUM_MAINNET,BSC_MAINNET;ARBITRUM_MAINNET,OPTIMISM_MAINNET'
+          - name: 'ARBITRUM_MAINNET'
+            pairs: 'ARBITRUM_MAINNET,BSC_MAINNET;ARBITRUM_MAINNET,OPTIMISM_MAINNET'
             enabled: false
             phaseTimeout: 20m
-          - name: 'AVALANCHE_MAINNET,ARBITRUM_MAINNET;AVALANCHE_MAINNET,BASE_MAINNET;AVALANCHE_MAINNET,BSC_MAINNET;AVALANCHE_MAINNET,OPTIMISM_MAINNET;AVALANCHE_MAINNET,POLYGON_MAINNET;AVALANCHE_MAINNET,WEMIX_MAINNET'
+          - name: 'AVALANCHE_MAINNET'
+            pairs: 'AVALANCHE_MAINNET,ARBITRUM_MAINNET;AVALANCHE_MAINNET,BASE_MAINNET;AVALANCHE_MAINNET,BSC_MAINNET;AVALANCHE_MAINNET,OPTIMISM_MAINNET;AVALANCHE_MAINNET,POLYGON_MAINNET;AVALANCHE_MAINNET,WEMIX_MAINNET'
             enabled: false
             phaseTimeout: 20m
-          - name: 'BASE_MAINNET,ARBITRUM_MAINNET;BASE_MAINNET,BSC_MAINNET;BASE_MAINNET,OPTIMISM_MAINNET;BASE_MAINNET,POLYGON_MAINNET'
+          - name: 'BASE_MAINNET'
+            pairs: 'BASE_MAINNET,ARBITRUM_MAINNET;BASE_MAINNET,BSC_MAINNET;BASE_MAINNET,OPTIMISM_MAINNET;BASE_MAINNET,POLYGON_MAINNET'
             enabled: false
             phaseTimeout: 20m
-          - name: 'BLAST_MAINNET,ARBITRUM_MAINNET;BLAST_MAINNET,BASE_MAINNET;BLAST_MAINNET,BSC_MAINNET'
+          - name: 'BLAST_MAINNET'
+            pairs: 'BLAST_MAINNET,ARBITRUM_MAINNET;BLAST_MAINNET,BASE_MAINNET;BLAST_MAINNET,BSC_MAINNET'
             enabled: false
             phaseTimeout: 20m
-          - name: 'BSC_MAINNET,OPTIMISM_MAINNET;BSC_MAINNET,POLYGON_MAINNET;BSC_MAINNET,WEMIX_MAINNET'
+          - name: 'BSC_MAINNET'
+            pairs: 'BSC_MAINNET,OPTIMISM_MAINNET;BSC_MAINNET,POLYGON_MAINNET;BSC_MAINNET,WEMIX_MAINNET'
             enabled: false
             phaseTimeout: 20m
-          - name: 'ETHEREUM_MAINNET,ARBITRUM_MAINNET;ETHEREUM_MAINNET,AVALANCHE_MAINNET;ETHEREUM_MAINNET,BASE_MAINNET;ETHEREUM_MAINNET,BLAST_MAINNET;ETHEREUM_MAINNET,BSC_MAINNET;ETHEREUM_MAINNET,CELO_MAINNET;ETHEREUM_MAINNET,GNOSIS_MAINNET;ETHEREUM_MAINNET,OPTIMISM_MAINNET;ETHEREUM_MAINNET,POLYGON_MAINNET;ETHEREUM_MAINNET,WEMIX_MAINNET'
+          - name: 'ETHEREUM_MAINNET 1'
+            pairs: 'ETHEREUM_MAINNET,ARBITRUM_MAINNET;ETHEREUM_MAINNET,AVALANCHE_MAINNET;ETHEREUM_MAINNET,BASE_MAINNET;ETHEREUM_MAINNET,BLAST_MAINNET;ETHEREUM_MAINNET,BSC_MAINNET;ETHEREUM_MAINNET,CELO_MAINNET;ETHEREUM_MAINNET,GNOSIS_MAINNET;ETHEREUM_MAINNET,OPTIMISM_MAINNET;ETHEREUM_MAINNET,POLYGON_MAINNET;ETHEREUM_MAINNET,WEMIX_MAINNET'
             enabled: false
             phaseTimeout: 40m
-          - name: 'ETHEREUM_MAINNET,METIS_ANDROMEDA;ETHEREUM_MAINNET,ZKSYNC_MAINNET'
+          - name: 'ETHEREUM_MAINNET 2'
+            pairs: 'ETHEREUM_MAINNET,METIS_ANDROMEDA;ETHEREUM_MAINNET,ZKSYNC_MAINNET'
             enabled: false
             phaseTimeout: 90m
-          - name: 'GNOSIS_MAINNET,ARBITRUM_MAINNET;GNOSIS_MAINNET,AVALANCHE_MAINNET;GNOSIS_MAINNET,BASE_MAINNET;GNOSIS_MAINNET,BSC_MAINNET;GNOSIS_MAINNET,OPTIMISM_MAINNET;GNOSIS_MAINNET,POLYGON_MAINNET'
+          - name: 'GNOSIS_MAINNET'
+            pairs: 'GNOSIS_MAINNET,ARBITRUM_MAINNET;GNOSIS_MAINNET,AVALANCHE_MAINNET;GNOSIS_MAINNET,BASE_MAINNET;GNOSIS_MAINNET,BSC_MAINNET;GNOSIS_MAINNET,OPTIMISM_MAINNET;GNOSIS_MAINNET,POLYGON_MAINNET'
             enabled: false
             phaseTimeout: 20m
-          - name: 'METIS_ANDROMEDA,ARBITRUM_MAINNET'
+          - name: 'METIS_ANDROMEDA'
+            pairs: 'METIS_ANDROMEDA,ARBITRUM_MAINNET'
             enabled: false
             phaseTimeout: 60m
-          - name: 'MODE_MAINNET,OPTIMISM_MAINNET;MODE_MAINNET,ARBITRUM_MAINNET;MODE_MAINNET,BASE_MAINNET;MODE_MAINNET,BSC_MAINNET'
+          - name: 'MODE_MAINNET'
+            pairs: 'MODE_MAINNET,OPTIMISM_MAINNET;MODE_MAINNET,ARBITRUM_MAINNET;MODE_MAINNET,BASE_MAINNET;MODE_MAINNET,BSC_MAINNET'
             enabled: false
             phaseTimeout: 20m
-          - name: 'OPTIMISM_MAINNET,POLYGON_MAINNET;OPTIMISM_MAINNET,WEMIX_MAINNET'
+          - name: 'OPTIMISM_MAINNET'
+            pairs: 'OPTIMISM_MAINNET,POLYGON_MAINNET;OPTIMISM_MAINNET,WEMIX_MAINNET'
             enabled: false
             phaseTimeout: 20m
-          - name: 'POLYGON_MAINNET,ARBITRUM_MAINNET;POLYGON_MAINNET,WEMIX_MAINNET'
+          - name: 'POLYGON_MAINNET'
+            pairs: 'POLYGON_MAINNET,ARBITRUM_MAINNET;POLYGON_MAINNET,WEMIX_MAINNET'
             enabled: false
             phaseTimeout: 20m
-          - id: 'WEMIX_MAINNET'
-            name: 'WEMIX_MAINNET,ARBITRUM_MAINNET;WEMIX_MAINNET,KROMA_MAINNET'
+          - name: 'WEMIX_MAINNET'
+            pairs: 'WEMIX_MAINNET,ARBITRUM_MAINNET;WEMIX_MAINNET,KROMA_MAINNET'
             enabled: true
             phaseTimeout: 20m
-          - name: 'ZKSYNC_MAINNET,ARBITRUM_MAINNET'
+          - name: 'ZKSYNC_MAINNET'
+            pairs: 'ZKSYNC_MAINNET,ARBITRUM_MAINNET'
             enabled: false
             phaseTimeout: 90m
     steps:
@@ -325,7 +337,7 @@ jobs:
           echo ::add-mask::$SLACK_USER
           echo "SLACK_USER=$SLACK_USER" >> "$GITHUB_ENV"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            BASE64_CCIP_CONFIG_OVERRIDE=$(jq -r '.inputs.base64_test_input' $GITHUB_EVENT_PATH)
+#            BASE64_CCIP_CONFIG_OVERRIDE=$(jq -r '.inputs.base64_test_input' $GITHUB_EVENT_PATH)
             BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ./integration-tests/ccip-tests/testconfig/override/mainnet.toml)
             echo ::add-mask::$BASE64_CCIP_CONFIG_OVERRIDE
             echo "base_64_override=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_OUTPUT
@@ -342,8 +354,8 @@ jobs:
         run: |
           echo "### chainlink image used for this test run :link:" >>$GITHUB_STEP_SUMMARY
           echo "\`${{ env.CHAINLINK_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "### chainlink-tests image tag for this test run :ship:" >>$GITHUB_STEP_SUMMARY
-          echo "\`${{ env.CHAINLINK_TEST_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+#          echo "### chainlink-tests image tag for this test run :ship:" >>$GITHUB_STEP_SUMMARY
+#          echo "\`${{ env.CHAINLINK_TEST_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
       - name: Prepare Base64 TOML override for CCIP secrets
         if: ${{ matrix.lanes.enabled == true }}
         uses: ./.github/actions/setup-create-base64-config-ccip
@@ -367,7 +379,7 @@ jobs:
           BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }},${{ steps.set_override_config.outputs.base_64_override }}
           TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }},${{ steps.set_override_config.outputs.base_64_override }}
           E2E_TEST_GRAFANA_DASHBOARD_URL: "/d/ddf75041-1e39-42af-aa46-361fe4c36e9e/ci-e2e-tests-logs"
-          OVERRIDE_NETWORK_PAIRS: ${{ matrix.lanes.name }}
+          OVERRIDE_NETWORK_PAIRS: ${{ matrix.lanes.pairs }}
           OVERRIDE_PHASE_TIMEOUT: ${{ matrix.lanes.phaseTimeout }}
         with:
           test_command_to_run: cd ./integration-tests/ccip-tests && go test -v -timeout 3h -count=1 -p 30 -json -run ^TestSmokeCCIPForGivenNetworkPairs$ ./smoke 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci -singlepackage -hidepassingtests=false
@@ -379,10 +391,10 @@ jobs:
           go_mod_path: ./integration-tests/go.mod
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
+#          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
           artifacts_location: ./integration-tests/smoke/logs/payload_ccip.json
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           cache_key_id: ccip-smoke-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "true"
-          should_cleanup: true
+          should_cleanup: false
