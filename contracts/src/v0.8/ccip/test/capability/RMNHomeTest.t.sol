@@ -80,7 +80,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
     encodedConfig.configDigest = versionedConfig.configDigest;
 
     vm.expectEmit();
-    emit HomeBase.ConfigSet(encodedConfig);
+    emit HomeBase.ConfigSet(encodedConfig.configDigest, encodedConfig);
 
     s_rmnHome.setSecondary(RMN_DON_ID, encodedConfig.staticConfig, encodedConfig.dynamicConfig, ZERO_DIGEST);
 

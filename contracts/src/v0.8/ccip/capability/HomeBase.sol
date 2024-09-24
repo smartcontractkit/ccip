@@ -6,15 +6,13 @@ import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
 abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
-  event ConfigSet(StoredConfig versionedConfig);
+  event ConfigSet(bytes32 indexed configDigest, StoredConfig versionedConfig);
   event ConfigRevoked(bytes32 indexed configDigest);
   event DynamicConfigSet(bytes32 indexed configDigest, bytes dynamicConfig);
   event ConfigPromoted(bytes32 indexed configDigest);
 
   error ConfigDigestMismatch(bytes32 expectedConfigDigest, bytes32 gotConfigDigest);
   error DigestNotFound(bytes32 configDigest);
-  error ZeroAddressNotAllowed();
-  error OnlyCapabilitiesRegistryCanCall();
 
   /// @notice Used for encoding the config digest prefix
   uint256 private constant PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..00
@@ -39,12 +37,21 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
     bytes dynamicConfig;
   }
 
+  // ================================================================
+  // │                    Functions to override                     │
+  // ================================================================
+
+  /// @notice Validates that the static and dynamic config are valid. Reverts otherwise.
   function _validateStaticAndDynamicConfig(bytes memory staticConfig, bytes memory dynamicConfig) internal view virtual;
 
+  /// @notice Validates that the dynamic config is valid given the static config. Reverts otherwise.
   function _validateDynamicConfig(bytes memory staticConfig, bytes memory dynamicConfig) internal view virtual;
 
+  /// @notice Validates that the caller is allowed to make changes to the config.
   function _validateCaller() internal view virtual;
 
+  /// @notice Returns the prefix used for calculating the config digest.
+  /// @dev This is used to ensure that the config digest is unique across different contract implementations.
   function _getConfigDigestPrefix() internal pure virtual returns (uint256);
 
   // ================================================================
@@ -53,6 +60,7 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
 
   /// @notice Returns the current primary and secondary config digests.
   /// @dev Can be bytes32(0) if no config has been set yet or it has been revoked.
+  /// @param pluginKey The key of the plugin to get the config digests for.
   /// @return primaryConfigDigest The digest of the primary config.
   /// @return secondaryConfigDigest The digest of the secondary config.
   function getConfigDigests(
@@ -64,16 +72,22 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
     );
   }
 
+  /// @notice Returns the primary config digest for for a given key.
+  /// @param pluginKey The key of the plugin to get the config digests for.
   function getPrimaryDigest(bytes32 pluginKey) public view returns (bytes32) {
     return s_configs[pluginKey][s_primaryConfigIndex].configDigest;
   }
 
+  /// @notice Returns the secondary config digest for for a given key.
+  /// @param pluginKey The key of the plugin to get the config digests for.
   function getSecondaryDigest(bytes32 pluginKey) public view returns (bytes32) {
     return s_configs[pluginKey][s_primaryConfigIndex ^ 1].configDigest;
   }
 
   /// @notice Returns the stored config for a given digest. Will always return an empty config if the digest is the zero
   /// digest. This is done to prevent exposing old config state that is invalid.
+  /// @param pluginKey The key of the plugin to get the config for.
+  /// @param configDigest The digest of the config to fetch.
   function _getStoredConfig(
     bytes32 pluginKey,
     bytes32 configDigest
@@ -88,6 +102,10 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
     return (StoredConfig(ZERO_DIGEST, 0, "", ""), false);
   }
 
+  /// @notice Returns the primary stored config for a given key.
+  /// @param pluginKey The key of the plugin to get the config for.
+  /// @return primaryConfig The primary stored config.
+  /// @return ok True if the config was found, false otherwise.
   function _getPrimaryStoredConfig(
     bytes32 pluginKey
   ) internal view returns (StoredConfig memory primaryConfig, bool ok) {
@@ -98,6 +116,10 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
     return (s_configs[pluginKey][s_primaryConfigIndex], true);
   }
 
+  /// @notice Returns the secondary stored config for a given key.
+  /// @param pluginKey The key of the plugin to get the config for.
+  /// @return secondaryConfig The secondary stored config.
+  /// @return ok True if the config was found, false otherwise.
   function _getSecondaryStoredConfig(
     bytes32 pluginKey
   ) internal view returns (StoredConfig memory secondaryConfig, bool ok) {
@@ -113,8 +135,12 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
   // ================================================================
 
   /// @notice Sets a new config as the secondary config. Does not influence the primary config.
+  /// @param pluginKey The key of the plugin to set the config for.
+  /// @param encodedStaticConfig The static part of the config.
+  /// @param encodedDynamicConfig The dynamic part of the config.
   /// @param digestToOverwrite The digest of the config to overwrite, or ZERO_DIGEST if no config is to be overwritten.
   /// This is done to prevent accidental overwrites.
+  /// @return newConfigDigest The digest of the new config.
   function setSecondary(
     bytes32 pluginKey,
     bytes calldata encodedStaticConfig,
@@ -147,12 +173,13 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
 
     s_configs[pluginKey][s_primaryConfigIndex ^ 1] = newConfig;
 
-    emit ConfigSet(newConfig);
+    emit ConfigSet(newConfig.configDigest, newConfig);
 
     return newConfigDigest;
   }
 
   /// @notice Revokes a specific config by digest.
+  /// @param pluginKey The key of the plugin to revoke the config for.
   /// @param configDigest The digest of the config to revoke. This is done to prevent accidental revokes.
   function revokeSecondary(bytes32 pluginKey, bytes32 configDigest) external {
     _validateCaller();
@@ -170,6 +197,9 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
   }
 
   /// @notice Promotes the secondary config to the primary config and revokes the primary config.
+  /// @param pluginKey The key of the plugin to promote the config for.
+  /// @param digestToPromote The digest of the config to promote.
+  /// @param digestToRevoke The digest of the config to revoke.
   function promoteSecondaryAndRevokePrimary(
     bytes32 pluginKey,
     bytes32 digestToPromote,
@@ -196,6 +226,11 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
     emit ConfigPromoted(digestToPromote);
   }
 
+  /// @notice Sets the dynamic config for a specific config.
+  /// @param pluginKey The key of the plugin to set the dynamic config for.
+  /// @param newDynamicConfig The new dynamic config.
+  /// @param currentDigest The digest of the config to update.
+  /// @dev This does not update the config digest as only the static config is part of the digest.
   function setDynamicConfig(bytes32 pluginKey, bytes calldata newDynamicConfig, bytes32 currentDigest) external {
     _validateCaller();
 
@@ -214,6 +249,11 @@ abstract contract HomeBase is OwnerIsCreator, ITypeAndVersion {
     revert DigestNotFound(currentDigest);
   }
 
+  /// @notice Calculates the config digest for a given plugin key, static config, and version.
+  /// @param pluginKey The key of the plugin to calculate the digest for.
+  /// @param staticConfig The static part of the config.
+  /// @param version The version of the config.
+  /// @return The calculated config digest.
   function _calculateConfigDigest(
     bytes32 pluginKey,
     bytes memory staticConfig,

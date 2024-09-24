@@ -39,6 +39,8 @@ contract CCIPHome is HomeBase, ICapabilityConfiguration, IERC165 {
   error InvalidNode(OCR3Node node);
   error NotEnoughTransmitters(uint256 got, uint256 minimum);
   error OnlySelfCallAllowed();
+  error OnlyCapabilitiesRegistryCanCall();
+  error ZeroAddressNotAllowed();
 
   /// @notice Represents an oracle node in OCR3 configs part of the role DON.
   /// Every configured node should be a signer, but does not have to be a transmitter.
@@ -84,6 +86,7 @@ contract CCIPHome is HomeBase, ICapabilityConfiguration, IERC165 {
 
   string public constant override typeAndVersion = "CCIPHome 1.6.0-dev";
 
+  /// @dev A prefix added to all config digests that is unique to the implementation of the HomeBase contract.
   uint256 private constant PREFIX = 0x000a << (256 - 16); // 0x000a00..00
   bytes32 internal constant EMPTY_ENCODED_ADDRESS_HASH = keccak256(abi.encode(address(0)));
   /// @dev 256 is the hard limit due to the bit encoding of their indexes into a uint256.
@@ -98,6 +101,8 @@ contract CCIPHome is HomeBase, ICapabilityConfiguration, IERC165 {
   /// @dev All chains that are configured.
   EnumerableSet.UintSet private s_remoteChainSelectors;
 
+  /// @notice Constructor for the CCIPHome contract takes in the address of the capabilities registry. This address
+  /// is the only allowed caller to mutate the configuration through beforeCapabilityConfigSet.
   constructor(address capabilitiesRegistry) {
     if (capabilitiesRegistry == address(0)) {
       revert ZeroAddressNotAllowed();
@@ -131,8 +136,10 @@ contract CCIPHome is HomeBase, ICapabilityConfiguration, IERC165 {
     if (msg.sender != i_capabilitiesRegistry) {
       revert OnlyCapabilitiesRegistryCanCall();
     }
+    // solhint-disable-next-line avoid-low-level-calls
     (bool success, bytes memory errorData) = address(this).call(update);
     if (!success) {
+      // re-throw the revert message from the call
       assembly {
         revert(add(errorData, 32), errorData)
       }
@@ -152,6 +159,7 @@ contract CCIPHome is HomeBase, ICapabilityConfiguration, IERC165 {
 
   /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes. Use
   /// in case one of the configs is too large to be returnable by one of the other getters.
+  /// @param pluginKey The unique key for the DON that the configuration applies to.
   /// @param configDigest The digest of the config to fetch.
   /// @return versionedConfig The config and its version.
   /// @return ok True if the config was found, false otherwise.
@@ -174,6 +182,10 @@ contract CCIPHome is HomeBase, ICapabilityConfiguration, IERC165 {
     return (versionedConfig, false);
   }
 
+  /// @notice Returns the primary and secondary configuration for a given plugin key.
+  /// @param pluginKey The unique key for the DON that the configuration applies to.
+  /// @return primaryConfig The primary configuration.
+  /// @return secondaryConfig The secondary configuration.
   function getAllConfigs(
     bytes32 pluginKey
   ) external view returns (VersionedConfig memory primaryConfig, VersionedConfig memory secondaryConfig) {
@@ -204,6 +216,9 @@ contract CCIPHome is HomeBase, ICapabilityConfiguration, IERC165 {
   // │                         Validation                           │
   // ================================================================
 
+  /// @inheritdoc HomeBase
+  /// @param encodedStaticConfig The abi encoded static configuration.
+  /// @dev Validates the static only as CCIPHome does not use any dynamic config.
   function _validateStaticAndDynamicConfig(bytes memory encodedStaticConfig, bytes memory) internal view override {
     OCR3Config memory cfg = abi.decode(encodedStaticConfig, (OCR3Config));
 
@@ -261,17 +276,17 @@ contract CCIPHome is HomeBase, ICapabilityConfiguration, IERC165 {
     _ensureInRegistry(p2pIds);
   }
 
-  function _validateDynamicConfig(
-    bytes memory encodedStaticConfig,
-    bytes memory encodedDynamicConfig
-  ) internal pure override {
-    // OCR doesn't use dynamic config
-  }
+  /// @inheritdoc HomeBase
+  /// @dev No-op as there is no dynamic config.
+  function _validateDynamicConfig(bytes memory, bytes memory) internal pure override {}
 
+  /// @inheritdoc HomeBase
   function _getConfigDigestPrefix() internal pure override returns (uint256) {
     return PREFIX;
   }
 
+  /// @inheritdoc HomeBase
+  /// @dev Uses ownable as caller validation method.
   function _validateCaller() internal view override {
     if (msg.sender != address(this)) {
       revert OnlySelfCallAllowed();
