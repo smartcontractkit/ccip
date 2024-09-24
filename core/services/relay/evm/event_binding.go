@@ -168,7 +168,7 @@ func (e *eventBinding) QueryKey(ctx context.Context, filter query.KeyFilter, lim
 	}
 	remapped.Expressions = append(defaultExpressions, remapped.Expressions...)
 
-	logs, err := e.lp.FilteredLogs(ctx, remapped, limitAndSort, e.contractName+"-"+e.eventName)
+	logs, err := e.lp.FilteredLogs(ctx, remapped.Expressions, limitAndSort, e.contractName+"-"+e.address.String()+"-"+e.eventName)
 	if err != nil {
 		return nil, err
 	}
@@ -224,13 +224,7 @@ func (e *eventBinding) getLatestValueWithFilters(
 		return err
 	}
 
-	fai := filtersAndIndices[0]
 	remainingFilters := filtersAndIndices[1:]
-
-	logs, err := e.lp.IndexedLogs(ctx, e.hash, e.address, 1, []common.Hash{fai}, confs)
-	if err != nil {
-		return wrapInternalErr(err)
-	}
 
 	// TODO Use filtered logs here BCF-3316
 	// TODO: there should be a better way to ask log poller to filter these
