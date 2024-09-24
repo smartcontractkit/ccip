@@ -250,7 +250,6 @@ jobs:
       SLACK_CHANNEL: ${{ secrets.QA_SLACK_CHANNEL }}
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
-#      ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
     strategy:
       fail-fast: false
       matrix:
@@ -337,7 +336,6 @@ jobs:
           echo ::add-mask::$SLACK_USER
           echo "SLACK_USER=$SLACK_USER" >> "$GITHUB_ENV"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-#            BASE64_CCIP_CONFIG_OVERRIDE=$(jq -r '.inputs.base64_test_input' $GITHUB_EVENT_PATH)
             BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ./integration-tests/ccip-tests/testconfig/override/mainnet.toml)
             echo ::add-mask::$BASE64_CCIP_CONFIG_OVERRIDE
             echo "base_64_override=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_OUTPUT
@@ -354,8 +352,6 @@ jobs:
         run: |
           echo "### chainlink image used for this test run :link:" >>$GITHUB_STEP_SUMMARY
           echo "\`${{ env.CHAINLINK_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
-#          echo "### chainlink-tests image tag for this test run :ship:" >>$GITHUB_STEP_SUMMARY
-#          echo "\`${{ env.CHAINLINK_TEST_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
       - name: Prepare Base64 TOML override for CCIP secrets
         if: ${{ matrix.lanes.enabled == true }}
         uses: ./.github/actions/setup-create-base64-config-ccip
@@ -391,7 +387,6 @@ jobs:
           go_mod_path: ./integration-tests/go.mod
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
-#          QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
           triggered_by: ${{ env.TEST_TRIGGERED_BY }}
           artifacts_location: ./integration-tests/smoke/logs/payload_ccip.json
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
