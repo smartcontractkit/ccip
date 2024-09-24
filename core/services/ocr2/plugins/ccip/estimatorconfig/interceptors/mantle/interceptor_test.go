@@ -18,7 +18,8 @@ func TestInterceptor(t *testing.T) {
 	ctx := context.Background()
 
 	tokenRatio := big.NewInt(10)
-	interceptor := NewInterceptor(ctx, ethClient)
+	interceptor, err := NewInterceptor(ctx, ethClient)
+	require.NoError(t, err)
 
 	// request token ratio
 	ethClient.On("CallContract", ctx, mock.IsType(ethereum.CallMsg{}), mock.IsType(&big.Int{})).
@@ -79,7 +80,8 @@ func TestModifyGasPriceComponents(t *testing.T) {
 			ethClient := mocks.NewClient(t)
 			ctx := context.Background()
 
-			interceptor := NewInterceptor(ctx, ethClient)
+			interceptor, err := NewInterceptor(ctx, ethClient)
+			require.NoError(t, err)
 
 			// request token ratio
 			ethClient.On("CallContract", ctx, mock.IsType(ethereum.CallMsg{}), mock.IsType(&big.Int{})).

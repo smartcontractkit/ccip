@@ -3,7 +3,6 @@ package mantle
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/big"
 	"strings"
 	"time"
@@ -31,21 +30,21 @@ type Interceptor struct {
 	tokenRatioLastUpdate time.Time
 }
 
-func NewInterceptor(_ context.Context, client evmClient.Client) *Interceptor {
+func NewInterceptor(_ context.Context, client evmClient.Client) (*Interceptor, error) {
 	// Encode calldata for tokenRatio method
 	tokenRatioMethodAbi, err := abi.JSON(strings.NewReader(mantleTokenRatioAbiString))
 	if err != nil {
-		log.Panicf("failed to parse GasPriceOracle %s() method ABI for Mantle; %v", tokenRatioMethod, err)
+		return nil, fmt.Errorf("failed to parse GasPriceOracle %s() method ABI for Mantle; %v", tokenRatioMethod, err)
 	}
 	tokenRatioCallData, err := tokenRatioMethodAbi.Pack(tokenRatioMethod)
 	if err != nil {
-		log.Panicf("failed to parse GasPriceOracle %s() calldata for Mantle; %v", tokenRatioMethod, err)
+		return nil, fmt.Errorf("failed to parse GasPriceOracle %s() calldata for Mantle; %v", tokenRatioMethod, err)
 	}
 
 	return &Interceptor{
 		client:             client,
 		tokenRatioCallData: tokenRatioCallData,
-	}
+	}, nil
 }
 
 // ModifyGasPriceComponents returns modified gasPrice.
