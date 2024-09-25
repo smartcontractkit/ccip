@@ -1094,6 +1094,7 @@ func (lp *logPoller) PruneOldBlocks(ctx context.Context) (bool, error) {
 		// No blocks saved yet.
 		return true, nil
 	}
+	lp.lggr.Errorw("Calling DeleteBlocksBefore")
 	if latestBlock.FinalizedBlockNumber <= lp.keepFinalizedBlocksDepth {
 		// No-op, keep all blocks
 		return true, nil
@@ -1105,6 +1106,7 @@ func (lp *logPoller) PruneOldBlocks(ctx context.Context) (bool, error) {
 		latestBlock.FinalizedBlockNumber-lp.keepFinalizedBlocksDepth,
 		lp.logPrunePageSize,
 	)
+	lp.lggr.Errorw("DeleteBlocksBefore returned", "logPrunePageSize", lp.logPrunePageSize, "rowsRemoved", rowsRemoved, "allRemoved", rowsRemoved < lp.logPrunePageSize)
 	return lp.logPrunePageSize == 0 || rowsRemoved < lp.logPrunePageSize, err
 }
 
