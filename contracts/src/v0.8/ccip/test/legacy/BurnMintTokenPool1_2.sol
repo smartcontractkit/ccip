@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL
 pragma solidity ^0.8.20;
 
 import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
