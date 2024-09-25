@@ -10,13 +10,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/seth"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
+	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/lib/client"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"

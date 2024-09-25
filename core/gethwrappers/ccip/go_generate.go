@@ -12,9 +12,10 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/OnRamp/OnRamp.abi ../../../contracts/solc/v0.8.24/OnRamp/OnRamp.bin OnRamp onramp
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/EVM2EVMOffRamp/EVM2EVMOffRamp.abi ../../../contracts/solc/v0.8.24/EVM2EVMOffRamp/EVM2EVMOffRamp.bin EVM2EVMOffRamp evm_2_evm_offramp
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/OffRamp/OffRamp.abi ../../../contracts/solc/v0.8.24/OffRamp/OffRamp.bin OffRamp offramp
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/RMNRemote/RMNRemote.abi ../../../contracts/solc/v0.8.24/RMNRemote/RMNRemote.bin RMNRemote rmn_remote
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MultiAggregateRateLimiter/MultiAggregateRateLimiter.abi ../../../contracts/solc/v0.8.24/MultiAggregateRateLimiter/MultiAggregateRateLimiter.bin MultiAggregateRateLimiter multi_aggregate_rate_limiter
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/Router/Router.abi ../../../contracts/solc/v0.8.24/Router/Router.bin Router router
-//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/PriceRegistry/PriceRegistry.abi ../../../contracts/solc/v0.8.24/PriceRegistry/PriceRegistry.bin PriceRegistry price_registry
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/FeeQuoter/FeeQuoter.abi ../../../contracts/solc/v0.8.24/FeeQuoter/FeeQuoter.bin FeeQuoter fee_quoter
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPConfig/CCIPConfig.abi ../../../contracts/solc/v0.8.24/CCIPConfig/CCIPConfig.bin CCIPConfig ccip_config
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/NonceManager/NonceManager.abi ../../../contracts/solc/v0.8.24/NonceManager/NonceManager.bin NonceManager nonce_manager
 
@@ -43,6 +44,9 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/IOCR3ConfigEncoder/IOCR3ConfigEncoder.abi ../../../contracts/solc/v0.8.24/IOCR3ConfigEncoder/IOCR3ConfigEncoder.bin IOCR3ConfigEncoder ocr3_config_encoder
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MockE2EUSDCTokenMessenger/MockE2EUSDCTokenMessenger.abi ../../../contracts/solc/v0.8.24/MockE2EUSDCTokenMessenger/MockE2EUSDCTokenMessenger.bin MockE2EUSDCTokenMessenger mock_usdc_token_messenger
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MockE2EUSDCTransmitter/MockE2EUSDCTransmitter.abi ../../../contracts/solc/v0.8.24/MockE2EUSDCTransmitter/MockE2EUSDCTransmitter.bin MockE2EUSDCTransmitter mock_usdc_token_transmitter
+
+// EncodingUtils
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CCIPEncodingUtils/CCIPEncodingUtils.abi ../../../contracts/solc/v0.8.24/CCIPEncodingUtils/CCIPEncodingUtils.bin EncodingUtils ccip_encoding_utils
 
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:

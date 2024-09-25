@@ -38,6 +38,7 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
+	evmcapabilities "github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	v2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -370,6 +371,7 @@ func setupNodeCCIP(
 	sourceChainID *big.Int, destChainID *big.Int,
 	bootstrapPeerID string,
 	bootstrapPort int64,
+	sourceFinalityDepth, destFinalityDepth uint32,
 ) (chainlink.Application, string, common.Address, ocr2key.KeyBundle) {
 	trueRef, falseRef := true, false
 
@@ -404,7 +406,7 @@ func setupNodeCCIP(
 		c.P2P.V2.ListenAddresses = &p2pAddresses
 		c.P2P.V2.AnnounceAddresses = &p2pAddresses
 
-		c.EVM = []*v2.EVMConfig{createConfigV2Chain(sourceChainID), createConfigV2Chain(destChainID)}
+		c.EVM = []*v2.EVMConfig{createConfigV2Chain(sourceChainID, sourceFinalityDepth), createConfigV2Chain(destChainID, destFinalityDepth)}
 
 		if bootstrapPeerID != "" {
 			// Supply the bootstrap IP and port as a V2 peer address
@@ -460,9 +462,10 @@ func setupNodeCCIP(
 	}
 	loopRegistry := plugins.NewLoopRegistry(lggr.Named("LoopRegistry"), config.Tracing())
 	relayerFactory := chainlink.RelayerFactory{
-		Logger:       lggr,
-		LoopRegistry: loopRegistry,
-		GRPCOpts:     loop.GRPCOpts{},
+		Logger:               lggr,
+		LoopRegistry:         loopRegistry,
+		GRPCOpts:             loop.GRPCOpts{},
+		CapabilitiesRegistry: evmcapabilities.NewRegistry(logger.TestLogger(t)),
 	}
 	testCtx := testutils.Context(t)
 	// evm alway enabled for backward compatibility
@@ -525,7 +528,7 @@ func setupNodeCCIP(
 	return app, peerID.Raw(), transmitter, kb
 }
 
-func createConfigV2Chain(chainId *big.Int) *v2.EVMConfig {
+func createConfigV2Chain(chainId *big.Int, finalityDepth uint32) *v2.EVMConfig {
 	// NOTE: For the executor jobs, the default of 500k is insufficient for a 3 message batch
 	defaultGasLimit := uint64(5000000)
 	tr := true
@@ -536,8 +539,7 @@ func createConfigV2Chain(chainId *big.Int) *v2.EVMConfig {
 	sourceC.GasEstimator.Mode = &fixedPrice
 	d, _ := config.NewDuration(100 * time.Millisecond)
 	sourceC.LogPollInterval = &d
-	fd := uint32(2)
-	sourceC.FinalityDepth = &fd
+	sourceC.FinalityDepth = &finalityDepth
 	return &v2.EVMConfig{
 		ChainID: (*evmUtils.Big)(chainId),
 		Enabled: &tr,
@@ -552,9 +554,11 @@ type CCIPIntegrationTestHarness struct {
 	Bootstrap Node
 }
 
-func SetupCCIPIntegrationTH(t *testing.T, sourceChainID, sourceChainSelector, destChainId, destChainSelector uint64) CCIPIntegrationTestHarness {
+func SetupCCIPIntegrationTH(t *testing.T, sourceChainID, sourceChainSelector, destChainId, destChainSelector uint64,
+	sourceFinalityDepth, destFinalityDepth uint32) CCIPIntegrationTestHarness {
 	return CCIPIntegrationTestHarness{
-		CCIPContracts: testhelpers.SetupCCIPContracts(t, sourceChainID, sourceChainSelector, destChainId, destChainSelector),
+		CCIPContracts: testhelpers.SetupCCIPContracts(t, sourceChainID, sourceChainSelector, destChainId,
+			destChainSelector, sourceFinalityDepth, destFinalityDepth),
 	}
 }
 
@@ -927,7 +931,8 @@ func (c *CCIPIntegrationTestHarness) ConsistentlyReportNotCommitted(t *testing.T
 func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *testing.T, bootstrapNodePort int64) (Node, []Node, int64) {
 	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb := setupNodeCCIP(t, c.Dest.User, bootstrapNodePort,
 		"bootstrap_ccip", c.Source.Chain, c.Dest.Chain, big.NewInt(0).SetUint64(c.Source.ChainID),
-		big.NewInt(0).SetUint64(c.Dest.ChainID), "", 0)
+		big.NewInt(0).SetUint64(c.Dest.ChainID), "", 0, c.Source.FinalityDepth,
+		c.Dest.FinalityDepth)
 	var (
 		oracles []confighelper.OracleIdentityExtra
 		nodes   []Node
@@ -955,6 +960,8 @@ func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *
 			big.NewInt(0).SetUint64(c.Dest.ChainID),
 			bootstrapPeerID,
 			bootstrapNodePort,
+			c.Source.FinalityDepth,
+			c.Dest.FinalityDepth,
 		)
 		nodes = append(nodes, Node{
 			App:         app,

@@ -20,10 +20,11 @@ import (
 	ocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	ocr3 "github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/smartcontractkit/seth"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/guregu/null.v4"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/i_automation_registry_master_wrapper_2_3"
 
@@ -43,9 +44,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 
-	ctf_concurrency "github.com/smartcontractkit/chainlink-testing-framework/concurrency"
-	ctfTestEnv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
-	"github.com/smartcontractkit/chainlink-testing-framework/logging"
+	ctf_concurrency "github.com/smartcontractkit/chainlink-testing-framework/lib/concurrency"
+	ctfTestEnv "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
 )
 
 type NodeDetails struct {
@@ -88,8 +89,7 @@ type AutomationTest struct {
 	mercuryCredentialName    string
 	TransmitterKeyIndex      int
 
-	Logger         zerolog.Logger
-	useLogBufferV1 bool
+	Logger zerolog.Logger
 }
 
 type UpkeepConfig struct {
@@ -117,7 +117,6 @@ func NewAutomationTestK8s(
 		TransmitterKeyIndex:    0,
 		UpkeepPrivilegeManager: chainClient.MustGetRootKeyAddress(),
 		mercuryCredentialName:  "",
-		useLogBufferV1:         false,
 		Logger:                 l,
 	}
 }
@@ -134,7 +133,6 @@ func NewAutomationTestDocker(
 		TransmitterKeyIndex:    0,
 		UpkeepPrivilegeManager: chainClient.MustGetRootKeyAddress(),
 		mercuryCredentialName:  "",
-		useLogBufferV1:         false,
 		Logger:                 l,
 	}
 }
@@ -145,10 +143,6 @@ func (a *AutomationTest) SetIsOnk8s(flag bool) {
 
 func (a *AutomationTest) SetMercuryCredentialName(name string) {
 	a.mercuryCredentialName = name
-}
-
-func (a *AutomationTest) SetUseLogBufferV1(flag bool) {
-	a.useLogBufferV1 = flag
 }
 
 func (a *AutomationTest) SetTransmitterKeyIndex(index int) {
@@ -421,9 +415,6 @@ func (a *AutomationTest) AddAutomationJobs() error {
 	if strings.Contains(contractVersion, "v2.1") {
 		if a.mercuryCredentialName != "" {
 			pluginCfg["mercuryCredentialName"] = "\"" + a.mercuryCredentialName + "\""
-		}
-		if a.useLogBufferV1 {
-			pluginCfg["useBufferV1"] = "true"
 		}
 	}
 	for i := 1; i < len(a.ChainlinkNodes); i++ {

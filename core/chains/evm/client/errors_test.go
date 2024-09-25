@@ -215,6 +215,7 @@ func Test_Eth_Errors(t *testing.T) {
 			{"insufficient funds for gas + value. balance: 42719769622667482000, fee: 48098250000000, value: 42719769622667482000", true, "celo"},
 			{"client error insufficient eth", true, "tomlConfig"},
 			{"transaction would cause overdraft", true, "Geth"},
+			{"failed to forward tx to sequencer, please try again. Error message: 'insufficient funds for gas * price + value'", true, "Mantle"},
 		}
 		for _, test := range tests {
 			err = evmclient.NewSendErrorS(test.message)
@@ -316,6 +317,8 @@ func Test_Eth_Errors(t *testing.T) {
 			{"failed to add tx to the pool: not enough step counters to continue the execution", true, "Xlayer"},
 			{"failed to add tx to the pool: not enough keccak counters to continue the execution", true, "zkEVM"},
 			{"failed to add tx to the pool: not enough keccak counters to continue the execution", true, "Xlayer"},
+			{"RPC error response: failed to add tx to the pool: out of counters at node level (Steps)", true, "zkEVM"},
+			{"RPC error response: failed to add tx to the pool: out of counters at node level (GasUsed, KeccakHashes, PoseidonHashes, PoseidonPaddings, MemAligns, Arithmetics, Binaries, Steps, Sha256Hashes)", true, "Xlayer"},
 		}
 
 		for _, test := range tests {
@@ -400,7 +403,10 @@ func Test_Eth_Errors_Fatal(t *testing.T) {
 		{"Failed to serialize transaction: max priority fee per gas higher than 2^64-1", true, "zkSync"},
 		{"Failed to serialize transaction: oversized data. max: 1000000; actual: 1000000", true, "zkSync"},
 
+		{"failed to forward tx to sequencer, please try again. Error message: 'invalid sender'", true, "Mantle"},
+
 		{"client error fatal", true, "tomlConfig"},
+		{"invalid chain id for signer", true, "Treasure"},
 	}
 
 	for _, test := range tests {

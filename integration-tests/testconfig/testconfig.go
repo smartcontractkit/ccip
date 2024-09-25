@@ -17,14 +17,14 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/smartcontractkit/seth"
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
-	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/config"
-	k8s_config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
-	"github.com/smartcontractkit/chainlink-testing-framework/logging"
-	"github.com/smartcontractkit/chainlink-testing-framework/networks"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/conversions"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/osutil"
+	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
+	k8s_config "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/config"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/conversions"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/osutil"
 
 	a_config "github.com/smartcontractkit/chainlink/integration-tests/testconfig/automation"
 	f_config "github.com/smartcontractkit/chainlink/integration-tests/testconfig/functions"
@@ -522,10 +522,6 @@ func (c *TestConfig) readNetworkConfiguration() error {
 
 	c.Network.UpperCaseNetworkNames()
 	c.Network.OverrideURLsAndKeysFromEVMNetwork()
-	err := c.Network.Default()
-	if err != nil {
-		return errors.Wrapf(err, "error reading default network config")
-	}
 
 	// this is the only value we need to generate dynamically before starting a new simulated chain
 	if c.PrivateEthereumNetwork != nil && c.PrivateEthereumNetwork.EthereumChainConfig != nil {

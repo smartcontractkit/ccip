@@ -7,14 +7,15 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/seth"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
-	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/utils/seth"
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
+	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/lib/utils/seth"
 	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-	msClient "github.com/smartcontractkit/chainlink-testing-framework/client"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
+	msClient "github.com/smartcontractkit/chainlink-testing-framework/lib/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 )
 

@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
+
 	"github.com/smartcontractkit/chainlink/v2/plugins"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
@@ -14,7 +16,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	"github.com/Masterminds/semver/v3"
 	"go.uber.org/multierr"
 
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"

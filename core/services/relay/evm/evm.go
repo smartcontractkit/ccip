@@ -12,6 +12,8 @@ import (
 	"sync"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/chaintype"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig/interceptors/mantle"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
@@ -45,6 +47,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo/bm"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
 	lloconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/llo/config"
 	mercuryconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/mercury/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
@@ -406,6 +409,18 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 	sourceStartBlock := commitPluginConfig.SourceStartBlock
 	destStartBlock := commitPluginConfig.DestStartBlock
 
+	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
+
+	// CCIPCommit reads only when source chain is Mantle, then reports to dest chain
+	// to minimize misconfigure risk, might make sense to wire Mantle only when Commit + Mantle + IsSourceProvider
+	if r.chain.Config().EVM().ChainType() == chaintype.ChainMantle && commitPluginConfig.IsSourceProvider {
+		mantleInterceptor, iErr := mantle.NewInterceptor(ctx, r.chain.Client())
+		if iErr != nil {
+			return nil, iErr
+		}
+		feeEstimatorConfig.AddGasPriceInterceptor(mantleInterceptor)
+	}
+
 	// The src chain implementation of this provider does not need a configWatcher or contractTransmitter;
 	// bail early.
 	if commitPluginConfig.IsSourceProvider {
@@ -416,6 +431,7 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 			r.chain.LogPoller(),
 			r.chain.GasEstimator(),
 			r.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
+			feeEstimatorConfig,
 		), nil
 	}
 
@@ -451,6 +467,7 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 		*r.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
 		*contractTransmitter,
 		configWatcher,
+		feeEstimatorConfig,
 	), nil
 }
 
@@ -473,6 +490,18 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 
 	usdcConfig := execPluginConfig.USDCConfig
 
+	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
+
+	// CCIPExec reads when dest chain is mantle, and uses it to calc boosting in batching
+	// to minimize misconfigure risk, make sense to wire Mantle only when Exec + Mantle + !IsSourceProvider
+	if r.chain.Config().EVM().ChainType() == chaintype.ChainMantle && !execPluginConfig.IsSourceProvider {
+		mantleInterceptor, iErr := mantle.NewInterceptor(ctx, r.chain.Client())
+		if iErr != nil {
+			return nil, iErr
+		}
+		feeEstimatorConfig.AddGasPriceInterceptor(mantleInterceptor)
+	}
+
 	// The src chain implementation of this provider does not need a configWatcher or contractTransmitter;
 	// bail early.
 	if execPluginConfig.IsSourceProvider {
@@ -490,6 +519,7 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 			int(usdcConfig.AttestationAPITimeoutSeconds),
 			usdcConfig.AttestationAPIIntervalMilliseconds,
 			usdcConfig.SourceMessageTransmitterAddress,
+			feeEstimatorConfig,
 		)
 	}
 
@@ -525,6 +555,7 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 		configWatcher,
 		r.chain.GasEstimator(),
 		*r.chain.Config().EVM().GasEstimator().PriceMax().ToInt(),
+		feeEstimatorConfig,
 		r.chain.TxManager(),
 		cciptypes.Address(rargs.ContractID),
 	)

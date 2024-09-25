@@ -356,6 +356,7 @@ LimitDefault = 8000000
 LimitMax = 8000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
+EstimateLimit = false
 BumpMin = '5 gwei'
 BumpPercent = 20
 BumpThreshold = 3
@@ -370,6 +371,9 @@ BlockHistorySize = 4
 CheckInclusionBlocks = 12
 CheckInclusionPercentile = 90
 TransactionPercentile = 50
+
+[EVM.GasEstimator.FeeHistory]
+CacheTimeout = '10s'
 
 [EVM.HeadTracker]
 HistoryDepth = 100

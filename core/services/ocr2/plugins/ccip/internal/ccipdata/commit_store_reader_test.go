@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
@@ -38,6 +37,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
+	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 )
@@ -193,15 +193,24 @@ func TestCommitStoreReaders(t *testing.T) {
 	lm := new(rollupMocks.L1Oracle)
 	ge.On("L1Oracle").Return(lm)
 
+	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
+	feeEstimatorConfig.On(
+		"ModifyGasPriceComponents",
+		mock.AnythingOfType("context.backgroundCtx"),
+		mock.AnythingOfType("*big.Int"),
+		mock.AnythingOfType("*big.Int"),
+	).Return(func(ctx context.Context, x, y *big.Int) (*big.Int, *big.Int, error) {
+		return x, y, nil
+	})
 	maxGasPrice := big.NewInt(1e8)
-	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp) // ge, maxGasPrice
+	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp, feeEstimatorConfig) // ge, maxGasPrice
 	require.NoError(t, err)
 	err = c10r.SetGasEstimator(ctx, ge)
 	require.NoError(t, err)
 	err = c10r.SetSourceMaxGasPrice(ctx, maxGasPrice)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&v1_0_0.CommitStore{}).String())
-	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr2), ec, lp)
+	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr2), ec, lp, feeEstimatorConfig)
 	require.NoError(t, err)
 	err = c12r.SetGasEstimator(ctx, ge)
 	require.NoError(t, err)
@@ -284,7 +293,7 @@ func TestCommitStoreReaders(t *testing.T) {
 	}
 	gasPrice := big.NewInt(10)
 	daPrice := big.NewInt(20)
-	ge.On("GetFee", mock.Anything, mock.Anything, mock.Anything, assets.NewWei(maxGasPrice)).Return(gas.EvmFee{Legacy: assets.NewWei(gasPrice)}, uint64(0), nil)
+	ge.On("GetFee", mock.Anything, mock.Anything, mock.Anything, assets.NewWei(maxGasPrice), (*common.Address)(nil), (*common.Address)(nil)).Return(gas.EvmFee{Legacy: assets.NewWei(gasPrice)}, uint64(0), nil)
 	lm.On("GasPrice", mock.Anything).Return(assets.NewWei(daPrice), nil)
 
 	for v, cr := range crs {
@@ -370,8 +379,10 @@ func TestCommitStoreReaders(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, commonOffchain, c2)
 			// We should be able to query for gas prices now.
+
 			gpe, err := cr.GasPriceEstimator(ctx)
 			require.NoError(t, err)
+
 			gp, err := gpe.GetGasPrice(context.Background())
 			require.NoError(t, err)
 			assert.True(t, gp.Cmp(big.NewInt(0)) > 0)
@@ -412,7 +423,10 @@ func TestNewCommitStoreReader(t *testing.T) {
 			if tc.expectedErr == "" {
 				lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil)
 			}
-			_, err = factory.NewCommitStoreReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp)
+
+			feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
+
+			_, err = factory.NewCommitStoreReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp, feeEstimatorConfig)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {

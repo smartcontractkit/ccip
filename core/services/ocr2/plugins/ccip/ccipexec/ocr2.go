@@ -468,21 +468,36 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	return encodedReport, nil
 }
 
-func (r *ExecutionReportingPlugin) Report(ctx context.Context, _ types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
+// Returns required number of observations to reach consensus
+func (r *ExecutionReportingPlugin) getConsensusThreshold() int {
+	// Default consensus threshold is F+1
+	consensusThreshold := r.F + 1
+	if r.batchingStrategy.GetBatchingStrategyID() == ZKOverflowBatchingStrategyID {
+		// For batching strategy 1, consensus threshold is 2F+1
+		// This is because chains that can overflow need to reach consensus during the inflight cache period
+		// to avoid 2 transmissions round of an overflown message.
+		consensusThreshold = 2*r.F + 1
+	}
+	return consensusThreshold
+}
+
+func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("ExecutionReport")
 	if healthy, err := r.chainHealthcheck.IsHealthy(ctx); err != nil {
 		return false, nil, err
 	} else if !healthy {
 		return false, nil, ccip.ErrChainIsNotHealthy
 	}
+	consensusThreshold := r.getConsensusThreshold()
+	lggr.Infof("Consensus threshold set to: %d", consensusThreshold)
+
 	parsableObservations := ccip.GetParsableObservations[ccip.ExecutionObservation](lggr, observations)
-	// Need at least F+1 observations
-	if len(parsableObservations) <= r.F {
-		lggr.Warn("Non-empty observations <= F, need at least F+1 to continue")
+	if len(parsableObservations) < consensusThreshold {
+		lggr.Warnf("Insufficient observations: only %d received, but need more than %d to proceed", len(parsableObservations), consensusThreshold)
 		return false, nil, nil
 	}
 
-	observedMessages, err := calculateObservedMessagesConsensus(parsableObservations, r.F)
+	observedMessages, err := calculateObservedMessagesConsensus(parsableObservations, consensusThreshold)
 	if err != nil {
 		return false, nil, err
 	}
