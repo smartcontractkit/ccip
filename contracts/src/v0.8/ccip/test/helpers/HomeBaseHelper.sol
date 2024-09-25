@@ -1,42 +1,42 @@
-// SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.24;
-
-import {HomeBase} from "../../capability/HomeBase.sol";
-
-contract HomeBaseHelper is HomeBase {
-  error InvalidCaller();
-
-  string public constant override typeAndVersion = "HomeBaseHelper 1.6.0-dev";
-
-  uint256 public constant PREFIX = 0x0c0c << (256 - 16);
-
-  function _validateStaticAndDynamicConfig(bytes memory, bytes memory) internal view override {}
-
-  function _validateDynamicConfig(bytes memory, bytes memory) internal view override {}
-
-  function _getConfigDigestPrefix() internal pure override returns (uint256) {
-    return PREFIX;
-  }
-
-  function _validateCaller() internal view override {
-    if (msg.sender != owner()) {
-      revert InvalidCaller();
-    }
-  }
-
-  function getStoredConfig(bytes32 configDigest) external view returns (StoredConfig memory, bool ok) {
-    return _getStoredConfig(configDigest);
-  }
-
-  function getPrimaryStoredConfig() external view returns (StoredConfig memory, bool ok) {
-    return _getPrimaryStoredConfig();
-  }
-
-  function getSecondaryStoredConfig() external view returns (StoredConfig memory, bool ok) {
-    return _getSecondaryStoredConfig();
-  }
-
-  function calculateConfigDigest(bytes memory staticConfig, uint32 version) external view returns (bytes32) {
-    return _calculateConfigDigest(staticConfig, version);
-  }
-}
+//// SPDX-License-Identifier: BUSL-1.1
+//pragma solidity 0.8.24;
+//
+//import {HomeBase} from "../../capability/HomeBase.sol";
+//
+//contract HomeBaseHelper is HomeBase {
+//  error InvalidCaller();
+//
+//  string public constant override typeAndVersion = "HomeBaseHelper 1.6.0-dev";
+//
+//  uint256 public constant PREFIX = 0x0c0c << (256 - 16);
+//
+//  function _validateStaticAndDynamicConfig(bytes memory, bytes memory) internal view override {}
+//
+//  function _validateDynamicConfig(bytes memory, bytes memory) internal view override {}
+//
+//  function _getConfigDigestPrefix() internal pure override returns (uint256) {
+//    return PREFIX;
+//  }
+//
+//  function _validateCaller() internal view override {
+//    if (msg.sender != owner()) {
+//      revert InvalidCaller();
+//    }
+//  }
+//
+//  function getStoredConfig(bytes32 configDigest) external view returns (StoredConfig memory, bool ok) {
+//    return _getStoredConfig(configDigest);
+//  }
+//
+//  function getPrimaryStoredConfig() external view returns (StoredConfig memory, bool ok) {
+//    return _getPrimaryStoredConfig();
+//  }
+//
+//  function getSecondaryStoredConfig() external view returns (StoredConfig memory, bool ok) {
+//    return _getSecondaryStoredConfig();
+//  }
+//
+//  function calculateConfigDigest(bytes memory staticConfig, uint32 version) external view returns (bytes32) {
+//    return _calculateConfigDigest(staticConfig, version);
+//  }
+//}
