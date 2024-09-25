@@ -282,8 +282,6 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
 
   /// @notice Sets a new config as the secondary config. Does not influence the primary config.
   /// @param pluginKey The key of the plugin to set the config for.
-  /// @param digestToOverwrite The digest of the config to overwrite, or ZERO_DIGEST if no config is to be overwritten.
-  /// This is done to prevent accidental overwrites.
   /// @return newConfigDigest The digest of the new config.
   function _setSecondary(
     bytes32 pluginKey,

@@ -49,11 +49,7 @@ contract RMNHomeTest is Test {
       (PREFIX & PREFIX_MASK)
         | (
           uint256(
-            keccak256(
-              bytes.concat(
-                abi.encode(bytes32("EVM"), block.chainid, address(s_rmnHome), RMN_DON_ID, version), staticConfig
-              )
-            )
+            keccak256(bytes.concat(abi.encode(bytes32("EVM"), block.chainid, address(s_rmnHome), version), staticConfig))
           ) & ~PREFIX_MASK
         )
     );
@@ -82,10 +78,9 @@ contract RMNHome_setSecondary is RMNHomeTest {
     vm.expectEmit();
     emit HomeBase.ConfigSet(encodedConfig.configDigest, encodedConfig);
 
-    s_rmnHome.setSecondary(RMN_DON_ID, encodedConfig.staticConfig, encodedConfig.dynamicConfig, ZERO_DIGEST);
+    s_rmnHome.setSecondary(encodedConfig.staticConfig, encodedConfig.dynamicConfig, ZERO_DIGEST);
 
-    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) =
-      s_rmnHome.getConfig(RMN_DON_ID, versionedConfig.configDigest);
+    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getConfig(versionedConfig.configDigest);
     assertTrue(ok);
     assertEq(storedVersionedConfig.version, versionedConfig.version);
     RMNHome.StaticConfig memory storedStaticConfig = storedVersionedConfig.staticConfig;
@@ -114,7 +109,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
     config.staticConfig.nodes = new RMNHome.Node[](257);
 
     vm.expectRevert(RMNHome.OutOfBoundsNodesLength.selector);
-    s_rmnHome.setSecondary(RMN_DON_ID, abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
+    s_rmnHome.setSecondary(abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
   }
 
   function test_setSecondary_DuplicatePeerId_reverts() public {
@@ -122,7 +117,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
     config.staticConfig.nodes[1].peerId = config.staticConfig.nodes[0].peerId;
 
     vm.expectRevert(RMNHome.DuplicatePeerId.selector);
-    s_rmnHome.setSecondary(RMN_DON_ID, abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
+    s_rmnHome.setSecondary(abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
   }
 
   function test_setSecondary_DuplicateOffchainPublicKey_reverts() public {
@@ -130,7 +125,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
     config.staticConfig.nodes[1].offchainPublicKey = config.staticConfig.nodes[0].offchainPublicKey;
 
     vm.expectRevert(RMNHome.DuplicateOffchainPublicKey.selector);
-    s_rmnHome.setSecondary(RMN_DON_ID, abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
+    s_rmnHome.setSecondary(abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
   }
 
   function test_setSecondary_DuplicateSourceChain_reverts() public {
@@ -138,7 +133,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
     config.dynamicConfig.sourceChains[1].chainSelector = config.dynamicConfig.sourceChains[0].chainSelector;
 
     vm.expectRevert(RMNHome.DuplicateSourceChain.selector);
-    s_rmnHome.setSecondary(RMN_DON_ID, abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
+    s_rmnHome.setSecondary(abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
   }
 
   function test_setSecondary_OutOfBoundsObserverNodeIndex_reverts() public {
@@ -146,7 +141,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
     config.dynamicConfig.sourceChains[0].observerNodesBitmap = 1 << config.staticConfig.nodes.length;
 
     vm.expectRevert(RMNHome.OutOfBoundsObserverNodeIndex.selector);
-    s_rmnHome.setSecondary(RMN_DON_ID, abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
+    s_rmnHome.setSecondary(abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
   }
 
   function test_setSecondary_MinObserversTooHigh_reverts() public {
@@ -154,7 +149,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
     config.dynamicConfig.sourceChains[0].minObservers++;
 
     vm.expectRevert(RMNHome.MinObserversTooHigh.selector);
-    s_rmnHome.setSecondary(RMN_DON_ID, abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
+    s_rmnHome.setSecondary(abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
   }
 
   function test_setSecondary_OnlyOwner_reverts() public {
@@ -163,7 +158,7 @@ contract RMNHome_setSecondary is RMNHomeTest {
     vm.startPrank(address(0));
 
     vm.expectRevert("Only callable by owner");
-    s_rmnHome.setSecondary(RMN_DON_ID, abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
+    s_rmnHome.setSecondary(abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
   }
 }
 
@@ -171,25 +166,24 @@ contract RMNHome_setDynamicConfig is RMNHomeTest {
   function setUp() public override {
     super.setUp();
     Config memory config = _getBaseConfig();
-    s_rmnHome.setSecondary(RMN_DON_ID, abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
+    s_rmnHome.setSecondary(abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
   }
 
   function test_setDynamicConfig_success() public {
-    (bytes32 priorPrimaryDigest,) = s_rmnHome.getConfigDigests(RMN_DON_ID);
+    (bytes32 priorPrimaryDigest,) = s_rmnHome.getConfigDigests();
 
     Config memory config = _getBaseConfig();
     config.dynamicConfig.sourceChains[0].minObservers--;
 
-    (, bytes32 secondaryConfigDigest) = s_rmnHome.getConfigDigests(RMN_DON_ID);
+    (, bytes32 secondaryConfigDigest) = s_rmnHome.getConfigDigests();
     bytes memory encodedConfig = abi.encode(config.dynamicConfig);
 
     vm.expectEmit();
     emit HomeBase.DynamicConfigSet(secondaryConfigDigest, encodedConfig);
 
-    s_rmnHome.setDynamicConfig(RMN_DON_ID, encodedConfig, secondaryConfigDigest);
+    s_rmnHome.setDynamicConfig(encodedConfig, secondaryConfigDigest);
 
-    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) =
-      s_rmnHome.getConfig(RMN_DON_ID, secondaryConfigDigest);
+    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getConfig(secondaryConfigDigest);
     assertTrue(ok);
     assertEq(
       storedVersionedConfig.dynamicConfig.sourceChains[0].minObservers,
@@ -197,7 +191,7 @@ contract RMNHome_setDynamicConfig is RMNHomeTest {
     );
 
     // Asser the digests don't change when updating the dynamic config
-    (bytes32 primaryDigest, bytes32 secondaryDigest) = s_rmnHome.getConfigDigests(RMN_DON_ID);
+    (bytes32 primaryDigest, bytes32 secondaryDigest) = s_rmnHome.getConfigDigests();
     assertEq(primaryDigest, priorPrimaryDigest);
     assertEq(secondaryDigest, secondaryConfigDigest);
   }
@@ -208,18 +202,18 @@ contract RMNHome_setDynamicConfig is RMNHomeTest {
     config.dynamicConfig.sourceChains[0].minObservers++;
 
     vm.expectRevert(abi.encodeWithSelector(HomeBase.DigestNotFound.selector, ZERO_DIGEST));
-    s_rmnHome.setDynamicConfig(RMN_DON_ID, abi.encode(config.dynamicConfig), ZERO_DIGEST);
+    s_rmnHome.setDynamicConfig(abi.encode(config.dynamicConfig), ZERO_DIGEST);
   }
 
   function test_setDynamicConfig_DigestNotFound_reverts() public {
     // Zero always reverts
     vm.expectRevert(abi.encodeWithSelector(HomeBase.DigestNotFound.selector, ZERO_DIGEST));
-    s_rmnHome.setDynamicConfig(RMN_DON_ID, abi.encode(_getBaseConfig().dynamicConfig), ZERO_DIGEST);
+    s_rmnHome.setDynamicConfig(abi.encode(_getBaseConfig().dynamicConfig), ZERO_DIGEST);
 
     // Non-existent digest reverts
     bytes32 nonExistentDigest = keccak256("nonExistentDigest");
     vm.expectRevert(abi.encodeWithSelector(HomeBase.DigestNotFound.selector, nonExistentDigest));
-    s_rmnHome.setDynamicConfig(RMN_DON_ID, abi.encode(_getBaseConfig().dynamicConfig), nonExistentDigest);
+    s_rmnHome.setDynamicConfig(abi.encode(_getBaseConfig().dynamicConfig), nonExistentDigest);
   }
 
   function test_setDynamicConfig_OnlyOwner_reverts() public {
@@ -228,7 +222,7 @@ contract RMNHome_setDynamicConfig is RMNHomeTest {
     vm.startPrank(address(0));
 
     vm.expectRevert("Only callable by owner");
-    s_rmnHome.setDynamicConfig(RMN_DON_ID, abi.encode(config.dynamicConfig), keccak256("configDigest"));
+    s_rmnHome.setDynamicConfig(abi.encode(config.dynamicConfig), keccak256("configDigest"));
   }
 }
 
@@ -238,23 +232,22 @@ contract RMNHome_revokeSecondary is RMNHomeTest {
     super.setUp();
     Config memory config = _getBaseConfig();
     bytes32 digest =
-      s_rmnHome.setSecondary(RMN_DON_ID, abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
-    s_rmnHome.promoteSecondaryAndRevokePrimary(RMN_DON_ID, digest, ZERO_DIGEST);
+      s_rmnHome.setSecondary(abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
+    s_rmnHome.promoteSecondaryAndRevokePrimary(digest, ZERO_DIGEST);
 
     config.dynamicConfig.sourceChains[0].minObservers--;
-    s_rmnHome.setSecondary(RMN_DON_ID, abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
+    s_rmnHome.setSecondary(abi.encode(config.staticConfig), abi.encode(config.dynamicConfig), ZERO_DIGEST);
   }
 
   function test_revokeSecondary_success() public {
-    (bytes32 priorPrimaryDigest, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests(RMN_DON_ID);
+    (bytes32 priorPrimaryDigest, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests();
 
     vm.expectEmit();
     emit HomeBase.ConfigRevoked(priorSecondaryDigest);
 
-    s_rmnHome.revokeSecondary(RMN_DON_ID, priorSecondaryDigest);
+    s_rmnHome.revokeSecondary(priorSecondaryDigest);
 
-    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) =
-      s_rmnHome.getConfig(RMN_DON_ID, priorSecondaryDigest);
+    (RMNHome.VersionedConfig memory storedVersionedConfig, bool ok) = s_rmnHome.getConfig(priorSecondaryDigest);
     assertFalse(ok);
     // Ensure no old data is returned, even though it's still in storage
     assertEq(storedVersionedConfig.version, 0);
@@ -262,25 +255,25 @@ contract RMNHome_revokeSecondary is RMNHomeTest {
     assertEq(storedVersionedConfig.dynamicConfig.sourceChains.length, 0);
 
     // Asser the primary digest is unaffected but the secondary digest is set to zero
-    (bytes32 primaryDigest, bytes32 secondaryDigest) = s_rmnHome.getConfigDigests(RMN_DON_ID);
+    (bytes32 primaryDigest, bytes32 secondaryDigest) = s_rmnHome.getConfigDigests();
     assertEq(primaryDigest, priorPrimaryDigest);
     assertEq(secondaryDigest, ZERO_DIGEST);
     assertTrue(secondaryDigest != priorSecondaryDigest);
   }
 
   function test_revokeSecondary_ConfigDigestMismatch_reverts() public {
-    (, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests(RMN_DON_ID);
+    (, bytes32 priorSecondaryDigest) = s_rmnHome.getConfigDigests();
 
     bytes32 wrongDigest = keccak256("wrong_digest");
     vm.expectRevert(abi.encodeWithSelector(HomeBase.ConfigDigestMismatch.selector, priorSecondaryDigest, wrongDigest));
-    s_rmnHome.revokeSecondary(RMN_DON_ID, wrongDigest);
+    s_rmnHome.revokeSecondary(wrongDigest);
   }
 
   function test_revokeSecondary_OnlyOwner_reverts() public {
     vm.startPrank(address(0));
 
     vm.expectRevert("Only callable by owner");
-    s_rmnHome.revokeSecondary(RMN_DON_ID, keccak256("configDigest"));
+    s_rmnHome.revokeSecondary(keccak256("configDigest"));
   }
 }
 
@@ -291,6 +284,6 @@ contract RMNHome_promoteSecondaryAndRevokePrimary is RMNHomeTest {
     vm.startPrank(address(0));
 
     vm.expectRevert("Only callable by owner");
-    s_rmnHome.promoteSecondaryAndRevokePrimary(RMN_DON_ID, keccak256("toPromote"), keccak256("ToRevoke"));
+    s_rmnHome.promoteSecondaryAndRevokePrimary(keccak256("toPromote"), keccak256("ToRevoke"));
   }
 }
