@@ -21,7 +21,7 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
 
   event ChainConfigRemoved(uint64 chainSelector);
   event ChainConfigSet(uint64 chainSelector, ChainConfig chainConfig);
-  event ConfigSet(bytes32 indexed configDigest, VersionedConfig versionedConfig);
+  event ConfigSet(bytes32 indexed configDigest, uint32 version, OCR3Config config);
   event ConfigRevoked(bytes32 indexed configDigest);
   event DynamicConfigSet(bytes32 indexed configDigest, bytes dynamicConfig);
   event ConfigPromoted(bytes32 indexed configDigest);
@@ -298,14 +298,25 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
 
     uint32 newVersion = ++s_configCount;
 
-    VersionedConfig memory newConfig = VersionedConfig({configDigest: newDigest, version: newVersion, config: config});
-
     VersionedConfig storage existingConfig = s_configs[pluginKey][s_primaryConfigIndex ^ 1];
-    // TODO existingConfig.config = config;
     existingConfig.version = newVersion;
     existingConfig.configDigest = newDigest;
 
-    emit ConfigSet(newConfig.configDigest, newConfig);
+    existingConfig.config.pluginType = config.pluginType;
+    existingConfig.config.chainSelector = config.chainSelector;
+    existingConfig.config.FRoleDON = config.FRoleDON;
+    existingConfig.config.offchainConfigVersion = config.offchainConfigVersion;
+    existingConfig.config.offrampAddress = config.offrampAddress;
+    existingConfig.config.offchainConfig = config.offchainConfig;
+
+    while (existingConfig.config.nodes.length > 0) {
+      existingConfig.config.nodes.pop();
+    }
+    for (uint256 i = 0; i < config.nodes.length; ++i) {
+      existingConfig.config.nodes.push(config.nodes[i]);
+    }
+
+    emit ConfigSet(newDigest, newVersion, config);
 
     return newDigest;
   }
