@@ -496,15 +496,20 @@ func TestORM(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), deleted)
 
-	// Delete unmatched logs with page limit
+	// Select unmatched logs with page limit
 	ids, err := o1.SelectUnmatchedLogIDs(ctx, 2)
 	require.NoError(t, err)
-	assert.Equal(t, int64(2), ids)
+	assert.Len(t, ids, 2)
 
-	// Delete unmatched logs without page limit
+	// Select unmatched logs without page limit
 	ids, err = o1.SelectUnmatchedLogIDs(ctx, 0)
 	require.NoError(t, err)
-	assert.Equal(t, int64(2), ids)
+	assert.Len(t, ids, 3)
+
+	// Delete logs by row id
+	deleted, err = o1.DeleteLogsByRowID(ctx, ids)
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), deleted)
 
 	// Ensure that both of the logs from the second chain are still there
 	logs, err = o2.SelectLogs(ctx, 0, 100, common.HexToAddress("0x1236"), topic2)
@@ -519,7 +524,7 @@ func TestORM(t *testing.T) {
 	// The only log which should be deleted is the one which matches filter1 (ret=1ms) but not filter12 (ret=1 hour)
 	// Importantly, it shouldn't delete any logs matching only filter0 (ret=0 meaning permanent retention).  Anything
 	// matching filter12 should be kept regardless of what other filters it matches.
-	assert.Len(t, logs, 7)
+	assert.Len(t, logs, 4)
 
 	// Delete logs after should delete all logs.
 	err = o1.DeleteLogsAndBlocksAfter(ctx, 1)

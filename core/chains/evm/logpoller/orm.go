@@ -382,20 +382,20 @@ type Exp struct {
 
 func (o *DSORM) SelectUnmatchedLogIDs(ctx context.Context, limit int64) (ids []uint64, err error) {
 	query := `
-		SELECT l.id FROM evm.logs l JOIN (
+		SELECT l.id FROM evm.logs l LEFT JOIN (
 			SELECT evm_chain_id, address, event
 			FROM evm.log_poller_filters
 				WHERE evm_chain_id = $1
 				GROUP BY evm_chain_id, address, event
 		) r ON l.evm_chain_id = r.evm_chain_id AND l.address = r.address AND l.event_sig = r.event
-		WHERE l.evm_chain_id = $1 AND r.id IS NULL
+		WHERE l.evm_chain_id = $1 AND r.evm_chain_id IS NULL
 	`
 
 	if limit == 0 {
 		err = o.ds.SelectContext(ctx, &ids, query, ubig.New(o.chainID))
 		return ids, err
 	}
-	err = o.ds.SelectContext(ctx, &ids, fmt.Sprintf("%s LIMIT %d", query, limit))
+	err = o.ds.SelectContext(ctx, &ids, fmt.Sprintf("%s LIMIT %d", query, limit), ubig.New(o.chainID))
 
 	return ids, err
 }
