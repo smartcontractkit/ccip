@@ -117,9 +117,7 @@ contract BurnMintERC677_mint is BurnMintERC677Setup {
     // Mint max supply
     s_burnMintERC677.mint(OWNER, s_burnMintERC677.maxSupply());
 
-    vm.expectRevert(
-      abi.encodeWithSelector(BurnMintERC20.MaxSupplyExceeded.selector, s_burnMintERC677.maxSupply() + 1)
-    );
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC20.MaxSupplyExceeded.selector, s_burnMintERC677.maxSupply() + 1));
 
     // Attempt to mint 1 more than max supply
     s_burnMintERC677.mint(OWNER, 1);

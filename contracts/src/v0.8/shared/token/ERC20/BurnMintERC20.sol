@@ -44,12 +44,7 @@ contract BurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Burnable,
   /// @dev the allowed burner addresses
   EnumerableSet.AddressSet internal s_burners;
 
-  constructor(
-    string memory name,
-    string memory symbol,
-    uint8 decimals_,
-    uint256 maxSupply_
-  ) ERC20(name, symbol) {
+  constructor(string memory name, string memory symbol, uint8 decimals_, uint256 maxSupply_) ERC20(name, symbol) {
     i_decimals = decimals_;
     i_maxSupply = maxSupply_;
 
