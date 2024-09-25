@@ -21,7 +21,7 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
 
   event ChainConfigRemoved(uint64 chainSelector);
   event ChainConfigSet(uint64 chainSelector, ChainConfig chainConfig);
-  event ConfigSet(bytes32 indexed configDigest, StoredConfig versionedConfig);
+  event ConfigSet(bytes32 indexed configDigest, VersionedConfig versionedConfig);
   event ConfigRevoked(bytes32 indexed configDigest);
   event DynamicConfigSet(bytes32 indexed configDigest, bytes dynamicConfig);
   event ConfigPromoted(bytes32 indexed configDigest);
@@ -43,18 +43,14 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
   error FTooHigh();
   error InvalidNode(OCR3Node node);
   error NotEnoughTransmitters(uint256 got, uint256 minimum);
-  error OnlySelfCallAllowed();
   error OnlyCapabilitiesRegistryCanCall();
   error ZeroAddressNotAllowed();
   error ConfigDigestMismatch(bytes32 expectedConfigDigest, bytes32 gotConfigDigest);
   error DigestNotFound(bytes32 configDigest);
 
-  // TODO kill
-  struct StoredConfig {
-    bytes32 configDigest;
-    uint32 version;
-    bytes config;
-  }
+  error InvalidStateTransition(
+    bytes32 currentPrimaryDigest, bytes32 currentSecondaryDigest, bytes32 blue, bytes32 green
+  );
 
   /// @notice Represents an oracle node in OCR3 configs part of the role DON.
   /// Every configured node should be a signer, but does not have to be a transmitter.
@@ -124,7 +120,7 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
 
   /// @notice This array holds the configs.
   /// @dev Value i in this array is valid iff s_configs[i].configDigest != 0.
-  mapping(bytes32 pluginKey => StoredConfig[MAX_CONCURRENT_CONFIGS]) private s_configs;
+  mapping(bytes32 pluginKey => VersionedConfig[MAX_CONCURRENT_CONFIGS]) private s_configs;
 
   /// @notice The total number of configs ever set, used for generating the version of the configs.
   uint32 private s_configCount = 0;
@@ -160,20 +156,46 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
   function beforeCapabilityConfigSet(
     bytes32[] calldata, // nodes
     bytes calldata update,
-    uint64, // configCount
-    uint32 // donId
+    // Config count is unused because we don't want to invalidate a config on blue/green promotions so we keep track of
+    // the actual newly submitted configs instead of the number of config mutations.
+    uint64, // config count
+    uint32 donId
   ) external override {
     if (msg.sender != i_capabilitiesRegistry) {
       revert OnlyCapabilitiesRegistryCanCall();
     }
-    // solhint-disable-next-line avoid-low-level-calls
-    (bool success, bytes memory errorData) = address(this).call(update);
-    if (!success) {
-      // re-throw the revert message from the call
-      assembly {
-        revert(add(errorData, 32), errorData)
+
+    (OCR3Config memory blue, OCR3Config memory green) = abi.decode(update, (OCR3Config, OCR3Config));
+    bytes32 pluginKey = bytes32(uint256(donId));
+    uint32 newConfigVersion = s_configCount + 1;
+
+    (bytes32 currentBlueDigest, bytes32 currentGreenDigest) = getConfigDigests(pluginKey);
+    bytes32 newBlueDigest = _calculateConfigDigest(pluginKey, abi.encode(blue), newConfigVersion);
+    bytes32 newGreenDigest = _calculateConfigDigest(pluginKey, abi.encode(green), newConfigVersion);
+
+    // Check the possible steps of the state machine
+    // 1. promoteSecondaryAndRevokePrimary requires
+    //   - blue digest to be the current secondary digest
+    //   - green digest to be the zero digest
+    if (currentGreenDigest == newBlueDigest && newGreenDigest == ZERO_DIGEST) {
+      _promoteSecondaryAndRevokePrimary(pluginKey, newBlueDigest);
+      return;
+    }
+    // setSecondary and revokeSecondary require no changes to the blue config
+    if (currentBlueDigest == newBlueDigest) {
+      // 2. If the green config is non-zero, we call setSecondary
+      if (newGreenDigest != ZERO_DIGEST) {
+        _setSecondary(pluginKey, blue, newBlueDigest);
+        return;
+      } else {
+        // 3. If the green config is zero, we call revokeSecondary
+        _revokeSecondary(pluginKey, newGreenDigest);
+        return;
       }
     }
+
+    // There are no other valid state transitions so we revert if we have not returned by now.
+    revert InvalidStateTransition(currentBlueDigest, currentGreenDigest, newBlueDigest, newGreenDigest);
   }
 
   /// @inheritdoc ICapabilityConfiguration
@@ -187,6 +209,32 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
   // │                          Getters                             │
   // ================================================================
 
+  /// @notice Returns the current primary and secondary config digests.
+  /// @dev Can be bytes32(0) if no config has been set yet or it has been revoked.
+  /// @param pluginKey The key of the plugin to get the config digests for.
+  /// @return primaryConfigDigest The digest of the primary config.
+  /// @return secondaryConfigDigest The digest of the secondary config.
+  function getConfigDigests(
+    bytes32 pluginKey
+  ) public view returns (bytes32 primaryConfigDigest, bytes32 secondaryConfigDigest) {
+    return (
+      s_configs[pluginKey][s_primaryConfigIndex].configDigest,
+      s_configs[pluginKey][s_primaryConfigIndex ^ 1].configDigest
+    );
+  }
+
+  /// @notice Returns the primary config digest for for a given key.
+  /// @param pluginKey The key of the plugin to get the config digests for.
+  function getPrimaryDigest(bytes32 pluginKey) public view returns (bytes32) {
+    return s_configs[pluginKey][s_primaryConfigIndex].configDigest;
+  }
+
+  /// @notice Returns the secondary config digest for for a given key.
+  /// @param pluginKey The key of the plugin to get the config digests for.
+  function getSecondaryDigest(bytes32 pluginKey) public view returns (bytes32) {
+    return s_configs[pluginKey][s_primaryConfigIndex ^ 1].configDigest;
+  }
+
   /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes. Use
   /// in case one of the configs is too large to be returnable by one of the other getters.
   /// @param pluginKey The unique key for the DON that the configuration applies to.
@@ -197,18 +245,14 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
     bytes32 pluginKey,
     bytes32 configDigest
   ) external view returns (VersionedConfig memory versionedConfig, bool ok) {
-    (StoredConfig memory storedConfig, bool configOK) = _getStoredConfig(pluginKey, configDigest);
-    if (configOK) {
-      return (
-        VersionedConfig({
-          version: storedConfig.version,
-          configDigest: storedConfig.configDigest,
-          config: abi.decode(storedConfig.config, (OCR3Config))
-        }),
-        true
-      );
+    for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
+      // We never want to return true for a zero digest, even if the caller is asking for it, as this can expose old
+      // config state that is invalid.
+      if (s_configs[pluginKey][i].configDigest == configDigest && configDigest != ZERO_DIGEST) {
+        return (s_configs[pluginKey][i], true);
+      }
     }
-
+    // versionConfig is uninitialized so it contains default values.
     return (versionedConfig, false);
   }
 
@@ -219,36 +263,121 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
   function getAllConfigs(
     bytes32 pluginKey
   ) external view returns (VersionedConfig memory primaryConfig, VersionedConfig memory secondaryConfig) {
-    (StoredConfig memory primaryStoredConfig, bool primaryOk) = _getPrimaryStoredConfig(pluginKey);
-
-    if (primaryOk) {
-      primaryConfig = VersionedConfig({
-        version: primaryStoredConfig.version,
-        configDigest: primaryStoredConfig.configDigest,
-        config: abi.decode(primaryStoredConfig.config, (OCR3Config))
-      });
+    VersionedConfig memory storedPrimaryConfig = s_configs[pluginKey][s_primaryConfigIndex];
+    if (storedPrimaryConfig.configDigest != ZERO_DIGEST) {
+      primaryConfig = storedPrimaryConfig;
     }
 
-    (StoredConfig memory secondaryStoredConfig, bool secondaryOk) = _getSecondaryStoredConfig(pluginKey);
-
-    if (secondaryOk) {
-      secondaryConfig = VersionedConfig({
-        version: secondaryStoredConfig.version,
-        configDigest: secondaryStoredConfig.configDigest,
-        config: abi.decode(secondaryStoredConfig.config, (OCR3Config))
-      });
+    VersionedConfig memory storedSecondaryConfig = s_configs[pluginKey][s_primaryConfigIndex ^ 1];
+    if (storedSecondaryConfig.configDigest != ZERO_DIGEST) {
+      secondaryConfig = storedSecondaryConfig;
     }
 
     return (primaryConfig, secondaryConfig);
   }
 
   // ================================================================
+  // │                     State transitions                        │
+  // ================================================================
+
+  /// @notice Sets a new config as the secondary config. Does not influence the primary config.
+  /// @param pluginKey The key of the plugin to set the config for.
+  /// @param digestToOverwrite The digest of the config to overwrite, or ZERO_DIGEST if no config is to be overwritten.
+  /// This is done to prevent accidental overwrites.
+  /// @return newConfigDigest The digest of the new config.
+  function _setSecondary(
+    bytes32 pluginKey,
+    OCR3Config memory config,
+    bytes32 newDigest
+  ) internal returns (bytes32 newConfigDigest) {
+    _validateConfig(config);
+
+    bytes32 existingDigest = getSecondaryDigest(pluginKey);
+    // are we going to overwrite a config? If so, emit an event.
+    if (getSecondaryDigest(pluginKey) != ZERO_DIGEST) {
+      emit ConfigRevoked(existingDigest);
+    }
+
+    uint32 newVersion = ++s_configCount;
+
+    VersionedConfig memory newConfig = VersionedConfig({configDigest: newDigest, version: newVersion, config: config});
+
+    VersionedConfig storage existingConfig = s_configs[pluginKey][s_primaryConfigIndex ^ 1];
+    // TODO existingConfig.config = config;
+    existingConfig.version = newVersion;
+    existingConfig.configDigest = newDigest;
+
+    emit ConfigSet(newConfig.configDigest, newConfig);
+
+    return newDigest;
+  }
+
+  /// @notice Revokes a specific config by digest.
+  /// @param pluginKey The key of the plugin to revoke the config for.
+  /// @param configDigest The digest of the config to revoke. This is done to prevent accidental revokes.
+  function _revokeSecondary(bytes32 pluginKey, bytes32 configDigest) internal {
+    uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
+    if (s_configs[pluginKey][secondaryConfigIndex].configDigest != configDigest) {
+      revert ConfigDigestMismatch(s_configs[pluginKey][secondaryConfigIndex].configDigest, configDigest);
+    }
+
+    emit ConfigRevoked(configDigest);
+    // Delete only the digest, as that's what's used to determine if a config is active. This means the actual
+    // config stays in storage which should significantly reduce the gas cost of overwriting that storage space in
+    // the future.
+    delete s_configs[pluginKey][secondaryConfigIndex].configDigest;
+  }
+
+  /// @notice Promotes the secondary config to the primary config and revokes the primary config.
+  /// @param pluginKey The key of the plugin to promote the config for.
+  /// @param digestToPromote The digest of the config to promote.
+  function _promoteSecondaryAndRevokePrimary(bytes32 pluginKey, bytes32 digestToPromote) internal {
+    uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
+    if (s_configs[pluginKey][secondaryConfigIndex].configDigest != digestToPromote) {
+      revert ConfigDigestMismatch(s_configs[pluginKey][secondaryConfigIndex].configDigest, digestToPromote);
+    }
+
+    uint256 primaryConfigIndex = s_primaryConfigIndex;
+
+    delete s_configs[pluginKey][primaryConfigIndex].configDigest;
+
+    bytes32 digestToRevoke = s_configs[pluginKey][primaryConfigIndex].configDigest;
+    if (digestToRevoke != ZERO_DIGEST) {
+      emit ConfigRevoked(digestToRevoke);
+    }
+
+    s_primaryConfigIndex ^= 1;
+
+    emit ConfigPromoted(digestToPromote);
+  }
+
+  /// @notice Calculates the config digest for a given plugin key, static config, and version.
+  /// @param pluginKey The key of the plugin to calculate the digest for.
+  /// @param staticConfig The static part of the config.
+  /// @param version The version of the config.
+  /// @return The calculated config digest.
+  function _calculateConfigDigest(
+    bytes32 pluginKey,
+    bytes memory staticConfig,
+    uint32 version
+  ) internal view returns (bytes32) {
+    return bytes32(
+      (PREFIX & PREFIX_MASK)
+        | (
+          uint256(
+            keccak256(
+              bytes.concat(abi.encode(bytes32("EVM"), block.chainid, address(this), pluginKey, version), staticConfig)
+            )
+          ) & ~PREFIX_MASK
+        )
+    );
+  }
+
+  // ================================================================
   // │                         Validation                           │
   // ================================================================
 
-  function _validateConfig(bytes memory encodedConfig) internal view {
-    OCR3Config memory cfg = abi.decode(encodedConfig, (OCR3Config));
-
+  function _validateConfig(OCR3Config memory cfg) internal view {
     if (cfg.chainSelector == 0) revert ChainSelectorNotSet();
     if (cfg.pluginType != Internal.OCRPluginType.Commit && cfg.pluginType != Internal.OCRPluginType.Execution) {
       revert InvalidPluginType();
@@ -301,206 +430,6 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
 
     // Check that the readers are in the capabilities registry.
     _ensureInRegistry(p2pIds);
-  }
-
-  /// @dev No-op as there is no dynamic config.
-  function _validateDynamicConfig(bytes memory, bytes memory) internal pure {}
-
-  /// @dev Uses ownable as caller validation method.
-  function _validateCaller() internal view {
-    if (msg.sender != address(this)) {
-      revert OnlySelfCallAllowed();
-    }
-  }
-
-  // ================================================================
-  // │                         HomeBase                             │
-  // ================================================================
-
-  // ================================================================
-  // │                          Getters                             │
-  // ================================================================
-
-  /// @notice Returns the current primary and secondary config digests.
-  /// @dev Can be bytes32(0) if no config has been set yet or it has been revoked.
-  /// @param pluginKey The key of the plugin to get the config digests for.
-  /// @return primaryConfigDigest The digest of the primary config.
-  /// @return secondaryConfigDigest The digest of the secondary config.
-  function getConfigDigests(
-    bytes32 pluginKey
-  ) external view returns (bytes32 primaryConfigDigest, bytes32 secondaryConfigDigest) {
-    return (
-      s_configs[pluginKey][s_primaryConfigIndex].configDigest,
-      s_configs[pluginKey][s_primaryConfigIndex ^ 1].configDigest
-    );
-  }
-
-  /// @notice Returns the primary config digest for for a given key.
-  /// @param pluginKey The key of the plugin to get the config digests for.
-  function getPrimaryDigest(bytes32 pluginKey) public view returns (bytes32) {
-    return s_configs[pluginKey][s_primaryConfigIndex].configDigest;
-  }
-
-  /// @notice Returns the secondary config digest for for a given key.
-  /// @param pluginKey The key of the plugin to get the config digests for.
-  function getSecondaryDigest(bytes32 pluginKey) public view returns (bytes32) {
-    return s_configs[pluginKey][s_primaryConfigIndex ^ 1].configDigest;
-  }
-
-  /// @notice Returns the stored config for a given digest. Will always return an empty config if the digest is the zero
-  /// digest. This is done to prevent exposing old config state that is invalid.
-  /// @param pluginKey The key of the plugin to get the config for.
-  /// @param configDigest The digest of the config to fetch.
-  function _getStoredConfig(
-    bytes32 pluginKey,
-    bytes32 configDigest
-  ) internal view returns (StoredConfig memory storedConfig, bool ok) {
-    for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
-      // We never want to return true for a zero digest, even if the caller is asking for it, as this can expose old
-      // config state that is invalid.
-      if (s_configs[pluginKey][i].configDigest == configDigest && configDigest != ZERO_DIGEST) {
-        return (s_configs[pluginKey][i], true);
-      }
-    }
-    return (StoredConfig(ZERO_DIGEST, 0, ""), false);
-  }
-
-  /// @notice Returns the primary stored config for a given key.
-  /// @param pluginKey The key of the plugin to get the config for.
-  /// @return primaryConfig The primary stored config.
-  /// @return ok True if the config was found, false otherwise.
-  function _getPrimaryStoredConfig(
-    bytes32 pluginKey
-  ) internal view returns (StoredConfig memory primaryConfig, bool ok) {
-    if (s_configs[pluginKey][s_primaryConfigIndex].configDigest == ZERO_DIGEST) {
-      return (StoredConfig(ZERO_DIGEST, 0, ""), false);
-    }
-
-    return (s_configs[pluginKey][s_primaryConfigIndex], true);
-  }
-
-  /// @notice Returns the secondary stored config for a given key.
-  /// @param pluginKey The key of the plugin to get the config for.
-  /// @return secondaryConfig The secondary stored config.
-  /// @return ok True if the config was found, false otherwise.
-  function _getSecondaryStoredConfig(
-    bytes32 pluginKey
-  ) internal view returns (StoredConfig memory secondaryConfig, bool ok) {
-    if (s_configs[pluginKey][s_primaryConfigIndex ^ 1].configDigest == ZERO_DIGEST) {
-      return (StoredConfig(ZERO_DIGEST, 0, ""), false);
-    }
-
-    return (s_configs[pluginKey][s_primaryConfigIndex ^ 1], true);
-  }
-
-  // ================================================================
-  // │                     State transitions                        │
-  // ================================================================
-
-  /// @notice Sets a new config as the secondary config. Does not influence the primary config.
-  /// @param pluginKey The key of the plugin to set the config for.
-  /// @param digestToOverwrite The digest of the config to overwrite, or ZERO_DIGEST if no config is to be overwritten.
-  /// This is done to prevent accidental overwrites.
-  /// @return newConfigDigest The digest of the new config.
-  function setSecondary(
-    bytes32 pluginKey,
-    bytes calldata config,
-    bytes32 digestToOverwrite
-  ) external returns (bytes32 newConfigDigest) {
-    _validateCaller();
-    _validateConfig(config);
-
-    bytes32 existingDigest = getSecondaryDigest(pluginKey);
-
-    if (existingDigest != digestToOverwrite) {
-      revert ConfigDigestMismatch(existingDigest, digestToOverwrite);
-    }
-
-    // are we going to overwrite a config? If so, emit an event.
-    if (existingDigest != ZERO_DIGEST) {
-      emit ConfigRevoked(digestToOverwrite);
-    }
-
-    uint32 newVersion = ++s_configCount;
-    newConfigDigest = _calculateConfigDigest(pluginKey, config, newVersion);
-
-    StoredConfig memory newConfig = StoredConfig({configDigest: newConfigDigest, version: newVersion, config: config});
-
-    s_configs[pluginKey][s_primaryConfigIndex ^ 1] = newConfig;
-
-    emit ConfigSet(newConfig.configDigest, newConfig);
-
-    return newConfigDigest;
-  }
-
-  /// @notice Revokes a specific config by digest.
-  /// @param pluginKey The key of the plugin to revoke the config for.
-  /// @param configDigest The digest of the config to revoke. This is done to prevent accidental revokes.
-  function revokeSecondary(bytes32 pluginKey, bytes32 configDigest) external {
-    _validateCaller();
-
-    uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
-    if (s_configs[pluginKey][secondaryConfigIndex].configDigest != configDigest) {
-      revert ConfigDigestMismatch(s_configs[pluginKey][secondaryConfigIndex].configDigest, configDigest);
-    }
-
-    emit ConfigRevoked(configDigest);
-    // Delete only the digest, as that's what's used to determine if a config is active. This means the actual
-    // config stays in storage which should significantly reduce the gas cost of overwriting that storage space in
-    // the future.
-    delete s_configs[pluginKey][secondaryConfigIndex].configDigest;
-  }
-
-  /// @notice Promotes the secondary config to the primary config and revokes the primary config.
-  /// @param pluginKey The key of the plugin to promote the config for.
-  /// @param digestToPromote The digest of the config to promote.
-  /// @param digestToRevoke The digest of the config to revoke.
-  function promoteSecondaryAndRevokePrimary(
-    bytes32 pluginKey,
-    bytes32 digestToPromote,
-    bytes32 digestToRevoke
-  ) external {
-    _validateCaller();
-
-    uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
-    if (s_configs[pluginKey][secondaryConfigIndex].configDigest != digestToPromote) {
-      revert ConfigDigestMismatch(s_configs[pluginKey][secondaryConfigIndex].configDigest, digestToPromote);
-    }
-
-    uint256 primaryConfigIndex = s_primaryConfigIndex;
-    if (s_configs[pluginKey][primaryConfigIndex].configDigest != digestToRevoke) {
-      revert ConfigDigestMismatch(s_configs[pluginKey][primaryConfigIndex].configDigest, digestToRevoke);
-    }
-
-    delete s_configs[pluginKey][primaryConfigIndex].configDigest;
-
-    s_primaryConfigIndex ^= 1;
-    if (digestToRevoke != ZERO_DIGEST) {
-      emit ConfigRevoked(digestToRevoke);
-    }
-    emit ConfigPromoted(digestToPromote);
-  }
-
-  /// @notice Calculates the config digest for a given plugin key, static config, and version.
-  /// @param pluginKey The key of the plugin to calculate the digest for.
-  /// @param staticConfig The static part of the config.
-  /// @param version The version of the config.
-  /// @return The calculated config digest.
-  function _calculateConfigDigest(
-    bytes32 pluginKey,
-    bytes memory staticConfig,
-    uint32 version
-  ) internal view returns (bytes32) {
-    return bytes32(
-      (PREFIX & PREFIX_MASK)
-        | (
-          uint256(
-            keccak256(
-              bytes.concat(abi.encode(bytes32("EVM"), block.chainid, address(this), pluginKey, version), staticConfig)
-            )
-          ) & ~PREFIX_MASK
-        )
-    );
   }
 
   // ================================================================
