@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
@@ -17,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
-	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 )
 
@@ -54,9 +54,7 @@ func Test_RootsEligibleForExecution(t *testing.T) {
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 2, time.Now(), 1)))
 
-	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
-
-	commitStore, err := v1_2_0.NewCommitStore(logger.TestLogger(t), commitStoreAddr, nil, lp, feeEstimatorConfig)
+	commitStore, err := v1_2_0.NewCommitStore(logger.TestLogger(t), commitStoreAddr, nil, lp)
 	require.NoError(t, err)
 
 	rootsCache := cache.NewCommitRootsCache(logger.TestLogger(t), commitStore, 10*time.Hour, time.Second)
@@ -164,9 +162,7 @@ func Test_RootsEligibleForExecutionWithReorgs(t *testing.T) {
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 3, time.Now(), 1)))
 
-	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
-
-	commitStore, err := v1_2_0.NewCommitStore(logger.TestLogger(t), commitStoreAddr, nil, lp, feeEstimatorConfig)
+	commitStore, err := v1_2_0.NewCommitStore(logger.TestLogger(t), commitStoreAddr, nil, lp)
 	require.NoError(t, err)
 
 	rootsCache := cache.NewCommitRootsCache(logger.TestLogger(t), commitStore, 10*time.Hour, time.Second)
@@ -225,9 +221,7 @@ func Test_BlocksWithTheSameTimestamps(t *testing.T) {
 	}
 	require.NoError(t, orm.InsertLogsWithBlock(ctx, inputLogs, logpoller.NewLogPollerBlock(utils.RandomBytes32(), 2, time.Now(), 2)))
 
-	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
-
-	commitStore, err := v1_2_0.NewCommitStore(logger.TestLogger(t), commitStoreAddr, nil, lp, feeEstimatorConfig)
+	commitStore, err := v1_2_0.NewCommitStore(logger.TestLogger(t), commitStoreAddr, nil, lp)
 	require.NoError(t, err)
 
 	rootsCache := cache.NewCommitRootsCache(logger.TestLogger(t), commitStore, 10*time.Hour, time.Second)

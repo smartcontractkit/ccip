@@ -6,7 +6,7 @@ ShutdownGracePeriod = '10s'
 FeedsManager = true
 LogPoller = true
 UICSAKeys = true
-CCIP = false
+CCIP = true
 
 [Database]
 DefaultIdleInTxSessionTimeout = '1m0s'
@@ -384,6 +384,7 @@ L2Full = '(: |^)l2 full'
 TransactionAlreadyMined = '(: |^)transaction already mined'
 Fatal = '(: |^)fatal'
 ServiceUnavailable = '(: |^)service unavailable'
+TooManyResults = '(: |^)too many results'
 
 [EVM.OCR]
 ContractConfirmations = 11

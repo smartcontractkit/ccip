@@ -15,7 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 
-	client2 "github.com/smartcontractkit/chainlink-testing-framework/lib/client"
+	client2 "github.com/smartcontractkit/chainlink-testing-framework/client"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"

@@ -1,5 +1,5 @@
 ## To Override the default config:
-# example usage: make set_config override_toml=../config/config.toml
+# example usage: make set_config override_toml=../config/config.toml network_config_toml=../config/network.toml
 .PHONY: set_config
 set_config:
 	if [ -s "$(override_toml)" ]; then \
@@ -12,6 +12,10 @@ set_config:
       		echo "No override config found, using default config"; \
         	echo  > ./testconfig/override/.env; \
 	fi
+	if [ -s "$(network_config_toml)" ]; then \
+  	  echo "Overriding network config with $(network_config_toml)"; \
+      echo "export BASE64_NETWORK_CONFIG=$$(base64 -i $(network_config_toml))" >> ./testconfig/override/.env; \
+    fi
 
 	@echo "Checking for test secrets file in ~/.testsecrets...";
 	@if [ ! -f ~/.testsecrets ]; then \

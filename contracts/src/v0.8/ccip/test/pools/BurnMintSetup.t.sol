@@ -28,8 +28,8 @@ contract BurnMintSetup is RouterSetup {
       remotePoolAddress: abi.encode(s_remoteBurnMintPool),
       remoteTokenAddress: abi.encode(s_remoteToken),
       allowed: true,
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
 
     BurnMintTokenPool(pool).applyChainUpdates(chains);

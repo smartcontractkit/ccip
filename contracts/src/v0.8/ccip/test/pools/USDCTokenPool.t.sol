@@ -17,13 +17,12 @@ import {USDCTokenPoolHelper} from "../helpers/USDCTokenPoolHelper.sol";
 import {MockE2EUSDCTransmitter} from "../mocks/MockE2EUSDCTransmitter.sol";
 import {MockUSDCTokenMessenger} from "../mocks/MockUSDCTokenMessenger.sol";
 
-import {IERC165} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolSetup is BaseTest {
   IBurnMintERC20 internal s_token;
   MockUSDCTokenMessenger internal s_mockUSDC;
   MockE2EUSDCTransmitter internal s_mockUSDCTransmitter;
-  uint32 internal constant USDC_DEST_TOKEN_GAS = 150_000;
 
   struct USDCMessage {
     uint32 version;
@@ -57,7 +56,7 @@ contract USDCTokenPoolSetup is BaseTest {
     BurnMintERC677 usdcToken = new BurnMintERC677("LINK", "LNK", 18, 0);
     s_token = usdcToken;
     deal(address(s_token), OWNER, type(uint256).max);
-    _setUpRamps();
+    setUpRamps();
 
     s_mockUSDCTransmitter = new MockE2EUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER, address(s_token));
     s_mockUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
@@ -78,16 +77,16 @@ contract USDCTokenPoolSetup is BaseTest {
       remotePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       remoteTokenAddress: abi.encode(address(s_token)),
       allowed: true,
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     chainUpdates[1] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
       remotePoolAddress: abi.encode(DEST_CHAIN_USDC_POOL),
       remoteTokenAddress: abi.encode(DEST_CHAIN_USDC_TOKEN),
       allowed: true,
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
 
     s_usdcTokenPool.applyChainUpdates(chainUpdates);
@@ -105,7 +104,7 @@ contract USDCTokenPoolSetup is BaseTest {
     s_usdcTokenPoolWithAllowList.setDomains(domains);
   }
 
-  function _setUpRamps() internal {
+  function setUpRamps() internal {
     s_router = new Router(address(s_token), address(s_mockRMN));
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
@@ -151,7 +150,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_token),
       amount,
       address(s_usdcTokenPool),
-      receiver,
+      expectedDomain.allowedCaller,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
@@ -176,7 +175,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
   function test_Fuzz_LockOrBurn_Success(bytes32 destinationReceiver, uint256 amount) public {
     vm.assume(destinationReceiver != bytes32(0));
-    amount = bound(amount, 1, _getOutboundRateLimiterConfig().capacity);
+    amount = bound(amount, 1, getOutboundRateLimiterConfig().capacity);
     s_token.transfer(address(s_usdcTokenPool), amount);
     vm.startPrank(s_routerAllowedOnRamp);
 
@@ -191,7 +190,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_token),
       amount,
       address(s_usdcTokenPool),
-      destinationReceiver,
+      expectedDomain.allowedCaller,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
@@ -217,7 +216,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
   function test_Fuzz_LockOrBurnWithAllowList_Success(bytes32 destinationReceiver, uint256 amount) public {
     vm.assume(destinationReceiver != bytes32(0));
-    amount = bound(amount, 1, _getOutboundRateLimiterConfig().capacity);
+    amount = bound(amount, 1, getOutboundRateLimiterConfig().capacity);
     s_token.transfer(address(s_usdcTokenPoolWithAllowList), amount);
     vm.startPrank(s_routerAllowedOnRamp);
 
@@ -231,7 +230,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       address(s_token),
       amount,
       address(s_usdcTokenPoolWithAllowList),
-      destinationReceiver,
+      expectedDomain.allowedCaller,
       expectedDomain.domainIdentifier,
       s_mockUSDC.DESTINATION_TOKEN_MESSENGER(),
       expectedDomain.allowedCaller
@@ -267,8 +266,8 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       remotePoolAddress: abi.encode(address(1)),
       remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
 
     s_usdcTokenPool.applyChainUpdates(chainUpdates);
@@ -320,23 +319,30 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       })
     );
   }
+
+  function test_lockOrBurn_InvalidReceiver_Revert() public {
+    vm.startPrank(s_routerAllowedOnRamp);
+
+    bytes memory receiver = abi.encodePacked(address(0), address(1));
+
+    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidReceiver.selector, receiver));
+
+    s_usdcTokenPool.lockOrBurn(
+      Pool.LockOrBurnInV1({
+        originalSender: OWNER,
+        receiver: receiver,
+        amount: 1,
+        remoteChainSelector: DEST_CHAIN_SELECTOR,
+        localToken: address(s_token)
+      })
+    );
+  }
 }
 
 contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
-  // From https://github.com/circlefin/evm-cctp-contracts/blob/377c9bd813fb86a42d900ae4003599d82aef635a/src/messages/BurnMessage.sol#L57
-  function _formatMessage(
-    uint32 _version,
-    bytes32 _burnToken,
-    bytes32 _mintRecipient,
-    uint256 _amount,
-    bytes32 _messageSender
-  ) internal pure returns (bytes memory) {
-    return abi.encodePacked(_version, _burnToken, _mintRecipient, _amount, _messageSender);
-  }
-
   function test_Fuzz_ReleaseOrMint_Success(address recipient, uint256 amount) public {
     vm.assume(recipient != address(0) && recipient != address(s_token));
-    amount = bound(amount, 0, _getInboundRateLimiterConfig().capacity);
+    amount = bound(amount, 0, getInboundRateLimiterConfig().capacity);
 
     USDCMessage memory usdcMessage = USDCMessage({
       version: 0,
@@ -346,13 +352,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       sender: SOURCE_CHAIN_TOKEN_SENDER,
       recipient: bytes32(uint256(uint160(recipient))),
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
-      messageBody: _formatMessage(
-        0,
-        bytes32(uint256(uint160(address(s_token)))),
-        bytes32(uint256(uint160(recipient))),
-        amount,
-        bytes32(uint256(uint160(OWNER)))
-      )
+      messageBody: bytes("")
     });
 
     bytes memory message = _generateUSDCMessage(usdcMessage);
@@ -363,8 +363,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
         USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
-      ),
-      destGasAmount: USDC_DEST_TOKEN_GAS
+        )
     });
 
     bytes memory offchainTokenData =
@@ -409,8 +408,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain})),
-      destGasAmount: USDC_DEST_TOKEN_GAS
+      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain}))
     });
 
     // The mocked receiver does not release the token to the pool, so we manually do it here
@@ -454,13 +452,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       sender: SOURCE_CHAIN_TOKEN_SENDER,
       recipient: bytes32(uint256(uint160(address(s_mockUSDC)))),
       destinationCaller: bytes32(uint256(uint160(address(s_usdcTokenPool)))),
-      messageBody: _formatMessage(
-        0,
-        bytes32(uint256(uint160(address(s_token)))),
-        bytes32(uint256(uint160(OWNER))),
-        amount,
-        bytes32(uint256(uint160(OWNER)))
-      )
+      messageBody: bytes("")
     });
 
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
@@ -468,8 +460,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
       extraData: abi.encode(
         USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})
-      ),
-      destGasAmount: USDC_DEST_TOKEN_GAS
+        )
     });
 
     bytes memory offchainTokenData = abi.encode(
@@ -493,7 +484,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
   }
 
   function test_TokenMaxCapacityExceeded_Revert() public {
-    uint256 capacity = _getInboundRateLimiterConfig().capacity;
+    uint256 capacity = getInboundRateLimiterConfig().capacity;
     uint256 amount = 10 * capacity;
     address recipient = address(1);
     vm.startPrank(s_routerAllowedOffRamp);
@@ -501,8 +492,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     Internal.SourceTokenData memory sourceTokenData = Internal.SourceTokenData({
       sourcePoolAddress: abi.encode(SOURCE_CHAIN_USDC_POOL),
       destTokenAddress: abi.encode(address(s_usdcTokenPool)),
-      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER})),
-      destGasAmount: USDC_DEST_TOKEN_GAS
+      extraData: abi.encode(USDCTokenPool.SourceTokenDataPayload({nonce: 1, sourceDomain: SOURCE_DOMAIN_IDENTIFIER}))
     });
 
     bytes memory offchainTokenData =

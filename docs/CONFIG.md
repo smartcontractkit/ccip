@@ -51,7 +51,7 @@ ShutdownGracePeriod is the maximum time allowed to shut down gracefully. If exce
 FeedsManager = true # Default
 LogPoller = false # Default
 UICSAKeys = false # Default
-CCIP = false # Default
+CCIP = true # Default
 ```
 
 
@@ -75,7 +75,7 @@ UICSAKeys enables CSA Keys in the UI.
 
 ### CCIP
 ```toml
-CCIP = false # Default
+CCIP = true # Default
 ```
 CCIP enables the CCIP service.
 
@@ -2599,9 +2599,9 @@ Enabled = true
 Mode = 'BlockHistory'
 PriceDefault = '5 gwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
-PriceMin = '1 gwei'
-LimitDefault = 8000000
-LimitMax = 8000000
+PriceMin = '3 gwei'
+LimitDefault = 500000
+LimitMax = 500000
 LimitMultiplier = '1'
 LimitTransfer = 21000
 EstimateLimit = false
@@ -5852,9 +5852,6 @@ CheckInclusionBlocks = 12
 CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
-[GasEstimator.FeeHistory]
-CacheTimeout = '10s'
-
 [HeadTracker]
 HistoryDepth = 100
 MaxBufferSize = 3
@@ -5901,7 +5898,7 @@ LinkContractAddress = '0xa71848C99155DA0b245981E5ebD1C94C4be51c43'
 LogBackfillBatchSize = 1000
 LogPollInterval = '10s'
 LogKeepBlocksDepth = 100000
-LogPrunePageSize = 10000
+LogPrunePageSize = 0
 BackupLogPollerBlockDelay = 100
 MinIncomingConfirmations = 3
 MinContractPayment = '0.00001 link'
@@ -5931,7 +5928,7 @@ Mode = 'Arbitrum'
 PriceDefault = '100 mwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
 PriceMin = '0'
-LimitDefault = 8000000
+LimitDefault = 500000
 LimitMax = 1000000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
@@ -5950,9 +5947,6 @@ BlockHistorySize = 8
 CheckInclusionBlocks = 12
 CheckInclusionPercentile = 90
 TransactionPercentile = 60
-
-[GasEstimator.FeeHistory]
-CacheTimeout = '10s'
 
 [HeadTracker]
 HistoryDepth = 100
@@ -5987,105 +5981,6 @@ GasLimit = 5400000
 
 </p></details>
 
-<details><summary>Mode Mainnet (34443)</summary><p>
-
-```toml
-AutoCreateKey = true
-BlockBackfillDepth = 10
-BlockBackfillSkip = false
-ChainType = 'optimismBedrock'
-FinalityDepth = 200
-FinalityTagEnabled = true
-LogBackfillBatchSize = 1000
-LogPollInterval = '15s'
-LogKeepBlocksDepth = 100000
-LogPrunePageSize = 10000
-BackupLogPollerBlockDelay = 100
-MinIncomingConfirmations = 3
-MinContractPayment = '0.00001 link'
-NonceAutoSync = true
-NoNewHeadsThreshold = '3m0s'
-RPCDefaultBatchSize = 250
-RPCBlockQueryDelay = 1
-FinalizedBlockOffset = 0
-NoNewFinalizedHeadsThreshold = '0s'
-
-[Transactions]
-ForwardersEnabled = false
-MaxInFlight = 16
-MaxQueued = 250
-ReaperInterval = '1h0m0s'
-ReaperThreshold = '168h0m0s'
-ResendAfterThreshold = '1m0s'
-
-[Transactions.AutoPurge]
-Enabled = false
-
-[BalanceMonitor]
-Enabled = true
-
-[GasEstimator]
-Mode = 'BlockHistory'
-PriceDefault = '20 gwei'
-PriceMax = '120 gwei'
-PriceMin = '1 gwei'
-LimitDefault = 8000000
-LimitMax = 8000000
-LimitMultiplier = '1'
-LimitTransfer = 21000
-EstimateLimit = false
-BumpMin = '100 wei'
-BumpPercent = 20
-BumpThreshold = 60
-EIP1559DynamicFees = true
-FeeCapDefault = '120 gwei'
-TipCapDefault = '1 wei'
-TipCapMin = '1 wei'
-
-[GasEstimator.BlockHistory]
-BatchSize = 25
-BlockHistorySize = 200
-CheckInclusionBlocks = 12
-CheckInclusionPercentile = 90
-EIP1559FeeCapBufferBlocks = 0
-TransactionPercentile = 60
-
-[GasEstimator.FeeHistory]
-CacheTimeout = '10s'
-
-[HeadTracker]
-HistoryDepth = 300
-MaxBufferSize = 3
-SamplingInterval = '1s'
-MaxAllowedFinalityDepth = 10000
-FinalityTagBypass = true
-
-[NodePool]
-PollFailureThreshold = 2
-PollInterval = '3s'
-SelectionMode = 'HighestHead'
-SyncThreshold = 5
-LeaseDuration = '0s'
-NodeIsSyncingEnabled = false
-FinalizedBlockPollInterval = '5s'
-EnforceRepeatableRead = false
-DeathDeclarationDelay = '10s'
-
-[OCR]
-ContractConfirmations = 4
-ContractTransmitterTransmitTimeout = '10s'
-DatabaseTimeout = '10s'
-DeltaCOverride = '168h0m0s'
-DeltaCJitterOverride = '1h0m0s'
-ObservationGracePeriod = '1s'
-
-[OCR2]
-[OCR2.Automation]
-GasLimit = 5400000
-```
-
-</p></details>
-
 <details><summary>Arbitrum Mainnet (42161)</summary><p>
 
 ```toml
@@ -6094,12 +5989,12 @@ BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'arbitrum'
 FinalityDepth = 50
-FinalityTagEnabled = true
+FinalityTagEnabled = false
 LinkContractAddress = '0xf97f4df75117a78c1A5a0DBb814Af92458539FB4'
 LogBackfillBatchSize = 1000
 LogPollInterval = '1s'
 LogKeepBlocksDepth = 100000
-LogPrunePageSize = 10000
+LogPrunePageSize = 0
 BackupLogPollerBlockDelay = 100
 MinIncomingConfirmations = 3
 MinContractPayment = '0.00001 link'
@@ -6129,7 +6024,7 @@ Mode = 'Arbitrum'
 PriceDefault = '100 mwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
 PriceMin = '0'
-LimitDefault = 8000000
+LimitDefault = 500000
 LimitMax = 1000000000
 LimitMultiplier = '1'
 LimitTransfer = 21000
@@ -7106,8 +7001,8 @@ Mode = 'BlockHistory'
 PriceDefault = '25 gwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
 PriceMin = '25 gwei'
-LimitDefault = 8000000
-LimitMax = 8000000
+LimitDefault = 500000
+LimitMax = 500000
 LimitMultiplier = '1'
 LimitTransfer = 21000
 EstimateLimit = false
@@ -7203,8 +7098,8 @@ Mode = 'BlockHistory'
 PriceDefault = '25 gwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
 PriceMin = '25 gwei'
-LimitDefault = 8000000
-LimitMax = 8000000
+LimitDefault = 500000
+LimitMax = 500000
 LimitMultiplier = '1'
 LimitTransfer = 21000
 EstimateLimit = false
@@ -9381,6 +9276,7 @@ L2Full = '(: |^)l2 full' # Example
 TransactionAlreadyMined = '(: |^)transaction already mined' # Example
 Fatal = '(: |^)fatal' # Example
 ServiceUnavailable = '(: |^)service unavailable' # Example
+TooManyResults = '(: |^)too many results' # Example
 ```
 Errors enable the node to provide custom regex patterns to match against error messages from RPCs.
 
@@ -9467,6 +9363,12 @@ Fatal is a regex pattern to match against fatal errors.
 ServiceUnavailable = '(: |^)service unavailable' # Example
 ```
 ServiceUnavailable is a regex pattern to match against service unavailable errors.
+
+### TooManyResults
+```toml
+TooManyResults = '(: |^)too many results' # Example
+```
+TooManyResults is a regex pattern to match an eth_getLogs error indicating the result set is too large to return
 
 ## EVM.OCR
 ```toml
@@ -9579,6 +9481,7 @@ GasLimit controls the gas limit for transmit transactions from ocr2automation jo
 [EVM.Workflow]
 FromAddress = '0x2a3e23c6f242F5345320814aC8a1b4E58707D292' # Example
 ForwarderAddress = '0x2a3e23c6f242F5345320814aC8a1b4E58707D292' # Example
+DefaultGasLimit = 400_000 # Default
 ```
 
 
@@ -9593,6 +9496,12 @@ FromAddress is Address of the transmitter key to use for workflow writes.
 ForwarderAddress = '0x2a3e23c6f242F5345320814aC8a1b4E58707D292' # Example
 ```
 ForwarderAddress is the keystone forwarder contract address on chain.
+
+### DefaultGasLimit
+```toml
+DefaultGasLimit = 400_000 # Default
+```
+DefaultGasLimit is the default gas limit for workflow transactions.
 
 ## Cosmos
 ```toml

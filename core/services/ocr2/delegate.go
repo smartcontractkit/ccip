@@ -13,6 +13,7 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -32,7 +33,6 @@ import (
 	ocr2keepers20runner "github.com/smartcontractkit/chainlink-automation/pkg/v2/runner"
 	ocr2keepers21config "github.com/smartcontractkit/chainlink-automation/pkg/v3/config"
 	ocr2keepers21 "github.com/smartcontractkit/chainlink-automation/pkg/v3/plugin"
-	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop/reportingplugins"
 	"github.com/smartcontractkit/chainlink-common/pkg/loop/reportingplugins/ocr3"
@@ -49,7 +49,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
@@ -511,8 +510,6 @@ func (d *Delegate) ServicesForSpec(ctx context.Context, jb job.Job) ([]job.Servi
 		return d.newServicesCCIPCommit(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID)
 	case types.CCIPExecution:
 		return d.newServicesCCIPExecution(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID)
-	case "liquiditymanager": // TODO: add constant to chainlink-common
-		return d.newServicesLiquidityManager(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc)
 	default:
 		return nil, errors.Errorf("plugin type %s not supported", spec.PluginType)
 	}
@@ -777,7 +774,7 @@ func (d *Delegate) newServicesGenericPlugin(
 				}
 				keyBundles[name] = os
 			}
-			onchainKeyringAdapter, err = ocrcommon.NewOCR3OnchainKeyringMultiChainAdapter(keyBundles, lggr)
+			onchainKeyringAdapter, err = ocrcommon.NewOCR3OnchainKeyringMultiChainAdapter(keyBundles, kb.PublicKey(), lggr)
 			if err != nil {
 				return nil, err
 			}
@@ -958,6 +955,7 @@ func (d *Delegate) newServicesLLO(
 		return nil, err
 	}
 
+	// Handle key bundle IDs explicitly specified in job spec
 	kbm := make(map[llotypes.ReportFormat]llo.Key)
 	for rfStr, kbid := range pluginCfg.KeyBundleIDs {
 		k, err3 := d.ks.Get(kbid)
@@ -970,26 +968,19 @@ func (d *Delegate) newServicesLLO(
 		}
 		kbm[rf] = k
 	}
-	// NOTE: This is a bit messy because we assume chain type matches report
-	// format, and it may not in all cases. We don't yet know what report
-	// formats we need or how they correspond to chain types, so assume it's
-	// 1:1 for now but will change in future
-	//
+
+	// Use the default key bundle if not specified
+	// NOTE: Only JSON and EVMPremiumLegacy supported for now
 	// https://smartcontract-it.atlassian.net/browse/MERC-3722
-	for _, s := range chaintype.SupportedChainTypes {
-		rf, err3 := llotypes.ReportFormatFromString(string(s))
-		if err3 != nil {
-			return nil, fmt.Errorf("job %d (%s) has a chain type with no matching report format %s: %w", jb.ID, jb.Name.ValueOrZero(), s, err3)
-		}
+	for _, rf := range []llotypes.ReportFormat{llotypes.ReportFormatJSON, llotypes.ReportFormatEVMPremiumLegacy} {
 		if _, exists := kbm[rf]; !exists {
 			// Use the first if unspecified
-			kbs, err4 := d.ks.GetAllOfType(s)
-			if err4 != nil {
-				return nil, err4
+			kbs, err3 := d.ks.GetAllOfType("evm")
+			if err3 != nil {
+				return nil, err3
 			}
 			if len(kbs) == 0 {
-				// unsupported key type
-				continue
+				return nil, fmt.Errorf("no on-chain signing keys found for report format %s", "evm")
 			} else if len(kbs) > 1 {
 				lggr.Debugf("Multiple on-chain signing keys found for report format %s, using the first", rf.String())
 			}
@@ -1892,76 +1883,6 @@ func newExecPluginConfig(isSourceProvider bool, srcStartBlock uint64, dstStartBl
 		USDCConfig:       usdcConfig,
 		JobID:            jobID,
 	}
-}
-
-func (d *Delegate) newServicesLiquidityManager(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig) ([]job.ServiceCtx, error) {
-	spec := jb.OCR2OracleSpec
-	if spec.Relay != relay.NetworkEVM {
-		return nil, errors.New("Non evm chains are not supported for rebalancer execution")
-	}
-	// the relay ID specified in the spec will be that of the main/master chain
-	rid, err := spec.RelayID()
-	if err != nil {
-		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: string(spec.PluginType)}
-	}
-	relayer := evmrelay.NewRebalancerRelayer(
-		d.legacyChains,
-		d.lggr,
-		d.ethKs,
-	)
-	rebalancerProvider, err := relayer.NewRebalancerProvider(
-		ctx,
-		types.RelayArgs{
-			ExternalJobID: jb.ExternalJobID,
-			JobID:         jb.ID,
-			ContractID:    spec.ContractID,
-			New:           d.isNewlyCreatedJob,
-			RelayConfig:   spec.RelayConfig.Bytes(),
-			ProviderType:  string(spec.PluginType),
-		}, types.PluginArgs{
-			TransmitterID: spec.TransmitterID.String,
-			PluginConfig:  spec.PluginConfig.Bytes(),
-		})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create rebalancer provider: %w", err)
-	}
-	factory, err := liquiditymanager.NewPluginFactory(
-		lggr,
-		spec.PluginConfig.Bytes(),
-		rebalancerProvider.LiquidityManagerFactory(),
-		rebalancerProvider.DiscovererFactory(),
-		rebalancerProvider.BridgeFactory(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create rebalancer plugin factory: %w", err)
-	}
-	oracleArgsNoPlugin := libocr2.OCR3OracleArgs[liquiditymanagermodels.Report]{
-		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
-		V2Bootstrappers:              bootstrapPeers,
-		ContractTransmitter:          rebalancerProvider.ContractTransmitterOCR3(),
-		ContractConfigTracker:        rebalancerProvider.ContractConfigTracker(),
-		Database:                     ocrDB,
-		LocalConfig:                  lc,
-		MonitoringEndpoint: d.monitoringEndpointGen.GenMonitoringEndpoint(
-			rid.Network,
-			rid.ChainID,
-			spec.ContractID,
-			synchronization.OCR3Rebalancer,
-		),
-		OffchainConfigDigester: rebalancerProvider.OffchainConfigDigester(),
-		OffchainKeyring:        kb,
-		OnchainKeyring:         ocr3impls.NewOnchainKeyring[liquiditymanagermodels.Report](kb, lggr),
-		ReportingPluginFactory: factory,
-		Logger: commonlogger.NewOCRWrapper(lggr.Named("RebalancerOracle"), d.cfg.OCR2().TraceLogging(), func(msg string) {
-			lggr.ErrorIf(d.jobORM.RecordError(context.Background(), jb.ID, msg), "unable to record error")
-		}),
-		MetricsRegisterer: prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
-	}
-	oracle, err := libocr2.NewOracle(oracleArgsNoPlugin)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create oracle: %w", err)
-	}
-	return []job.ServiceCtx{rebalancerProvider, job.NewServiceAdapter(oracle)}, nil
 }
 
 // errorLog implements [loop.ErrorLog]

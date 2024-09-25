@@ -43,6 +43,10 @@ packages:
   github.com/smartcontractkit/chainlink/v2/core/bridges:
     interfaces:
       ORM:
+  github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types:
+    interfaces:
+      CCIPOracle:
+      OracleCreator:
   github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types:
     interfaces:
       Dispatcher:
@@ -261,10 +265,14 @@ packages:
       ORM:
       Runner:
       PipelineParamUnmarshaler:
-  github.com/smartcontractkit/chainlink/v2/core/services/promreporter:
+  github.com/smartcontractkit/chainlink/v2/core/services/headreporter:
     config:
-      dir: core/internal/mocks
+      dir: "{{ .InterfaceDir }}"
+      filename: "{{ .InterfaceName | snakecase }}_mock.go"
+      inpackage: true
+      mockname: "Mock{{ .InterfaceName | camelcase }}"
     interfaces:
+      HeadReporter:
       PrometheusBackend:
   github.com/smartcontractkit/libocr/commontypes:
     config:
@@ -370,13 +378,13 @@ packages:
       outpkg: mock_contracts
     interfaces:
       CommitStoreInterface:
-  github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter:
+  github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry:
     config:
       dir: core/gethwrappers/ccip/mocks/
-      filename: fee_quoter_interface.go
+      filename: price_registry_interface.go
       outpkg: mock_contracts
     interfaces:
-      FeeQuoterInterface:
+      PriceRegistryInterface: 
   github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface:
     config:
       dir: core/gethwrappers/ccip/mocks/
@@ -467,14 +475,14 @@ packages:
       filename: optimism_portal2_interface.go
       outpkg: mock_optimism_portal_2
     interfaces:
-      OptimismPortal2Interface:
+      OptimismPortal2Interface: 
   github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/optimism_dispute_game_factory:
     config:
       dir: core/gethwrappers/liquiditymanager/mocks/mock_optimism_dispute_game_factory/
       filename: optimism_dispute_game_factory_interface.go
       outpkg: mock_optimism_dispute_game_factory
     interfaces:
-      OptimismDisputeGameFactoryInterface: 
+      OptimismDisputeGameFactoryInterface:
   github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache:
     config:
       filename: chain_health_mock.go
@@ -494,20 +502,12 @@ packages:
       PriceRegistryReader:
         config:
           filename: price_registry_reader_mock.go
-      FeeEstimatorConfigReader:
-        config:
-          filename: fee_estimator_config_mock.go
       TokenPoolReader:
         config:
           filename: token_pool_reader_mock.go
       USDCReader:
         config:
           filename: usdc_reader_mock.go
-  github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig:
-    interfaces:
-      GasPriceInterceptor:
-        config:
-          filename: gas_price_interceptor_mock.go
   github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/batchreader:
     config:
       filename: token_pool_batched_reader_mock.go
@@ -579,37 +579,6 @@ packages:
       Reader:
         config:
           mockname: "Mock{{ .InterfaceName }}"
-  github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/bridge:
+  github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer:
     interfaces:
-      Bridge:
-        config:
-          filename: bridge_mock.go
-      Factory:
-        config:
-          filename: bridge_factory_mock.go
-  github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/chain/evm:
-    interfaces:
-      Factory:
-        config:
-          filename: lm_factory_mock.go
-          dir: "{{ .InterfaceDir }}/../../mocks"
-      LiquidityManager:
-        config:
-          filename: liquidity_manager_mock.go
-  github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager:
-    interfaces:
-      LiquidityManager:
-  github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/discoverer:
-    interfaces:
-      Discoverer:
-        config:
-          filename: discoverer_mock.go
-      Factory:
-        config:
-          filename: factory_mock.go
-  github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager/rebalalgo:
-    config:
-      dir: "{{ .InterfaceDir }}/../mocks"
-      filename: rebalancer_mock.go
-    interfaces:
-      RebalancingAlgo:
+      ORM:

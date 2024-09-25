@@ -10,7 +10,7 @@ The test config is read in following order:
   - The config mentioned in this file will override the default config.
   - Example override file - [override.toml.example](./examples/override.toml.example)
 - If there are sensitive details like private keys, credentials in test config, they can be specified in a separate dotenv file as env vars
-  - The `~/.testsecrets` file in home directory is automatically loaded and should have all test secrets as env vars. Learn more about it [here](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md#test-secrets) 
+  - The `~/.testsecrets` file in home directory is automatically loaded and should have all test secrets as env vars  
   - Example secret file - [.testsecrets.example](./examples/.testsecrets.example)
 
 ## CCIP.ContractVersions
@@ -110,7 +110,7 @@ Or,
 DataFile = '<path/to/deployment.json>'
 ```
 
-## CCIP.Env 
+## CCIP.Env
 
 Specifies the environment details for the test to be run on.
 Mandatory fields are:
@@ -119,7 +119,14 @@ Mandatory fields are:
 - **NewCLCluster**: [CCIP.Env.NewCLCluster](#ccipenvnewclcluster) - This is mandatory if the test needs to deploy Chainlink nodes.
 - **ExistingCLCluster**: [CCIP.Env.ExistingCLCluster](#ccipenvexistingclcluster) - This is mandatory if the test needs to run on existing Chainlink nodes to deploy ccip jobs.
 
-Test needs network/chain details to be set through configuration. Set network urls in ~/.testsecrets [see docs](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md#test-secrets).
+Test needs network/chain details to be set through configuration. This configuration is mandatory for running the tests.
+you have option to set the network details in two ways:
+
+1. Using [CCIP.Env.Networks](#ccipenvnetworks)
+2. Using a separate network config file -
+   - refer to the example - [network_config.toml.example](./examples/network_config.toml.example)
+   - once all necessary values are set, encode the toml file content in base64 format,
+   - set the base64'ed string content in `BASE64_NETWORK_CONFIG` environment variable.
 
 ### CCIP.Env.Networks
 
@@ -139,7 +146,7 @@ If the network is not present in known_networks, then the network details can be
 
 #### CCIP.Env.Network.EVMNetworks
 
-Specifies the network config to be used while creating blockchain EVMClient for test. 
+Specifies the network config to be used while creating blockchain EVMClient for test.
 It is a map of network name to EVMNetworks where key is network name specified under `CCIP.Env.Networks.selected_networks` and value is `EVMNetwork`. 
 The EVMNetwork is imported from [EVMNetwork](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/blockchain/config.go#L43) in chainlink-testing-framework.
 
@@ -472,10 +479,6 @@ Specifies whether to set up bi-directional lanes between networks.
 ### CCIP.Groups.[testgroup].CommitAndExecuteOnSameDON
 
 Specifies whether commit and execution jobs are to be run on the same Chainlink node.
-
-### CCIP.Groups.[testgroup].AllowOutOfOrder
-
-Specifies whether out of order execution is allowed globally for all the chains.
 
 ### CCIP.Groups.[testgroup].NoOfCommitNodes
 
