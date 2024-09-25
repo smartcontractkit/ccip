@@ -88,7 +88,8 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     bytes memory tokenPoolInitArgs,
     bytes32 salt
   ) external returns (address, address) {
-    // Ensure a unique deployment between senders even if the same input parameter is used
+    // Ensure a unique deployment between senders even if the same input parameter is used to prevent
+    // DOS/Frontrunning attacks
     salt = keccak256(abi.encodePacked(salt, msg.sender));
 
     // Deploy the token. The constructor parameters are already provided in the tokenInitCode
@@ -124,7 +125,8 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     bytes memory tokenPoolInitArgs,
     bytes32 salt
   ) external returns (address poolAddress) {
-    // Ensure a unique deployment between senders even if the same input parameter is used
+    // Ensure a unique deployment between senders even if the same input parameter is used to prevent
+    // DOS/Frontrunning attacks
     salt = keccak256(abi.encodePacked(salt, msg.sender));
 
     // create the token pool and return the address
