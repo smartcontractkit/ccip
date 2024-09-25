@@ -72,13 +72,42 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   /// @notice The index of the primary config.
   uint32 private s_primaryConfigIndex = 0;
 
+  // ================================================================
+  // │                          Getters                             │
+  // ================================================================
+
+  /// @notice Returns the current primary and secondary config digests.
+  /// @dev Can be bytes32(0) if no config has been set yet or it has been revoked.
+  /// @return primaryConfigDigest The digest of the primary config.
+  /// @return secondaryConfigDigest The digest of the secondary config.
+  function getConfigDigests() external view returns (bytes32 primaryConfigDigest, bytes32 secondaryConfigDigest) {
+    return (s_configs[s_primaryConfigIndex].configDigest, s_configs[s_primaryConfigIndex ^ 1].configDigest);
+  }
+
+  /// @notice Returns the primary config digest
+  function getPrimaryDigest() public view returns (bytes32) {
+    return s_configs[s_primaryConfigIndex].configDigest;
+  }
+
+  /// @notice Returns the secondary config digest
+  function getSecondaryDigest() public view returns (bytes32) {
+    return s_configs[s_primaryConfigIndex ^ 1].configDigest;
+  }
+
   /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes. Use
   /// in case one of the configs is too large to be returnable by one of the other getters.
   /// @param configDigest The digest of the config to fetch.
   /// @return versionedConfig The config and its version.
   /// @return ok True if the config was found, false otherwise.
   function getConfig(bytes32 configDigest) external view returns (VersionedConfig memory versionedConfig, bool ok) {
-    return _getStoredConfig(configDigest);
+    for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
+      // We never want to return true for a zero digest, even if the caller is asking for it, as this can expose old
+      // config state that is invalid.
+      if (s_configs[i].configDigest == configDigest && configDigest != ZERO_DIGEST) {
+        return (s_configs[i], true);
+      }
+    }
+    return (versionedConfig, false);
   }
 
   function getAllConfigs()
@@ -99,126 +128,6 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     return (primaryConfig, secondaryConfig);
   }
 
-  function _validateStaticAndDynamicConfig(
-    StaticConfig memory staticConfig,
-    DynamicConfig memory dynamicConfig
-  ) internal pure {
-    // Ensure that observerNodesBitmap can be bit-encoded into a uint256.
-    if (staticConfig.nodes.length > 256) {
-      revert OutOfBoundsNodesLength();
-    }
-
-    // Ensure no peerId or offchainPublicKey is duplicated.
-    for (uint256 i = 0; i < staticConfig.nodes.length; ++i) {
-      for (uint256 j = i + 1; j < staticConfig.nodes.length; ++j) {
-        if (staticConfig.nodes[i].peerId == staticConfig.nodes[j].peerId) {
-          revert DuplicatePeerId();
-        }
-        if (staticConfig.nodes[i].offchainPublicKey == staticConfig.nodes[j].offchainPublicKey) {
-          revert DuplicateOffchainPublicKey();
-        }
-      }
-    }
-
-    _validateDynamicConfigParsed(dynamicConfig, staticConfig.nodes.length);
-  }
-
-  function _validateDynamicConfigParsed(DynamicConfig memory dynamicConfig, uint256 numberOfNodes) internal pure {
-    uint256 numberOfSourceChains = dynamicConfig.sourceChains.length;
-    for (uint256 i = 0; i < numberOfSourceChains; ++i) {
-      SourceChain memory currentSourceChain = dynamicConfig.sourceChains[i];
-      // Ensure the source chain is unique.
-      for (uint256 j = i + 1; j < numberOfSourceChains; ++j) {
-        if (currentSourceChain.chainSelector == dynamicConfig.sourceChains[j].chainSelector) {
-          revert DuplicateSourceChain();
-        }
-      }
-
-      // all observer node indices are valid
-      uint256 bitmap = currentSourceChain.observerNodesBitmap;
-      // Check if there are any bits set for indexes outside of the expected range.
-      if (bitmap & (type(uint256).max >> (256 - numberOfNodes)) != bitmap) {
-        revert OutOfBoundsObserverNodeIndex();
-      }
-
-      uint256 observersCount = 0;
-      for (; bitmap != 0; ++observersCount) {
-        bitmap &= bitmap - 1;
-      }
-
-      // minObservers are tenable
-      if (currentSourceChain.minObservers > observersCount) {
-        revert MinObserversTooHigh();
-      }
-    }
-  }
-
-  function _validateDynamicConfig(StaticConfig memory staticConfig, DynamicConfig memory dynamicConfig) internal pure {
-    _validateDynamicConfigParsed(dynamicConfig, staticConfig.nodes.length);
-  }
-
-  function _validateCaller() internal view {
-    _validateOwnership();
-  }
-
-  // ================================================================
-  // │                          Getters                             │
-  // ================================================================
-
-  /// @notice Returns the current primary and secondary config digests.
-  /// @dev Can be bytes32(0) if no config has been set yet or it has been revoked.
-  /// @return primaryConfigDigest The digest of the primary config.
-  /// @return secondaryConfigDigest The digest of the secondary config.
-  function getConfigDigests() external view returns (bytes32 primaryConfigDigest, bytes32 secondaryConfigDigest) {
-    return (s_configs[s_primaryConfigIndex].configDigest, s_configs[s_primaryConfigIndex ^ 1].configDigest);
-  }
-
-  /// @notice Returns the primary config digest for for a given key.
-  function getPrimaryDigest() public view returns (bytes32) {
-    return s_configs[s_primaryConfigIndex].configDigest;
-  }
-
-  /// @notice Returns the secondary config digest for for a given key.
-  function getSecondaryDigest() public view returns (bytes32) {
-    return s_configs[s_primaryConfigIndex ^ 1].configDigest;
-  }
-
-  /// @notice Returns the stored config for a given digest. Will always return an empty config if the digest is the zero
-  /// digest. This is done to prevent exposing old config state that is invalid.
-  /// @param configDigest The digest of the config to fetch.
-  function _getStoredConfig(bytes32 configDigest) internal view returns (VersionedConfig memory storedConfig, bool ok) {
-    for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
-      // We never want to return true for a zero digest, even if the caller is asking for it, as this can expose old
-      // config state that is invalid.
-      if (s_configs[i].configDigest == configDigest && configDigest != ZERO_DIGEST) {
-        return (s_configs[i], true);
-      }
-    }
-    return (storedConfig, false);
-  }
-
-  /// @notice Returns the primary stored config for a given key.
-  /// @return primaryConfig The primary stored config.
-  /// @return ok True if the config was found, false otherwise.
-  function _getPrimaryStoredConfig() internal view returns (VersionedConfig memory primaryConfig, bool ok) {
-    if (s_configs[s_primaryConfigIndex].configDigest == ZERO_DIGEST) {
-      return (primaryConfig, false);
-    }
-
-    return (s_configs[s_primaryConfigIndex], true);
-  }
-
-  /// @notice Returns the secondary stored config for a given key.
-  /// @return secondaryConfig The secondary stored config.
-  /// @return ok True if the config was found, false otherwise.
-  function _getSecondaryStoredConfig() internal view returns (VersionedConfig memory secondaryConfig, bool ok) {
-    if (s_configs[s_primaryConfigIndex ^ 1].configDigest == ZERO_DIGEST) {
-      return (secondaryConfig, false);
-    }
-
-    return (s_configs[s_primaryConfigIndex ^ 1], true);
-  }
-
   // ================================================================
   // │                     State transitions                        │
   // ================================================================
@@ -233,8 +142,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     StaticConfig calldata staticConfig,
     DynamicConfig calldata dynamicConfig,
     bytes32 digestToOverwrite
-  ) external returns (bytes32 newConfigDigest) {
-    _validateCaller();
+  ) external onlyOwner returns (bytes32 newConfigDigest) {
     _validateStaticAndDynamicConfig(staticConfig, dynamicConfig);
 
     bytes32 existingDigest = getSecondaryDigest();
@@ -264,9 +172,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
 
   /// @notice Revokes a specific config by digest.
   /// @param configDigest The digest of the config to revoke. This is done to prevent accidental revokes.
-  function revokeSecondary(bytes32 configDigest) external {
-    _validateCaller();
-
+  function revokeSecondary(bytes32 configDigest) external onlyOwner {
     uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
     if (s_configs[secondaryConfigIndex].configDigest != configDigest) {
       revert ConfigDigestMismatch(s_configs[secondaryConfigIndex].configDigest, configDigest);
@@ -282,9 +188,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   /// @notice Promotes the secondary config to the primary config and revokes the primary config.
   /// @param digestToPromote The digest of the config to promote.
   /// @param digestToRevoke The digest of the config to revoke.
-  function promoteSecondaryAndRevokePrimary(bytes32 digestToPromote, bytes32 digestToRevoke) external {
-    _validateCaller();
-
+  function promoteSecondaryAndRevokePrimary(bytes32 digestToPromote, bytes32 digestToRevoke) external onlyOwner {
     uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
     if (s_configs[secondaryConfigIndex].configDigest != digestToPromote) {
       revert ConfigDigestMismatch(s_configs[secondaryConfigIndex].configDigest, digestToPromote);
@@ -308,13 +212,10 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   /// @param newDynamicConfig The new dynamic config.
   /// @param currentDigest The digest of the config to update.
   /// @dev This does not update the config digest as only the static config is part of the digest.
-  function setDynamicConfig(DynamicConfig calldata newDynamicConfig, bytes32 currentDigest) external {
-    _validateCaller();
-
+  function setDynamicConfig(DynamicConfig calldata newDynamicConfig, bytes32 currentDigest) external onlyOwner {
     for (uint256 i = 0; i < MAX_CONCURRENT_CONFIGS; ++i) {
       if (s_configs[i].configDigest == currentDigest && currentDigest != ZERO_DIGEST) {
-        _validateDynamicConfig(s_configs[i].staticConfig, newDynamicConfig);
-
+        _validateDynamicConfig(newDynamicConfig, s_configs[i].staticConfig.nodes.length);
         // Since the static config doesn't change we don't have to update the digest or version.
         s_configs[i].dynamicConfig = newDynamicConfig;
 
@@ -339,5 +240,63 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
           ) & ~PREFIX_MASK
         )
     );
+  }
+
+  // ================================================================
+  // │                         Validation                           │
+  // ================================================================
+
+  function _validateStaticAndDynamicConfig(
+    StaticConfig memory staticConfig,
+    DynamicConfig memory dynamicConfig
+  ) internal pure {
+    // Ensure that observerNodesBitmap can be bit-encoded into a uint256.
+    if (staticConfig.nodes.length > 256) {
+      revert OutOfBoundsNodesLength();
+    }
+
+    // Ensure no peerId or offchainPublicKey is duplicated.
+    for (uint256 i = 0; i < staticConfig.nodes.length; ++i) {
+      for (uint256 j = i + 1; j < staticConfig.nodes.length; ++j) {
+        if (staticConfig.nodes[i].peerId == staticConfig.nodes[j].peerId) {
+          revert DuplicatePeerId();
+        }
+        if (staticConfig.nodes[i].offchainPublicKey == staticConfig.nodes[j].offchainPublicKey) {
+          revert DuplicateOffchainPublicKey();
+        }
+      }
+    }
+
+    _validateDynamicConfig(dynamicConfig, staticConfig.nodes.length);
+  }
+
+  function _validateDynamicConfig(DynamicConfig memory dynamicConfig, uint256 numberOfNodes) internal pure {
+    uint256 numberOfSourceChains = dynamicConfig.sourceChains.length;
+    for (uint256 i = 0; i < numberOfSourceChains; ++i) {
+      SourceChain memory currentSourceChain = dynamicConfig.sourceChains[i];
+      // Ensure the source chain is unique.
+      for (uint256 j = i + 1; j < numberOfSourceChains; ++j) {
+        if (currentSourceChain.chainSelector == dynamicConfig.sourceChains[j].chainSelector) {
+          revert DuplicateSourceChain();
+        }
+      }
+
+      // all observer node indices are valid
+      uint256 bitmap = currentSourceChain.observerNodesBitmap;
+      // Check if there are any bits set for indexes outside of the expected range.
+      if (bitmap & (type(uint256).max >> (256 - numberOfNodes)) != bitmap) {
+        revert OutOfBoundsObserverNodeIndex();
+      }
+
+      uint256 observersCount = 0;
+      for (; bitmap != 0; ++observersCount) {
+        bitmap &= bitmap - 1;
+      }
+
+      // minObservers are tenable
+      if (currentSourceChain.minObservers > observersCount) {
+        revert MinObserversTooHigh();
+      }
+    }
   }
 }
