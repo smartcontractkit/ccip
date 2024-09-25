@@ -1,4 +1,4 @@
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {IOwnable} from "../../shared/interfaces/IOwnable.sol";
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
@@ -12,6 +12,9 @@ import {RegistryModuleOwnerCustom} from "./RegistryModuleOwnerCustom.sol";
 
 import {Create2} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
 
+/// @notice A contract for deploying new tokens and token pools, and configuring them with the token admin registry
+/// @dev At the end of the transaction, the ownership transfer process will begin, but the user must accept the
+/// ownership transfer in a separate transaction.
 contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
   using Create2 for bytes32;
 
@@ -47,20 +50,25 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     RemoteChainConfig remoteChainConfig;
   }
 
-  bytes4 public constant EMPTY_PARAMETER_FLAG = bytes4(keccak256("EMPTY_PARAMETER_FLAG"));
   string public constant typeAndVersion = "TokenPoolFactory 1.0.0-dev";
 
-  ITokenAdminRegistry internal immutable i_tokenAdminRegistry;
-  RegistryModuleOwnerCustom internal immutable i_registryModuleOwnerCustom;
+  ITokenAdminRegistry private immutable i_tokenAdminRegistry;
+  RegistryModuleOwnerCustom private immutable i_registryModuleOwnerCustom;
 
   address private immutable i_rmnProxy;
   address private immutable i_ccipRouter;
 
-  mapping(uint64 remoteChainSelector => RemoteChainConfig remoteConfig) internal s_remoteChainConfigs;
+  mapping(uint64 remoteChainSelector => RemoteChainConfig remoteConfig) private s_remoteChainConfigs;
 
-  constructor(address tokenAdminRegistry, address tokenAdminModule, address rmnProxy, address ccipRouter) {
+  constructor(
+    ITokenAdminRegistry tokenAdminRegistry,
+    RegistryModuleOwnerCustom tokenAdminModule,
+    address rmnProxy,
+    address ccipRouter
+  ) {
     if (
-      tokenAdminRegistry == address(0) || rmnProxy == address(0) || rmnProxy == address(0) || ccipRouter == address(0)
+      address(tokenAdminRegistry) == address(0) || address(tokenAdminModule) == address(0) || rmnProxy == address(0)
+        || ccipRouter == address(0)
     ) revert InvalidZeroAddress();
 
     i_tokenAdminRegistry = ITokenAdminRegistry(tokenAdminRegistry);
@@ -83,7 +91,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     // Ensure a unique deployment between senders even if the same input parameter is used
     salt = keccak256(abi.encodePacked(salt, msg.sender));
 
-    // Deploy the token
+    // Deploy the token. The constructor parameters are already provided in the tokenInitCode
     address token = Create2.deploy(0, salt, tokenInitCode);
 
     // Deploy the token pool
@@ -141,12 +149,13 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     bytes calldata tokenPoolInitCode,
     bytes memory tokenPoolInitArgs,
     bytes32 salt
-  ) internal returns (address) {
+  ) private returns (address) {
     // Create an array of chain updates to apply to the token pool
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](remoteTokenPools.length);
 
+    RemoteTokenPoolInfo memory remoteTokenPool;
     for (uint256 i = 0; i < remoteTokenPools.length; i++) {
-      RemoteTokenPoolInfo memory remoteTokenPool = remoteTokenPools[i];
+      remoteTokenPool = remoteTokenPools[i];
       RemoteChainConfig memory remoteChainConfig = s_remoteChainConfigs[remoteTokenPool.remoteChainSelector];
 
       // If the user provides an empty byte string, indicated no token has already been deployed,
@@ -218,7 +227,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
   /// the token pool will not be able to be set in the token admin registry, and this function will revert.
   /// @param token The address of the token to set the pool for
   /// @param pool The address of the pool to set in the token admin registry
-  function _setTokenPoolInTokenAdminRegistry(address token, address pool) internal {
+  function _setTokenPoolInTokenAdminRegistry(address token, address pool) private {
     i_registryModuleOwnerCustom.registerAdminViaOwner(token);
     i_tokenAdminRegistry.acceptAdminRole(token);
     i_tokenAdminRegistry.setPool(token, pool);

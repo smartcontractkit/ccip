@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IBurnMintERC20} from "../ERC20/IBurnMintERC20.sol";
 import {IOwnable} from "../../interfaces/IOwnable.sol";
+import {IGetCCIPAdmin} from "../../../ccip/interfaces/IGetCCIPAdmin.sol";
 
 import {OwnerIsCreator} from "../../access/OwnerIsCreator.sol";
 
@@ -14,7 +15,7 @@ import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v4.8.3/contra
 
 /// @notice A basic ERC20 compatible token contract with burn and minting roles.
 /// @dev The total supply can be limited during deployment.
-contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator {
+contract BurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Burnable, OwnerIsCreator {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error SenderNotMinter(address sender);
@@ -47,23 +48,12 @@ contract BurnMintERC20 is IBurnMintERC20, IERC165, ERC20Burnable, OwnerIsCreator
     string memory name,
     string memory symbol,
     uint8 decimals_,
-    uint256 maxSupply_,
-    uint256 preMint_,
-    address newOwner_
+    uint256 maxSupply_
   ) ERC20(name, symbol) {
     i_decimals = decimals_;
     i_maxSupply = maxSupply_;
 
-    s_ccipAdmin = newOwner_;
-
-    // Mint the initial supply to the new Owner, saving gas by not calling if the mint amount is zero
-    if (preMint_ != 0) _mint(newOwner_, preMint_);
-
-    // Grant the deployer the minter and burner roles. This contract is expected to be deployed by a factory
-    // contract that will transfer ownership to the correct address after deployment, so granting minting and burning
-    // privileges here saves gas by not requiring two transactions.
-    grantMintRole(newOwner_);
-    grantBurnRole(newOwner_);
+    s_ccipAdmin = msg.sender;
   }
 
   function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {

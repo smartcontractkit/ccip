@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity ^0.8.4;
 
 import {IBurnMintERC20} from "../../../token/ERC20/IBurnMintERC20.sol";
 
@@ -24,7 +24,7 @@ contract BurnMintERC20Setup is BaseTest {
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_burnMintERC20 = new BurnMintERC20("Chainlink Token", "LINK", 18, s_maxSupply, 0, OWNER);
+    s_burnMintERC20 = new BurnMintERC20("Chainlink Token", "LINK", 18, s_maxSupply);
 
     // Set s_mockPool to be a burner and minter
     s_burnMintERC20.grantMintAndBurnRoles(s_mockPool);
@@ -38,7 +38,7 @@ contract BurnMintERC20_constructor is BurnMintERC20Setup {
     string memory symbol = "LINK2";
     uint8 decimals = 19;
     uint256 maxSupply = 1e33;
-    s_burnMintERC20 = new BurnMintERC20(name, symbol, decimals, maxSupply, 0, OWNER);
+    s_burnMintERC20 = new BurnMintERC20(name, symbol, decimals, maxSupply);
 
     assertEq(name, s_burnMintERC20.name());
     assertEq(symbol, s_burnMintERC20.symbol());

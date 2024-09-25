@@ -1,20 +1,18 @@
 pragma solidity ^0.8.24;
 
 import {IOwner} from "../../interfaces/IOwner.sol";
-
-import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
-import {TokenPool} from "../../pools/TokenPool.sol";
-
-import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
-import {TokenPoolFactory} from "../../tokenAdminRegistry/TokenPoolFactory.sol";
-
-import {RegistryModuleOwnerCustom} from "../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
-import {TokenAdminRegistrySetup} from "./TokenAdminRegistry.t.sol";
-
-import {RateLimiter} from "../../libraries/RateLimiter.sol";
+import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
 import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
-import {BurnMintERC20} from "../../../shared/token/ERC20/BurnMintERC20.sol";
+
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
+import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
+import {FactoryBurnMintERC20} from "../../tokenAdminRegistry/FactoryBurnMintERC20.sol";
+import {RegistryModuleOwnerCustom} from "../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
+import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
+import {TokenPoolFactory} from "../../tokenAdminRegistry/TokenPoolFactory.sol";
+import {TokenAdminRegistrySetup} from "./TokenAdminRegistry.t.sol";
 
 import {Create2} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
 
@@ -42,14 +40,13 @@ contract TokenPoolFactorySetup is TokenAdminRegistrySetup {
     s_registryModuleOwnerCustom = new RegistryModuleOwnerCustom(address(s_tokenAdminRegistry));
     s_tokenAdminRegistry.addRegistryModule(address(s_registryModuleOwnerCustom));
 
-    s_tokenPoolFactory = new TokenPoolFactory(
-      address(s_tokenAdminRegistry), address(s_registryModuleOwnerCustom), s_rmnProxy, address(s_sourceRouter)
-    );
+    s_tokenPoolFactory =
+      new TokenPoolFactory(s_tokenAdminRegistry, s_registryModuleOwnerCustom, s_rmnProxy, address(s_sourceRouter));
 
     // Create Init Code for BurnMintERC20 TestToken with 18 decimals and supply cap of max uint256 value
     s_tokenCreationParams = abi.encode("TestToken", "TT", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
 
-    s_tokenInitCode = abi.encodePacked(type(BurnMintERC20).creationCode, s_tokenCreationParams);
+    s_tokenInitCode = abi.encodePacked(type(FactoryBurnMintERC20).creationCode, s_tokenCreationParams);
 
     s_poolInitCode = type(BurnMintTokenPool).creationCode;
 
@@ -66,9 +63,14 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
   function test_TokenPoolFactory_Constructor_Revert() public {
     // Revert cause the tokenAdminRegistry is address(0)
     vm.expectRevert(TokenPoolFactory.InvalidZeroAddress.selector);
-    new TokenPoolFactory(address(0), address(0), address(0), address(0));
+    new TokenPoolFactory(ITokenAdminRegistry(address(0)), RegistryModuleOwnerCustom(address(0)), address(0), address(0));
 
-    new TokenPoolFactory(address(0xdeadbeef), address(0xdeadbeef), address(0xdeadbeef), address(0xdeadbeef));
+    new TokenPoolFactory(
+      ITokenAdminRegistry(address(0xdeadbeef)),
+      RegistryModuleOwnerCustom(address(0xdeadbeef)),
+      address(0xdeadbeef),
+      address(0xdeadbeef)
+    );
   }
 
   function test_createTokenPool_WithNoExistingTokenOnRemoteChain_Success() public {
@@ -116,9 +118,8 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
     RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
 
     // We want to deploy a new factory and Owner Module.
-    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
-      address(newTokenAdminRegistry), address(newRegistryModule), s_rmnProxy, address(s_destRouter)
-    );
+    TokenPoolFactory newTokenPoolFactory =
+      new TokenPoolFactory(newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter));
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
@@ -207,7 +208,8 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
     vm.startPrank(OWNER);
     bytes32 dynamicSalt = keccak256(abi.encodePacked(FAKE_SALT, OWNER));
 
-    BurnMintERC20 newRemoteToken = new BurnMintERC20("TestToken", "TT", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
+    FactoryBurnMintERC20 newRemoteToken =
+      new FactoryBurnMintERC20("TestToken", "TT", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
 
     // We have to create a new factory, registry module, and token admin registry to simulate the other chain
 
@@ -215,9 +217,8 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
     RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
 
     // We want to deploy a new factory and Owner Module.
-    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
-      address(newTokenAdminRegistry), address(newRegistryModule), s_rmnProxy, address(s_destRouter)
-    );
+    TokenPoolFactory newTokenPoolFactory =
+      new TokenPoolFactory(newTokenAdminRegistry, newRegistryModule, s_rmnProxy, address(s_destRouter));
 
     newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
 
