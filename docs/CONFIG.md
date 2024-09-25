@@ -4225,6 +4225,7 @@ GasLimit = 5400000
 AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
+ChainType = 'astar'
 FinalityDepth = 100
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
