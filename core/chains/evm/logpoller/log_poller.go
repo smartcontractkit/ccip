@@ -670,7 +670,7 @@ func (lp *logPoller) backgroundWorkerRun() {
 			} else if !allRemoved {
 				// Tick faster when cleanup can't keep up with the pace of new logs
 				logPruneTick = time.After(timeutil.JitterPct(0.1).Apply(logPruneShortInterval))
-			} else if successfulExpiredLogPrunes == 20 {
+			} else if successfulExpiredLogPrunes == 5 {
 				// Only prune unmatched logs if we've successfully pruned all expired logs at least 20 times
 				// since the last time unmatched logs were pruned
 				if allRemoved, err := lp.PruneUnmatchedLogs(ctx); err != nil {
