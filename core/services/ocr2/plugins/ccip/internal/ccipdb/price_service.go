@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
@@ -23,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 // PriceService manages DB access for gas and token price data.
@@ -49,11 +49,23 @@ const (
 	// Token prices are refreshed every 10 minutes, we only report prices for blue chip tokens, DS&A simulation show
 	// their prices are stable, 10-minute resolution is accurate enough.
 	tokenPriceUpdateInterval = 10 * time.Minute
+
+	// Prices should expire after 25 minutes in DB. Prices should be fresh in the Commit plugin.
+	// 25 min provides sufficient buffer for the Commit plugin to withstand transient price update outages, while
+	// surfacing price update outages quickly enough.
+	priceExpireThreshold = 25 * time.Minute
+
+	// Cleanups are called every 10 minutes. For a given job, on average we may expect 3 token prices and 1 gas price.
+	// 10 minutes should result in ~13 rows being cleaned up per job, it is not a heavy load on DB, so there is no need
+	// to run cleanup more frequently. We shouldn't clean up less frequently than `priceExpireThreshold`.
+	priceCleanupInterval = 10 * time.Minute
 )
 
 type priceService struct {
-	gasUpdateInterval   time.Duration
-	tokenUpdateInterval time.Duration
+	priceExpireThreshold time.Duration
+	cleanupInterval      time.Duration
+	gasUpdateInterval    time.Duration
+	tokenUpdateInterval  time.Duration
 
 	lggr              logger.Logger
 	orm               cciporm.ORM
@@ -88,8 +100,10 @@ func NewPriceService(
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pw := &priceService{
-		gasUpdateInterval:   gasPriceUpdateInterval,
-		tokenUpdateInterval: tokenPriceUpdateInterval,
+		priceExpireThreshold: priceExpireThreshold,
+		cleanupInterval:      utils.WithJitter(priceCleanupInterval), // use WithJitter to avoid multiple services impacting DB at same time
+		gasUpdateInterval:    utils.WithJitter(gasPriceUpdateInterval),
+		tokenUpdateInterval:  utils.WithJitter(tokenPriceUpdateInterval),
 
 		lggr:              lggr,
 		orm:               orm,
@@ -128,11 +142,13 @@ func (p *priceService) Close() error {
 }
 
 func (p *priceService) run() {
-	gasUpdateTicker := time.NewTicker(utils.WithJitter(p.gasUpdateInterval))
-	tokenUpdateTicker := time.NewTicker(utils.WithJitter(p.tokenUpdateInterval))
+	cleanupTicker := time.NewTicker(p.cleanupInterval)
+	gasUpdateTicker := time.NewTicker(p.gasUpdateInterval)
+	tokenUpdateTicker := time.NewTicker(p.tokenUpdateInterval)
 
 	go func() {
 		defer p.wg.Done()
+		defer cleanupTicker.Stop()
 		defer gasUpdateTicker.Stop()
 		defer tokenUpdateTicker.Stop()
 
@@ -140,6 +156,11 @@ func (p *priceService) run() {
 			select {
 			case <-p.backgroundCtx.Done():
 				return
+			case <-cleanupTicker.C:
+				err := p.runCleanup(p.backgroundCtx)
+				if err != nil {
+					p.lggr.Errorw("Error when cleaning up in-db prices in the background", "err", err)
+				}
 			case <-gasUpdateTicker.C:
 				err := p.runGasPriceUpdate(p.backgroundCtx)
 				if err != nil {
@@ -217,6 +238,28 @@ func (p *priceService) GetGasAndTokenPrices(ctx context.Context, destChainSelect
 	}
 
 	return gasPrices, tokenPrices, nil
+}
+
+func (p *priceService) runCleanup(ctx context.Context) error {
+	eg := new(errgroup.Group)
+
+	eg.Go(func() error {
+		err := p.orm.ClearGasPricesByDestChain(ctx, p.destChainSelector, int(p.priceExpireThreshold.Seconds()))
+		if err != nil {
+			return fmt.Errorf("error clearing gas prices: %w", err)
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		err := p.orm.ClearTokenPricesByDestChain(ctx, p.destChainSelector, int(p.priceExpireThreshold.Seconds()))
+		if err != nil {
+			return fmt.Errorf("error clearing token prices: %w", err)
+		}
+		return nil
+	})
+
+	return eg.Wait()
 }
 
 func (p *priceService) runGasPriceUpdate(ctx context.Context) error {
@@ -403,29 +446,28 @@ func (p *priceService) observeTokenPriceUpdates(
 	return tokenPricesUSD, nil
 }
 
-func (p *priceService) writeGasPricesToDB(ctx context.Context, sourceGasPriceUSD *big.Int) error {
+func (p *priceService) writeGasPricesToDB(ctx context.Context, sourceGasPriceUSD *big.Int) (err error) {
 	if sourceGasPriceUSD == nil {
 		return nil
 	}
 
-	_, err := p.orm.UpsertGasPricesForDestChain(ctx, p.destChainSelector, []cciporm.GasPrice{
+	return p.orm.InsertGasPricesForDestChain(ctx, p.destChainSelector, p.jobId, []cciporm.GasPriceUpdate{
 		{
 			SourceChainSelector: p.sourceChainSelector,
 			GasPrice:            assets.NewWei(sourceGasPriceUSD),
 		},
 	})
-	return err
 }
 
-func (p *priceService) writeTokenPricesToDB(ctx context.Context, tokenPricesUSD map[cciptypes.Address]*big.Int) error {
+func (p *priceService) writeTokenPricesToDB(ctx context.Context, tokenPricesUSD map[cciptypes.Address]*big.Int) (err error) {
 	if tokenPricesUSD == nil {
 		return nil
 	}
 
-	var tokenPrices []cciporm.TokenPrice
+	var tokenPrices []cciporm.TokenPriceUpdate
 
 	for token, price := range tokenPricesUSD {
-		tokenPrices = append(tokenPrices, cciporm.TokenPrice{
+		tokenPrices = append(tokenPrices, cciporm.TokenPriceUpdate{
 			TokenAddr:  string(token),
 			TokenPrice: assets.NewWei(price),
 		})
@@ -436,8 +478,7 @@ func (p *priceService) writeTokenPricesToDB(ctx context.Context, tokenPricesUSD 
 		return tokenPrices[i].TokenAddr < tokenPrices[j].TokenAddr
 	})
 
-	_, err := p.orm.UpsertTokenPricesForDestChain(ctx, p.destChainSelector, tokenPrices, p.tokenUpdateInterval)
-	return err
+	return p.orm.InsertTokenPricesForDestChain(ctx, p.destChainSelector, p.jobId, tokenPrices)
 }
 
 // Input price is USD per full token, with 18 decimal precision

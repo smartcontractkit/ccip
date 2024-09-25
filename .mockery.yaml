@@ -43,10 +43,6 @@ packages:
   github.com/smartcontractkit/chainlink/v2/core/bridges:
     interfaces:
       ORM:
-  github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types:
-    interfaces:
-      CCIPOracle:
-      OracleCreator:
   github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types:
     interfaces:
       Dispatcher:

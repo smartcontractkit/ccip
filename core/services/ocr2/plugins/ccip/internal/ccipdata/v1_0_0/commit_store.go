@@ -2,7 +2,6 @@ package v1_0_0
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -12,10 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"golang.org/x/exp/maps"
+	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -25,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_0_0"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
@@ -91,7 +90,7 @@ func encodeCommitReport(commitReportArgs abi.Arguments, report cciptypes.CommitS
 	var usdPerUnitGas = big.NewInt(0)
 	var destChainSelector = uint64(0)
 	if len(report.GasPrices) > 1 {
-		return []byte{}, fmt.Errorf("CommitStore V1_0_0 can only accept 1 gas price, received: %d", len(report.GasPrices))
+		return []byte{}, errors.Errorf("CommitStore V1_0_0 can only accept 1 gas price, received: %d", len(report.GasPrices))
 	}
 	if len(report.GasPrices) > 0 {
 		usdPerUnitGas = report.GasPrices[0].Value
@@ -134,7 +133,7 @@ func DecodeCommitReport(commitReportArgs abi.Arguments, report []byte) (cciptype
 		MerkleRoot [32]byte `json:"merkleRoot"`
 	})
 	if !ok {
-		return cciptypes.CommitStoreReport{}, fmt.Errorf("invalid commit report got %T", unpacked[0])
+		return cciptypes.CommitStoreReport{}, errors.Errorf("invalid commit report got %T", unpacked[0])
 	}
 
 	var tokenPriceUpdates []cciptypes.TokenPrice
@@ -383,7 +382,7 @@ func (c *CommitStore) GetLatestPriceEpochAndRound(ctx context.Context) (uint64, 
 }
 
 func (c *CommitStore) IsDestChainHealthy(context.Context) (bool, error) {
-	if err := errors.Join(maps.Values(c.lp.HealthReport())...); err != nil {
+	if err := c.lp.Healthy(); err != nil {
 		return false, nil
 	}
 	return true, nil

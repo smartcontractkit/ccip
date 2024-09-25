@@ -1144,16 +1144,6 @@ func findExistingJobForOCR2(ctx context.Context, j *job.Job, tx job.ORM) (int32,
 	return tx.FindOCR2JobIDByAddress(ctx, contractID, feedID)
 }
 
-// Unsafe_SetConnectionsManager sets the ConnectionsManager on the service.
-//
-// We need to be able to inject a mock for the client to facilitate integration
-// tests.
-//
-// ONLY TO BE USED FOR TESTING.
-func (s *service) Unsafe_SetConnectionsManager(connMgr ConnectionsManager) {
-	s.connMgr = connMgr
-}
-
 // findExistingJobForOCRFlux looks for existing job for OCR or flux
 func findExistingJobForOCRFlux(ctx context.Context, j *job.Job, tx job.ORM) (int32, error) {
 	var address types.EIP55Address

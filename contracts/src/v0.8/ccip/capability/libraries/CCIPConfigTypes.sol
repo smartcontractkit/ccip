@@ -9,7 +9,14 @@ library CCIPConfigTypes {
   /// The only valid transition from "Init" is to the "Running" state - this is the first ever configuration.
   /// The only valid transition from "Running" is to the "Staging" state - this is a blue/green proposal.
   /// The only valid transition from "Staging" is back to the "Running" state - this is a promotion.
-  /// TODO: explain rollbacks?
+  /// In order to rollback a configuration, we must therefore do the following:
+  /// - Suppose that we have a correct configuration in the "Running" state (V1).
+  /// - We propose a new configuration and transition to the "Staging" state (V2).
+  /// - V2 turns out to be buggy
+  /// - In the same transaction, we must:
+  ///   - Promote V2
+  ///   - Re-propose V1
+  ///   - Promote V1
   enum ConfigState {
     Init,
     Running,
@@ -30,21 +37,26 @@ library CCIPConfigTypes {
     ChainConfig chainConfig;
   }
 
+  /// @notice Represents an oracle node in OCR3 configs part of the role DON.
+  /// Every configured node should be a signer, but does not have to be a transmitter.
+  struct OCR3Node {
+    bytes32 p2pId; // Peer2Peer connection ID of the oracle
+    bytes signerKey; // On-chain signer public key
+    bytes transmitterKey; // On-chain transmitter public key. Can be set to empty bytes to represent that the node is a signer but not a transmitter.
+  }
+
   /// @notice OCR3 configuration.
+  /// Note that FRoleDON >= fChain, since FRoleDON represents the role DON, and fChain represents sub-committees.
+  /// FRoleDON values are typically identical across multiple OCR3 configs since the chains pertain to one role DON,
+  /// but FRoleDON values can change across OCR3 configs to indicate role DON splits.
   struct OCR3Config {
     Internal.OCRPluginType pluginType; // ────────╮ The plugin that the configuration is for.
     uint64 chainSelector; //                      | The (remote) chain that the configuration is for.
-    uint8 F; //                                   | The "big F" parameter for the role DON.
+    uint8 FRoleDON; //                            | The "big F" parameter for the role DON.
     uint64 offchainConfigVersion; // ─────────────╯ The version of the offchain configuration.
     bytes offrampAddress; // The remote chain offramp address.
-    // NOTE: bootstrapP2PIds and p2pIds should be sent as sorted sets
-    bytes32[] bootstrapP2PIds; // The bootstrap P2P IDs of the oracles that are part of the role DON.
-    // len(p2pIds) == len(signers) == len(transmitters) == 3 * F + 1
-    // NOTE: indexes matter here! The p2p ID at index i corresponds to the signer at index i and the transmitter at index i.
-    // This is crucial in order to build the oracle ID <-> peer ID mapping offchain.
-    bytes32[] p2pIds; // The P2P IDs of the oracles that are part of the role DON.
-    bytes[] signers; // The onchain signing keys of nodes in the don.
-    bytes[] transmitters; // The onchain transmitter keys of nodes in the don.
+    bytes rmnHomeAddress; // The home chain RMN home address.
+    OCR3Node[] nodes; // Keys & IDs of nodes part of the role DON
     bytes offchainConfig; // The offchain configuration for the OCR3 protocol. Protobuf encoded.
   }
 

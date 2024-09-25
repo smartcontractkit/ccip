@@ -36,8 +36,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-	coretypes "github.com/smartcontractkit/chainlink-common/pkg/types/core/mocks"
 
+	evmcapabilities "github.com/smartcontractkit/chainlink/v2/core/capabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	v2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -379,6 +379,7 @@ func setupNodeCCIP(
 			fmt.Sprintf("127.0.0.1:%d", port),
 		}
 		c.Log.Level = &loglevel
+		c.Feature.CCIP = &trueRef
 		c.Feature.UICSAKeys = &trueRef
 		c.Feature.FeedsManager = &trueRef
 		c.OCR.Enabled = &falseRef
@@ -460,7 +461,7 @@ func setupNodeCCIP(
 		Logger:               lggr,
 		LoopRegistry:         loopRegistry,
 		GRPCOpts:             loop.GRPCOpts{},
-		CapabilitiesRegistry: coretypes.NewCapabilitiesRegistry(t),
+		CapabilitiesRegistry: evmcapabilities.NewRegistry(lggr),
 	}
 	testCtx := testutils.Context(t)
 	// evm alway enabled for backward compatibility
