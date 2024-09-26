@@ -226,13 +226,19 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	res := &wasp.Response{}
 	sourceCCIP := c.Lane.Source
 	var recentRequestFoundAt *time.Time
+	var latestEvent *types.Log
 	var err error
 	// Use IsPastRequestTriggeredWithinTimeframe to check for any historical CCIP send request events
 	// within the specified timeframe for the first message. Subsequently, use the watcher method to monitor
 	// and detect any new events as they occur.
 	if c.CurrentMsgSerialNo.Load() == int64(1) {
-		recentRequestFoundAt, err = sourceCCIP.IsPastRequestTriggeredWithinTimeframe(testcontext.Get(c.t), c.SkipRequestIfAnotherRequestTriggeredWithin)
+		latestEvent, err = sourceCCIP.IsPastRequestTriggeredWithinTimeframe(testcontext.Get(c.t), c.SkipRequestIfAnotherRequestTriggeredWithin)
 		require.NoError(c.t, err, "error while filtering past requests")
+		if latestEvent != nil {
+			hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(latestEvent.BlockNumber)))
+			require.NoError(c.t, err, "error while getting header by block number")
+			recentRequestFoundAt = pointer.ToTime(hdr.Timestamp)
+		}
 	} else {
 		recentRequestFoundAt = sourceCCIP.IsRequestTriggeredWithinTimeframe(c.SkipRequestIfAnotherRequestTriggeredWithin)
 	}
