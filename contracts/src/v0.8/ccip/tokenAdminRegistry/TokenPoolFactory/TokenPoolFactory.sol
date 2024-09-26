@@ -6,11 +6,12 @@ import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
 import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
-import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
-import {RegistryModuleOwnerCustom} from "./../RegistryModuleOwnerCustom.sol";
+import {RegistryModuleOwnerCustom} from "../RegistryModuleOwnerCustom.sol";
 
 import {Create2} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
+
+import {console2 as console} from "forge-std/console2.sol";
 
 /// @notice A contract for deploying new tokens and token pools, and configuring them with the token admin registry
 /// @dev At the end of the transaction, the ownership transfer process will begin, but the user must accept the
@@ -22,6 +23,12 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
 
   error InvalidZeroAddress();
 
+  enum PoolType {
+    BurnMint,
+    LockRelease
+    Custom
+  }
+
   struct RemoteTokenPoolInfo {
     uint64 remoteChainSelector; // The CCIP specific selector for the remote chain
     // The address of the remote pool to either deploy or use as is. If
@@ -29,6 +36,15 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     bytes remotePoolAddress;
     // The address of the remote token to either deploy or use as is
     // If the empty parameter flag is provided, the address will be predicted
+    bytes remotePoolInitCode;
+    // The addresses of the remote RMNProxy and Router to use as immutable params and the factory to use in
+    // address calculations
+
+
+    bytes remotePoolInitArgs;
+    // RemoteChainConfig remoteChainConfig;
+    RemoteChainConfig remoteChainConfig;
+    // the address of the remote token
     bytes remoteTokenAddress;
     // The init code for the remote token if it needs to be deployed
     // and includes all the constructor params already appended
@@ -58,7 +74,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
   address private immutable i_rmnProxy;
   address private immutable i_ccipRouter;
 
-  mapping(uint64 remoteChainSelector => RemoteChainConfig remoteConfig) private s_remoteChainConfigs;
+  // mapping(uint64 remoteChainSelector => RemoteChainConfig remoteConfig) private s_remoteChainConfigs;
 
   constructor(
     ITokenAdminRegistry tokenAdminRegistry,
@@ -160,7 +176,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     RemoteTokenPoolInfo memory remoteTokenPool;
     for (uint256 i = 0; i < remoteTokenPools.length; i++) {
       remoteTokenPool = remoteTokenPools[i];
-      RemoteChainConfig memory remoteChainConfig = s_remoteChainConfigs[remoteTokenPool.remoteChainSelector];
+      // RemoteChainConfig memory remoteChainConfig = s_remoteChainConfigs[remoteTokenPool.remoteChainSelector];
 
       // If the user provides an empty byte string, indicated no token has already been deployed,
       // then the address of the token needs to be predicted. Otherwise the address provided will be used.
@@ -168,7 +184,10 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
         // The user must provide the initCode for the remote token, so its address can be predicted correctly. It's
         // provided in the remoteTokenInitCode field for the remoteTokenPool
         remoteTokenPool.remoteTokenAddress = abi.encode(
-          salt.computeAddress(keccak256(remoteTokenPool.remoteTokenInitCode), remoteChainConfig.remotePoolFactory)
+          salt.computeAddress(
+            keccak256(remoteTokenPool.remoteTokenInitCode),
+            remoteTokenPool.remoteChainConfig.remotePoolFactory
+          )
         );
       }
 
@@ -181,20 +200,20 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
         // Combine the initCode with the initArgs to create the full deployment code
         bytes32 remotePoolInitcode = keccak256(
           bytes.concat(
-            type(BurnMintTokenPool).creationCode,
+            remoteTokenPool.remotePoolInitCode,
             // Calculate the remote pool Args with an empty allowList, remote RMN, and Remote Router addresses.
             abi.encode(
               abi.decode(remoteTokenPool.remoteTokenAddress, (address)),
               new address[](0),
-              remoteChainConfig.remoteRMNProxy,
-              remoteChainConfig.remoteRouter
+              remoteTokenPool.remoteChainConfig.remoteRMNProxy,
+              remoteTokenPool.remoteChainConfig.remoteRouter
             )
           )
         );
 
         // Abi encode the computed remote address so it can be used as bytes in the chain update
         remoteTokenPool.remotePoolAddress = abi.encode(
-          salt.computeAddress(remotePoolInitcode, remoteChainConfig.remotePoolFactory)
+          salt.computeAddress(remotePoolInitcode, remoteTokenPool.remoteChainConfig.remotePoolFactory)
         );
       }
 
@@ -239,36 +258,5 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
 
     // Begin the 2 admin transfer process which must be accepted in a separate tx.
     i_tokenAdminRegistry.transferAdminRole(token, msg.sender);
-  }
-
-  // ================================================================
-  // |                  Remote Chain Configuration                  |
-  // ================================================================
-
-  /// @notice Updates the remote chain config for the given remote chain selector
-  /// @param remoteChainConfigs An array of remote chain configs to update
-  /// @dev The function may only be called by the contract owner.
-  function updateRemoteChainConfig(RemoteChainConfigUpdate[] calldata remoteChainConfigs) external onlyOwner {
-    for (uint256 i = 0; i < remoteChainConfigs.length; ++i) {
-      RemoteChainConfig memory remoteConfig = remoteChainConfigs[i].remoteChainConfig;
-
-      // Zero address validation check
-      if (
-        remoteChainConfigs[i].remoteChainSelector == 0 ||
-        remoteConfig.remotePoolFactory == address(0) ||
-        remoteConfig.remoteRouter == address(0) ||
-        remoteConfig.remoteRMNProxy == address(0)
-      ) revert InvalidZeroAddress();
-
-      s_remoteChainConfigs[remoteChainConfigs[i].remoteChainSelector] = remoteChainConfigs[i].remoteChainConfig;
-      emit RemoteChainConfigUpdated(remoteChainConfigs[i].remoteChainSelector, remoteConfig);
-    }
-  }
-
-  /// @notice Get the remote chain config for a given remote chain selector
-  /// @param remoteChainSelector The remote chain selector to get the config for
-  /// @return remoteChainConfig The remote chain config for the given remote chain selector
-  function getRemoteChainConfig(uint64 remoteChainSelector) public view returns (RemoteChainConfig memory) {
-    return s_remoteChainConfigs[remoteChainSelector];
   }
 }
