@@ -69,29 +69,29 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
 
   /// @notice The total number of configs ever set, used for generating the version of the configs.
   uint32 private s_configCount = 0;
-  /// @notice The index of the primary config.
-  uint32 private s_primaryConfigIndex = 0;
+  /// @notice The index of the active config.
+  uint32 private s_activeConfigIndex = 0;
 
   // ================================================================
   // │                          Getters                             │
   // ================================================================
 
-  /// @notice Returns the current primary and secondary config digests.
+  /// @notice Returns the current active and candidate config digests.
   /// @dev Can be bytes32(0) if no config has been set yet or it has been revoked.
-  /// @return primaryConfigDigest The digest of the primary config.
-  /// @return secondaryConfigDigest The digest of the secondary config.
-  function getConfigDigests() external view returns (bytes32 primaryConfigDigest, bytes32 secondaryConfigDigest) {
-    return (s_configs[s_primaryConfigIndex].configDigest, s_configs[s_primaryConfigIndex ^ 1].configDigest);
+  /// @return activeConfigDigest The digest of the active config.
+  /// @return candidateConfigDigest The digest of the candidate config.
+  function getConfigDigests() external view returns (bytes32 activeConfigDigest, bytes32 candidateConfigDigest) {
+    return (s_configs[s_activeConfigIndex].configDigest, s_configs[s_activeConfigIndex ^ 1].configDigest);
   }
 
-  /// @notice Returns the primary config digest
-  function getPrimaryDigest() public view returns (bytes32) {
-    return s_configs[s_primaryConfigIndex].configDigest;
+  /// @notice Returns the active config digest
+  function getActiveDigest() public view returns (bytes32) {
+    return s_configs[s_activeConfigIndex].configDigest;
   }
 
-  /// @notice Returns the secondary config digest
-  function getSecondaryDigest() public view returns (bytes32) {
-    return s_configs[s_primaryConfigIndex ^ 1].configDigest;
+  /// @notice Returns the candidate config digest
+  function getCandidateDigest() public view returns (bytes32) {
+    return s_configs[s_activeConfigIndex ^ 1].configDigest;
   }
 
   /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes. Use
@@ -113,39 +113,39 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   function getAllConfigs()
     external
     view
-    returns (VersionedConfig memory primaryConfig, VersionedConfig memory secondaryConfig)
+    returns (VersionedConfig memory activeConfig, VersionedConfig memory candidateConfig)
   {
-    VersionedConfig memory storedPrimaryConfig = s_configs[s_primaryConfigIndex];
-    if (storedPrimaryConfig.configDigest != ZERO_DIGEST) {
-      primaryConfig = storedPrimaryConfig;
+    VersionedConfig memory storedActiveConfig = s_configs[s_activeConfigIndex];
+    if (storedActiveConfig.configDigest != ZERO_DIGEST) {
+      activeConfig = storedActiveConfig;
     }
 
-    VersionedConfig memory storedSecondaryConfig = s_configs[s_primaryConfigIndex ^ 1];
-    if (storedSecondaryConfig.configDigest != ZERO_DIGEST) {
-      secondaryConfig = storedSecondaryConfig;
+    VersionedConfig memory storedCandidateConfig = s_configs[s_activeConfigIndex ^ 1];
+    if (storedCandidateConfig.configDigest != ZERO_DIGEST) {
+      candidateConfig = storedCandidateConfig;
     }
 
-    return (primaryConfig, secondaryConfig);
+    return (activeConfig, candidateConfig);
   }
 
   // ================================================================
   // │                     State transitions                        │
   // ================================================================
 
-  /// @notice Sets a new config as the secondary config. Does not influence the primary config.
+  /// @notice Sets a new config as the candidate config. Does not influence the active config.
   /// @param staticConfig The static part of the config.
   /// @param dynamicConfig The dynamic part of the config.
   /// @param digestToOverwrite The digest of the config to overwrite, or ZERO_DIGEST if no config is to be overwritten.
   /// This is done to prevent accidental overwrites.
   /// @return newConfigDigest The digest of the new config.
-  function setSecondary(
+  function setCandidate(
     StaticConfig calldata staticConfig,
     DynamicConfig calldata dynamicConfig,
     bytes32 digestToOverwrite
   ) external onlyOwner returns (bytes32 newConfigDigest) {
     _validateStaticAndDynamicConfig(staticConfig, dynamicConfig);
 
-    bytes32 existingDigest = getSecondaryDigest();
+    bytes32 existingDigest = getCandidateDigest();
 
     if (existingDigest != digestToOverwrite) {
       revert ConfigDigestMismatch(existingDigest, digestToOverwrite);
@@ -159,7 +159,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     uint32 newVersion = ++s_configCount;
     newConfigDigest = _calculateConfigDigest(abi.encode(staticConfig), newVersion);
 
-    VersionedConfig storage existingConfig = s_configs[s_primaryConfigIndex ^ 1];
+    VersionedConfig storage existingConfig = s_configs[s_activeConfigIndex ^ 1];
     existingConfig.configDigest = newConfigDigest;
     existingConfig.version = newVersion;
     existingConfig.staticConfig = staticConfig;
@@ -172,36 +172,36 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
 
   /// @notice Revokes a specific config by digest.
   /// @param configDigest The digest of the config to revoke. This is done to prevent accidental revokes.
-  function revokeSecondary(bytes32 configDigest) external onlyOwner {
-    uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
-    if (s_configs[secondaryConfigIndex].configDigest != configDigest) {
-      revert ConfigDigestMismatch(s_configs[secondaryConfigIndex].configDigest, configDigest);
+  function revokeCandidate(bytes32 configDigest) external onlyOwner {
+    uint256 candidateConfigIndex = s_activeConfigIndex ^ 1;
+    if (s_configs[candidateConfigIndex].configDigest != configDigest) {
+      revert ConfigDigestMismatch(s_configs[candidateConfigIndex].configDigest, configDigest);
     }
 
     emit ConfigRevoked(configDigest);
     // Delete only the digest, as that's what's used to determine if a config is active. This means the actual
     // config stays in storage which should significantly reduce the gas cost of overwriting that storage space in
     // the future.
-    delete s_configs[secondaryConfigIndex].configDigest;
+    delete s_configs[candidateConfigIndex].configDigest;
   }
 
-  /// @notice Promotes the secondary config to the primary config and revokes the primary config.
+  /// @notice Promotes the candidate config to the active config and revokes the active config.
   /// @param digestToPromote The digest of the config to promote.
   /// @param digestToRevoke The digest of the config to revoke.
-  function promoteSecondaryAndRevokePrimary(bytes32 digestToPromote, bytes32 digestToRevoke) external onlyOwner {
-    uint256 secondaryConfigIndex = s_primaryConfigIndex ^ 1;
-    if (s_configs[secondaryConfigIndex].configDigest != digestToPromote) {
-      revert ConfigDigestMismatch(s_configs[secondaryConfigIndex].configDigest, digestToPromote);
+  function promoteCandidateAndRevokeActive(bytes32 digestToPromote, bytes32 digestToRevoke) external onlyOwner {
+    uint256 candidateConfigIndex = s_activeConfigIndex ^ 1;
+    if (s_configs[candidateConfigIndex].configDigest != digestToPromote) {
+      revert ConfigDigestMismatch(s_configs[candidateConfigIndex].configDigest, digestToPromote);
     }
 
-    uint256 primaryConfigIndex = s_primaryConfigIndex;
-    if (s_configs[primaryConfigIndex].configDigest != digestToRevoke) {
-      revert ConfigDigestMismatch(s_configs[primaryConfigIndex].configDigest, digestToRevoke);
+    uint256 activeConfigIndex = s_activeConfigIndex;
+    if (s_configs[activeConfigIndex].configDigest != digestToRevoke) {
+      revert ConfigDigestMismatch(s_configs[activeConfigIndex].configDigest, digestToRevoke);
     }
 
-    delete s_configs[primaryConfigIndex].configDigest;
+    delete s_configs[activeConfigIndex].configDigest;
 
-    s_primaryConfigIndex ^= 1;
+    s_activeConfigIndex ^= 1;
     if (digestToRevoke != ZERO_DIGEST) {
       emit ConfigRevoked(digestToRevoke);
     }
