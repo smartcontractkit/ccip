@@ -46,6 +46,8 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     bytes offchainConfig; // Offchain configuration for RMN nodes.
   }
 
+  /// @notice The main struct stored in the contract, containing the static and dynamic parts of the config as well as
+  /// the version and the digest of the config.
   struct VersionedConfig {
     uint32 version;
     bytes32 configDigest;
@@ -62,6 +64,8 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   uint256 private constant MAX_CONCURRENT_CONFIGS = 2;
   /// @notice Helper to identify the zero config digest with less casting.
   bytes32 private constant ZERO_DIGEST = bytes32(uint256(0));
+  // @notice To ensure that observerNodesBitmap can be bit-encoded into a uint256.
+  uint256 private constant MAX_NODES = 256;
 
   /// @notice This array holds the configs.
   /// @dev Value i in this array is valid iff s_configs[i].configDigest != 0.
@@ -69,7 +73,11 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
 
   /// @notice The total number of configs ever set, used for generating the version of the configs.
   uint32 private s_configCount = 0;
-  /// @notice The index of the active config.
+  /// @notice The index of the active config. Used to determine which config is active. Adding the configs to a list
+  /// with two items and using this index to determine which one is active is a gas efficient way to handle this. Having
+  /// a set place for the active config would mean we have to copy the candidate config to the active config when it is
+  /// promoted, which would be more expensive. This index allows us to flip the configs around using `XOR 1`, which
+  /// flips 0 to 1 and 1 to 0.
   uint32 private s_activeConfigIndex = 0;
 
   // ================================================================
@@ -170,7 +178,9 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     return newConfigDigest;
   }
 
-  /// @notice Revokes a specific config by digest.
+  /// @notice Revokes a specific config by digest. This is used when the candidate config turns out to be incorrect to
+  /// remove it without it ever having to be promoted. It's also possible to revoke the candidate config by setting a
+  /// newer candidate config using `setCandidate`.
   /// @param configDigest The digest of the config to revoke. This is done to prevent accidental revokes.
   function revokeCandidate(bytes32 configDigest) external onlyOwner {
     uint256 candidateConfigIndex = s_activeConfigIndex ^ 1;
@@ -188,6 +198,9 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   /// @notice Promotes the candidate config to the active config and revokes the active config.
   /// @param digestToPromote The digest of the config to promote.
   /// @param digestToRevoke The digest of the config to revoke.
+  /// @dev No config is changed in storage, the only storage changes that happen are
+  /// - The activeConfigIndex is flipped.
+  /// - The digest of the old active config is deleted.
   function promoteCandidateAndRevokeActive(bytes32 digestToPromote, bytes32 digestToRevoke) external onlyOwner {
     uint256 candidateConfigIndex = s_activeConfigIndex ^ 1;
     if (s_configs[candidateConfigIndex].configDigest != digestToPromote) {
@@ -251,7 +264,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     DynamicConfig memory dynamicConfig
   ) internal pure {
     // Ensure that observerNodesBitmap can be bit-encoded into a uint256.
-    if (staticConfig.nodes.length > 256) {
+    if (staticConfig.nodes.length > MAX_NODES) {
       revert OutOfBoundsNodesLength();
     }
 
