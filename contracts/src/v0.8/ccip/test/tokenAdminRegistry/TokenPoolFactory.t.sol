@@ -7,10 +7,12 @@ import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
 
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
+import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
-import {FactoryBurnMintERC20} from "../../tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20.sol";
+
 import {RegistryModuleOwnerCustom} from "../../tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
+import {FactoryBurnMintERC20} from "../../tokenAdminRegistry/TokenPoolFactory/FactoryBurnMintERC20.sol";
 import {TokenPoolFactory} from "../../tokenAdminRegistry/TokenPoolFactory/TokenPoolFactory.sol";
 import {TokenAdminRegistrySetup} from "./TokenAdminRegistry.t.sol";
 
@@ -111,7 +113,8 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       s_tokenInitCode,
       s_poolInitCode,
       poolCreationParams,
-      FAKE_SALT
+      FAKE_SALT,
+      TokenPoolFactory.PoolType.BURN_MINT
     );
 
     assertNotEq(address(0), tokenAddress, "Token Address should not be 0");
@@ -164,6 +167,7 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       "", // remotePoolAddress
       type(BurnMintTokenPool).creationCode, // remotePoolInitCode
       remoteChainConfig, // remoteChainConfig
+      TokenPoolFactory.PoolType.BURN_MINT, // poolType
       "", // remoteTokenAddress
       s_tokenInitCode, // remoteTokenInitCode
       RateLimiter.Config(false, 0, 0)
@@ -182,7 +186,8 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       s_tokenInitCode,
       s_poolInitCode,
       "",
-      FAKE_SALT
+      FAKE_SALT,
+      TokenPoolFactory.PoolType.BURN_MINT
     );
 
     // Ensure that the remote Token was set to the one we predicted
@@ -227,7 +232,8 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       s_tokenInitCode,
       s_poolInitCode,
       "",
-      FAKE_SALT
+      FAKE_SALT,
+      TokenPoolFactory.PoolType.BURN_MINT
     );
 
     assertEq(
@@ -287,6 +293,7 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       "", // remotePoolAddress
       type(BurnMintTokenPool).creationCode, // remotePoolInitCode
       remoteChainConfig, // remoteChainConfig
+      TokenPoolFactory.PoolType.BURN_MINT, // poolType
       abi.encode(address(newRemoteToken)), // remoteTokenAddress
       s_tokenInitCode, // remoteTokenInitCode
       RateLimiter.Config(false, 0, 0) // rateLimiterConfig
@@ -299,7 +306,8 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       s_tokenInitCode,
       s_poolInitCode,
       "",
-      FAKE_SALT
+      FAKE_SALT,
+      TokenPoolFactory.PoolType.BURN_MINT
     );
 
     assertEq(address(TokenPool(poolAddress).getToken()), tokenAddress, "Token Address should have been set locally");
@@ -344,7 +352,8 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       new TokenPoolFactory.RemoteTokenPoolInfo[](0),
       s_poolInitCode,
       "",
-      FAKE_SALT
+      FAKE_SALT,
+      TokenPoolFactory.PoolType.BURN_MINT
     );
 
     assertEq(
@@ -381,6 +390,7 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       RANDOM_POOL_ADDRESS, // remotePoolAddress
       type(BurnMintTokenPool).creationCode, // remotePoolInitCode
       TokenPoolFactory.RemoteChainConfig(address(0), address(0), address(0)), // remoteChainConfig
+      TokenPoolFactory.PoolType.BURN_MINT, // poolType
       RANDOM_TOKEN_ADDRESS, // remoteTokenAddress
       "", // remoteTokenInitCode
       RateLimiter.Config(false, 0, 0) // rateLimiterConfig
@@ -391,7 +401,8 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       s_tokenInitCode,
       s_poolInitCode,
       poolCreationParams,
-      FAKE_SALT
+      FAKE_SALT,
+      TokenPoolFactory.PoolType.BURN_MINT
     );
 
     assertNotEq(address(0), tokenAddress, "Token Address should not be 0");
@@ -418,5 +429,126 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
     assertEq(IOwner(tokenAddress).owner(), OWNER, "Token should be owned by the owner");
 
     assertEq(IOwner(poolAddress).owner(), OWNER, "Token should be owned by the owner");
+  }
+
+  function test_createTokenPoolLockRelease_NoExistingToken_predict_Success() public {
+    vm.startPrank(OWNER);
+    bytes32 dynamicSalt = keccak256(abi.encodePacked(FAKE_SALT, OWNER));
+
+    // We have to create a new factory, registry module, and token admin registry to simulate the other chain
+    TokenAdminRegistry newTokenAdminRegistry = new TokenAdminRegistry();
+    RegistryModuleOwnerCustom newRegistryModule = new RegistryModuleOwnerCustom(address(newTokenAdminRegistry));
+
+    // We want to deploy a new factory and Owner Module.
+    TokenPoolFactory newTokenPoolFactory = new TokenPoolFactory(
+      newTokenAdminRegistry,
+      newRegistryModule,
+      s_rmnProxy,
+      address(s_destRouter)
+    );
+
+    newTokenAdminRegistry.addRegistryModule(address(newRegistryModule));
+
+    TokenPoolFactory.RemoteChainConfig memory remoteChainConfig = TokenPoolFactory.RemoteChainConfig(
+      address(newTokenPoolFactory),
+      address(s_destRouter),
+      address(s_rmnProxy)
+    );
+
+    // Create an array of remote pools where nothing exists yet, but we want to predict the address for
+    // the new pool and token on DEST_CHAIN_SELECTOR
+    TokenPoolFactory.RemoteTokenPoolInfo[] memory remoteTokenPools = new TokenPoolFactory.RemoteTokenPoolInfo[](1);
+
+    // The only field that matters is DEST_CHAIN_SELECTOR because we dont want any existing token pool or token
+    // on the remote chain
+    remoteTokenPools[0] = TokenPoolFactory.RemoteTokenPoolInfo(
+      DEST_CHAIN_SELECTOR, // remoteChainSelector
+      "", // remotePoolAddress
+      type(LockReleaseTokenPool).creationCode, // remotePoolInitCode
+      remoteChainConfig, // remoteChainConfig
+      TokenPoolFactory.PoolType.LOCK_RELEASE, // poolType
+      "", // remoteTokenAddress
+      s_tokenInitCode, // remoteTokenInitCode
+      RateLimiter.Config(false, 0, 0)
+    );
+
+    // Predict the address of the token and pool on the DESTINATION chain
+    address predictedTokenAddress = dynamicSalt.computeAddress(
+      keccak256(s_tokenInitCode),
+      address(newTokenPoolFactory)
+    );
+
+    // Since the remote chain information was provided, we should be able to get the information from the newly
+    // deployed token pool using the available getter functions
+    (, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
+      remoteTokenPools,
+      s_tokenInitCode,
+      type(LockReleaseTokenPool).creationCode,
+      "",
+      FAKE_SALT,
+      TokenPoolFactory.PoolType.LOCK_RELEASE
+    );
+
+    // Ensure that the remote Token was set to the one we predicted
+    assertEq(
+      abi.encode(predictedTokenAddress),
+      TokenPool(poolAddress).getRemoteToken(DEST_CHAIN_SELECTOR),
+      "Token Address should have been predicted"
+    );
+
+    {
+      // Create the constructor params for the predicted pool
+      // The predictedTokenAddress is NOT abi-encoded since the raw evm-address
+      // is used in the constructor params
+      bytes memory predictedPoolCreationParams = abi.encode(
+        predictedTokenAddress,
+        new address[](0),
+        s_rmnProxy,
+        true,
+        address(s_destRouter)
+      );
+
+      // Take the init code and concat the destination params to it, the initCode shouldn't change
+      bytes memory predictedPoolInitCode = abi.encodePacked(
+        type(LockReleaseTokenPool).creationCode,
+        predictedPoolCreationParams
+      );
+
+      // Predict the address of the pool on the DESTINATION chain
+      address predictedPoolAddress = dynamicSalt.computeAddress(
+        keccak256(predictedPoolInitCode),
+        address(newTokenPoolFactory)
+      );
+
+      // Assert that the address set for the remote pool is the same as the predicted address
+      assertEq(
+        abi.encode(predictedPoolAddress),
+        TokenPool(poolAddress).getRemotePool(DEST_CHAIN_SELECTOR),
+        "Pool Address should have been predicted"
+      );
+    }
+
+    // On the new token pool factory, representing a destination chain,
+    // deploy a new token and a new pool
+    (address newTokenAddress, address newPoolAddress) = newTokenPoolFactory.deployTokenAndTokenPool(
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
+      s_tokenInitCode,
+      type(LockReleaseTokenPool).creationCode,
+      "",
+      FAKE_SALT,
+      TokenPoolFactory.PoolType.LOCK_RELEASE
+    );
+
+    assertEq(
+      TokenPool(poolAddress).getRemotePool(DEST_CHAIN_SELECTOR),
+      abi.encode(newPoolAddress),
+      "New Pool Address should have been deployed correctly"
+    );
+
+    assertEq(
+      TokenPool(poolAddress).getRemoteToken(DEST_CHAIN_SELECTOR),
+      abi.encode(newTokenAddress),
+      "New Token Address should have been deployed correctly"
+    );
   }
 }
