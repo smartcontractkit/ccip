@@ -322,7 +322,7 @@ func (n *ClNode) containerStartOrRestart(restartDb bool) error {
 		return fmt.Errorf("%s err: %w", ErrStartCLNodeContainer, err)
 	}
 
-	clEndpoint, err := test_env.GetEndpointFromPort(testcontext.Get(n.t), container, "http", "6688")
+	clEndpoint, err := test_env.GetEndpoint(testcontext.Get(n.t), container, "http")
 	if err != nil {
 		return err
 	}
@@ -446,17 +446,9 @@ func (n *ClNode) getContainerRequest(secrets string) (
 		Name:            n.ContainerName,
 		AlwaysPullImage: n.AlwaysPullImage,
 		Image:           fmt.Sprintf("%s:%s", n.ContainerImage, n.ContainerVersion),
-		ExposedPorts:    []string{"6688/tcp", test_env.NatPortFormat("40000")},
+		ExposedPorts:    []string{"6688/tcp"},
 		Env:             n.ContainerEnvs,
-		Entrypoint: []string{"/home/chainlink/go/bin/dlv",
-			"exec",
-			"/usr/local/bin/chainlink",
-			"--accept-multiclient",
-			"--headless",
-			"--listen=0.0.0.0:40000",
-			"--api-version=2",
-			"--continue",
-			"--",
+		Entrypoint: []string{"chainlink",
 			"-c", configPath,
 			"-s", secretsPath,
 			"node", "start", "-d",
