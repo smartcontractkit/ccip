@@ -1,16 +1,16 @@
 pragma solidity 0.8.24;
 
-import {IOwnable} from "../../shared/interfaces/IOwnable.sol";
-import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {ITokenAdminRegistry} from "../interfaces/ITokenAdminRegistry.sol";
+import {IOwnable} from "../../../shared/interfaces/IOwnable.sol";
+import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
+import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
-import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
-import {RateLimiter} from "../libraries/RateLimiter.sol";
-import {BurnMintTokenPool} from "../pools/BurnMintTokenPool.sol";
-import {TokenPool} from "../pools/TokenPool.sol";
-import {RegistryModuleOwnerCustom} from "./RegistryModuleOwnerCustom.sol";
+import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
+import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
+import {RegistryModuleOwnerCustom} from "./../RegistryModuleOwnerCustom.sol";
 
-import {Create2} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
+import {Create2} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
 
 /// @notice A contract for deploying new tokens and token pools, and configuring them with the token admin registry
 /// @dev At the end of the transaction, the ownership transfer process will begin, but the user must accept the
@@ -67,8 +67,10 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     address ccipRouter
   ) {
     if (
-      address(tokenAdminRegistry) == address(0) || address(tokenAdminModule) == address(0) || rmnProxy == address(0)
-        || ccipRouter == address(0)
+      address(tokenAdminRegistry) == address(0) ||
+      address(tokenAdminModule) == address(0) ||
+      rmnProxy == address(0) ||
+      ccipRouter == address(0)
     ) revert InvalidZeroAddress();
 
     i_tokenAdminRegistry = ITokenAdminRegistry(tokenAdminRegistry);
@@ -191,8 +193,9 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
         );
 
         // Abi encode the computed remote address so it can be used as bytes in the chain update
-        remoteTokenPool.remotePoolAddress =
-          abi.encode(salt.computeAddress(remotePoolInitcode, remoteChainConfig.remotePoolFactory));
+        remoteTokenPool.remotePoolAddress = abi.encode(
+          salt.computeAddress(remotePoolInitcode, remoteChainConfig.remotePoolFactory)
+        );
       }
 
       chainUpdates[i] = TokenPool.ChainUpdate({
@@ -251,8 +254,10 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
 
       // Zero address validation check
       if (
-        remoteChainConfigs[i].remoteChainSelector == 0 || remoteConfig.remotePoolFactory == address(0)
-          || remoteConfig.remoteRouter == address(0) || remoteConfig.remoteRMNProxy == address(0)
+        remoteChainConfigs[i].remoteChainSelector == 0 ||
+        remoteConfig.remotePoolFactory == address(0) ||
+        remoteConfig.remoteRouter == address(0) ||
+        remoteConfig.remoteRMNProxy == address(0)
       ) revert InvalidZeroAddress();
 
       s_remoteChainConfigs[remoteChainConfigs[i].remoteChainSelector] = remoteChainConfigs[i].remoteChainConfig;

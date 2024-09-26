@@ -6,7 +6,6 @@ import {IERC677} from "../../../token/ERC677/IERC677.sol";
 
 import {BaseTest} from "../../BaseTest.t.sol";
 import {BurnMintERC677} from "../../../token/ERC677/BurnMintERC677.sol";
-import {BurnMintERC20} from "../../../token/ERC20/BurnMintERC20.sol";
 
 import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
@@ -107,7 +106,7 @@ contract BurnMintERC677_mint is BurnMintERC677Setup {
   // Revert
 
   function testSenderNotMinterReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(BurnMintERC20.SenderNotMinter.selector, OWNER));
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC677.SenderNotMinter.selector, OWNER));
     s_burnMintERC677.mint(STRANGER, 1e18);
   }
 
@@ -117,7 +116,9 @@ contract BurnMintERC677_mint is BurnMintERC677Setup {
     // Mint max supply
     s_burnMintERC677.mint(OWNER, s_burnMintERC677.maxSupply());
 
-    vm.expectRevert(abi.encodeWithSelector(BurnMintERC20.MaxSupplyExceeded.selector, s_burnMintERC677.maxSupply() + 1));
+    vm.expectRevert(
+      abi.encodeWithSelector(BurnMintERC677.MaxSupplyExceeded.selector, s_burnMintERC677.maxSupply() + 1)
+    );
 
     // Attempt to mint 1 more than max supply
     s_burnMintERC677.mint(OWNER, 1);
@@ -140,7 +141,7 @@ contract BurnMintERC677_burn is BurnMintERC677Setup {
   // Revert
 
   function testSenderNotBurnerReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(BurnMintERC20.SenderNotBurner.selector, OWNER));
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC677.SenderNotBurner.selector, OWNER));
 
     s_burnMintERC677.burnFrom(STRANGER, s_amount);
   }
@@ -181,7 +182,7 @@ contract BurnMintERC677_burnFromAlias is BurnMintERC677Setup {
   // Reverts
 
   function testSenderNotBurnerReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(BurnMintERC20.SenderNotBurner.selector, OWNER));
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC677.SenderNotBurner.selector, OWNER));
 
     s_burnMintERC677.burn(OWNER, s_amount);
   }
@@ -223,7 +224,7 @@ contract BurnMintERC677_burnFrom is BurnMintERC677Setup {
   // Reverts
 
   function testSenderNotBurnerReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(BurnMintERC20.SenderNotBurner.selector, OWNER));
+    vm.expectRevert(abi.encodeWithSelector(BurnMintERC677.SenderNotBurner.selector, OWNER));
 
     s_burnMintERC677.burnFrom(OWNER, s_amount);
   }
