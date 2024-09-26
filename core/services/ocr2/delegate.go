@@ -11,19 +11,19 @@ import (
 
 	"gopkg.in/guregu/null.v4"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"google.golang.org/grpc"
+
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"google.golang.org/grpc"
 
 	ocr2keepers20 "github.com/smartcontractkit/chainlink-automation/pkg/v2"
 	ocr2keepers20config "github.com/smartcontractkit/chainlink-automation/pkg/v2/config"
@@ -41,7 +41,6 @@ import (
 	llotypes "github.com/smartcontractkit/chainlink-common/pkg/types/llo"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 	datastreamsllo "github.com/smartcontractkit/chainlink-data-streams/llo"
-
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	coreconfig "github.com/smartcontractkit/chainlink/v2/core/config"
@@ -52,8 +51,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/functions"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/generic"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/liquiditymanager"
@@ -63,7 +64,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/median"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/mercury"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper"
-
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/autotelemetry21"
 	ocr2keeper21core "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/core"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
@@ -79,8 +79,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/synchronization"
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
-
-	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
 type ErrJobSpecNoRelayer struct {
@@ -1730,12 +1728,29 @@ func (d *Delegate) ccipCommitGetSrcProvider(ctx context.Context, jb job.Job, plu
 }
 
 func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, transmitterID string) ([]job.ServiceCtx, error) {
+	if jb.OCR2OracleSpec == nil {
+		return nil, fmt.Errorf("spec is nil")
+	}
 	spec := jb.OCR2OracleSpec
 	if spec.Relay != relay.NetworkEVM {
 		return nil, fmt.Errorf("non evm chains are not supported for CCIP execution")
 	}
-	dstRid, err := spec.RelayID()
+	var pluginJobSpecConfig ccipconfig.ExecPluginJobSpecConfig
+	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginJobSpecConfig)
+	if err != nil {
+		return nil, err
+	}
 
+	if pluginJobSpecConfig.USDCConfig.AttestationAPI != "" {
+		err = pluginJobSpecConfig.USDCConfig.ValidateUSDCConfig()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	sourceTokenAddress := ccip.EvmAddrToGeneric(pluginJobSpecConfig.USDCConfig.SourceTokenAddress)
+
+	dstRid, err := spec.RelayID()
 	if err != nil {
 		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: string(spec.PluginType)}
 	}
@@ -1746,12 +1761,6 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 
 	// PROVIDER BASED ARG CONSTRUCTION
 	// Write PluginConfig bytes to send source/dest relayer provider + info outside of top level rargs/pargs over the wire
-	var pluginJobSpecConfig ccipconfig.ExecPluginJobSpecConfig
-	err = json.Unmarshal(spec.PluginConfig.Bytes(), &pluginJobSpecConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	dstChainID, err := strconv.ParseInt(dstRid.ChainID, 10, 64)
 	if err != nil {
 		return nil, err
@@ -1786,7 +1795,7 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 	}
 
-	return ccipexec.NewExecServices(ctx, lggr, jb, srcProvider, dstProvider, int64(srcChainID), dstChainID, d.isNewlyCreatedJob, oracleArgsNoPlugin2, logError)
+	return ccipexec.NewExecServices(ctx, lggr, d.cfg, jb, string(sourceTokenAddress), srcProvider, dstProvider, int64(srcChainID), dstChainID, d.isNewlyCreatedJob, oracleArgsNoPlugin2, logError)
 }
 
 func (d *Delegate) ccipExecGetDstProvider(ctx context.Context, jb job.Job, pluginJobSpecConfig ccipconfig.ExecPluginJobSpecConfig, transmitterID string) (types.CCIPExecProvider, error) {

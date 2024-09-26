@@ -15,7 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -34,7 +34,7 @@ type BatchContext struct {
 	report                     commitReportWithSendRequests
 	inflight                   []InflightInternalExecutionReport
 	inflightAggregateValue     *big.Int
-	lggr                       logger.Logger
+	lggr                       logger.SugaredLogger
 	availableDataLen           int
 	availableGas               uint64
 	expectedNonces             map[cciptypes.Address]uint64

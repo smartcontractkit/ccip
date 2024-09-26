@@ -9,10 +9,9 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
@@ -31,7 +30,7 @@ import (
 //
 // Additionally, to reduce the number of calls to the RPC, we refresh RMN state in the background based on defaultRMNStateRefreshInterval
 type ChainHealthcheck interface {
-	job.ServiceCtx
+	services.Service
 	IsHealthy(ctx context.Context) (bool, error)
 }
 
@@ -52,7 +51,7 @@ type chainHealthcheck struct {
 	globalStatusExpiration   time.Duration
 	rmnStatusRefreshInterval time.Duration
 
-	lggr        logger.Logger
+	lggr        logger.SugaredLogger
 	onRamp      ccipdata.OnRampReader
 	commitStore ccipdata.CommitStoreReader
 
@@ -60,6 +59,14 @@ type chainHealthcheck struct {
 	wg               *sync.WaitGroup
 	backgroundCtx    context.Context //nolint:containedctx
 	backgroundCancel context.CancelFunc
+}
+
+func (c *chainHealthcheck) HealthReport() map[string]error {
+	return make(map[string]error)
+}
+
+func (c *chainHealthcheck) Name() string {
+	return c.lggr.Name()
 }
 
 func NewChainHealthcheck(lggr logger.Logger, onRamp ccipdata.OnRampReader, commitStore ccipdata.CommitStoreReader) *chainHealthcheck {
@@ -73,7 +80,7 @@ func NewChainHealthcheck(lggr logger.Logger, onRamp ccipdata.OnRampReader, commi
 		globalStatusExpiration:   defaultGlobalStatusExpirationDuration,
 		rmnStatusRefreshInterval: defaultRMNStateRefreshInterval,
 
-		lggr:        lggr,
+		lggr:        logger.Sugared(lggr),
 		onRamp:      onRamp,
 		commitStore: commitStore,
 
@@ -95,7 +102,7 @@ func newChainHealthcheckWithCustomEviction(lggr logger.Logger, onRamp ccipdata.O
 		globalStatusExpiration:   globalStatusDuration,
 		rmnStatusRefreshInterval: rmnStatusRefreshInterval,
 
-		lggr:        lggr,
+		lggr:        logger.Sugared(lggr),
 		onRamp:      onRamp,
 		commitStore: commitStore,
 

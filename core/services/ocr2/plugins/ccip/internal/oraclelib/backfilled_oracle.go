@@ -2,16 +2,16 @@ package oraclelib
 
 import (
 	"context"
+
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/smartcontractkit/chainlink/v2/core/services"
 
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
 

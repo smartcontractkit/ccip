@@ -16,8 +16,8 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
@@ -50,7 +50,7 @@ var (
 )
 
 type ExecutionPluginStaticConfig struct {
-	lggr                          logger.Logger
+	lggr                          logger.SugaredLogger
 	onRampReader                  ccipdata.OnRampReader
 	offRampReader                 ccipdata.OffRampReader
 	commitStoreReader             ccipdata.CommitStoreReader
@@ -69,7 +69,7 @@ type ExecutionPluginStaticConfig struct {
 type ExecutionReportingPlugin struct {
 	// Misc
 	F                int
-	lggr             logger.Logger
+	lggr             logger.SugaredLogger
 	offchainConfig   cciptypes.ExecOffchainConfig
 	tokenDataWorker  tokendata.Worker
 	metricsCollector ccip.PluginMetricsCollector
@@ -101,7 +101,7 @@ func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp)
 	return types.Query{}, nil
 }
 
-func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
+func (r *ExecutionReportingPlugin) Observation(ctx context.Context, _ types.ReportTimestamp, _ types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("ExecutionObservation")
 	if healthy, err := r.chainHealthcheck.IsHealthy(ctx); err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	return ccip.NewExecutionObservation(executableObservations).Marshal()
 }
 
-func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, inflight []InflightInternalExecutionReport) ([]ccip.ObservedMessage, error) {
+func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.SugaredLogger, inflight []InflightInternalExecutionReport) ([]ccip.ObservedMessage, error) {
 	unexpiredReports, err := r.commitRootsCache.RootsEligibleForExecution(ctx)
 	if err != nil {
 		return nil, err
@@ -256,7 +256,7 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context,
 func (r *ExecutionReportingPlugin) buildBatch(
 	ctx context.Context,
 	inflight []InflightInternalExecutionReport,
-	lggr logger.Logger,
+	lggr logger.SugaredLogger,
 	report commitReportWithSendRequests,
 	aggregateTokenLimit *big.Int,
 	sourceTokenPricesUSD map[cciptypes.Address]*big.Int,
@@ -573,7 +573,7 @@ func calculateObservedMessagesConsensus(observations []ccip.ExecutionObservation
 	return finalSequenceNumbers, nil
 }
 
-func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
+func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
 	execReport, err := r.offRampReader.DecodeExecutionReport(ctx, report)
 	if err != nil {
@@ -607,7 +607,7 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	return true, nil
 }
 
-func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
+func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("ShouldTransmitAcceptedReport")
 	execReport, err := r.offRampReader.DecodeExecutionReport(ctx, report)
 	if err != nil {

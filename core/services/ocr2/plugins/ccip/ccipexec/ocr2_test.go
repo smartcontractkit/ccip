@@ -20,11 +20,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	lpMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -137,7 +138,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p := &ExecutionReportingPlugin{}
 			p.inflightReports = newInflightExecReportsContainer(time.Minute)
 			p.inflightReports.reports = tc.inflightReports
-			p.lggr = logger.TestLogger(t)
+			p.lggr = commonlogger.TestSugared(t)
 			p.tokenDataWorker = tokendata.NewBackgroundWorker(
 				make(map[cciptypes.Address]tokendata.Reader), 10, 5*time.Second, time.Hour)
 			p.metricsCollector = ccip.NoopMetricsCollector
@@ -284,7 +285,7 @@ func TestExecutionReportingPlugin_Report(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := ExecutionReportingPlugin{}
-			p.lggr = logger.TestLogger(t)
+			p.lggr = commonlogger.TestSugared(t)
 			p.F = tc.f
 			bs, err := NewBatchingStrategy(tc.batchingStrategyId, &statuschecker.TxmStatusChecker{})
 			assert.NoError(t, err)
@@ -342,7 +343,7 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 	plugin := ExecutionReportingPlugin{
 		offRampReader:    mockOffRampReader,
-		lggr:             logger.TestLogger(t),
+		lggr:             commonlogger.TestSugared(t),
 		inflightReports:  newInflightExecReportsContainer(1 * time.Hour),
 		chainHealthcheck: chainHealthcheck,
 		metricsCollector: ccip.NoopMetricsCollector,
@@ -394,7 +395,7 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	plugin := ExecutionReportingPlugin{
 		commitStoreReader: mockCommitStoreReader,
 		offRampReader:     mockOffRampReader,
-		lggr:              logger.TestLogger(t),
+		lggr:              commonlogger.TestSugared(t),
 		inflightReports:   newInflightExecReportsContainer(1 * time.Hour),
 		chainHealthcheck:  chainHealthcheck,
 	}
@@ -428,7 +429,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 
 	// ensure that buildReport should cap the built report to fit in MaxExecutionReportLength
 	p := &ExecutionReportingPlugin{}
-	p.lggr = logger.TestLogger(t)
+	p.lggr = commonlogger.TestSugared(t)
 
 	commitStore := ccipdatamocks.NewCommitStoreReader(t)
 	commitStore.On("VerifyExecutionReport", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
@@ -559,7 +560,7 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 	}
 
 	ctx := testutils.Context(t)
-	lggr := logger.TestLogger(t)
+	lggr := commonlogger.TestSugared(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &ExecutionReportingPlugin{}
@@ -1411,7 +1412,7 @@ func encodeExecutionReport(t *testing.T, report cciptypes.ExecReport) []byte {
 // Verify the price registry update mechanism in case of configuration change on the source onRamp.
 func TestExecutionReportingPlugin_ensurePriceRegistrySynchronization(t *testing.T) {
 	p := &ExecutionReportingPlugin{}
-	p.lggr = logger.TestLogger(t)
+	p.lggr = commonlogger.TestSugared(t)
 	p.sourcePriceRegistryLock = sync.RWMutex{}
 
 	sourcePriceRegistryAddress1 := cciptypes.Address(utils.RandomAddress().String())

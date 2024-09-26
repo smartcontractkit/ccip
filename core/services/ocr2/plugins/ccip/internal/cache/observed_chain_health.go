@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -27,6 +28,18 @@ type ObservedChainHealthcheck struct {
 	// This changes very rarely, so it's not a performance concern for Prometheus
 	onrampAddress    string
 	laneHealthStatus *prometheus.GaugeVec
+}
+
+func (o *ObservedChainHealthcheck) Ready() error {
+	return nil
+}
+
+func (o *ObservedChainHealthcheck) HealthReport() map[string]error {
+	return make(map[string]error)
+}
+
+func (o *ObservedChainHealthcheck) Name() string {
+	return fmt.Sprintf("ObservedChainHealthcheck.%v.%v.%v", o.plugin, o.sourceChain, o.destChain)
 }
 
 func NewObservedChainHealthCheck(

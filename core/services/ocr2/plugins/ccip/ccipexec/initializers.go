@@ -2,36 +2,33 @@ package ccipexec
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
+
+	"github.com/smartcontractkit/chainlink/v2/plugins"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/loop"
+
+	"github.com/smartcontractkit/chainlink/v2/core/config/env"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	"github.com/Masterminds/semver/v3"
 	"go.uber.org/multierr"
 
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/statuschecker"
-
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
 )
 
@@ -54,128 +51,39 @@ var defaultNewReportingPluginRetryConfig = ccipdata.RetryConfig{
 	MaxRetries: (6 * 4) + 10,
 }
 
-func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider, srcChainID int64, dstChainID int64, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
-	if jb.OCR2OracleSpec == nil {
-		return nil, fmt.Errorf("spec is nil")
-	}
-	spec := jb.OCR2OracleSpec
-	var pluginConfig ccipconfig.ExecPluginJobSpecConfig
-	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
-	if err != nil {
-		return nil, err
-	}
+func NewExecServices(ctx context.Context, lggr logger.Logger, cfg plugins.RegistrarConfig, jb job.Job, sourceTokenAddress string, srcProvider types.CCIPExecProvider, dstProvider types.CCIPExecProvider, srcChainID int64, dstChainID int64, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+	lggr = lggr.Named("ccip-exec").Named(string(jb.ID))
 
-	offRampAddress := ccipcalc.HexToAddress(spec.ContractID)
-	offRampReader, err := dstProvider.NewOffRampReader(ctx, offRampAddress)
-	if err != nil {
-		return nil, fmt.Errorf("create offRampReader: %w", err)
-	}
+	loopCmd := env.CCIPExecPlugin.Cmd.Get()
+	loopEnabled := loopCmd != ""
 
-	offRampConfig, err := offRampReader.GetStaticConfig(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get offRamp static config: %w", err)
-	}
-
-	srcChainSelector := offRampConfig.SourceChainSelector
-	dstChainSelector := offRampConfig.ChainSelector
-	onRampReader, err := srcProvider.NewOnRampReader(ctx, offRampConfig.OnRamp, srcChainSelector, dstChainSelector)
-	if err != nil {
-		return nil, fmt.Errorf("create onRampReader: %w", err)
-	}
-
-	dynamicOnRampConfig, err := onRampReader.GetDynamicConfig(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get onramp dynamic config: %w", err)
-	}
-
-	sourceWrappedNative, err := srcProvider.SourceNativeToken(ctx, dynamicOnRampConfig.Router)
-	if err != nil {
-		return nil, fmt.Errorf("get source wrapped native token: %w", err)
-	}
-
-	srcCommitStore, err := srcProvider.NewCommitStoreReader(ctx, offRampConfig.CommitStore)
-	if err != nil {
-		return nil, fmt.Errorf("could not create src commitStoreReader reader: %w", err)
-	}
-
-	dstCommitStore, err := dstProvider.NewCommitStoreReader(ctx, offRampConfig.CommitStore)
-	if err != nil {
-		return nil, fmt.Errorf("could not create dst commitStoreReader reader: %w", err)
-	}
-
-	var commitStoreReader ccipdata.CommitStoreReader
-	commitStoreReader = ccip.NewProviderProxyCommitStoreReader(srcCommitStore, dstCommitStore)
-
-	tokenDataProviders := make(map[cciptypes.Address]tokendata.Reader)
-	// init usdc token data provider
-	if pluginConfig.USDCConfig.AttestationAPI != "" {
-		lggr.Infof("USDC token data provider enabled")
-		err2 := pluginConfig.USDCConfig.ValidateUSDCConfig()
+	var pluginFactory types.ReportingPluginFactory
+	if loopEnabled {
+		// find loop command
+		envVars, err := plugins.ParseEnvFile(env.CCIPExecPlugin.Env.Get())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse ccip exec env file: %w", err)
+		}
+		cmdFn, grpcOpts, err := cfg.RegisterLOOP(plugins.CmdConfig{
+			ID:  lggr.Name(),
+			Cmd: loopCmd,
+			Env: envVars,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to register ccip exec plugin: %w", err)
+		}
+		// get reporting plugin factory from loop
+		factoryServer := loop.NewExecutionService(lggr, grpcOpts, cmdFn, srcProvider, dstProvider, uint32(srcChainID), uint32(dstChainID), sourceTokenAddress)
+		pluginFactory = factoryServer
+	} else {
+		var err2 error
+		pluginFactory, err2 = NewExecutionReportingPluginFactoryV2(ctx, lggr, sourceTokenAddress, srcChainID, dstChainID, srcProvider, dstProvider)
 		if err2 != nil {
 			return nil, err2
 		}
-
-		usdcReader, err2 := srcProvider.NewTokenDataReader(ctx, ccip.EvmAddrToGeneric(pluginConfig.USDCConfig.SourceTokenAddress))
-		if err2 != nil {
-			return nil, fmt.Errorf("new usdc reader: %w", err2)
-		}
-		tokenDataProviders[cciptypes.Address(pluginConfig.USDCConfig.SourceTokenAddress.String())] = usdcReader
 	}
 
-	// Prom wrappers
-	onRampReader = observability.NewObservedOnRampReader(onRampReader, srcChainID, ccip.ExecPluginLabel)
-	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, dstChainID, ccip.ExecPluginLabel)
-	offRampReader = observability.NewObservedOffRampReader(offRampReader, dstChainID, ccip.ExecPluginLabel)
-	metricsCollector := ccip.NewPluginMetricsCollector(ccip.ExecPluginLabel, srcChainID, dstChainID)
-
-	tokenPoolBatchedReader, err := dstProvider.NewTokenPoolBatchedReader(ctx, offRampAddress, srcChainSelector)
-	if err != nil {
-		return nil, fmt.Errorf("new token pool batched reader: %w", err)
-	}
-
-	chainHealthcheck := cache.NewObservedChainHealthCheck(
-		cache.NewChainHealthcheck(
-			// Adding more details to Logger to make healthcheck logs more informative
-			// It's safe because healthcheck logs only in case of unhealthy state
-			lggr.With(
-				"onramp", offRampConfig.OnRamp,
-				"commitStore", offRampConfig.CommitStore,
-				"offramp", offRampAddress,
-			),
-			onRampReader,
-			commitStoreReader,
-		),
-		ccip.ExecPluginLabel,
-		srcChainID,
-		dstChainID,
-		offRampConfig.OnRamp,
-	)
-
-	tokenBackgroundWorker := tokendata.NewBackgroundWorker(
-		tokenDataProviders,
-		tokenDataWorkerNumWorkers,
-		tokenDataWorkerTimeout,
-		2*tokenDataWorkerTimeout,
-	)
-
-	wrappedPluginFactory := NewExecutionReportingPluginFactory(ExecutionPluginStaticConfig{
-		lggr:                          lggr,
-		onRampReader:                  onRampReader,
-		commitStoreReader:             commitStoreReader,
-		offRampReader:                 offRampReader,
-		sourcePriceRegistryProvider:   ccip.NewChainAgnosticPriceRegistry(srcProvider),
-		sourceWrappedNativeToken:      sourceWrappedNative,
-		destChainSelector:             dstChainSelector,
-		priceRegistryProvider:         ccip.NewChainAgnosticPriceRegistry(dstProvider),
-		tokenPoolBatchedReader:        tokenPoolBatchedReader,
-		tokenDataWorker:               tokenBackgroundWorker,
-		metricsCollector:              metricsCollector,
-		chainHealthcheck:              chainHealthcheck,
-		newReportingPluginRetryConfig: defaultNewReportingPluginRetryConfig,
-		txmStatusChecker:              statuschecker.NewTxmStatusChecker(dstProvider.GetTransactionStatus),
-	})
-
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetInt64(dstChainID))
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(pluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetInt64(dstChainID))
 	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(lggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
@@ -190,14 +98,10 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 				dstProvider,
 				job.NewServiceAdapter(oracle),
 			),
-			chainHealthcheck,
-			tokenBackgroundWorker,
 		}, nil
 	}
 	return []job.ServiceCtx{
 		job.NewServiceAdapter(oracle),
-		chainHealthcheck,
-		tokenBackgroundWorker,
 	}, nil
 }
 

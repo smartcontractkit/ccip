@@ -7,11 +7,9 @@ import (
 	"time"
 
 	"github.com/patrickmn/go-cache"
-	orderedmap "github.com/wk8/go-ordered-map/v2"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
 const (

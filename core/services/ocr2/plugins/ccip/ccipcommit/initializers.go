@@ -8,17 +8,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
+
+	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 
-	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	cciporm "github.com/smartcontractkit/chainlink/v2/core/services/ccip"
@@ -28,7 +31,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"

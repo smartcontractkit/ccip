@@ -515,6 +515,7 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 			execPluginConfig.SourceStartBlock,
 			execPluginConfig.JobID,
 			usdcConfig.AttestationAPI,
+			string(ccip.EvmAddrToGeneric(usdcConfig.SourceTokenAddress)),
 			int(usdcConfig.AttestationAPITimeoutSeconds),
 			usdcConfig.AttestationAPIIntervalMilliseconds,
 			usdcConfig.SourceMessageTransmitterAddress,

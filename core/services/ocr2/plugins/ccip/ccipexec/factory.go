@@ -5,8 +5,17 @@ import (
 	"fmt"
 	"sync"
 
+	"go.uber.org/multierr"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
@@ -23,6 +32,161 @@ type ExecutionReportingPluginFactory struct {
 	destPriceRegReader ccipdata.PriceRegistryReader
 	destPriceRegAddr   cciptypes.Address
 	readersMu          *sync.Mutex
+	lggr               logger.Logger
+	services           []services.Service
+}
+
+func (rf *ExecutionReportingPluginFactory) Name() string {
+	return rf.lggr.Name()
+}
+
+// Start is used to run chainHealthcheck and tokenDataWorker, which were previously passed
+// back to the delegate as top level job.ServiceCtx to be managed in core alongside the reporting
+// plugin factory
+func (rf *ExecutionReportingPluginFactory) Start(ctx context.Context) (err error) {
+	rf.readersMu.Lock()
+	defer rf.readersMu.Unlock()
+	for _, service := range rf.services {
+		serviceErr := service.Start(ctx)
+		err = multierr.Append(err, serviceErr)
+	}
+	return
+}
+
+func (rf *ExecutionReportingPluginFactory) Close() (err error) {
+	rf.readersMu.Lock()
+	defer rf.readersMu.Unlock()
+	for _, service := range rf.services {
+		closeErr := service.Close()
+		err = multierr.Append(err, closeErr)
+	}
+
+	return
+}
+
+func (rf *ExecutionReportingPluginFactory) Ready() error {
+	return nil
+}
+
+func (rf *ExecutionReportingPluginFactory) HealthReport() map[string]error {
+	return make(map[string]error)
+}
+
+func NewExecutionReportingPluginFactoryV2(ctx context.Context, lggr logger.Logger, sourceTokenAddress string, srcChainID int64, dstChainID int64, srcProvider commontypes.CCIPExecProvider, dstProvider commontypes.CCIPExecProvider) (*ExecutionReportingPluginFactory, error) {
+	// NewOffRampReader doesn't need addr param when provided in job spec
+	offRampReader, err := dstProvider.NewOffRampReader(ctx, "")
+	if err != nil {
+		return nil, fmt.Errorf("create offRampReader: %w", err)
+	}
+
+	offRampConfig, err := offRampReader.GetStaticConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get offRamp static config: %w", err)
+	}
+
+	srcChainSelector := offRampConfig.SourceChainSelector
+	dstChainSelector := offRampConfig.ChainSelector
+	onRampReader, err := srcProvider.NewOnRampReader(ctx, offRampConfig.OnRamp, srcChainSelector, dstChainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("create onRampReader: %w", err)
+	}
+
+	dynamicOnRampConfig, err := onRampReader.GetDynamicConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get onramp dynamic config: %w", err)
+	}
+
+	sourceWrappedNative, err := srcProvider.SourceNativeToken(ctx, dynamicOnRampConfig.Router)
+	if err != nil {
+		return nil, fmt.Errorf("get source wrapped native token: %w", err)
+	}
+
+	srcCommitStore, err := srcProvider.NewCommitStoreReader(ctx, offRampConfig.CommitStore)
+	if err != nil {
+		return nil, fmt.Errorf("could not create src commitStoreReader reader: %w", err)
+	}
+
+	dstCommitStore, err := dstProvider.NewCommitStoreReader(ctx, offRampConfig.CommitStore)
+	if err != nil {
+		return nil, fmt.Errorf("could not create dst commitStoreReader reader: %w", err)
+	}
+
+	var commitStoreReader ccipdata.CommitStoreReader
+	commitStoreReader = ccip.NewProviderProxyCommitStoreReader(srcCommitStore, dstCommitStore)
+
+	tokenDataProviders := make(map[cciptypes.Address]tokendata.Reader)
+	// init usdc token data provider
+	usdcReader, err2 := srcProvider.NewTokenDataReader(ctx, "")
+	tokenDataProviders[cciptypes.Address(sourceTokenAddress)] = usdcReader
+	if err2 != nil {
+		// in order to not wire the attestation API through this factory, we wire it through the provider
+		// when the provider is created. In some cases the attestation API can be nil, which means we
+		// don't want any token data providers. This should not cause creating the job to fail, so we
+		// give an empty map and move on.
+		if err2.Error() != "empty USDC attestation API" {
+			return nil, fmt.Errorf("new usdc reader: %w", err2)
+		}
+		tokenDataProviders = make(map[cciptypes.Address]tokendata.Reader)
+	}
+
+	// Prom wrappers
+	onRampReader = observability.NewObservedOnRampReader(onRampReader, srcChainID, ccip.ExecPluginLabel)
+	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, dstChainID, ccip.ExecPluginLabel)
+	offRampReader = observability.NewObservedOffRampReader(offRampReader, dstChainID, ccip.ExecPluginLabel)
+	metricsCollector := ccip.NewPluginMetricsCollector(ccip.ExecPluginLabel, srcChainID, dstChainID)
+
+	tokenPoolBatchedReader, err := dstProvider.NewTokenPoolBatchedReader(ctx, "", srcChainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("new token pool batched reader: %w", err)
+	}
+
+	chainHealthcheck := cache.NewObservedChainHealthCheck(
+		cache.NewChainHealthcheck(
+			// Adding more details to Logger to make healthcheck logs more informative
+			// It's safe because healthcheck logs only in case of unhealthy state
+			logger.With(lggr, "onramp", offRampConfig.OnRamp,
+				"commitStore", offRampConfig.CommitStore,
+			),
+			onRampReader,
+			commitStoreReader,
+		),
+		ccip.ExecPluginLabel,
+		srcChainID,
+		dstChainID,
+		offRampConfig.OnRamp,
+	)
+
+	tokenBackgroundWorker := tokendata.NewBackgroundWorker(
+		tokenDataProviders,
+		tokenDataWorkerNumWorkers,
+		tokenDataWorkerTimeout,
+		2*tokenDataWorkerTimeout,
+	)
+
+	return &ExecutionReportingPluginFactory{
+		config: ExecutionPluginStaticConfig{
+			lggr:                          logger.Sugared(lggr),
+			onRampReader:                  onRampReader,
+			commitStoreReader:             commitStoreReader,
+			offRampReader:                 offRampReader,
+			sourcePriceRegistryProvider:   ccip.NewChainAgnosticPriceRegistry(srcProvider),
+			sourceWrappedNativeToken:      sourceWrappedNative,
+			destChainSelector:             dstChainSelector,
+			priceRegistryProvider:         ccip.NewChainAgnosticPriceRegistry(dstProvider),
+			tokenPoolBatchedReader:        tokenPoolBatchedReader,
+			tokenDataWorker:               tokenBackgroundWorker,
+			metricsCollector:              metricsCollector,
+			chainHealthcheck:              chainHealthcheck,
+			newReportingPluginRetryConfig: defaultNewReportingPluginRetryConfig,
+		},
+		services:  []services.Service{chainHealthcheck, tokenBackgroundWorker},
+		readersMu: &sync.Mutex{},
+		lggr:      logger.Sugared(lggr),
+
+		// the fields below are initially empty and populated on demand
+		destPriceRegReader: nil,
+		destPriceRegAddr:   "",
+	}, nil
 }
 
 func NewExecutionReportingPluginFactory(config ExecutionPluginStaticConfig) *ExecutionReportingPluginFactory {
@@ -36,7 +200,7 @@ func NewExecutionReportingPluginFactory(config ExecutionPluginStaticConfig) *Exe
 	}
 }
 
-func (rf *ExecutionReportingPluginFactory) UpdateDynamicReaders(ctx context.Context, newPriceRegAddr cciptypes.Address) error {
+func (rf *ExecutionReportingPluginFactory) UpdateDynamicReaders(_ context.Context, newPriceRegAddr cciptypes.Address) error {
 	rf.readersMu.Lock()
 	defer rf.readersMu.Unlock()
 	// TODO: Investigate use of Close() to cleanup.
@@ -88,6 +252,14 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 func (rf *ExecutionReportingPluginFactory) NewReportingPluginFn(config types.ReportingPluginConfig) func() (reportingPluginAndInfo, error) {
 	newReportingPluginFn := func() (reportingPluginAndInfo, error) {
 		ctx := context.Background() // todo: consider setting a timeout
+
+		// Start the chainHealthcheck and tokenDataWorker services
+		// Using Start, while a bit more obtuse, allows us to manage these services
+		// in the same process as the plugin factory in LOOP mode
+		err := rf.Start(ctx)
+		if err != nil {
+			return reportingPluginAndInfo{}, err
+		}
 
 		destPriceRegistry, destWrappedNative, err := rf.config.offRampReader.ChangeConfig(ctx, config.OnchainConfig, config.OffchainConfig)
 		if err != nil {

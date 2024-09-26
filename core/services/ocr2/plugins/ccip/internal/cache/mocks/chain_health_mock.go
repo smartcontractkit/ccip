@@ -66,6 +66,53 @@ func (_c *ChainHealthcheck_Close_Call) RunAndReturn(run func() error) *ChainHeal
 	return _c
 }
 
+// HealthReport provides a mock function with given fields:
+func (_m *ChainHealthcheck) HealthReport() map[string]error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for HealthReport")
+	}
+
+	var r0 map[string]error
+	if rf, ok := ret.Get(0).(func() map[string]error); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]error)
+		}
+	}
+
+	return r0
+}
+
+// ChainHealthcheck_HealthReport_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HealthReport'
+type ChainHealthcheck_HealthReport_Call struct {
+	*mock.Call
+}
+
+// HealthReport is a helper method to define mock.On call
+func (_e *ChainHealthcheck_Expecter) HealthReport() *ChainHealthcheck_HealthReport_Call {
+	return &ChainHealthcheck_HealthReport_Call{Call: _e.mock.On("HealthReport")}
+}
+
+func (_c *ChainHealthcheck_HealthReport_Call) Run(run func()) *ChainHealthcheck_HealthReport_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *ChainHealthcheck_HealthReport_Call) Return(_a0 map[string]error) *ChainHealthcheck_HealthReport_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *ChainHealthcheck_HealthReport_Call) RunAndReturn(run func() map[string]error) *ChainHealthcheck_HealthReport_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsHealthy provides a mock function with given fields: ctx
 func (_m *ChainHealthcheck) IsHealthy(ctx context.Context) (bool, error) {
 	ret := _m.Called(ctx)
@@ -118,6 +165,96 @@ func (_c *ChainHealthcheck_IsHealthy_Call) Return(_a0 bool, _a1 error) *ChainHea
 }
 
 func (_c *ChainHealthcheck_IsHealthy_Call) RunAndReturn(run func(context.Context) (bool, error)) *ChainHealthcheck_IsHealthy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Name provides a mock function with given fields:
+func (_m *ChainHealthcheck) Name() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Name")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// ChainHealthcheck_Name_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Name'
+type ChainHealthcheck_Name_Call struct {
+	*mock.Call
+}
+
+// Name is a helper method to define mock.On call
+func (_e *ChainHealthcheck_Expecter) Name() *ChainHealthcheck_Name_Call {
+	return &ChainHealthcheck_Name_Call{Call: _e.mock.On("Name")}
+}
+
+func (_c *ChainHealthcheck_Name_Call) Run(run func()) *ChainHealthcheck_Name_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *ChainHealthcheck_Name_Call) Return(_a0 string) *ChainHealthcheck_Name_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *ChainHealthcheck_Name_Call) RunAndReturn(run func() string) *ChainHealthcheck_Name_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Ready provides a mock function with given fields:
+func (_m *ChainHealthcheck) Ready() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Ready")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// ChainHealthcheck_Ready_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Ready'
+type ChainHealthcheck_Ready_Call struct {
+	*mock.Call
+}
+
+// Ready is a helper method to define mock.On call
+func (_e *ChainHealthcheck_Expecter) Ready() *ChainHealthcheck_Ready_Call {
+	return &ChainHealthcheck_Ready_Call{Call: _e.mock.On("Ready")}
+}
+
+func (_c *ChainHealthcheck_Ready_Call) Run(run func()) *ChainHealthcheck_Ready_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *ChainHealthcheck_Ready_Call) Return(_a0 error) *ChainHealthcheck_Ready_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *ChainHealthcheck_Ready_Call) RunAndReturn(run func() error) *ChainHealthcheck_Ready_Call {
 	_c.Call.Return(run)
 	return _c
 }

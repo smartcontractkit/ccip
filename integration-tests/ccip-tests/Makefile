@@ -67,3 +67,7 @@ test_smoke_ccip_default: set_config
 .PHONY: build_ccip_image
 build_ccip_image:
 	docker build -f ../../core/chainlink.Dockerfile --build-arg COMMIT_SHA=$(git rev-parse HEAD) --build-arg CHAINLINK_USER=chainlink -t $(image):$(tag) ../../
+
+.PHONY: build_ccip_plugin_image
+build_ccip_plugin_image:
+	docker build -f ../../plugins/chainlink.Dockerfile --build-arg COMMIT_SHA=$(git rev-parse HEAD) --build-arg CHAINLINK_USER=chainlink -t $(image):$(tag) ../../

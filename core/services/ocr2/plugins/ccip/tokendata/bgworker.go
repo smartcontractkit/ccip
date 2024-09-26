@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
 
 type msgResult struct {
@@ -22,7 +21,7 @@ type msgResult struct {
 }
 
 type Worker interface {
-	job.ServiceCtx
+	services.Service
 	// AddJobsFromMsgs will include the provided msgs for background processing.
 	AddJobsFromMsgs(ctx context.Context, msgs []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta)
 
@@ -44,6 +43,14 @@ type BackgroundWorker struct {
 	wg               *sync.WaitGroup
 	backgroundCtx    context.Context //nolint:containedctx
 	backgroundCancel context.CancelFunc
+}
+
+func (w *BackgroundWorker) HealthReport() map[string]error {
+	return make(map[string]error)
+}
+
+func (w *BackgroundWorker) Name() string {
+	return "TokenDataBackgroundWorker"
 }
 
 func NewBackgroundWorker(

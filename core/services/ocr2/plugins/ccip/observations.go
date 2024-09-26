@@ -10,12 +10,13 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 )
 
+// CommitObservation are stored to the commit store.
 // Note if a breaking change is introduced to this struct nodes running different versions
 // will not be able to unmarshal each other's observations. Do not modify unless you
 // know what you are doing.

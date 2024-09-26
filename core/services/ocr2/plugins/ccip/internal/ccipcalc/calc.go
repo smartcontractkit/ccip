@@ -4,7 +4,7 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 // ContiguousReqs checks if seqNrs contains all numbers from min to max.
