@@ -412,7 +412,7 @@ jobs:
           - name: ocr
             id: ocr
             nodes: 2
-            os: ubuntu22.04-16cores-64GB
+            os: ubuntu-latest
             file: ocr
             pyroscope_env: ci-smoke-ocr-evm-simulated
           - name: reorg_above_finality
