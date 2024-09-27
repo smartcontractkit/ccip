@@ -238,6 +238,8 @@ jobs:
     environment: integration
     runs-on: ubuntu-latest
     needs: [ build-chainlink ]
+    # if the event is a scheduled event or the test type is smoke and no previous job failed
+    if: ${{ (github.event_name == 'schedule' || inputs.test_type == 'smoke') && !contains(needs.*.result, 'failure') }}
     permissions:
       issues: read
       checks: write
@@ -311,8 +313,6 @@ jobs:
             pairs: 'ZKSYNC_MAINNET,ARBITRUM_MAINNET'
             enabled: false
             phaseTimeout: 90m
-    # if the event is a scheduled event or the test type is smoke and no previous job failed
-    if: ${{ (github.event_name == 'schedule' || inputs.test_type == 'smoke') && !contains(needs.*.result, 'failure') && matrix.lanes.enabled == 'true' }}
     steps:
       - name: Collect Metrics
         if: ${{ matrix.lanes.enabled == true }}
