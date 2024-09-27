@@ -44,7 +44,6 @@ import (
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/v3/reportcodec"
-	"github.com/smartcontractkit/chainlink/v2/core/utils/testutils/heavyweight"
 )
 
 const (

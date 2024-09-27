@@ -3,7 +3,7 @@ name: Chain Selectors Version Check
 on:
   push:
     branches:
-      - develop
+      - ccip-develop
       - release/*
     tags:
       - v*

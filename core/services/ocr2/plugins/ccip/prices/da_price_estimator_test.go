@@ -23,13 +23,13 @@ func TestDAPriceEstimator_GetGasPrice(t *testing.T) {
 	ctx := context.Background()
 
 	testCases := []struct {
-		name         string
-		daGasPrice   *big.Int
-		execGasPrice *big.Int
-		expPrice     *big.Int
+		name            string
+		daGasPrice      *big.Int
+		execGasPrice    *big.Int
+		expPrice        *big.Int
 		modExecGasPrice *big.Int
 		modDAGasPrice   *big.Int
-		expErr       bool
+		expErr          bool
 	}{
 		{
 			name:         "base",
@@ -495,24 +495,25 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					Return(tc.execEstimatorResponse...)
 			}
 
-		t.Run(tc.name, func(t *testing.T) {
-			g := DAGasPriceEstimator{
-				execEstimator:       execEstimator,
-				l1Oracle:            nil,
-				priceEncodingLength: daGasPriceEncodingLength,
-				feeEstimatorConfig:  feeEstimatorConfig,
-			}
+			t.Run(tc.name, func(t *testing.T) {
+				g := DAGasPriceEstimator{
+					execEstimator:       execEstimator,
+					l1Oracle:            nil,
+					priceEncodingLength: daGasPriceEncodingLength,
+					feeEstimatorConfig:  feeEstimatorConfig,
+				}
 
-			costUSD, err := g.EstimateMsgCostUSD(tc.gasPrice, tc.wrappedNativePrice, tc.msg)
+				costUSD, err := g.EstimateMsgCostUSD(tc.gasPrice, tc.wrappedNativePrice, tc.msg)
 
-			switch {
-			case len(tc.execEstimatorResponse) == 4 && tc.execEstimatorResponse[3] != nil,
-				tc.execEstimatorErr != nil:
-				assert.Error(t, err)
-			default:
-				assert.NoError(t, err)
-				assert.Equal(t, tc.expUSD, costUSD)
-			}
+				switch {
+				case len(tc.execEstimatorResponse) == 4 && tc.execEstimatorResponse[3] != nil,
+					tc.execEstimatorErr != nil:
+					assert.Error(t, err)
+				default:
+					assert.NoError(t, err)
+					assert.Equal(t, tc.expUSD, costUSD)
+				}
+			})
 		})
 	}
 }

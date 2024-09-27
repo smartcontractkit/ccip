@@ -535,7 +535,6 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(gasPriceObs map[uint64][]*
 
 		latestGasPrice, exists := latestGasPrice[chainSelector]
 		if exists && latestGasPrice.value != nil {
-			gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.GasPriceHeartBeat
 			gasPriceDeviated, err := r.gasPriceEstimator.Deviates(newGasPrice, latestGasPrice.value)
 			if err != nil {
 				return nil, nil, err

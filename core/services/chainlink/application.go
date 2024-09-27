@@ -30,15 +30,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/standardcapabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/static"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/promreporter"
-
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/build"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities"
-	"github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/capabilities/remote"
-	remotetypes "github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	evmutils "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -68,7 +62,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/registrysyncer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/wsrpc"
-	"github.com/smartcontractkit/chainlink/v2/core/services/standardcapabilities"
 	"github.com/smartcontractkit/chainlink/v2/core/services/streams"
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 	"github.com/smartcontractkit/chainlink/v2/core/services/vrf"
@@ -78,7 +71,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/sessions"
 	"github.com/smartcontractkit/chainlink/v2/core/sessions/ldapauth"
 	"github.com/smartcontractkit/chainlink/v2/core/sessions/localauth"
-	"github.com/smartcontractkit/chainlink/v2/core/static"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
 )
 
@@ -538,18 +530,6 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			cfg.OCR2(),
 			cfg.Insecure(),
 			opts.RelayerChainInteroperators,
-		)
-		delegates[job.CCIP] = ccip.NewDelegate(
-			globalLogger,
-			loopRegistrarConfig,
-			pipelineRunner,
-			opts.RelayerChainInteroperators.LegacyEVMChains(),
-			relayerChainInterops,
-			opts.KeyStore,
-			opts.DS,
-			peerWrapper,
-			telemetryManager,
-			cfg.Capabilities(),
 		)
 	} else {
 		globalLogger.Debug("Off-chain reporting v2 disabled")

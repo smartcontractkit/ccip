@@ -108,8 +108,6 @@ type RPCClient interface {
 
 const rpcSubscriptionMethodNewHeads = "newHeads"
 
-const rpcSubscriptionMethodNewHeads = "newHeads"
-
 type rawclient struct {
 	rpc  *rpc.Client
 	geth *ethclient.Client

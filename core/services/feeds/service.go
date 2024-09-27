@@ -1111,16 +1111,6 @@ func (s *service) observeJobProposalCounts(ctx context.Context) error {
 	return nil
 }
 
-// Unsafe_SetConnectionsManager sets the ConnectionsManager on the service.
-//
-// We need to be able to inject a mock for the client to facilitate integration
-// tests.
-//
-// ONLY TO BE USED FOR TESTING.
-func (s *service) Unsafe_SetConnectionsManager(connMgr ConnectionsManager) {
-	s.connMgr = connMgr
-}
-
 // findExistingJobForOCR2 looks for existing job for OCR2
 func findExistingJobForOCR2(ctx context.Context, j *job.Job, tx job.ORM) (int32, error) {
 	var contractID string

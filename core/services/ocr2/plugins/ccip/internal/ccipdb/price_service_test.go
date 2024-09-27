@@ -802,7 +802,7 @@ func setupORM(t *testing.T) cciporm.ORM {
 	t.Helper()
 
 	db := pgtest.NewSqlxDB(t)
-	orm, err := cciporm.NewORM(db)
+	orm, err := cciporm.NewORM(db, logger.NullLogger)
 
 	require.NoError(t, err)
 

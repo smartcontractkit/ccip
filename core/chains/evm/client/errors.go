@@ -271,19 +271,6 @@ var gnosis = ClientErrors{
 	TransactionAlreadyInMempool: regexp.MustCompile(`(: |^)(alreadyknown)`),
 }
 
-var aStar = ClientErrors{
-	TerminallyUnderpriced: regexp.MustCompile(`(?:: |^)(gas price less than block base fee)$`),
-}
-
-var mantle = ClientErrors{
-	InsufficientEth: regexp.MustCompile(`(: |^)'*insufficient funds for gas \* price \+ value`),
-	Fatal:           regexp.MustCompile(`(: |^)'*invalid sender`),
-}
-
-var gnosis = ClientErrors{
-	TransactionAlreadyInMempool: regexp.MustCompile(`(: |^)(alreadyknown)`),
-}
-
 const TerminallyStuckMsg = "transaction terminally stuck"
 
 // Tx.Error messages that are set internally so they are not chain or client specific
