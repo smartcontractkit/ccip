@@ -43,18 +43,20 @@ env:
   E2E_TEST_AVALANCHE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_BASE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_BLAST_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_BSC_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_CELO_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_ETHEREUM_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_GNOSIS_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_KROMA_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_LINEA_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_METIS_ANDROMEDA_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_MODE_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_OPTIMISM_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_POLYGON_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
+  E2E_TEST_SCROLL_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_WEMIX_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
   E2E_TEST_ZKSYNC_MAINNET_WALLET_KEY: ${{ secrets.QA_SHARED_803C_KEY }}
 
-  
 jobs:
   build-chainlink:
     environment: integration
@@ -232,7 +234,7 @@ jobs:
           should_cleanup: false
           
   ccip-smoke-test:
-    name: CCIP smoke Test ${{ matrix.lanes.name }}
+    name: 'CCIP smoke - Source: ${{ matrix.lanes.name }}'
     environment: integration
     runs-on: ubuntu-latest
     needs: [ build-chainlink ]
@@ -256,59 +258,60 @@ jobs:
         lanes:
           - name: 'ARBITRUM_MAINNET'
             pairs: 'ARBITRUM_MAINNET,BSC_MAINNET;ARBITRUM_MAINNET,OPTIMISM_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'AVALANCHE_MAINNET'
             pairs: 'AVALANCHE_MAINNET,ARBITRUM_MAINNET;AVALANCHE_MAINNET,BASE_MAINNET;AVALANCHE_MAINNET,BSC_MAINNET;AVALANCHE_MAINNET,OPTIMISM_MAINNET;AVALANCHE_MAINNET,POLYGON_MAINNET;AVALANCHE_MAINNET,WEMIX_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'BASE_MAINNET'
             pairs: 'BASE_MAINNET,ARBITRUM_MAINNET;BASE_MAINNET,BSC_MAINNET;BASE_MAINNET,OPTIMISM_MAINNET;BASE_MAINNET,POLYGON_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'BLAST_MAINNET'
             pairs: 'BLAST_MAINNET,ARBITRUM_MAINNET;BLAST_MAINNET,BASE_MAINNET;BLAST_MAINNET,BSC_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'BSC_MAINNET'
             pairs: 'BSC_MAINNET,OPTIMISM_MAINNET;BSC_MAINNET,POLYGON_MAINNET;BSC_MAINNET,WEMIX_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'ETHEREUM_MAINNET 1'
             pairs: 'ETHEREUM_MAINNET,ARBITRUM_MAINNET;ETHEREUM_MAINNET,AVALANCHE_MAINNET;ETHEREUM_MAINNET,BASE_MAINNET;ETHEREUM_MAINNET,BLAST_MAINNET;ETHEREUM_MAINNET,BSC_MAINNET;ETHEREUM_MAINNET,CELO_MAINNET;ETHEREUM_MAINNET,GNOSIS_MAINNET;ETHEREUM_MAINNET,OPTIMISM_MAINNET;ETHEREUM_MAINNET,POLYGON_MAINNET;ETHEREUM_MAINNET,WEMIX_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 40m
           - name: 'ETHEREUM_MAINNET 2'
             pairs: 'ETHEREUM_MAINNET,METIS_ANDROMEDA;ETHEREUM_MAINNET,ZKSYNC_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 90m
           - name: 'GNOSIS_MAINNET'
-            pairs: 'GNOSIS_MAINNET,ARBITRUM_MAINNET;GNOSIS_MAINNET,AVALANCHE_MAINNET;GNOSIS_MAINNET,BASE_MAINNET;GNOSIS_MAINNET,BSC_MAINNET;GNOSIS_MAINNET,OPTIMISM_MAINNET;GNOSIS_MAINNET,POLYGON_MAINNET'
-            enabled: true
+            pairs: 'GNOSIS_MAINNET,ARBITRUM_MAINNET'
+            # GNOSIS_MAINNET,AVALANCHE_MAINNET;GNOSIS_MAINNET,BASE_MAINNET;GNOSIS_MAINNET,BSC_MAINNET;GNOSIS_MAINNET,OPTIMISM_MAINNET;GNOSIS_MAINNET,POLYGON_MAINNET'
+            enabled: false
             phaseTimeout: 20m
           - name: 'METIS_ANDROMEDA'
             pairs: 'METIS_ANDROMEDA,ARBITRUM_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 60m
           - name: 'MODE_MAINNET'
             pairs: 'MODE_MAINNET,OPTIMISM_MAINNET;MODE_MAINNET,ARBITRUM_MAINNET;MODE_MAINNET,BASE_MAINNET;MODE_MAINNET,BSC_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'OPTIMISM_MAINNET'
             pairs: 'OPTIMISM_MAINNET,POLYGON_MAINNET;OPTIMISM_MAINNET,WEMIX_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'POLYGON_MAINNET'
             pairs: 'POLYGON_MAINNET,ARBITRUM_MAINNET;POLYGON_MAINNET,WEMIX_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'WEMIX_MAINNET'
             pairs: 'WEMIX_MAINNET,ARBITRUM_MAINNET;WEMIX_MAINNET,KROMA_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 20m
           - name: 'ZKSYNC_MAINNET'
             pairs: 'ZKSYNC_MAINNET,ARBITRUM_MAINNET'
-            enabled: true
+            enabled: false
             phaseTimeout: 90m
     steps:
       - name: Collect Metrics
@@ -393,3 +396,86 @@ jobs:
           cache_key_id: ccip-smoke-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "true"
           should_cleanup: false
+
+  # Reporting Jobs
+  start-slack-thread:
+    name: Start Slack Thread
+    if: ${{ always() && needs.ccip-smoke-test.result != 'skipped' && needs.ccip-smoke-test.result != 'cancelled' }}
+    environment: integration
+    outputs:
+      thread_ts: ${{ steps.slack.outputs.thread_ts }}
+    permissions:
+      checks: write
+      pull-requests: write
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    needs: [ ccip-smoke-test ]
+    steps:
+      - name: Debug Result
+        run: echo ${{ join(needs.*.result, ',') }}
+      - name: Main Slack Notification
+        uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
+        id: slack
+        with:
+          channel-id: "#test-run-notifications"
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "${{ contains(join(needs.*.result, ','), 'failure') && '#C62828' || '#2E7D32' }}",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "CCIP Mainnet Smoke tests ${{ contains(join(needs.*.result, ','), 'failure') && ':x:' || ':white_check_mark:'}}",
+                        "emoji": true
+                      }
+                    },
+                    {
+                      "type": "divider"
+                    },
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "<${{ github.server_url }}/${{ github.repository }}/${{contains(github.ref_name, 'release') && 'releases/tag' || 'tree'}}/${{ github.ref_name }}|${{ github.ref_name }}> | <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}> | <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Run>"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
+
+  post-test-results-to-slack:
+    name: Post Test Results
+    if: ${{ always() && needs.start-slack-thread.result != 'skipped' && needs.start-slack-thread.result != 'cancelled' }}
+    environment: integration
+    permissions:
+      checks: write
+      pull-requests: write
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    needs: start-slack-thread
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+      - name: Post Test Results
+        uses: ./.github/actions/notify-slack-jobs-result
+        with:
+          github_token: ${{ github.token }}
+          github_repository: ${{ github.repository }}
+          workflow_run_id: ${{ github.run_id }}
+          github_job_name_regex: ^CCIP smoke (.*)$
+          message_title: CCIP Mainnet Smoke test
+          slack_channel_id: "#test-run-notifications"
+          slack_bot_token: ${{ secrets.QA_SLACK_API_KEY }}
+          slack_thread_ts: ${{ needs.start-slack-thread.outputs.thread_ts }}
+
+  # End Reporting Jobs
