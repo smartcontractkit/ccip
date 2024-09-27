@@ -32,19 +32,21 @@ import (
 	"github.com/smartcontractkit/libocr/gethwrappers/offchainaggregator"
 	"github.com/smartcontractkit/libocr/gethwrappers2/ocr2aggregator"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
-	ctf_client "github.com/smartcontractkit/chainlink-testing-framework/lib/client"
-	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/chainlink"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/ethereum"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/foundry"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/mockserver"
-	mockservercfg "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/mockserver-cfg"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
-	reportModel "github.com/smartcontractkit/chainlink-testing-framework/lib/testreporters"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
+	"github.com/smartcontractkit/chainlink-testing-framework/havoc"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+	ctf_client "github.com/smartcontractkit/chainlink-testing-framework/client"
+	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/config"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/chainlink"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/ethereum"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/foundry"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver"
+	mockservercfg "github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver-cfg"
+	"github.com/smartcontractkit/chainlink-testing-framework/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/networks"
+	reportModel "github.com/smartcontractkit/chainlink-testing-framework/testreporters"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -279,6 +281,7 @@ func (o *OCRSoakTest) Setup(ocrTestConfig tt.OcrTestConfig) {
 	require.NoError(o.t, err, "Connecting to chainlink nodes shouldn't fail")
 	o.bootstrapNode, o.workerNodes = nodes[0], nodes[1:]
 	o.mockServer = ctf_client.ConnectMockServer(o.testEnvironment)
+	require.NoError(o.t, err, "Creating mockserver clients shouldn't fail")
 
 	linkContract, err := contracts.DeployLinkTokenContract(o.log, sethClient)
 	require.NoError(o.t, err, "Error deploying LINK contract")
@@ -547,8 +550,7 @@ func (o *OCRSoakTest) LoadState() error {
 	}
 
 	o.mockServer = ctf_client.ConnectMockServerURL(testState.MockServerURL)
-
-	return nil
+	return err
 }
 
 func (o *OCRSoakTest) Resume() {

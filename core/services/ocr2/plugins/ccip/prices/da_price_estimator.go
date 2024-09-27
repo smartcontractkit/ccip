@@ -19,6 +19,9 @@ type DAGasPriceEstimator struct {
 	feeEstimatorConfig  ccipdata.FeeEstimatorConfigReader
 	priceEncodingLength uint
 	daDeviationPPB      int64
+	daOverheadGas       int64
+	gasPerDAByte        int64
+	daMultiplier        int64
 }
 
 func NewDAGasPriceEstimator(

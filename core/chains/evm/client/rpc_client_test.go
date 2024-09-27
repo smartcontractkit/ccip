@@ -156,6 +156,33 @@ func TestRPCClient_SubscribeNewHead(t *testing.T) {
 			}()
 			wg.Wait()
 		}
+
+	})
+	t.Run("Concurrent Unsubscribe and onNewHead calls do not lead to a deadlock", func(t *testing.T) {
+		const numberOfAttempts = 1000 // need a large number to increase the odds of reproducing the issue
+		server := testutils.NewWSServer(t, chainId, serverCallBack)
+		wsURL := server.WSURL()
+
+		rpc := client.NewRPCClient(lggr, *wsURL, nil, "rpc", 1, chainId, commonclient.Primary, 0, commonclient.QueryTimeout, commonclient.QueryTimeout, "")
+		defer rpc.Close()
+		require.NoError(t, rpc.Dial(ctx))
+		var wg sync.WaitGroup
+		for i := 0; i < numberOfAttempts; i++ {
+			ch := make(chan *evmtypes.Head)
+			sub, err := rpc.SubscribeNewHead(tests.Context(t), ch)
+			require.NoError(t, err)
+			wg.Add(2)
+			go func() {
+				server.MustWriteBinaryMessageSync(t, makeNewHeadWSMessage(&evmtypes.Head{Number: 256, TotalDifficulty: big.NewInt(1000)}))
+				wg.Done()
+			}()
+			go func() {
+				rpc.UnsubscribeAllExceptAliveLoop()
+				sub.Unsubscribe()
+				wg.Done()
+			}()
+			wg.Wait()
+		}
 	})
 	t.Run("Block's chain ID matched configured", func(t *testing.T) {
 		server := testutils.NewWSServer(t, chainId, serverCallBack)

@@ -20,7 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
-
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 	evmClient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 )
 

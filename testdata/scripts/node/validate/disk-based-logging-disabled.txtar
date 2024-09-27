@@ -62,7 +62,7 @@ ShutdownGracePeriod = '5s'
 FeedsManager = true
 LogPoller = false
 UICSAKeys = false
-CCIP = false
+CCIP = true
 
 [Database]
 DefaultIdleInTxSessionTimeout = '1h0m0s'
@@ -319,12 +319,12 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = true
+FinalityTagEnabled = false
 LinkContractAddress = '0x514910771AF9Ca656af840dff83E8264EcF986CA'
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
 LogKeepBlocksDepth = 100000
-LogPrunePageSize = 10000
+LogPrunePageSize = 0
 BackupLogPollerBlockDelay = 100
 MinIncomingConfirmations = 3
 MinContractPayment = '0.1 link'
@@ -355,8 +355,8 @@ Mode = 'BlockHistory'
 PriceDefault = '20 gwei'
 PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
 PriceMin = '1 gwei'
-LimitDefault = 8000000
-LimitMax = 8000000
+LimitDefault = 500000
+LimitMax = 500000
 LimitMultiplier = '1'
 LimitTransfer = 21000
 EstimateLimit = false
@@ -374,9 +374,6 @@ BlockHistorySize = 4
 CheckInclusionBlocks = 12
 CheckInclusionPercentile = 90
 TransactionPercentile = 50
-
-[EVM.GasEstimator.FeeHistory]
-CacheTimeout = '10s'
 
 [EVM.HeadTracker]
 HistoryDepth = 100

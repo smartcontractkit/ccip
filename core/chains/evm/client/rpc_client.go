@@ -108,6 +108,8 @@ type RPCClient interface {
 
 const rpcSubscriptionMethodNewHeads = "newHeads"
 
+const rpcSubscriptionMethodNewHeads = "newHeads"
+
 type rawclient struct {
 	rpc  *rpc.Client
 	geth *ethclient.Client
@@ -550,14 +552,14 @@ func (r *rpcClient) SubscribeToHeads(ctx context.Context) (ch <-chan *evmtypes.H
 	return channel, forwarder, err
 }
 
-func (r *rpcClient) SubscribeToFinalizedHeads(_ context.Context) (<-chan *evmtypes.Head, commontypes.Subscription, error) {
+func (r *rpcClient) SubscribeToFinalizedHeads(ctx context.Context) (<-chan *evmtypes.Head, commontypes.Subscription, error) {
 	interval := r.finalizedBlockPollInterval
 	if interval == 0 {
 		return nil, nil, errors.New("FinalizedBlockPollInterval is 0")
 	}
 	timeout := interval
 	poller, channel := commonclient.NewPoller[*evmtypes.Head](interval, r.LatestFinalizedBlock, timeout, r.rpcLog)
-	if err := poller.Start(); err != nil {
+	if err := poller.Start(ctx); err != nil {
 		return nil, nil, err
 	}
 	return channel, &poller, nil

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/lib/utils/seth"
+	"github.com/smartcontractkit/chainlink/integration-tests/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -23,9 +23,9 @@ import (
 	ocr3 "github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 
 	ocr2keepers30config "github.com/smartcontractkit/chainlink-automation/pkg/v3/config"
-	ctfTestEnv "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
+	ctfTestEnv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
+	"github.com/smartcontractkit/chainlink-testing-framework/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions/automationv2"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
@@ -1427,7 +1427,7 @@ func setupAutomationTestDocker(
 	evmNetwork, err := env.GetFirstEvmNetwork()
 	require.NoError(t, err, "Error getting first evm network")
 
-	sethClient, err := seth_utils.GetChainClient(automationTestConfig, *evmNetwork)
+	sethClient, err := utils.TestAwareSethClient(t, automationTestConfig, evmNetwork)
 	require.NoError(t, err, "Error getting seth client")
 
 	err = actions.FundChainlinkNodesFromRootAddress(l, sethClient, contracts.ChainlinkClientToChainlinkNodeWithKeysAndAddress(env.ClCluster.NodeAPIs()), big.NewFloat(*automationTestConfig.GetCommonConfig().ChainlinkNodeFunding))

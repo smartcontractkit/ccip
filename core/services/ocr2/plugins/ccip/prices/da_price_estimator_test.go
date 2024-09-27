@@ -23,13 +23,13 @@ func TestDAPriceEstimator_GetGasPrice(t *testing.T) {
 	ctx := context.Background()
 
 	testCases := []struct {
-		name            string
-		daGasPrice      *big.Int
-		execGasPrice    *big.Int
-		expPrice        *big.Int
+		name         string
+		daGasPrice   *big.Int
+		execGasPrice *big.Int
+		expPrice     *big.Int
 		modExecGasPrice *big.Int
 		modDAGasPrice   *big.Int
-		expErr          bool
+		expErr       bool
 	}{
 		{
 			name:         "base",
@@ -422,7 +422,10 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					SourceTokenData: [][]byte{},
 				},
 			},
-			expUSD: execCostUSD,
+			daOverheadGas: 100_000,
+			gasPerDAByte:  16,
+			daMultiplier:  10_000, // 1x multiplier
+			expUSD:        execCostUSD,
 		},
 		{
 			name:               "double native price",
@@ -492,6 +495,7 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					Return(tc.execEstimatorResponse...)
 			}
 
+		t.Run(tc.name, func(t *testing.T) {
 			g := DAGasPriceEstimator{
 				execEstimator:       execEstimator,
 				l1Oracle:            nil,

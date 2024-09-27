@@ -618,6 +618,7 @@ func TestConfig_Marshal(t *testing.T) {
 						TransactionAlreadyMined:           ptr[string]("(: |^)transaction already mined"),
 						Fatal:                             ptr[string]("(: |^)fatal"),
 						ServiceUnavailable:                ptr[string]("(: |^)service unavailable"),
+						TooManyResults:                    ptr[string]("(: |^)too many results"),
 					},
 				},
 				OCR: evmcfg.OCR{
@@ -1096,6 +1097,7 @@ L2Full = '(: |^)l2 full'
 TransactionAlreadyMined = '(: |^)transaction already mined'
 Fatal = '(: |^)fatal'
 ServiceUnavailable = '(: |^)service unavailable'
+TooManyResults = '(: |^)too many results'
 
 [EVM.OCR]
 ContractConfirmations = 11
@@ -1373,7 +1375,7 @@ func TestConfig_Validate(t *testing.T) {
 		- 1: 2 errors:
 			- ChainID: missing: required for all chains
 			- Nodes: missing: must have at least one node
-	- Aptos.0.Enabled: invalid value (1): expected *bool`},
+	- Aptos.0.Enabled: invalid value (1): expected bool`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var c Config

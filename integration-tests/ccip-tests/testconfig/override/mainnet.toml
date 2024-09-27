@@ -1165,6 +1165,7 @@ TimeUnit = '1h'
 TestDuration = '5h'
 TestRunName = 'Soak_test_mainnet'
 FailOnFirstErrorInLoad = true
+SkipRequestIfAnotherRequestTriggeredWithin = '40m'
 
 
 [[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
@@ -1234,6 +1235,7 @@ LocalCluster = false
 ExistingDeployment = true
 ReuseContracts = true
 SkipRequestIfAnotherRequestTriggeredWithin = '24h'
+
 
 [CCIP.Groups.smoke.TokenConfig]
 NoOfTokensPerChain = 1

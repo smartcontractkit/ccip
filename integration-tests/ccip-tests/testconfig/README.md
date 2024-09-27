@@ -110,7 +110,7 @@ Or,
 DataFile = '<path/to/deployment.json>'
 ```
 
-## CCIP.Env 
+## CCIP.Env
 
 Specifies the environment details for the test to be run on.
 Mandatory fields are:
@@ -119,7 +119,16 @@ Mandatory fields are:
 - **NewCLCluster**: [CCIP.Env.NewCLCluster](#ccipenvnewclcluster) - This is mandatory if the test needs to deploy Chainlink nodes.
 - **ExistingCLCluster**: [CCIP.Env.ExistingCLCluster](#ccipenvexistingclcluster) - This is mandatory if the test needs to run on existing Chainlink nodes to deploy ccip jobs.
 
-Test needs network/chain details to be set through configuration. Set network urls in ~/.testsecrets [see docs](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md#test-secrets).
+Test needs network/chain details to be set through configuration. This configuration is mandatory for running the tests.
+you have option to set the network details in two ways:
+
+1. Using [CCIP.Env.Networks](#ccipenvnetworks)
+2. Using a separate network config file -
+   - refer to the example - [network_config.toml.example](./examples/network_config.toml.example)
+   - once all necessary values are set, encode the toml file content in base64 format,
+   - set the base64'ed string content in `BASE64_NETWORK_CONFIG` environment variable.
+
+Set network urls in ~/.testsecrets [see docs](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/config/README.md#test-secrets).
 
 ### CCIP.Env.Networks
 
@@ -139,7 +148,7 @@ If the network is not present in known_networks, then the network details can be
 
 #### CCIP.Env.Network.EVMNetworks
 
-Specifies the network config to be used while creating blockchain EVMClient for test. 
+Specifies the network config to be used while creating blockchain EVMClient for test.
 It is a map of network name to EVMNetworks where key is network name specified under `CCIP.Env.Networks.selected_networks` and value is `EVMNetwork`. 
 The EVMNetwork is imported from [EVMNetwork](https://github.com/smartcontractkit/chainlink-testing-framework/blob/main/blockchain/config.go#L43) in chainlink-testing-framework.
 
@@ -742,6 +751,11 @@ Specifies the duration network delay used for `NetworkChaos` experiment. This is
 #### CCIP.Groups.[testgroup].LoadProfile.WaitBetweenChaosDuringLoad
 
 If there are multiple chaos experiments, this specifies the duration to wait between each chaos experiment. This is only valid if the test is run on k8s and not on [existing deployments](#ccipgroupstestgroupexistingdeployment).
+
+#### CCIP.Groups.[testgroup].LoadProfile.SkipRequestIfAnotherRequestTriggeredWithin
+
+If a request is triggered within this duration, the test will skip sending another request during load run. For Example, if `SkipRequestIfAnotherRequestTriggeredWithin` is set to `40m`, and a request is triggered at 0th second, the test will skip sending another request for another 40m.
+This particular field is used to avoid sending multiple requests in a short duration during load run.
 
 #### CCIP.Groups.[testgroup].LoadProfile.OptimizeSpace
 

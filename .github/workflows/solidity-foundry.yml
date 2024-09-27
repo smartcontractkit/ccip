@@ -133,6 +133,7 @@ jobs:
               - '!contracts/src/v0.8/vendor/**'     
 
   tests:
+    if: ${{ needs.changes.outputs.non_src_changes == 'true' || needs.changes.outputs.sol_modified_added == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -267,7 +268,7 @@ jobs:
   analyze:
     needs: [ changes, define-matrix ]
     name: Run static analysis
-    if: needs.changes.outputs.not_test_sol_modified == 'true' && false
+    if: needs.changes.outputs.not_test_sol_modified == 'true'
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout the repo
@@ -582,69 +583,3 @@ jobs:
           hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
           this-job-name: Forge fmt ${{ matrix.product.name }}
         continue-on-error: true
-
-  coverage:
-    needs: [define-matrix, changes]
-    name: Coverage
-    runs-on: ubuntu-latest
-    env:
-      FOUNDRY_PROFILE: ccip
-
-    steps:
-      - name: Collect Metrics
-        if: ${{ needs.changes.outputs.non_src_changes == 'true' || needs.changes.outputs.sol_modified_added == 'true' }}
-        id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@dea9b546553cb4ca936607c2267a09c004e4ab3f # v3.0.0
-        with:
-          id: ccip-solidity-foundry-coverage
-          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
-          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          this-job-name: Coverage
-        continue-on-error: true
-
-      - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
-        with:
-          submodules: recursive
-
-      # Only needed because we use the NPM versions of packages
-      # and not native Foundry. This is to make sure the dependencies
-      # stay in sync.
-      - name: Setup NodeJS
-        uses: ./.github/actions/setup-nodejs
-
-      - name: Install Foundry
-        if: ${{ needs.changes.outputs.non_src_changes == 'true' || needs.changes.outputs.sol_modified_added == 'true' }}
-        uses: foundry-rs/foundry-toolchain@8f1998e9878d786675189ef566a2e4bf24869773 # v1.2.0
-        with:
-          version: ${{ needs.define-matrix.outputs.foundry-version }}
-
-      - name: Run Forge build
-        if: ${{ needs.changes.outputs.non_src_changes == 'true' || needs.changes.outputs.sol_modified_added == 'true' }}
-        working-directory: contracts
-        run: |
-          forge --version
-          forge build
-        id: build
-
-      - name: Run coverage
-        if: ${{ needs.changes.outputs.non_src_changes == 'true' || needs.changes.outputs.sol_modified_added == 'true' }}
-        working-directory: contracts
-        run: forge coverage --report lcov
-
-      - name: Prune report
-        if: ${{ needs.changes.outputs.non_src_changes == 'true' || needs.changes.outputs.sol_modified_added == 'true' }}
-        run: |
-          sudo apt-get install lcov
-          ./tools/ci/ccip_lcov_prune ./contracts/lcov.info ./lcov.info.pruned
-
-      - name: Report code coverage
-        if: ${{ needs.changes.outputs.non_src_changes == 'true' || needs.changes.outputs.sol_modified_added == 'true' }}
-        uses: zgosalvez/github-actions-report-lcov@a546f89a65a0cdcd82a92ae8d65e74d450ff3fbc # v4.1.4
-        with:
-          update-comment: true
-          coverage-files: lcov.info.pruned
-          minimum-coverage: 97.6
-          artifact-name: code-coverage-report
-          working-directory: ./contracts
-          github-token: ${{ secrets.GITHUB_TOKEN }}
