@@ -130,7 +130,7 @@ contract RMNHome_setCandidate is RMNHomeTest {
     s_rmnHome.setCandidate(config.staticConfig, config.dynamicConfig, ZERO_DIGEST);
 
     vm.expectEmit();
-    emit RMNHome.ConfigRevoked(digest);
+    emit RMNHome.CandidateConfigRevoked(digest);
 
     s_rmnHome.setCandidate(config.staticConfig, config.dynamicConfig, digest);
   }
@@ -160,7 +160,7 @@ contract RMNHome_revokeCandidate is RMNHomeTest {
     (bytes32 priorActiveDigest, bytes32 priorCandidateDigest) = s_rmnHome.getConfigDigests();
 
     vm.expectEmit();
-    emit RMNHome.ConfigRevoked(priorCandidateDigest);
+    emit RMNHome.CandidateConfigRevoked(priorCandidateDigest);
 
     s_rmnHome.revokeCandidate(priorCandidateDigest);
 
@@ -220,7 +220,7 @@ contract RMNHome_promoteCandidateAndRevokeActive is RMNHomeTest {
     bytes32 secondConfigToPromote = s_rmnHome.setCandidate(config.staticConfig, config.dynamicConfig, ZERO_DIGEST);
 
     vm.expectEmit();
-    emit RMNHome.ConfigRevoked(firstConfigToPromote);
+    emit RMNHome.ActiveConfigRevoked(firstConfigToPromote);
 
     vm.expectEmit();
     emit RMNHome.ConfigPromoted(secondConfigToPromote);

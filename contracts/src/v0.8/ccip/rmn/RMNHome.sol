@@ -40,7 +40,8 @@ import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 /// config as candidate and promote that, but fully clearing it is cleaner.
 contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   event ConfigSet(bytes32 indexed configDigest, uint32 version, StaticConfig staticConfig, DynamicConfig dynamicConfig);
-  event ConfigRevoked(bytes32 indexed configDigest);
+  event ActiveConfigRevoked(bytes32 indexed configDigest);
+  event CandidateConfigRevoked(bytes32 indexed configDigest);
   event DynamicConfigSet(bytes32 indexed configDigest, DynamicConfig dynamicConfig);
   event ConfigPromoted(bytes32 indexed configDigest);
 
@@ -63,7 +64,8 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   struct SourceChain {
     uint64 chainSelector; // ─────╮ The Source chain selector.
     uint64 minObservers; // ──────╯ Required number of observers to agree on an observation for this source chain.
-    uint256 observerNodesBitmap; // ObserverNodesBitmap & (1<<i) == (1<<i) iff nodes[i] is an observer for this source chain.
+    // ObserverNodesBitmap & (1<<i) == (1<<i) iff StaticConfig.nodes[i] is an observer for this source chain.
+    uint256 observerNodesBitmap;
   }
 
   struct StaticConfig {
@@ -195,7 +197,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
 
     // are we going to overwrite a config? If so, emit an event.
     if (existingDigest != ZERO_DIGEST) {
-      emit ConfigRevoked(digestToOverwrite);
+      emit CandidateConfigRevoked(digestToOverwrite);
     }
 
     uint32 newVersion = ++s_currentVersion;
@@ -226,7 +228,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
       revert ConfigDigestMismatch(s_configs[candidateConfigIndex].configDigest, configDigest);
     }
 
-    emit ConfigRevoked(configDigest);
+    emit CandidateConfigRevoked(configDigest);
     // Delete only the digest, as that's what's used to determine if a config is active. This means the actual
     // config stays in storage which should significantly reduce the gas cost of overwriting that storage space in
     // the future.
@@ -258,7 +260,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
 
     s_activeConfigIndex ^= 1;
     if (digestToRevoke != ZERO_DIGEST) {
-      emit ConfigRevoked(digestToRevoke);
+      emit ActiveConfigRevoked(digestToRevoke);
     }
     emit ConfigPromoted(digestToPromote);
   }
