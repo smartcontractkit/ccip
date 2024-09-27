@@ -1,19 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
-import {IOwnable} from "../../../shared/interfaces/IOwnable.sol";
 import {IGetCCIPAdmin} from "../../../ccip/interfaces/IGetCCIPAdmin.sol";
+import {IOwnable} from "../../../shared/interfaces/IOwnable.sol";
+import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 
 import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
 
 import {ERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
-import {ERC20Burnable} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {ERC20Burnable} from
+  "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice A basic ERC20 compatible token contract with burn and minting roles.
+/// @dev The constructor has been modified to support the deployment pattern used by a factory contract.
 /// @dev The total supply can be limited during deployment.
 contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Burnable, OwnerIsCreator {
   using EnumerableSet for EnumerableSet.AddressSet;
@@ -68,11 +71,8 @@ contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Bu
   }
 
   function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
-    return
-      interfaceId == type(IERC20).interfaceId ||
-      interfaceId == type(IBurnMintERC20).interfaceId ||
-      interfaceId == type(IERC165).interfaceId ||
-      interfaceId == type(IOwnable).interfaceId;
+    return interfaceId == type(IERC20).interfaceId || interfaceId == type(IBurnMintERC20).interfaceId
+      || interfaceId == type(IERC165).interfaceId || interfaceId == type(IOwnable).interfaceId;
   }
 
   // ================================================================
