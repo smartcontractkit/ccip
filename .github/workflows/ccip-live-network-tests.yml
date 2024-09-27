@@ -234,12 +234,10 @@ jobs:
           should_cleanup: false
           
   ccip-smoke-test:
-    name: 'CCIP smoke - Source: ${{ matrix.lanes.name }}'
+    name: 'CCIP Smoke - Source: ${{ matrix.lanes.name }}'
     environment: integration
     runs-on: ubuntu-latest
     needs: [ build-chainlink ]
-    # if the event is a scheduled event or the test type is smoke and no previous job failed
-    if: ${{ (github.event_name == 'schedule' || inputs.test_type == 'smoke') && !contains(needs.*.result, 'failure') &&  matrix.lanes.enabled == 'true' }}
     permissions:
       issues: read
       checks: write
@@ -313,6 +311,8 @@ jobs:
             pairs: 'ZKSYNC_MAINNET,ARBITRUM_MAINNET'
             enabled: false
             phaseTimeout: 90m
+    # if the event is a scheduled event or the test type is smoke and no previous job failed
+    if: ${{ (github.event_name == 'schedule' || inputs.test_type == 'smoke') && !contains(needs.*.result, 'failure') && matrix.lanes.enabled == 'true' }}
     steps:
       - name: Collect Metrics
         if: ${{ matrix.lanes.enabled == true }}
@@ -472,7 +472,7 @@ jobs:
           github_token: ${{ github.token }}
           github_repository: ${{ github.repository }}
           workflow_run_id: ${{ github.run_id }}
-          github_job_name_regex: ^CCIP smoke (.*)$
+          github_job_name_regex: ^CCIP Smoke (.*)$
           message_title: CCIP Mainnet Smoke test
           slack_channel_id: "#test_notif"
           slack_bot_token: ${{ secrets.QA_SLACK_API_KEY }}
