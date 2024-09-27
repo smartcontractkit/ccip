@@ -276,7 +276,7 @@ func (l *LoadArgs) TriggerLoadByLane() {
 		ccipLoad := NewCCIPLoad(
 			l.TestCfg.Test, lane, l.TestCfg.TestGroupInput.PhaseTimeout.Duration(),
 			100000, l.TestCfg.TestGroupInput.LoadProfile.MsgProfile, sendMaxData,
-			l.TestCfg.TestGroupInput.LoadProfile.SkipRequestIfAnotherRequestTriggeredWithin,
+			l.TestCfg.TestGroupInput.SkipRequestIfAnotherRequestTriggeredWithin,
 		)
 		ccipLoad.BeforeAllCall()
 		// if it's not multicall set the tokens to nil to free up some space,
