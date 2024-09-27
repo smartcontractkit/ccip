@@ -48,6 +48,10 @@ install-chainlink: operator-ui ## Install the chainlink binary.
 install-chainlink-cover: operator-ui ## Install the chainlink binary with cover flag.
 	go install -cover $(GOFLAGS) .
 
+.PHONY: install-chainlink-delve
+install-chainlink-delve: operator-ui ## Install the chainlink binary.
+	go install $(GOFLAGS) -gcflags "all=-N -l" .
+
 .PHONY: chainlink
 chainlink: ## Build the chainlink binary.
 	go build $(GOFLAGS) .
