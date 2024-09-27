@@ -926,4 +926,36 @@ contract HybridUSDCTokenPoolMigrationTests is HybridUSDCTokenPoolTests {
     );
     s_usdcTokenPool.provideLiquidity(DEST_CHAIN_SELECTOR, 1e6);
   }
+
+  function test_cannotRevertChainMechanism_afterMigration_Revert() public {
+    test_lockOrBurn_then_BurnInCCTPMigration_Success();
+
+    vm.startPrank(OWNER);
+
+    // Mark the destination chain as supporting CCTP, so use L/R instead.
+    uint64[] memory destChainAdds = new uint64[](1);
+    destChainAdds[0] = DEST_CHAIN_SELECTOR;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        HybridLockReleaseUSDCTokenPool.TokenLockingNotAllowedAfterMigration.selector, DEST_CHAIN_SELECTOR
+      )
+    );
+
+    s_usdcTokenPool.updateChainSelectorMechanisms(new uint64[](0), destChainAdds);
+  }
+
+  function test_cnanotProvideLiquidity_AfterMigration_Revert() public {
+    test_lockOrBurn_then_BurnInCCTPMigration_Success();
+
+    vm.startPrank(OWNER);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        HybridLockReleaseUSDCTokenPool.TokenLockingNotAllowedAfterMigration.selector, DEST_CHAIN_SELECTOR
+      )
+    );
+
+    s_usdcTokenPool.provideLiquidity(DEST_CHAIN_SELECTOR, 1e6);
+  }
 }

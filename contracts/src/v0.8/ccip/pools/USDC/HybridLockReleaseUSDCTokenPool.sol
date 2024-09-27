@@ -99,7 +99,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     _validateReleaseOrMint(releaseOrMintIn);
 
     // Circle requires a supply-lock to prevent incoming messages once the migration process begins.
-    // This prevents new outgoing messages once the migration has begun to ensure any the procedure runs as expected
+    // This prevents new incoming messages once the migration has begun to ensure any the procedure runs as expected
     if (s_proposedUSDCMigrationChain == releaseOrMintIn.remoteChainSelector) {
       revert LanePausedForCCTPMigration(s_proposedUSDCMigrationChain);
     }
@@ -170,6 +170,10 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
   function provideLiquidity(uint64 remoteChainSelector, uint256 amount) external {
     if (s_liquidityProvider[remoteChainSelector] != msg.sender) revert TokenPool.Unauthorized(msg.sender);
 
+    if (s_migratedChains.contains(remoteChainSelector)) {
+      revert TokenLockingNotAllowedAfterMigration(remoteChainSelector);
+    }
+
     if (remoteChainSelector == s_proposedUSDCMigrationChain) {
       revert LanePausedForCCTPMigration(remoteChainSelector);
     }
@@ -236,9 +240,10 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     return s_shouldUseLockRelease[remoteChainSelector];
   }
 
-  /// @notice Updates Updates designations for chains on whether to use primary or alt mechanism on CCIP messages
+  /// @notice Updates designations for chains on whether to use primary or alt mechanism on CCIP messages
   /// @param removes A list of chain selectors to disable Lock-Release, and enforce BM
-  /// @param adds A list of chain selectors to enable LR instead of BM
+  /// @param adds A list of chain selectors to enable LR instead of BM. These chains must not have been migrated
+  /// to CCTP yet or the transaction will revert
   function updateChainSelectorMechanisms(uint64[] calldata removes, uint64[] calldata adds) external onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
       delete s_shouldUseLockRelease[removes[i]];
@@ -246,6 +251,10 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     }
 
     for (uint256 i = 0; i < adds.length; ++i) {
+      // Prevent enabling lock release on chains which have already been migrated
+      if (s_migratedChains.contains(adds[i])) {
+        revert TokenLockingNotAllowedAfterMigration(adds[i]);
+      }
       s_shouldUseLockRelease[adds[i]] = true;
       emit LockReleaseEnabled(adds[i]);
     }

@@ -37,6 +37,8 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
 
   mapping(uint64 chainSelector => bool shouldUseLockRelease) internal s_shouldUseLockRelease;
 
+  EnumerableSet.UintSet internal s_migratedChains;
+
   constructor(address token, address router) {
     i_USDC = IBurnMintERC20(token);
     i_router = Router(router);
@@ -69,6 +71,8 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
 
     // Disable L/R automatically on burned chain and enable CCTP
     delete s_shouldUseLockRelease[burnChainSelector];
+
+    s_migratedChains.add(burnChainSelector);
 
     emit CCTPMigrationExecuted(burnChainSelector, tokensToBurn);
   }
