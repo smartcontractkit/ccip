@@ -7,6 +7,37 @@ import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 
 /// @notice Stores the home configuration for RMN, that is referenced by CCIP oracles, RMN nodes, and the RMNRemote
 /// contracts.
+/// @dev This contract is a state machine with the following states:
+/// - Init: The initial state of the contract, no config has been set, or all configs have been revoked.
+///   [0, 0]
+///
+/// - Candidate: A new config has been set, but it has not been promoted yet, or all active configs have been revoked.
+///   [0, 1]
+///
+/// - Active: A non-zero config has been promoted and is active, there is no candidate configured.
+///   [1, 0]
+///
+/// - ActiveAndCandidate: A non-zero config has been promoted and is active, and a new config has been set as candidate.
+///   [1, 1]
+///
+/// The following state transitions are allowed:
+/// - Init -> Candidate: setCandidate()
+/// - Candidate -> Active: promoteCandidateAndRevokeActive()
+/// - Candidate -> Candidate: setCandidate()
+/// - Candidate -> Init: revokeCandidate()
+/// - Active -> ActiveAndCandidate: setCandidate()
+/// - Active -> Init: promoteCandidateAndRevokeActive()
+/// - ActiveAndCandidate -> Active: promoteCandidateAndRevokeActive()
+/// - ActiveAndCandidate -> Active: revokeCandidate()
+/// - ActiveAndCandidate -> ActiveAndCandidate: setCandidate()
+///
+/// This means the following calls are not allowed at the following states:
+/// - Init: promoteCandidateAndRevokeActive(), as there is no config to promote.
+/// - Init: revokeCandidate(), as there is no config to revoke
+/// - Active: revokeCandidate(), as there is no candidate to revoke
+/// Note that we explicitly do allow promoteCandidateAndRevokeActive() to be called when there is an active config but
+/// no candidate config. This is the only way to remove the active config. The alternative would be to set some unusable
+/// config as candidate and promote that, but fully clearing it is cleaner.
 contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   event ConfigSet(bytes32 indexed configDigest, uint32 version, StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event ConfigRevoked(bytes32 indexed configDigest);
@@ -21,6 +52,8 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   error MinObserversTooHigh();
   error ConfigDigestMismatch(bytes32 expectedConfigDigest, bytes32 gotConfigDigest);
   error DigestNotFound(bytes32 configDigest);
+  error RevokingZeroDigestNotAllowed();
+  error NoOpStateTransitionNotAllowed();
 
   struct Node {
     bytes32 peerId; //            Used for p2p communication.
@@ -72,8 +105,8 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   /// @dev Value i in this array is valid iff s_configs[i].configDigest != 0.
   VersionedConfig[MAX_CONCURRENT_CONFIGS] private s_configs;
 
-  /// @notice The total number of configs ever set, used for generating the version of the configs.
-  uint32 private s_configCount = 0;
+  /// @notice The latest version set, incremented by one for each new config.
+  uint32 private s_currentVersion = 0;
   /// @notice The index of the active config. Used to determine which config is active. Adding the configs to a list
   /// with two items and using this index to determine which one is active is a gas efficient way to handle this. Having
   /// a set place for the active config would mean we have to copy the candidate config to the active config when it is
@@ -94,7 +127,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   }
 
   /// @notice Returns the active config digest
-  function getActiveDigest() public view returns (bytes32) {
+  function getActiveDigest() external view returns (bytes32) {
     return s_configs[s_activeConfigIndex].configDigest;
   }
 
@@ -165,7 +198,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
       emit ConfigRevoked(digestToOverwrite);
     }
 
-    uint32 newVersion = ++s_configCount;
+    uint32 newVersion = ++s_currentVersion;
     newConfigDigest = _calculateConfigDigest(abi.encode(staticConfig), newVersion);
 
     VersionedConfig storage existingConfig = s_configs[s_activeConfigIndex ^ 1];
@@ -184,6 +217,10 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   /// newer candidate config using `setCandidate`.
   /// @param configDigest The digest of the config to revoke. This is done to prevent accidental revokes.
   function revokeCandidate(bytes32 configDigest) external onlyOwner {
+    if (configDigest == ZERO_DIGEST) {
+      revert RevokingZeroDigestNotAllowed();
+    }
+
     uint256 candidateConfigIndex = s_activeConfigIndex ^ 1;
     if (s_configs[candidateConfigIndex].configDigest != configDigest) {
       revert ConfigDigestMismatch(s_configs[candidateConfigIndex].configDigest, configDigest);
@@ -203,17 +240,21 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   /// - The activeConfigIndex is flipped.
   /// - The digest of the old active config is deleted.
   function promoteCandidateAndRevokeActive(bytes32 digestToPromote, bytes32 digestToRevoke) external onlyOwner {
+    if (digestToPromote == ZERO_DIGEST && digestToRevoke == ZERO_DIGEST) {
+      revert NoOpStateTransitionNotAllowed();
+    }
+
     uint256 candidateConfigIndex = s_activeConfigIndex ^ 1;
     if (s_configs[candidateConfigIndex].configDigest != digestToPromote) {
       revert ConfigDigestMismatch(s_configs[candidateConfigIndex].configDigest, digestToPromote);
     }
 
-    uint256 activeConfigIndex = s_activeConfigIndex;
-    if (s_configs[activeConfigIndex].configDigest != digestToRevoke) {
-      revert ConfigDigestMismatch(s_configs[activeConfigIndex].configDigest, digestToRevoke);
+    VersionedConfig storage activeConfig = s_configs[s_activeConfigIndex];
+    if (activeConfig.configDigest != digestToRevoke) {
+      revert ConfigDigestMismatch(activeConfig.configDigest, digestToRevoke);
     }
 
-    delete s_configs[activeConfigIndex].configDigest;
+    delete activeConfig.configDigest;
 
     s_activeConfigIndex ^= 1;
     if (digestToRevoke != ZERO_DIGEST) {

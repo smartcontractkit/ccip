@@ -186,6 +186,11 @@ contract RMNHome_revokeCandidate is RMNHomeTest {
     s_rmnHome.revokeCandidate(wrongDigest);
   }
 
+  function test_revokeCandidate_RevokingZeroDigestNotAllowed_reverts() public {
+    vm.expectRevert(RMNHome.RevokingZeroDigestNotAllowed.selector);
+    s_rmnHome.revokeCandidate(ZERO_DIGEST);
+  }
+
   function test_revokeCandidate_OnlyOwner_reverts() public {
     vm.startPrank(address(0));
 
@@ -229,6 +234,11 @@ contract RMNHome_promoteCandidateAndRevokeActive is RMNHomeTest {
     assertEq(activeConfig.dynamicConfig.offchainConfig, config.dynamicConfig.offchainConfig);
 
     assertEq(candidateConfig.configDigest, ZERO_DIGEST);
+  }
+
+  function test_promoteCandidateAndRevokeActive_NoOpStateTransitionNotAllowed_reverts() public {
+    vm.expectRevert(RMNHome.NoOpStateTransitionNotAllowed.selector);
+    s_rmnHome.promoteCandidateAndRevokeActive(ZERO_DIGEST, ZERO_DIGEST);
   }
 
   function test_promoteCandidateAndRevokeActive_ConfigDigestMismatch_reverts() public {
