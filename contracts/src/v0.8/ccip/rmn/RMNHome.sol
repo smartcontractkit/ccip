@@ -38,6 +38,24 @@ import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 /// Note that we explicitly do allow promoteCandidateAndRevokeActive() to be called when there is an active config but
 /// no candidate config. This is the only way to remove the active config. The alternative would be to set some unusable
 /// config as candidate and promote that, but fully clearing it is cleaner.
+///
+///       ┌─────────────┐   setCandidate     ┌─────────────┐
+///       │             ├───────────────────►│             │ setCandidate
+///       │    Init     │   revokeCandidate  │  Candidate  │◄───────────┐
+///       │    [0,0]    │◄───────────────────┤    [0,1]    │────────────┘
+///       │             │  ┌─────────────────┤             │
+///       └─────────────┘  │  promote-       └─────────────┘
+///                  ▲     │  Candidate
+///        promote-  │     │
+///        Candidate │     │
+///                  │     │
+///       ┌──────────┴──┐  │  promote-       ┌─────────────┐
+///       │             │◄─┘  Candidate OR   │  Active &   │ setCandidate
+///       │    Active   │    revokeCandidate │  Candidate  │◄───────────┐
+///       │    [1,0]    │◄───────────────────┤    [1,1]    │────────────┘
+///       │             ├───────────────────►│             │
+///       └─────────────┘    setSecondary    └─────────────┘
+///
 contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   event ConfigSet(bytes32 indexed configDigest, uint32 version, StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event ActiveConfigRevoked(bytes32 indexed configDigest);
@@ -125,17 +143,17 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
   /// @return activeConfigDigest The digest of the active config.
   /// @return candidateConfigDigest The digest of the candidate config.
   function getConfigDigests() external view returns (bytes32 activeConfigDigest, bytes32 candidateConfigDigest) {
-    return (s_configs[s_activeConfigIndex].configDigest, s_configs[s_activeConfigIndex ^ 1].configDigest);
+    return (s_configs[getActiveIndex()].configDigest, s_configs[getCandidateIndex()].configDigest);
   }
 
   /// @notice Returns the active config digest
   function getActiveDigest() external view returns (bytes32) {
-    return s_configs[s_activeConfigIndex].configDigest;
+    return s_configs[getActiveIndex()].configDigest;
   }
 
   /// @notice Returns the candidate config digest
   function getCandidateDigest() public view returns (bytes32) {
-    return s_configs[s_activeConfigIndex ^ 1].configDigest;
+    return s_configs[getCandidateIndex()].configDigest;
   }
 
   /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes. Use
@@ -159,12 +177,12 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     view
     returns (VersionedConfig memory activeConfig, VersionedConfig memory candidateConfig)
   {
-    VersionedConfig memory storedActiveConfig = s_configs[s_activeConfigIndex];
+    VersionedConfig memory storedActiveConfig = s_configs[getActiveIndex()];
     if (storedActiveConfig.configDigest != ZERO_DIGEST) {
       activeConfig = storedActiveConfig;
     }
 
-    VersionedConfig memory storedCandidateConfig = s_configs[s_activeConfigIndex ^ 1];
+    VersionedConfig memory storedCandidateConfig = s_configs[getCandidateIndex()];
     if (storedCandidateConfig.configDigest != ZERO_DIGEST) {
       candidateConfig = storedCandidateConfig;
     }
@@ -203,7 +221,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
     uint32 newVersion = ++s_currentVersion;
     newConfigDigest = _calculateConfigDigest(abi.encode(staticConfig), newVersion);
 
-    VersionedConfig storage existingConfig = s_configs[s_activeConfigIndex ^ 1];
+    VersionedConfig storage existingConfig = s_configs[getCandidateIndex()];
     existingConfig.configDigest = newConfigDigest;
     existingConfig.version = newVersion;
     existingConfig.staticConfig = staticConfig;
@@ -223,7 +241,7 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
       revert RevokingZeroDigestNotAllowed();
     }
 
-    uint256 candidateConfigIndex = s_activeConfigIndex ^ 1;
+    uint256 candidateConfigIndex = getCandidateIndex();
     if (s_configs[candidateConfigIndex].configDigest != configDigest) {
       revert ConfigDigestMismatch(s_configs[candidateConfigIndex].configDigest, configDigest);
     }
@@ -246,12 +264,12 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
       revert NoOpStateTransitionNotAllowed();
     }
 
-    uint256 candidateConfigIndex = s_activeConfigIndex ^ 1;
+    uint256 candidateConfigIndex = getCandidateIndex();
     if (s_configs[candidateConfigIndex].configDigest != digestToPromote) {
       revert ConfigDigestMismatch(s_configs[candidateConfigIndex].configDigest, digestToPromote);
     }
 
-    VersionedConfig storage activeConfig = s_configs[s_activeConfigIndex];
+    VersionedConfig storage activeConfig = s_configs[getActiveIndex()];
     if (activeConfig.configDigest != digestToRevoke) {
       revert ConfigDigestMismatch(activeConfig.configDigest, digestToRevoke);
     }
@@ -297,6 +315,14 @@ contract RMNHome is OwnerIsCreator, ITypeAndVersion {
           ) & ~PREFIX_MASK
         )
     );
+  }
+
+  function getActiveIndex() private view returns (uint32) {
+    return s_activeConfigIndex;
+  }
+
+  function getCandidateIndex() private view returns (uint32) {
+    return s_activeConfigIndex ^ 1;
   }
 
   // ================================================================
