@@ -1,6 +1,7 @@
 package txmgr
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -1026,7 +1027,9 @@ func (ec *Confirmer[CHAIN_ID, HEAD, ADDR, TX_HASH, BLOCK_HASH, R, SEQ, FEE]) han
 // If any of the confirmed transactions does not have a receipt in the chain, it has been
 // re-org'd out and will be rebroadcast.
 func (ec *Confirmer[CHAIN_ID, HEAD, ADDR, TX_HASH, BLOCK_HASH, R, SEQ, FEE]) EnsureConfirmedTransactionsInLongestChain(ctx context.Context, head types.Head[BLOCK_HASH]) error {
-	if head.ChainLength() < ec.chainConfig.FinalityDepth() {
+	earliestInChain := head.EarliestHeadInChain().BlockNumber()
+	chainLength := head.BlockNumber() - earliestInChain
+	if uint32(chainLength) < ec.chainConfig.FinalityDepth() {
 		logArgs := []interface{}{
 			"chainLength", head.ChainLength(), "finalityDepth", ec.chainConfig.FinalityDepth(),
 		}
@@ -1041,16 +1044,37 @@ func (ec *Confirmer[CHAIN_ID, HEAD, ADDR, TX_HASH, BLOCK_HASH, R, SEQ, FEE]) Ens
 	} else {
 		ec.nConsecutiveBlocksChainTooShort = 0
 	}
-	etxs, err := ec.txStore.FindTransactionsConfirmedInBlockRange(ctx, head.BlockNumber(), head.EarliestHeadInChain().BlockNumber(), ec.chainID)
+	etxs, err := ec.txStore.FindTransactionsConfirmedInBlockRange(ctx, head.BlockNumber(), earliestInChain, ec.chainID)
 	if err != nil {
 		return fmt.Errorf("findTransactionsConfirmedInBlockRange failed: %w", err)
 	}
 
-	for _, etx := range etxs {
-		if !hasReceiptInLongestChain(*etx, head) {
-			if err := ec.markForRebroadcast(ctx, *etx, head); err != nil {
-				return fmt.Errorf("markForRebroadcast failed for etx %v: %w", etx.ID, err)
+	missingTxs := make(map[int64]*txmgrtypes.Tx[CHAIN_ID, ADDR, TX_HASH, BLOCK_HASH, SEQ, FEE], len(etxs))
+	txsByReceiptsBlock := make(map[BLOCK_HASH][]int64, len(etxs))
+	for i := range etxs {
+		missingTxs[etxs[i].ID] = etxs[i]
+		for _, attempts := range etxs[i].TxAttempts {
+			for _, receipt := range attempts.Receipts {
+				txsByReceiptsBlock[receipt.GetBlockHash()] = append(txsByReceiptsBlock[receipt.GetBlockHash()], etxs[i].ID)
 			}
+		}
+	}
+
+	for cur := head; cur != nil; cur = cur.GetParent() {
+		txIDs, ok := txsByReceiptsBlock[cur.BlockHash()]
+		if !ok {
+			continue
+		}
+
+		for _, txID := range txIDs {
+			delete(missingTxs, txID)
+		}
+
+	}
+
+	for _, etx := range missingTxs {
+		if err := ec.markForRebroadcast(ctx, *etx, head); err != nil {
+			return fmt.Errorf("markForRebroadcast failed for etx %v: %w", etx.ID, err)
 		}
 	}
 
@@ -1088,15 +1112,16 @@ func hasReceiptInLongestChain[
 	for {
 		for _, attempt := range etx.TxAttempts {
 			for _, receipt := range attempt.Receipts {
-				if receipt.GetBlockHash().String() == head.BlockHash().String() && receipt.GetBlockNumber().Int64() == head.BlockNumber() {
+				if receipt.GetBlockNumber().Int64() == head.BlockNumber() && bytes.Equal(receipt.GetBlockHash().Bytes(), head.BlockHash().Bytes()) {
 					return true
 				}
 			}
 		}
-		if head.GetParent() == nil {
+
+		head = head.GetParent()
+		if head == nil {
 			return false
 		}
-		head = head.GetParent()
 	}
 }
 
