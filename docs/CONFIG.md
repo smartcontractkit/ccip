@@ -8097,7 +8097,7 @@ ResendAfterThreshold = '1m0s'
 
 [Transactions.AutoPurge]
 Enabled = true
-DetectionApiUrl = 'https://sepolia-venus.scroll.io'
+DetectionApiUrl = 'https://venus.scroll.io'
 
 [BalanceMonitor]
 Enabled = true
