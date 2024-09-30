@@ -206,7 +206,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 		for i, read := range offchainAggregatorRespSlice {
 			val, readErr := read.GetResult()
 			if readErr != nil {
-				respErr = multierr.Append(respErr, fmt.Errorf("error with method call %v: %w", batchCalls.decimalCalls[i].MethodName(), readErr))
+				respErr = multierr.Append(respErr, fmt.Errorf("error with contract reader readName %v: %w", read.ReadName, readErr))
 				continue
 			}
 			if read.ReadName == DECIMALS_METHOD_NAME {
