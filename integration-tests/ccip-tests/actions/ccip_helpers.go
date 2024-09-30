@@ -1648,7 +1648,10 @@ func (sourceCCIP *SourceCCIPModule) IsRequestTriggeredWithinTimeframe(timeframe 
 
 // IsPastRequestTriggeredWithinTimeframe determines the average block time and calculates the block numbers
 // within the specified timeframe. It then uses FilterCCIPSendRequested to identify the past events.
-func (sourceCCIP *SourceCCIPModule) IsPastRequestTriggeredWithinTimeframe(ctx context.Context, timeframe *commonconfig.Duration) (*time.Time, error) {
+func (sourceCCIP *SourceCCIPModule) IsPastRequestTriggeredWithinTimeframe(
+	ctx context.Context,
+	timeframe *commonconfig.Duration,
+) (*types.Log, error) {
 	if timeframe == nil {
 		return nil, nil
 	}
@@ -1675,17 +1678,21 @@ func (sourceCCIP *SourceCCIPModule) IsPastRequestTriggeredWithinTimeframe(ctx co
 		return nil, fmt.Errorf("error while filtering CCIP send requested starting block number: %d. Error: %w", filterFromBlock, err)
 	}
 	defer func() {
-		_ = iterator.Close()
-	}()
-	if iterator.Next() {
-		hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(iterator.Event.Raw.BlockNumber)))
-		if err != nil {
-			return nil, fmt.Errorf("error getting header for block: %d, Error: %w", iterator.Event.Raw.BlockNumber, err)
+		iterErr := iterator.Close()
+		if iterErr != nil {
+			sourceCCIP.Common.Logger.Error().Err(iterErr).Msg("Error closing iterator")
 		}
-		return pointer.ToTime(hdr.Timestamp), nil
+	}()
+	lastBlockNumber := uint64(0)
+	var latestEvent *types.Log
+	for iterator.Next() {
+		blockNum := iterator.Event.Raw.BlockNumber
+		if blockNum > lastBlockNumber {
+			lastBlockNumber = blockNum
+			latestEvent = &iterator.Event.Raw
+		}
 	}
-
-	return nil, nil
+	return latestEvent, nil
 }
 
 func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
