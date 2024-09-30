@@ -64,6 +64,7 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
   error FChainTooHigh(uint256 fChain, uint256 FRoleDON);
   error TooManySigners();
   error FTooHigh();
+  error RMNHomeAddressCannotBeZero();
   error InvalidNode(OCR3Node node);
   error NotEnoughTransmitters(uint256 got, uint256 minimum);
   error OnlyCapabilitiesRegistryCanCall();
@@ -100,6 +101,7 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
     uint8 FRoleDON; //                     | The "big F" parameter for the role DON.
     uint64 offchainConfigVersion; // ──────╯ The version of the exec offchain configuration.
     bytes offrampAddress; // The remote chain offramp address.
+    bytes rmnHomeAddress; // The home chain RMN home address.
     OCR3Node[] nodes; // Keys & IDs of nodes part of the role DON
     bytes offchainConfig; // The offchain configuration for the OCR3 plugin. Protobuf encoded.
   }
@@ -434,6 +436,9 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
     }
     if (cfg.offrampAddress.length == 0 || keccak256(cfg.offrampAddress) == EMPTY_ENCODED_ADDRESS_HASH) {
       revert OfframpAddressCannotBeZero();
+    }
+    if (cfg.rmnHomeAddress.length == 0 || keccak256(cfg.rmnHomeAddress) == EMPTY_ENCODED_ADDRESS_HASH) {
+      revert RMNHomeAddressCannotBeZero();
     }
     if (!s_remoteChainSelectors.contains(cfg.chainSelector)) revert ChainSelectorNotFound(cfg.chainSelector);
 

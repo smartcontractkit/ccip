@@ -13,12 +13,13 @@ import {Vm} from "forge-std/Vm.sol";
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/interfaces/IERC165.sol";
 
 contract CCIPHomeTest is Test {
+  //  address internal constant OWNER = address(0x0000000123123123123);
   bytes32 internal constant ZERO_DIGEST = bytes32(uint256(0));
   address internal constant CAPABILITIES_REGISTRY = address(0x0000000123123123123);
   Internal.OCRPluginType internal constant DEFAULT_PLUGIN_TYPE = Internal.OCRPluginType.Commit;
   uint32 internal constant DEFAULT_DON_ID = 78978987;
 
-  CCIPHomeHelper public s_ccipHome = new CCIPHomeHelper(CAPABILITIES_REGISTRY);
+  CCIPHomeHelper public s_ccipHome;
 
   uint256 private constant PREFIX_MASK = type(uint256).max << (256 - 16); // 0xFFFF00..00
   uint256 private constant PREFIX = 0x000a << (256 - 16); // 0x000b00..00
@@ -26,6 +27,7 @@ contract CCIPHomeTest is Test {
   uint64 private constant DEFAULT_CHAIN_SELECTOR = 9381579735;
 
   function setUp() public virtual {
+    s_ccipHome = new CCIPHomeHelper(CAPABILITIES_REGISTRY);
     s_ccipHome.applyChainConfigUpdates(new uint64[](0), _getBaseChainConfigs());
 
     ICapabilitiesRegistry.NodeInfo memory nodeInfo = ICapabilitiesRegistry.NodeInfo({
@@ -90,6 +92,7 @@ contract CCIPHomeTest is Test {
       FRoleDON: 1,
       offchainConfigVersion: 98765,
       offrampAddress: abi.encode("offrampAddress"),
+      rmnHomeAddress: abi.encode("rmnHomeAddress"),
       nodes: nodes,
       offchainConfig: abi.encode("offchainConfig")
     });
@@ -233,6 +236,38 @@ contract CCIPHome_getConfigDigests is CCIPHomeTest {
 
     assertEq(activeDigest, s_ccipHome.getActiveDigest(DEFAULT_DON_ID, DEFAULT_PLUGIN_TYPE));
     assertEq(candidateDigest, s_ccipHome.getCandidateDigest(DEFAULT_DON_ID, DEFAULT_PLUGIN_TYPE));
+  }
+}
+
+contract CCIPHome_getAllConfigs is CCIPHomeTest {
+  function test_getAllConfigs_success() public {
+    CCIPHome.OCR3Config memory config = _getBaseConfig();
+    bytes32 firstDigest = s_ccipHome.setCandidate(DEFAULT_DON_ID, DEFAULT_PLUGIN_TYPE, config, ZERO_DIGEST);
+
+    (CCIPHome.VersionedConfig memory activeConfig, CCIPHome.VersionedConfig memory candidateConfig) =
+      s_ccipHome.getAllConfigs(DEFAULT_DON_ID, DEFAULT_PLUGIN_TYPE);
+    assertEq(activeConfig.configDigest, ZERO_DIGEST);
+    assertEq(candidateConfig.configDigest, firstDigest);
+
+    s_ccipHome.promoteCandidateAndRevokeActive(DEFAULT_DON_ID, DEFAULT_PLUGIN_TYPE, firstDigest, ZERO_DIGEST);
+
+    (activeConfig, candidateConfig) = s_ccipHome.getAllConfigs(DEFAULT_DON_ID, DEFAULT_PLUGIN_TYPE);
+    assertEq(activeConfig.configDigest, firstDigest);
+    assertEq(candidateConfig.configDigest, ZERO_DIGEST);
+
+    bytes32 secondDigest = s_ccipHome.setCandidate(DEFAULT_DON_ID, DEFAULT_PLUGIN_TYPE, config, ZERO_DIGEST);
+
+    (activeConfig, candidateConfig) = s_ccipHome.getAllConfigs(DEFAULT_DON_ID, DEFAULT_PLUGIN_TYPE);
+    assertEq(activeConfig.configDigest, firstDigest);
+    assertEq(candidateConfig.configDigest, secondDigest);
+
+    (activeConfig, candidateConfig) = s_ccipHome.getAllConfigs(DEFAULT_DON_ID + 1, DEFAULT_PLUGIN_TYPE);
+    assertEq(activeConfig.configDigest, ZERO_DIGEST);
+    assertEq(candidateConfig.configDigest, ZERO_DIGEST);
+
+    (activeConfig, candidateConfig) = s_ccipHome.getAllConfigs(DEFAULT_DON_ID, Internal.OCRPluginType.Execution);
+    assertEq(activeConfig.configDigest, ZERO_DIGEST);
+    assertEq(candidateConfig.configDigest, ZERO_DIGEST);
   }
 }
 
@@ -411,11 +446,487 @@ contract CCIPHome_promoteCandidateAndRevokeActive is CCIPHomeTest {
 }
 
 contract CCIPHome__validateConfig is CCIPHomeTest {
-//  function test_validateStaticAndDynamicConfig_OutOfBoundsNodesLength_reverts() public {
-//    CCIPHome.OCR3Config memory config = _getBaseConfig();
-//    config.staticConfig.nodes = new CCIPHome.Node[](257);
-//
-//    vm.expectRevert(CCIPHome.OutOfBoundsNodesLength.selector);
-//    s_ccipHome.setCandidate(config.staticConfig, config.dynamicConfig, ZERO_DIGEST);
-//  }
+  function setUp() public virtual override {
+    s_ccipHome = new CCIPHomeHelper(CAPABILITIES_REGISTRY);
+  }
+
+  function _addChainConfig(uint256 numNodes) internal returns (CCIPHome.OCR3Node[] memory nodes) {
+    return _addChainConfig(numNodes, 1);
+  }
+
+  function _makeBytes32Array(uint256 length, uint256 seed) internal pure returns (bytes32[] memory arr) {
+    arr = new bytes32[](length);
+    for (uint256 i = 0; i < length; i++) {
+      arr[i] = keccak256(abi.encode(i, 1, seed));
+    }
+    return arr;
+  }
+
+  function _makeBytesArray(uint256 length, uint256 seed) internal pure returns (bytes[] memory arr) {
+    arr = new bytes[](length);
+    for (uint256 i = 0; i < length; i++) {
+      arr[i] = abi.encode(keccak256(abi.encode(i, 1, seed)));
+    }
+    return arr;
+  }
+
+  function _addChainConfig(uint256 numNodes, uint8 fChain) internal returns (CCIPHome.OCR3Node[] memory nodes) {
+    bytes32[] memory p2pIds = _makeBytes32Array(numNodes, 0);
+    bytes[] memory signers = _makeBytesArray(numNodes, 10);
+    bytes[] memory transmitters = _makeBytesArray(numNodes, 20);
+
+    nodes = new CCIPHome.OCR3Node[](numNodes);
+
+    for (uint256 i = 0; i < numNodes; i++) {
+      nodes[i] = CCIPHome.OCR3Node({p2pId: p2pIds[i], signerKey: signers[i], transmitterKey: transmitters[i]});
+
+      vm.mockCall(
+        CAPABILITIES_REGISTRY,
+        abi.encodeWithSelector(ICapabilitiesRegistry.getNode.selector, p2pIds[i]),
+        abi.encode(
+          ICapabilitiesRegistry.NodeInfo({
+            nodeOperatorId: 1,
+            signer: bytes32(signers[i]),
+            p2pId: p2pIds[i],
+            hashedCapabilityIds: new bytes32[](0),
+            configCount: uint32(1),
+            workflowDONId: uint32(1),
+            capabilitiesDONIds: new uint256[](0)
+          })
+        )
+      );
+    }
+    // Add chain selector for chain 1.
+    CCIPHome.ChainConfigArgs[] memory adds = new CCIPHome.ChainConfigArgs[](1);
+    adds[0] = CCIPHome.ChainConfigArgs({
+      chainSelector: 1,
+      chainConfig: CCIPHome.ChainConfig({readers: p2pIds, fChain: fChain, config: bytes("config1")})
+    });
+
+    vm.expectEmit();
+    emit CCIPHome.ChainConfigSet(1, adds[0].chainConfig);
+    s_ccipHome.applyChainConfigUpdates(new uint64[](0), adds);
+
+    return nodes;
+  }
+
+  function _getCorrectOCR3Config(uint8 numNodes, uint8 FRoleDON) internal returns (CCIPHome.OCR3Config memory) {
+    CCIPHome.OCR3Node[] memory nodes = _addChainConfig(numNodes);
+
+    return CCIPHome.OCR3Config({
+      pluginType: Internal.OCRPluginType.Commit,
+      offrampAddress: abi.encode(keccak256(abi.encode("offramp"))),
+      rmnHomeAddress: abi.encode(keccak256(abi.encode("rmnHome"))),
+      chainSelector: 1,
+      nodes: nodes,
+      FRoleDON: FRoleDON,
+      offchainConfigVersion: 30,
+      offchainConfig: bytes("offchainConfig")
+    });
+  }
+
+  function _getCorrectOCR3Config() internal returns (CCIPHome.OCR3Config memory) {
+    return _getCorrectOCR3Config(4, 1);
+  }
+
+  // Successes.
+
+  function test__validateConfig_Success() public {
+    s_ccipHome.validateConfig(_getCorrectOCR3Config());
+  }
+
+  function test__validateConfigLessTransmittersThanSigners_Success() public {
+    // fChain is 1, so there should be at least 4 transmitters.
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config(5, 1);
+    config.nodes[1].transmitterKey = bytes("");
+
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfigSmallerFChain_Success() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config(11, 3);
+
+    // Set fChain to 2
+    _addChainConfig(4, 2);
+
+    s_ccipHome.validateConfig(config);
+  }
+
+  // Reverts
+
+  function test__validateConfig_ChainSelectorNotSet_Reverts() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    config.chainSelector = 0; // invalid
+
+    vm.expectRevert(CCIPHome.ChainSelectorNotSet.selector);
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfig_OfframpAddressCannotBeZero_Reverts() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    config.offrampAddress = ""; // invalid
+
+    vm.expectRevert(CCIPHome.OfframpAddressCannotBeZero.selector);
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfig_ABIEncodedAddress_OfframpAddressCannotBeZero_Reverts() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    config.offrampAddress = abi.encode(address(0)); // invalid
+
+    vm.expectRevert(CCIPHome.OfframpAddressCannotBeZero.selector);
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfig_RMNHomeAddressCannotBeZero_Reverts() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    config.rmnHomeAddress = ""; // invalid
+
+    vm.expectRevert(CCIPHome.RMNHomeAddressCannotBeZero.selector);
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfig_ABIEncodedAddress_RMNHomeAddressCannotBeZero_Reverts() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    config.rmnHomeAddress = abi.encode(address(0)); // invalid
+
+    vm.expectRevert(CCIPHome.RMNHomeAddressCannotBeZero.selector);
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfig_ChainSelectorNotFound_Reverts() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    config.chainSelector = 2; // not set
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPHome.ChainSelectorNotFound.selector, 2));
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfig_NotEnoughTransmitters_Reverts() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    uint256 numberOfTransmitters = 3;
+
+    // 32 > 31 (max num oracles)
+    CCIPHome.OCR3Node[] memory nodes = _addChainConfig(31);
+
+    // truncate transmitters to < 3 * fChain + 1
+    // since fChain is 1 in this case, we need to truncate to 3 transmitters.
+    for (uint256 i = numberOfTransmitters; i < nodes.length; ++i) {
+      nodes[i].transmitterKey = bytes("");
+    }
+
+    config.nodes = nodes;
+    vm.expectRevert(abi.encodeWithSelector(CCIPHome.NotEnoughTransmitters.selector, numberOfTransmitters, 4));
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfig_NotEnoughTransmittersEmptyAddresses_Reverts() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    config.nodes[0].transmitterKey = bytes("");
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPHome.NotEnoughTransmitters.selector, 3, 4));
+    s_ccipHome.validateConfig(config);
+
+    // Zero out remaining transmitters to verify error changes
+    for (uint256 i = 1; i < config.nodes.length; ++i) {
+      config.nodes[i].transmitterKey = bytes("");
+    }
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPHome.NotEnoughTransmitters.selector, 0, 4));
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfig_TooManySigners_Reverts() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    config.nodes = new CCIPHome.OCR3Node[](257);
+
+    vm.expectRevert(CCIPHome.TooManySigners.selector);
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfig_FChainTooHigh_Reverts() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    config.FRoleDON = 2; // too low
+
+    // Set fChain to 3
+    _addChainConfig(4, 3);
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPHome.FChainTooHigh.selector, 3, 2));
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfig_FMustBePositive_Reverts() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    config.FRoleDON = 0; // not positive
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPHome.FChainTooHigh.selector, 1, 0));
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfig_FTooHigh_Reverts() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    config.FRoleDON = 2; // too high
+
+    vm.expectRevert(CCIPHome.FTooHigh.selector);
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfig_ZeroP2PId_Reverts() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    config.nodes[1].p2pId = bytes32(0);
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPHome.InvalidNode.selector, config.nodes[1]));
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfig_ZeroSignerKey_Reverts() public {
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    config.nodes[2].signerKey = bytes("");
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPHome.InvalidNode.selector, config.nodes[2]));
+    s_ccipHome.validateConfig(config);
+  }
+
+  function test__validateConfig_NodeNotInRegistry_Reverts() public {
+    CCIPHome.OCR3Node[] memory nodes = _addChainConfig(4);
+    bytes32 nonExistentP2PId = keccak256("notInRegistry");
+    nodes[0].p2pId = nonExistentP2PId;
+
+    vm.mockCall(
+      CAPABILITIES_REGISTRY,
+      abi.encodeWithSelector(ICapabilitiesRegistry.getNode.selector, nonExistentP2PId),
+      abi.encode(
+        ICapabilitiesRegistry.NodeInfo({
+          nodeOperatorId: 0,
+          signer: bytes32(0),
+          p2pId: bytes32(uint256(0)),
+          hashedCapabilityIds: new bytes32[](0),
+          configCount: uint32(1),
+          workflowDONId: uint32(1),
+          capabilitiesDONIds: new uint256[](0)
+        })
+      )
+    );
+    CCIPHome.OCR3Config memory config = _getCorrectOCR3Config();
+    config.nodes = nodes;
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPHome.NodeNotInRegistry.selector, nonExistentP2PId));
+    s_ccipHome.validateConfig(config);
+  }
+}
+
+contract CCIPHome_applyChainConfigUpdates is CCIPHomeTest {
+  function setUp() public virtual override {
+    s_ccipHome = new CCIPHomeHelper(CAPABILITIES_REGISTRY);
+  }
+
+  function test_applyChainConfigUpdates_addChainConfigs_Success() public {
+    bytes32[] memory chainReaders = new bytes32[](1);
+    chainReaders[0] = keccak256(abi.encode(1));
+    CCIPHome.ChainConfigArgs[] memory adds = new CCIPHome.ChainConfigArgs[](2);
+    adds[0] = CCIPHome.ChainConfigArgs({
+      chainSelector: 1,
+      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
+    });
+    adds[1] = CCIPHome.ChainConfigArgs({
+      chainSelector: 2,
+      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config2")})
+    });
+    vm.mockCall(
+      CAPABILITIES_REGISTRY,
+      abi.encodeWithSelector(ICapabilitiesRegistry.getNode.selector, chainReaders[0]),
+      abi.encode(
+        ICapabilitiesRegistry.NodeInfo({
+          nodeOperatorId: 1,
+          signer: bytes32(uint256(1)),
+          p2pId: chainReaders[0],
+          hashedCapabilityIds: new bytes32[](0),
+          configCount: uint32(1),
+          workflowDONId: uint32(1),
+          capabilitiesDONIds: new uint256[](0)
+        })
+      )
+    );
+    vm.expectEmit();
+    emit CCIPHome.ChainConfigSet(1, adds[0].chainConfig);
+    vm.expectEmit();
+    emit CCIPHome.ChainConfigSet(2, adds[1].chainConfig);
+    s_ccipHome.applyChainConfigUpdates(new uint64[](0), adds);
+
+    CCIPHome.ChainConfigArgs[] memory configs = s_ccipHome.getAllChainConfigs(0, 2);
+    assertEq(configs.length, 2, "chain configs length must be 2");
+    assertEq(configs[0].chainSelector, 1, "chain selector must match");
+    assertEq(configs[1].chainSelector, 2, "chain selector must match");
+    assertEq(s_ccipHome.getNumChainConfigurations(), 2, "total chain configs must be 2");
+  }
+
+  function test_getPaginatedCCIPHomes_Success() public {
+    bytes32[] memory chainReaders = new bytes32[](1);
+    chainReaders[0] = keccak256(abi.encode(1));
+    CCIPHome.ChainConfigArgs[] memory adds = new CCIPHome.ChainConfigArgs[](2);
+    adds[0] = CCIPHome.ChainConfigArgs({
+      chainSelector: 1,
+      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
+    });
+    adds[1] = CCIPHome.ChainConfigArgs({
+      chainSelector: 2,
+      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config2")})
+    });
+    vm.mockCall(
+      CAPABILITIES_REGISTRY,
+      abi.encodeWithSelector(ICapabilitiesRegistry.getNode.selector, chainReaders[0]),
+      abi.encode(
+        ICapabilitiesRegistry.NodeInfo({
+          nodeOperatorId: 1,
+          signer: bytes32(uint256(1)),
+          p2pId: chainReaders[0],
+          hashedCapabilityIds: new bytes32[](0),
+          configCount: uint32(1),
+          workflowDONId: uint32(1),
+          capabilitiesDONIds: new uint256[](0)
+        })
+      )
+    );
+
+    s_ccipHome.applyChainConfigUpdates(new uint64[](0), adds);
+
+    CCIPHome.ChainConfigArgs[] memory configs = s_ccipHome.getAllChainConfigs(0, 2);
+    assertEq(configs.length, 2, "chain configs length must be 2");
+    assertEq(configs[0].chainSelector, 1, "chain selector must match");
+    assertEq(configs[1].chainSelector, 2, "chain selector must match");
+
+    configs = s_ccipHome.getAllChainConfigs(0, 1);
+    assertEq(configs.length, 1, "chain configs length must be 1");
+    assertEq(configs[0].chainSelector, 1, "chain selector must match");
+
+    configs = s_ccipHome.getAllChainConfigs(0, 10);
+    assertEq(configs.length, 2, "chain configs length must be 2");
+    assertEq(configs[0].chainSelector, 1, "chain selector must match");
+    assertEq(configs[1].chainSelector, 2, "chain selector must match");
+
+    configs = s_ccipHome.getAllChainConfigs(1, 1);
+    assertEq(configs.length, 1, "chain configs length must be 1");
+
+    configs = s_ccipHome.getAllChainConfigs(1, 2);
+    assertEq(configs.length, 0, "chain configs length must be 0");
+  }
+
+  function test_applyChainConfigUpdates_removeChainConfigs_Success() public {
+    bytes32[] memory chainReaders = new bytes32[](1);
+    chainReaders[0] = keccak256(abi.encode(1));
+    CCIPHome.ChainConfigArgs[] memory adds = new CCIPHome.ChainConfigArgs[](2);
+    adds[0] = CCIPHome.ChainConfigArgs({
+      chainSelector: 1,
+      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
+    });
+    adds[1] = CCIPHome.ChainConfigArgs({
+      chainSelector: 2,
+      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config2")})
+    });
+
+    vm.mockCall(
+      CAPABILITIES_REGISTRY,
+      abi.encodeWithSelector(ICapabilitiesRegistry.getNode.selector, chainReaders[0]),
+      abi.encode(
+        ICapabilitiesRegistry.NodeInfo({
+          nodeOperatorId: 1,
+          signer: bytes32(uint256(1)),
+          p2pId: chainReaders[0],
+          hashedCapabilityIds: new bytes32[](0),
+          configCount: uint32(1),
+          workflowDONId: uint32(1),
+          capabilitiesDONIds: new uint256[](0)
+        })
+      )
+    );
+
+    vm.expectEmit();
+    emit CCIPHome.ChainConfigSet(1, adds[0].chainConfig);
+    vm.expectEmit();
+    emit CCIPHome.ChainConfigSet(2, adds[1].chainConfig);
+    s_ccipHome.applyChainConfigUpdates(new uint64[](0), adds);
+
+    assertEq(s_ccipHome.getNumChainConfigurations(), 2, "total chain configs must be 2");
+
+    uint64[] memory removes = new uint64[](1);
+    removes[0] = uint64(1);
+
+    vm.expectEmit();
+    emit CCIPHome.ChainConfigRemoved(1);
+    s_ccipHome.applyChainConfigUpdates(removes, new CCIPHome.ChainConfigArgs[](0));
+
+    assertEq(s_ccipHome.getNumChainConfigurations(), 1, "total chain configs must be 1");
+  }
+
+  // Reverts.
+
+  function test_applyChainConfigUpdates_selectorNotFound_Reverts() public {
+    uint64[] memory removes = new uint64[](1);
+    removes[0] = uint64(1);
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPHome.ChainSelectorNotFound.selector, 1));
+    s_ccipHome.applyChainConfigUpdates(removes, new CCIPHome.ChainConfigArgs[](0));
+  }
+
+  function test_applyChainConfigUpdates_nodeNotInRegistry_Reverts() public {
+    bytes32[] memory chainReaders = new bytes32[](1);
+    chainReaders[0] = keccak256(abi.encode(1));
+    CCIPHome.ChainConfigArgs[] memory adds = new CCIPHome.ChainConfigArgs[](1);
+    adds[0] = CCIPHome.ChainConfigArgs({
+      chainSelector: 1,
+      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: abi.encode(1, 2, 3)})
+    });
+
+    vm.mockCall(
+      CAPABILITIES_REGISTRY,
+      abi.encodeWithSelector(ICapabilitiesRegistry.getNode.selector, chainReaders[0]),
+      abi.encode(
+        ICapabilitiesRegistry.NodeInfo({
+          nodeOperatorId: 0,
+          signer: bytes32(0),
+          p2pId: bytes32(uint256(0)),
+          hashedCapabilityIds: new bytes32[](0),
+          configCount: uint32(1),
+          workflowDONId: uint32(1),
+          capabilitiesDONIds: new uint256[](0)
+        })
+      )
+    );
+
+    vm.expectRevert(abi.encodeWithSelector(CCIPHome.NodeNotInRegistry.selector, chainReaders[0]));
+    s_ccipHome.applyChainConfigUpdates(new uint64[](0), adds);
+  }
+
+  function test__applyChainConfigUpdates_FChainNotPositive_Reverts() public {
+    bytes32[] memory chainReaders = new bytes32[](1);
+    chainReaders[0] = keccak256(abi.encode(1));
+    CCIPHome.ChainConfigArgs[] memory adds = new CCIPHome.ChainConfigArgs[](2);
+    adds[0] = CCIPHome.ChainConfigArgs({
+      chainSelector: 1,
+      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 1, config: bytes("config1")})
+    });
+    adds[1] = CCIPHome.ChainConfigArgs({
+      chainSelector: 2,
+      chainConfig: CCIPHome.ChainConfig({readers: chainReaders, fChain: 0, config: bytes("config2")}) // bad fChain
+    });
+
+    vm.mockCall(
+      CAPABILITIES_REGISTRY,
+      abi.encodeWithSelector(ICapabilitiesRegistry.getNode.selector, chainReaders[0]),
+      abi.encode(
+        ICapabilitiesRegistry.NodeInfo({
+          nodeOperatorId: 1,
+          signer: bytes32(uint256(1)),
+          p2pId: chainReaders[0],
+          hashedCapabilityIds: new bytes32[](0),
+          configCount: uint32(1),
+          workflowDONId: uint32(1),
+          capabilitiesDONIds: new uint256[](0)
+        })
+      )
+    );
+
+    vm.expectRevert(CCIPHome.FChainMustBePositive.selector);
+    s_ccipHome.applyChainConfigUpdates(new uint64[](0), adds);
+  }
 }
