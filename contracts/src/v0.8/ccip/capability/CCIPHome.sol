@@ -115,8 +115,8 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
   /// but FRoleDON values can change across OCR3 configs to indicate role DON splits.
   struct OCR3Config {
     Internal.OCRPluginType pluginType; // ─╮ The plugin that the configuration is for.
-    uint64 chainSelector; //               | The (remote) chain that the configuration is for.
-    uint8 FRoleDON; //                     | The "big F" parameter for the role DON.
+    uint64 chainSelector; //               │ The (remote) chain that the configuration is for.
+    uint8 FRoleDON; //                     │ The "big F" parameter for the role DON.
     uint64 offchainConfigVersion; // ──────╯ The version of the exec offchain configuration.
     bytes offrampAddress; // The remote chain offramp address.
     bytes rmnHomeAddress; // The home chain RMN home address.
@@ -198,6 +198,7 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
   }
 
   /// @inheritdoc IERC165
+  /// @dev Required for the capabilities registry to recognize this contract.
   function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
     return interfaceId == type(ICapabilityConfiguration).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
