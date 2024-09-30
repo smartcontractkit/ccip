@@ -45,6 +45,24 @@ import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts
 /// Note that we explicitly do allow promoteCandidateAndRevokeActive() to be called when there is an active config but
 /// no candidate config. This is the only way to remove the active config. The alternative would be to set some unusable
 /// config as candidate and promote that, but fully clearing it is cleaner.
+///
+///       ┌─────────────┐   setCandidate     ┌─────────────┐
+///       │             ├───────────────────►│             │ setCandidate
+///       │    Init     │   revokeCandidate  │  Candidate  │◄───────────┐
+///       │    [0,0]    │◄───────────────────┤    [0,1]    │────────────┘
+///       │             │  ┌─────────────────┤             │
+///       └─────────────┘  │  promote-       └─────────────┘
+///                  ▲     │  Candidate
+///        promote-  │     │
+///        Candidate │     │
+///                  │     │
+///       ┌──────────┴──┐  │  promote-       ┌─────────────┐
+///       │             │◄─┘  Candidate OR   │  Active &   │ setCandidate
+///       │    Active   │    revokeCandidate │  Candidate  │◄───────────┐
+///       │    [1,0]    │◄───────────────────┤    [1,1]    │────────────┘
+///       │             ├───────────────────►│             │
+///       └─────────────┘    setSecondary    └─────────────┘
+///
 contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, IERC165 {
   using EnumerableSet for EnumerableSet.UintSet;
 
