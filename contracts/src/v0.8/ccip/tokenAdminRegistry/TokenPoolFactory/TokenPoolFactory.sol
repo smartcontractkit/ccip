@@ -185,7 +185,6 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
       // If the user provides an empty byte string parameter, indicating the pool has not been deployed yet,
       // the address of the pool should be predicted. Otherwise use the provided address.
       if (remoteTokenPool.remotePoolAddress.length == 0) {
-
         // Address is predicted based on the init code hash and the deployer, so the hash must first be computed
         // using the initCode and a concatenated set of constructor parameters.
         bytes32 remotePoolInitcodeHash = _generatePoolInitcodeHash(
@@ -215,7 +214,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     if (poolType == PoolType.BURN_MINT) {
       tokenPoolInitArgs = abi.encode(token, new address[](0), i_rmnProxy, i_ccipRouter);
     } else if (poolType == PoolType.LOCK_RELEASE) {
-      // Lock/Release pools have an additional boolean constructor parameter that must be accounted for, acceptLiquidity, 
+      // Lock/Release pools have an additional boolean constructor parameter that must be accounted for, acceptLiquidity,
       // which is set to true by default in this case. Users wishing to set it to false must deploy the pool manually.
       tokenPoolInitArgs = abi.encode(token, new address[](0), i_rmnProxy, true, i_ccipRouter);
     }
@@ -246,7 +245,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     RemoteChainConfig memory remoteChainConfig,
     address remoteTokenAddress,
     PoolType poolType
-  ) internal virtual pure returns (bytes32) {
+  ) internal pure virtual returns (bytes32) {
     if (poolType == PoolType.BURN_MINT) {
       return keccak256(
         abi.encodePacked(
@@ -269,7 +268,6 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
         )
       );
     }
-
   }
 
   /// @notice Sets the token pool address in the token admin registry for a newly deployed token pool.
