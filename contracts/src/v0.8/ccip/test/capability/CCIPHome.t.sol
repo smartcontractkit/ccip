@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {ICapabilityConfiguration} from "../../../keystone/interfaces/ICapabilityConfiguration.sol";
-import {ICapabilitiesRegistry} from "../../capability/interfaces//ICapabilitiesRegistry.sol";
+import {ICapabilitiesRegistry} from "../../interfaces/ICapabilitiesRegistry.sol";
 
 import {CCIPHome} from "../../capability/CCIPHome.sol";
 import {Internal} from "../../libraries/Internal.sol";
