@@ -21,11 +21,11 @@ import (
 	tc "github.com/testcontainers/testcontainers-go"
 	tcwait "github.com/testcontainers/testcontainers-go/wait"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/docker"
-	"github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
-	"github.com/smartcontractkit/chainlink-testing-framework/logging"
-	"github.com/smartcontractkit/chainlink-testing-framework/logstream"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/docker"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logstream"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
@@ -72,6 +72,14 @@ func WithNodeEnvVars(ev map[string]string) ClNodeOption {
 			n.ContainerEnvs = map[string]string{}
 		}
 		maps.Copy(n.ContainerEnvs, ev)
+	}
+}
+
+func WithStartupTimeout(timeout time.Duration) ClNodeOption {
+	return func(n *ClNode) {
+		if timeout != 0 {
+			n.StartupTimeout = timeout
+		}
 	}
 }
 
@@ -130,6 +138,7 @@ func NewClNode(networks []string, imageName, imageVersion string, nodeConfig *ch
 			ContainerVersion: imageVersion,
 			Networks:         networks,
 			LogStream:        logStream,
+			StartupTimeout:   3 * time.Minute,
 		},
 		UserEmail:    "local@local.com",
 		UserPassword: "localdevpassword",
@@ -447,9 +456,9 @@ func (n *ClNode) getContainerRequest(secrets string) (
 			"-a", apiCredsPath,
 		},
 		Networks: append(n.Networks, "tracing"),
-		WaitingFor: tcwait.ForHTTP("/health").
+		WaitingFor: tcwait.ForHTTP("/readyz").
 			WithPort("6688/tcp").
-			WithStartupTimeout(90 * time.Second).
+			WithStartupTimeout(n.StartupTimeout).
 			WithPollInterval(1 * time.Second),
 		Files: []tc.ContainerFile{
 			{

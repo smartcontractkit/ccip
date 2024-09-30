@@ -10,14 +10,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
+
 	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/ccip/integration-tests/ccip-tests/contracts"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
@@ -131,8 +135,9 @@ func (c *CCIPE2ELoad) BeforeAllCall() {
 		c.EOAReceiver = c.msg.Receiver
 	}
 	if c.SendMaxDataIntermittentlyInMsgCount > 0 {
-		c.MaxDataBytes, err = sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
+		cfg, err := sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
 		require.NoError(c.t, err, "failed to fetch dynamic config")
+		c.MaxDataBytes = cfg.MaxDataBytes
 	}
 	// if the msg is sent via multicall, transfer the token transfer amount to multicall contract
 	if sourceCCIP.Common.MulticallEnabled &&
@@ -188,11 +193,28 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 	if !msgDetails.IsTokenTransfer() {
 		msg.TokenAmounts = []router.ClientEVMTokenAmount{}
 	}
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)
+
+	var (
+		extraArgs []byte
+		err       error
+	)
+	// v1.5.0 and later starts using V2 extra args
+	matchErr := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
+		contracts.OnRampContract: contracts.V1_5_0,
+	})
+	// TODO: The CCIP Offchain upgrade tests make the AllowOutOfOrder flag tricky in this case.
+	// It runs with out of date contract versions at first, then upgrades them. So transactions will assume that the new contracts are there
+	// before being deployed. So setting v2 args will break the test. This is a bit of a hack to get around that.
+	// The test will soon be deprecated, so a temporary solution is fine.
+	if matchErr != nil || !c.Lane.Source.Common.AllowOutOfOrder {
+		extraArgs, err = testhelpers.GetEVMExtraArgsV1(big.NewInt(gasLimit), false)
+	} else {
+		extraArgs, err = testhelpers.GetEVMExtraArgsV2(big.NewInt(gasLimit), c.Lane.Source.Common.AllowOutOfOrder)
+	}
 	if err != nil {
 		return router.ClientEVM2AnyMessage{}, stats, err
 	}
-	msg.ExtraArgs = extraArgsV1
+	msg.ExtraArgs = extraArgs
 	// if gaslimit is 0, set the receiver to EOA
 	if gasLimit == 0 {
 		msg.Receiver = c.EOAReceiver
@@ -203,7 +225,24 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	res := &wasp.Response{}
 	sourceCCIP := c.Lane.Source
-	recentRequestFoundAt := sourceCCIP.IsRequestTriggeredWithinTimeframe(c.SkipRequestIfAnotherRequestTriggeredWithin)
+	var recentRequestFoundAt *time.Time
+	var latestEvent *types.Log
+	var err error
+	// Use IsPastRequestTriggeredWithinTimeframe to check for any historical CCIP send request events
+	// within the specified timeframe for the first message. Subsequently, use the watcher method to monitor
+	// and detect any new events as they occur.
+	if c.CurrentMsgSerialNo.Load() == int64(1) {
+		latestEvent, err = sourceCCIP.IsPastRequestTriggeredWithinTimeframe(testcontext.Get(c.t), c.SkipRequestIfAnotherRequestTriggeredWithin)
+		require.NoError(c.t, err, "error while filtering past requests")
+		if latestEvent != nil {
+			hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(latestEvent.BlockNumber)))
+			require.NoError(c.t, err, "error while getting header by block number")
+			recentRequestFoundAt = pointer.ToTime(hdr.Timestamp)
+		}
+	} else {
+		recentRequestFoundAt = sourceCCIP.IsRequestTriggeredWithinTimeframe(c.SkipRequestIfAnotherRequestTriggeredWithin)
+	}
+
 	if recentRequestFoundAt != nil {
 		c.Lane.Logger.
 			Info().
@@ -267,8 +306,11 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		return res
 	}
 
+	// the msg is no longer needed, so we can clear it to avoid holding extra data during load
+	// nolint:ineffassign,staticcheck
+	msg = router.ClientEVM2AnyMessage{}
+
 	txConfirmationTime := time.Now().UTC()
-	lggr.Info().Str("tx", sendTx.Hash().Hex()).Msg("waiting for tx to be mined")
 	lggr = lggr.With().Str("Msg Tx", sendTx.Hash().String()).Logger()
 
 	stats.UpdateState(&lggr, 0, testreporters.TX, txConfirmationTime.Sub(startTime), testreporters.Success, nil)
@@ -296,13 +338,13 @@ func (c *CCIPE2ELoad) Validate(lggr zerolog.Logger, sendTx *types.Transaction, t
 	// if the finality tag is enabled and the last finalized block is greater than the block number of the message
 	// consider the message finalized
 	if c.Lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 &&
-		lstFinalizedBlock != 0 && lstFinalizedBlock > msgLogs[0].Raw.BlockNumber {
+		lstFinalizedBlock != 0 && lstFinalizedBlock > msgLogs[0].LogInfo.BlockNumber {
 		sourceLogFinalizedAt = c.LastFinalizedTimestamp.Load()
 		for i, stat := range stats {
 			stat.UpdateState(&lggr, stat.SeqNum, testreporters.SourceLogFinalized,
 				sourceLogFinalizedAt.Sub(sourceLogTime), testreporters.Success,
 				&testreporters.TransactionStats{
-					TxHash:             msgLogs[i].Raw.TxHash.Hex(),
+					TxHash:             msgLogs[i].LogInfo.TxHash.Hex(),
 					FinalizedByBlock:   strconv.FormatUint(lstFinalizedBlock, 10),
 					FinalizedAt:        sourceLogFinalizedAt.String(),
 					Fee:                msgLogs[i].Fee.String(),
@@ -314,7 +356,7 @@ func (c *CCIPE2ELoad) Validate(lggr zerolog.Logger, sendTx *types.Transaction, t
 	} else {
 		var finalizingBlock uint64
 		sourceLogFinalizedAt, finalizingBlock, err = c.Lane.Source.AssertSendRequestedLogFinalized(
-			&lggr, msgLogs[0].Raw.TxHash, msgLogs, sourceLogTime, stats)
+			&lggr, msgLogs[0].LogInfo.TxHash, msgLogs, sourceLogTime, stats)
 		if err != nil {
 			return err
 		}

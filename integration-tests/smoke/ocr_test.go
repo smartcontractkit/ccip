@@ -5,15 +5,16 @@ import (
 	"testing"
 	"time"
 
-	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/utils/seth"
+	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/lib/utils/seth"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/seth"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/logging"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
@@ -81,9 +82,7 @@ func TestOCRJobReplacement(t *testing.T) {
 
 func prepareORCv1SmokeTestEnv(t *testing.T, l zerolog.Logger, firstRoundResult int64) (*test_env.CLClusterTestEnv, []contracts.OffchainAggregator, *seth.Client) {
 	config, err := tc.GetConfig([]string{"Smoke"}, tc.OCR)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "Error getting config")
 
 	network, err := actions.EthereumNetworkConfigFromConfig(l, &config)
 	require.NoError(t, err, "Error building ethereum network config")

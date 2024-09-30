@@ -94,6 +94,8 @@ type JSONExecOffchainConfig struct {
 	InflightCacheExpiry config.Duration
 	// See [ccipdata.ExecOffchainConfig.RootSnoozeTime]
 	RootSnoozeTime config.Duration
+	// See [ccipdata.ExecOffchainConfig.BatchingStrategyID]
+	BatchingStrategyID uint32
 	// See [ccipdata.ExecOffchainConfig.MessageVisibilityInterval]
 	MessageVisibilityInterval config.Duration
 }
@@ -121,7 +123,8 @@ func (c JSONExecOffchainConfig) Validate() error {
 // OffRamp In 1.2 we have a different estimator impl
 type OffRamp struct {
 	*v1_0_0.OffRamp
-	offRampV120 evm_2_evm_offramp_1_2_0.EVM2EVMOffRampInterface
+	offRampV120        evm_2_evm_offramp_1_2_0.EVM2EVMOffRampInterface
+	feeEstimatorConfig ccipdata.FeeEstimatorConfigReader
 }
 
 func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (cciptypes.TokenBucketRateLimit, error) {
@@ -172,12 +175,13 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 		MessageVisibilityInterval:   offchainConfigParsed.MessageVisibilityInterval,
+		BatchingStrategyID:          offchainConfigParsed.BatchingStrategyID,
 	}
 	onchainConfig := cciptypes.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds),
 		Router:                                  cciptypes.Address(onchainConfigParsed.Router.String()),
 	}
-	priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0, 0)
+	priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, o.DestMaxGasPrice, 0, 0, o.feeEstimatorConfig)
 
 	o.UpdateDynamicConfig(onchainConfig, offchainConfig, priceEstimator)
 
@@ -317,8 +321,16 @@ func (o *OffRamp) DecodeExecutionReport(ctx context.Context, report []byte) (cci
 	return DecodeExecReport(ctx, o.ExecutionReportArgs, report)
 }
 
-func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) (*OffRamp, error) {
-	v100, err := v1_0_0.NewOffRamp(lggr, addr, ec, lp, estimator, destMaxGasPrice)
+func NewOffRamp(
+	lggr logger.Logger,
+	addr common.Address,
+	ec client.Client,
+	lp logpoller.LogPoller,
+	estimator gas.EvmFeeEstimator,
+	destMaxGasPrice *big.Int,
+	feeEstimatorConfig ccipdata.FeeEstimatorConfigReader,
+) (*OffRamp, error) {
+	v100, err := v1_0_0.NewOffRamp(lggr, addr, ec, lp, estimator, destMaxGasPrice, feeEstimatorConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +343,8 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 	v100.ExecutionReportArgs = abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRamp)[:1]
 
 	return &OffRamp{
-		OffRamp:     v100,
-		offRampV120: offRamp,
+		OffRamp:            v100,
+		offRampV120:        offRamp,
+		feeEstimatorConfig: feeEstimatorConfig,
 	}, nil
 }

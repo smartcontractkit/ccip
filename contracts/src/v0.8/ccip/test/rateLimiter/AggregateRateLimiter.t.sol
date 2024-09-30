@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
+
 import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
+
+import {FeeQuoterSetup} from "../feeQuoter/FeeQuoterSetup.t.sol";
 import {AggregateRateLimiterHelper} from "../helpers/AggregateRateLimiterHelper.sol";
-import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 
 import {stdError} from "forge-std/Test.sol";
 
-contract AggregateTokenLimiterSetup is PriceRegistrySetup {
+contract AggregateTokenLimiterSetup is FeeQuoterSetup {
   AggregateRateLimiterHelper internal s_rateLimiter;
   RateLimiter.Config internal s_config;
 
@@ -18,10 +21,10 @@ contract AggregateTokenLimiterSetup is PriceRegistrySetup {
   uint224 internal constant TOKEN_PRICE = 4e18;
 
   function setUp() public virtual override {
-    PriceRegistrySetup.setUp();
+    FeeQuoterSetup.setUp();
 
-    Internal.PriceUpdates memory priceUpdates = getSingleTokenPriceUpdateStruct(TOKEN, TOKEN_PRICE);
-    s_priceRegistry.updatePrices(priceUpdates);
+    Internal.PriceUpdates memory priceUpdates = _getSingleTokenPriceUpdateStruct(TOKEN, TOKEN_PRICE);
+    s_feeQuoter.updatePrices(priceUpdates);
 
     s_config = RateLimiter.Config({isEnabled: true, rate: 5, capacity: 100});
     s_rateLimiter = new AggregateRateLimiterHelper(s_config);
@@ -219,7 +222,7 @@ contract AggregateTokenLimiter_getTokenValue is AggregateTokenLimiterSetup {
   function test_GetTokenValue_Success() public view {
     uint256 numberOfTokens = 10;
     Client.EVMTokenAmount memory tokenAmount = Client.EVMTokenAmount({token: TOKEN, amount: 10});
-    uint256 value = s_rateLimiter.getTokenValue(tokenAmount, s_priceRegistry);
+    uint256 value = s_rateLimiter.getTokenValue(tokenAmount, IPriceRegistry(address(s_feeQuoter)));
     assertEq(value, (numberOfTokens * TOKEN_PRICE) / 1e18);
   }
 
@@ -229,6 +232,6 @@ contract AggregateTokenLimiter_getTokenValue is AggregateTokenLimiterSetup {
     Client.EVMTokenAmount memory tokenAmount = Client.EVMTokenAmount({token: tokenWithNoPrice, amount: 10});
 
     vm.expectRevert(abi.encodeWithSelector(AggregateRateLimiter.PriceNotFoundForToken.selector, tokenWithNoPrice));
-    s_rateLimiter.getTokenValue(tokenAmount, s_priceRegistry);
+    s_rateLimiter.getTokenValue(tokenAmount, IPriceRegistry(address(s_feeQuoter)));
   }
 }

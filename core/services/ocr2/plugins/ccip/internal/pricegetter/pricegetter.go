@@ -1,8 +1,18 @@
 package pricegetter
 
-import cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+import (
+	"context"
+	"math/big"
 
-//go:generate mockery --quiet --name PriceGetter --output . --filename mock.go --inpackage --case=underscore
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+)
+
 type PriceGetter interface {
 	cciptypes.PriceGetter
+}
+
+type AllTokensPriceGetter interface {
+	PriceGetter
+	// GetJobSpecTokenPricesUSD returns all token prices defined in the jobspec.
+	GetJobSpecTokenPricesUSD(ctx context.Context) (map[cciptypes.Address]*big.Int, error)
 }

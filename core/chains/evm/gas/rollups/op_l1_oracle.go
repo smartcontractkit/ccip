@@ -14,11 +14,10 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
-
-	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink/v2/common/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
@@ -88,7 +87,7 @@ const (
 	// decimals is a hex encoded call to:
 	// `function decimals() public pure returns (uint256);`
 	decimalsMethod = "decimals"
-	// OPGasOracleAddress is the address of the precompiled contract that exists on Optimism and Base.
+	// OPGasOracleAddress is the address of the precompiled contract that exists on Optimism, Base and Mantle.
 	OPGasOracleAddress = "0x420000000000000000000000000000000000000F"
 	// KromaGasOracleAddress is the address of the precompiled contract that exists on Kroma.
 	KromaGasOracleAddress = "0x4200000000000000000000000000000000000005"
@@ -99,7 +98,7 @@ const (
 func NewOpStackL1GasOracle(lggr logger.Logger, ethClient l1OracleClient, chainType chaintype.ChainType) (*optimismL1Oracle, error) {
 	var precompileAddress string
 	switch chainType {
-	case chaintype.ChainOptimismBedrock:
+	case chaintype.ChainOptimismBedrock, chaintype.ChainMantle:
 		precompileAddress = OPGasOracleAddress
 	case chaintype.ChainKroma:
 		precompileAddress = KromaGasOracleAddress
@@ -220,6 +219,10 @@ func (o *optimismL1Oracle) Name() string {
 	return o.logger.Name()
 }
 
+func (o *optimismL1Oracle) ChainType(_ context.Context) chaintype.ChainType {
+	return o.chainType
+}
+
 func (o *optimismL1Oracle) Start(ctx context.Context) error {
 	return o.StartOnce(o.Name(), func() error {
 		go o.run()
@@ -242,41 +245,45 @@ func (o *optimismL1Oracle) HealthReport() map[string]error {
 func (o *optimismL1Oracle) run() {
 	defer close(o.chDone)
 
-	t := o.refresh()
+	o.refresh()
 	close(o.chInitialised)
+
+	t := services.TickerConfig{
+		Initial:   o.pollPeriod,
+		JitterPct: services.DefaultJitter,
+	}.NewTicker(o.pollPeriod)
+	defer t.Stop()
 
 	for {
 		select {
 		case <-o.chStop:
 			return
 		case <-t.C:
-			t = o.refresh()
+			o.refresh()
 		}
 	}
 }
-func (o *optimismL1Oracle) refresh() (t *time.Timer) {
-	t, err := o.refreshWithError()
+func (o *optimismL1Oracle) refresh() {
+	err := o.refreshWithError()
 	if err != nil {
+		o.logger.Criticalw("Failed to refresh gas price", "err", err)
 		o.SvcErrBuffer.Append(err)
 	}
-	return
 }
 
-func (o *optimismL1Oracle) refreshWithError() (t *time.Timer, err error) {
-	t = time.NewTimer(utils.WithJitter(o.pollPeriod))
-
+func (o *optimismL1Oracle) refreshWithError() error {
 	ctx, cancel := o.chStop.CtxCancel(evmclient.ContextWithDefaultTimeout())
 	defer cancel()
 
 	price, err := o.GetDAGasPrice(ctx)
 	if err != nil {
-		return t, err
+		return err
 	}
 
 	o.l1GasPriceMu.Lock()
 	defer o.l1GasPriceMu.Unlock()
 	o.l1GasPrice = priceEntry{price: assets.NewWei(price), timestamp: time.Now()}
-	return
+	return nil
 }
 
 func (o *optimismL1Oracle) GasPrice(_ context.Context) (l1GasPrice *assets.Wei, err error) {

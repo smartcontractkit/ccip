@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"math/rand"
 	"strings"
 	"sync"
 	"testing"
@@ -21,11 +22,11 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
-	"github.com/smartcontractkit/chainlink-testing-framework/logging"
-	"github.com/smartcontractkit/chainlink-testing-framework/testreporters"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/conversions"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/testreporters"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/conversions"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	ethContracts "github.com/smartcontractkit/chainlink/integration-tests/contracts/ethereum"
@@ -39,14 +40,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/seth"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	"github.com/test-go/testify/require"
 
-	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
@@ -146,11 +148,12 @@ func DecodeTxInputData(abiString string, data []byte) (map[string]interface{}, e
 
 // todo - move to CTF
 func WaitForBlockNumberToBe(
+	ctx context.Context,
 	waitForBlockNumberToBe uint64,
 	client *seth.Client,
 	wg *sync.WaitGroup,
+	desiredBlockNumberReached chan<- bool,
 	timeout time.Duration,
-	t testing.TB,
 	l zerolog.Logger,
 ) (uint64, error) {
 	blockNumberChannel := make(chan uint64)
@@ -169,7 +172,7 @@ func WaitForBlockNumberToBe(
 					waitForBlockNumberToBe, latestBlockNumber)
 		case <-ticker.C:
 			go func() {
-				currentBlockNumber, err := client.Client.BlockNumber(testcontext.Get(t))
+				currentBlockNumber, err := client.Client.BlockNumber(ctx)
 				if err != nil {
 					errorChannel <- err
 				}
@@ -183,6 +186,9 @@ func WaitForBlockNumberToBe(
 			if latestBlockNumber >= waitForBlockNumberToBe {
 				ticker.Stop()
 				wg.Done()
+				if desiredBlockNumberReached != nil {
+					desiredBlockNumberReached <- true
+				}
 				l.Info().
 					Uint64("Latest Block Number", latestBlockNumber).
 					Uint64("Desired Block Number", waitForBlockNumberToBe).
@@ -1264,4 +1270,44 @@ func BuildTOMLNodeConfigForK8s(testConfig ctfconfig.GlobalTestConfig, testNetwor
 	}
 
 	return string(asStr), nil
+}
+
+func IsOPStackChain(chainID int64) bool {
+	return chainID == 8453 || //BASE MAINNET
+		chainID == 84532 || //BASE SEPOLIA
+		chainID == 10 || //OPTIMISM MAINNET
+		chainID == 11155420 //OPTIMISM SEPOLIA
+}
+
+func RandBool() bool {
+	return rand.Intn(2) == 1
+}
+
+func ContinuouslyGenerateTXsOnChain(sethClient *seth.Client, stopChannel chan bool, l zerolog.Logger) (bool, error) {
+	counterContract, err := contracts.DeployCounterContract(sethClient)
+	if err != nil {
+		return false, err
+	}
+	err = counterContract.Reset()
+	if err != nil {
+		return false, err
+	}
+	var count *big.Int
+	for {
+		select {
+		case <-stopChannel:
+			l.Info().Str("Number of generated transactions on chain", count.String()).Msg("Stopping generating txs on chain. Desired block number reached.")
+			return true, nil
+		default:
+			err = counterContract.Increment()
+			if err != nil {
+				return false, err
+			}
+			count, err = counterContract.Count()
+			if err != nil {
+				return false, err
+			}
+			l.Info().Str("Count", count.String()).Msg("Number of generated transactions on chain")
+		}
+	}
 }

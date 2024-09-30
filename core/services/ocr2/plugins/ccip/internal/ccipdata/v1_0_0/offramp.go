@@ -109,6 +109,8 @@ type ExecOffchainConfig struct {
 	InflightCacheExpiry config.Duration
 	// See [ccipdata.ExecOffchainConfig.RootSnoozeTime]
 	RootSnoozeTime config.Duration
+	// See [ccipdata.ExecOffchainConfig.BatchingStrategyID]
+	BatchingStrategyID uint32
 	// See [ccipdata.ExecOffchainConfig.MessageVisibilityInterval]
 	MessageVisibilityInterval config.Duration
 }
@@ -154,6 +156,7 @@ type OffRamp struct {
 	eventSig                common.Hash
 	cachedOffRampTokens     cache.AutoSync[cciptypes.OffRampTokens]
 	sourceToDestTokensCache sync.Map
+	feeEstimatorConfig      ccipdata.FeeEstimatorConfigReader
 
 	// Dynamic config
 	// configMu guards all the dynamic config fields.
@@ -416,6 +419,7 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 		MessageVisibilityInterval:   offchainConfigParsed.MessageVisibilityInterval,
+		BatchingStrategyID:          offchainConfigParsed.BatchingStrategyID,
 	}
 	onchainConfig := cciptypes.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds),
@@ -466,7 +470,6 @@ func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, se
 
 			return &cciptypes.ExecutionStateChanged{
 				SequenceNumber: sc.SequenceNumber,
-				Finalized:      sc.Raw.BlockNumber <= uint64(latestBlock.FinalizedBlockNumber),
 			}, nil
 		},
 	)
@@ -477,7 +480,7 @@ func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, se
 	res := make([]cciptypes.ExecutionStateChangedWithTxMeta, 0, len(parsedLogs))
 	for _, log := range parsedLogs {
 		res = append(res, cciptypes.ExecutionStateChangedWithTxMeta{
-			TxMeta:                log.TxMeta,
+			TxMeta:                log.TxMeta.WithFinalityStatus(uint64(latestBlock.FinalizedBlockNumber)),
 			ExecutionStateChanged: log.Data,
 		})
 	}
@@ -625,7 +628,7 @@ func (o *OffRamp) RegisterFilters() error {
 	return logpollerutil.RegisterLpFilters(o.lp, o.filters)
 }
 
-func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int) (*OffRamp, error) {
+func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int, feeEstimatorConfig ccipdata.FeeEstimatorConfigReader) (*OffRamp, error) {
 	offRamp, err := evm_2_evm_offramp_1_0_0.NewEVM2EVMOffRamp(addr, ec)
 	if err != nil {
 		return nil, err
@@ -680,8 +683,9 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 			offRamp.Address(),
 		),
 		// values set on the fly after ChangeConfig is called
-		gasPriceEstimator: prices.ExecGasPriceEstimator{},
-		offchainConfig:    cciptypes.ExecOffchainConfig{},
-		onchainConfig:     cciptypes.ExecOnchainConfig{},
+		gasPriceEstimator:  prices.ExecGasPriceEstimator{},
+		offchainConfig:     cciptypes.ExecOffchainConfig{},
+		onchainConfig:      cciptypes.ExecOnchainConfig{},
+		feeEstimatorConfig: feeEstimatorConfig,
 	}, nil
 }

@@ -13,23 +13,24 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
-	"github.com/smartcontractkit/chainlink-testing-framework/networks"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/conversions"
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
+	ctfconfigtypes "github.com/smartcontractkit/chainlink-testing-framework/lib/config/types"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/conversions"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/foundry"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/foundry"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver"
-	mockservercfg "github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver-cfg"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/mockserver"
+	mockservercfg "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/mockserver-cfg"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/chainlink"
-	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/reorg"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
+	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/chainlink"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/reorg"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	k8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
+	k8config "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/config"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/types/config/node"
@@ -292,8 +293,8 @@ func DeployLocalCluster(
 				require.NoError(t, err, "failed to get default chain config: %w", err)
 			} else {
 				chainConfig.ChainID = int(network.ChainID)
-				eth1 := ctfconfig.EthereumVersion_Eth1
-				geth := ctfconfig.ExecutionLayer_Geth
+				eth1 := ctfconfigtypes.EthereumVersion_Eth1
+				geth := ctfconfigtypes.ExecutionLayer_Geth
 
 				privateEthereumNetworks = append(privateEthereumNetworks, &ctfconfig.EthereumNetworkConfig{
 					EthereumVersion:     &eth1,
@@ -489,8 +490,7 @@ func DeployEnvironments(
 							"fullnameOverride": actions.NetworkName(network.Name),
 							"image": map[string]interface{}{
 								"repository": "ghcr.io/foundry-rs/foundry",
-								"tag":        "nightly-5ac78a9cd4b94dc53d1fe5e0f42372b28b5a7559",
-								//	"tag":        "nightly-ea2eff95b5c17edd3ffbdfc6daab5ce5cc80afc0",
+								"tag":        "nightly-2442e7a5fc165d7d0b022aa8b9f09dcdf675157b",
 							},
 							"anvil": map[string]interface{}{
 								"chainId":                   fmt.Sprintf("%d", network.ChainID),

@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink/dashboard-lib
 
-go 1.21.7
+go 1.22.5
 
 require (
 	github.com/K-Phoen/grabana v0.22.1
@@ -23,3 +23,5 @@ require (
 	github.com/stretchr/testify v1.9.0 // indirect
 	golang.org/x/sys v0.16.0 // indirect
 )
+
+exclude github.com/sourcegraph/sourcegraph/lib v0.0.0-20221216004406-749998a2ac74

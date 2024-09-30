@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
@@ -12,7 +12,7 @@ import {Internal} from "../../libraries/Internal.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ERC165Checker} from
-  "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/ERC165Checker.sol";
+  "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/ERC165Checker.sol";
 
 contract MockCCIPRouter is IRouter, IRouterClient {
   using SafeERC20 for IERC20;
@@ -26,7 +26,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
   event MsgExecuted(bool success, bytes retData, uint256 gasUsed);
 
   uint16 public constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
-  uint64 public constant DEFAULT_GAS_LIMIT = 200_000;
+  uint32 public constant DEFAULT_GAS_LIMIT = 200_000;
 
   uint256 internal s_mockFeeTokenAmount; //use setFee() to change to non-zero to test fees
 
@@ -45,8 +45,19 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     uint256 gasLimit,
     address receiver
   ) internal returns (bool success, bytes memory retData, uint256 gasUsed) {
-    // Only send through the router if the receiver is a contract and implements the IAny2EVMMessageReceiver interface.
-    if (receiver.code.length == 0 || !receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)) {
+    // There are three cases in which we skip calling the receiver:
+    // 1. If the message data is empty AND the gas limit is 0.
+    //          This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
+    //          that supports the IAny2EVMMessageReceiver interface, but without this first check we would call the
+    //          receiver without any gas, which would revert the transaction.
+    // 2. If the receiver is not a contract.
+    // 3. If the receiver is a contract but it does not support the IAny2EVMMessageReceiver interface.
+    //
+    // The ordering of these checks is important, as the first check is the cheapest to execute.
+    if (
+      (message.data.length == 0 && gasLimit == 0) || receiver.code.length == 0
+        || !receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
+    ) {
       return (true, "", 0);
     }
 

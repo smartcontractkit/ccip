@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/smartcontractkit/seth"
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
-	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/utils/seth"
+	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/lib/utils/seth"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
@@ -16,7 +16,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 	testconfig "github.com/smartcontractkit/chainlink/integration-tests/testconfig/vrfv2"

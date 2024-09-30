@@ -1,6 +1,3 @@
-# 377 warnings
-#./src/v0.8/automation
-
 # Ignore frozen Automation code
 ./src/v0.8/automation/v1_2
 ./src/v0.8/automation/interfaces/v1_2
@@ -44,3 +41,9 @@
 # Always ignore vendor
 ./src/v0.8/vendor
 ./node_modules/
+
+# Ignore RMNHome contract temporarily
+./src/v0.8/ccip/rmn/RMNHome.sol
+
+# Ignore tweaked vendored contracts
+./src/v0.8/shared/enumerable/EnumerableSetWithBytes16.sol

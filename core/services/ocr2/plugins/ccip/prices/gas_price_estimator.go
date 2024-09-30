@@ -3,6 +3,8 @@ package prices
 import (
 	"math/big"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 
@@ -27,22 +29,16 @@ const (
 )
 
 // GasPriceEstimatorCommit provides gasPriceEstimatorCommon + features needed in commit plugin, e.g. price deviation check.
-//
-//go:generate mockery --quiet --name GasPriceEstimatorCommit --output . --filename gas_price_estimator_commit_mock.go --inpackage --case=underscore
 type GasPriceEstimatorCommit interface {
 	cciptypes.GasPriceEstimatorCommit
 }
 
 // GasPriceEstimatorExec provides gasPriceEstimatorCommon + features needed in exec plugin, e.g. message cost estimation.
-//
-//go:generate mockery --quiet --name GasPriceEstimatorExec --output . --filename gas_price_estimator_exec_mock.go --inpackage --case=underscore
 type GasPriceEstimatorExec interface {
 	cciptypes.GasPriceEstimatorExec
 }
 
 // GasPriceEstimator provides complete gas price estimator functions.
-//
-//go:generate mockery --quiet --name GasPriceEstimator --output . --filename gas_price_estimator_mock.go --inpackage --case=underscore
 type GasPriceEstimator interface {
 	cciptypes.GasPriceEstimator
 }
@@ -53,12 +49,13 @@ func NewGasPriceEstimatorForCommitPlugin(
 	maxExecGasPrice *big.Int,
 	daDeviationPPB int64,
 	execDeviationPPB int64,
+	feeEstimatorConfig ccipdata.FeeEstimatorConfigReader,
 ) (GasPriceEstimatorCommit, error) {
 	switch commitStoreVersion.String() {
 	case "1.0.0", "1.1.0":
 		return NewExecGasPriceEstimator(estimator, maxExecGasPrice, execDeviationPPB), nil
 	case "1.2.0":
-		return NewDAGasPriceEstimator(estimator, maxExecGasPrice, execDeviationPPB, daDeviationPPB), nil
+		return NewDAGasPriceEstimator(estimator, maxExecGasPrice, execDeviationPPB, daDeviationPPB, feeEstimatorConfig), nil
 	default:
 		return nil, errors.Errorf("Invalid commitStore version: %s", commitStoreVersion)
 	}

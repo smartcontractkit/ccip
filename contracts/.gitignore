@@ -1,5 +1,4 @@
 artifacts
-foundry-artifacts
 cache
 node_modules
 solc
@@ -12,5 +11,7 @@ typechain
 # Foundry
 foundry-cache
 foundry-artifacts
+artifacts-zk
+cache-zk
 
 .openzeppelin

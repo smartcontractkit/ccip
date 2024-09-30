@@ -32,24 +32,7 @@ type BackfillArgs struct {
 	SourceStartBlock, DestStartBlock uint64
 }
 
-// GetFilteredSortedLaneTokens returns union of tokens supported on this lane, including fee tokens from the provided price registry
-// and the bridgeable tokens from offRamp. Bridgeable tokens are only included if they are configured on the pricegetter
-// Fee tokens are not filtered as they must always be priced
-func GetFilteredSortedLaneTokens(ctx context.Context, offRamp ccipdata.OffRampReader, priceRegistry cciptypes.PriceRegistryReader, priceGetter cciptypes.PriceGetter) (laneTokens []cciptypes.Address, excludedTokens []cciptypes.Address, err error) {
-	destFeeTokens, destBridgeableTokens, err := GetDestinationTokens(ctx, offRamp, priceRegistry)
-	if err != nil {
-		return nil, nil, fmt.Errorf("get tokens with batch limit: %w", err)
-	}
-
-	destTokensWithPrice, destTokensWithoutPrice, err := priceGetter.FilterConfiguredTokens(ctx, destBridgeableTokens)
-	if err != nil {
-		return nil, nil, fmt.Errorf("filter for priced tokens: %w", err)
-	}
-
-	return flattenedAndSortedTokens(destFeeTokens, destTokensWithPrice), destTokensWithoutPrice, nil
-}
-
-func flattenedAndSortedTokens(slices ...[]cciptypes.Address) (tokens []cciptypes.Address) {
+func FlattenedAndSortedTokens(slices ...[]cciptypes.Address) (tokens []cciptypes.Address) {
 	// fee token can overlap with bridgeable tokens, we need to dedup them to arrive at lane token set
 	tokens = FlattenUniqueSlice(slices...)
 
@@ -127,14 +110,19 @@ func SelectorToBytes(chainSelector uint64) [16]byte {
 	return b
 }
 
-// RetryUntilSuccess repeatedly calls fn until it returns a nil error. After each failed call there is an exponential
-// backoff applied, between initialDelay and maxDelay.
-func RetryUntilSuccess[T any](fn func() (T, error), initialDelay time.Duration, maxDelay time.Duration) (T, error) {
+// RetryUntilSuccess repeatedly calls fn until it returns a nil error or retries have been exhausted. After each failed
+// call there is an exponential backoff applied, between initialDelay and maxDelay.
+func RetryUntilSuccess[T any](
+	fn func() (T, error),
+	initialDelay time.Duration,
+	maxDelay time.Duration,
+	maxRetries uint,
+) (T, error) {
 	return retry.DoWithData(
 		fn,
 		retry.Delay(initialDelay),
 		retry.MaxDelay(maxDelay),
 		retry.DelayType(retry.BackOffDelay),
-		retry.UntilSucceeded(),
+		retry.Attempts(maxRetries),
 	)
 }

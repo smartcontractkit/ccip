@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/ethereum/go-ethereum v1.11.3
 	github.com/pkg/errors v0.9.1
-	github.com/smartcontractkit/chain-selectors v1.0.5
+	github.com/smartcontractkit/chain-selectors v1.0.23
 	go.uber.org/multierr v1.1.0
 	golang.org/x/crypto v0.1.0
 )
@@ -28,3 +28,5 @@ require (
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+exclude github.com/sourcegraph/sourcegraph/lib v0.0.0-20221216004406-749998a2ac74

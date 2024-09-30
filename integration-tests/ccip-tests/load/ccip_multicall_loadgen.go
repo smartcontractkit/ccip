@@ -12,10 +12,11 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/wasp"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-	"github.com/smartcontractkit/chainlink-testing-framework/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
@@ -90,7 +91,7 @@ func NewMultiCallLoadGenerator(testCfg *testsetups.CCIPTestConfig, lanes []*acti
 			testCfg.Test, lane, testCfg.TestGroupInput.PhaseTimeout.Duration(),
 			100000,
 			testCfg.TestGroupInput.LoadProfile.MsgProfile, 0,
-			testCfg.TestGroupInput.LoadProfile.SkipRequestIfAnotherRequestTriggeredWithin,
+			testCfg.TestGroupInput.SkipRequestIfAnotherRequestTriggeredWithin,
 		)
 		ccipLoad.BeforeAllCall()
 		m.E2ELoads[fmt.Sprintf("%s-%s", lane.SourceNetworkName, lane.DestNetworkName)] = ccipLoad

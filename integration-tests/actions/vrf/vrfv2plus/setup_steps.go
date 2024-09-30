@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/smartcontractkit/seth"
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
-	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/utils/seth"
+	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/lib/utils/seth"
 
 	"github.com/shopspring/decimal"
 	"golang.org/x/sync/errgroup"
@@ -17,8 +17,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/conversions"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/conversions"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	vrfcommon "github.com/smartcontractkit/chainlink/integration-tests/actions/vrf/common"
 	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
@@ -268,6 +268,7 @@ func SetupVRFV2PlusWrapperEnvironment(
 		coordinator,
 		wrapperConsumerContractsAmount,
 		wrapperSubId,
+		vrfv2PlusConfig,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf(vrfcommon.ErrGenericFormat, vrfcommon.ErrWaitTXsComplete, err)
@@ -309,6 +310,7 @@ func SetupVRFV2PlusWrapperEnvironment(
 		linkToken,
 		coordinator,
 		[]*big.Int{wrapperSubID},
+		*vrfv2PlusConfig.SubscriptionBillingType,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -529,4 +531,17 @@ func SetupSubsAndConsumersForExistingEnv(
 		}
 	}
 	return subIDs, consumers, nil
+}
+
+func SelectBillingTypeWithDistribution(billingType string, distributionFn func() bool) (bool, error) {
+	switch vrfv2plus_config.BillingType(billingType) {
+	case vrfv2plus_config.BillingType_Link:
+		return false, nil
+	case vrfv2plus_config.BillingType_Native:
+		return true, nil
+	case vrfv2plus_config.BillingType_Link_and_Native:
+		return distributionFn(), nil
+	default:
+		return false, fmt.Errorf("invalid billing type: %s", billingType)
+	}
 }

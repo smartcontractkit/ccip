@@ -1,15 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import {Internal} from "../libraries/Internal.sol";
 
 interface IPriceRegistry {
-  /// @notice Token price data feed configuration
-  struct TokenPriceFeedConfig {
-    address dataFeedAddress; // ──╮ AggregatorV3Interface contract (0 - feed is unset)
-    uint8 tokenDecimals; // ──────╯ Decimals of the token that the feed represents
-  }
-
   /// @notice Update the price for given tokens and gas prices for given chains.
   /// @param priceUpdates The price updates to apply.
   function updatePrices(Internal.PriceUpdates memory priceUpdates) external;
@@ -29,11 +23,6 @@ interface IPriceRegistry {
   /// @return tokenPrices The tokenPrices for the given tokens.
   function getTokenPrices(address[] calldata tokens) external view returns (Internal.TimestampedPackedUint224[] memory);
 
-  /// @notice Returns the token price data feed configuration
-  /// @param token The token to retrieve the feed config for
-  /// @return dataFeedAddress The token price data feed config (if feed address is 0, the feed config is disabled)
-  function getTokenPriceFeedConfig(address token) external view returns (TokenPriceFeedConfig memory);
-
   /// @notice Get an encoded `gasPrice` for a given destination chain ID.
   /// The 224-bit result encodes necessary gas price components.
   /// On L1 chains like Ethereum or Avax, the only component is the gas price.
@@ -42,10 +31,9 @@ interface IPriceRegistry {
   /// PriceRegistry does not contain chain-specific logic to parse destination chain price components.
   /// @param destChainSelector The destination chain to get the price for.
   /// @return gasPrice The encoded gasPrice for the given destination chain ID.
-  function getDestinationChainGasPrice(uint64 destChainSelector)
-    external
-    view
-    returns (Internal.TimestampedPackedUint224 memory);
+  function getDestinationChainGasPrice(
+    uint64 destChainSelector
+  ) external view returns (Internal.TimestampedPackedUint224 memory);
 
   /// @notice Gets the fee token price and the gas price, both denominated in dollars.
   /// @param token The source token to get the price for.
@@ -69,6 +57,6 @@ interface IPriceRegistry {
   ) external view returns (uint256 toTokenAmount);
 
   /// @notice Get the list of fee tokens.
-  /// @return The tokens set as fee tokens.
+  /// @return feeTokens The tokens set as fee tokens.
   function getFeeTokens() external view returns (address[] memory);
 }
