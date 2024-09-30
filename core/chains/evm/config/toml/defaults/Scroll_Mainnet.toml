@@ -27,7 +27,7 @@ HistoryDepth = 1200
 
 [Transactions.AutoPurge]
 Enabled = true
-DetectionApiUrl = 'https://sepolia-venus.scroll.io'
+DetectionApiUrl = 'https://venus.scroll.io'
 
 [OCR]
 ContractConfirmations = 1
