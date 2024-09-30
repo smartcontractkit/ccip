@@ -263,21 +263,21 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
     Internal.OCRPluginType pluginType
   ) public view returns (bytes32 activeConfigDigest, bytes32 candidateConfigDigest) {
     return (
-      s_configs[donId][pluginType][s_activeConfigIndex].configDigest,
-      s_configs[donId][pluginType][s_activeConfigIndex ^ 1].configDigest
+      s_configs[donId][pluginType][_getActiveIndex()].configDigest,
+      s_configs[donId][pluginType][_getCandidateIndex()].configDigest
     );
   }
 
   /// @notice Returns the active config digest for for a given key.
   /// @param donId The key of the plugin to get the config digests for.
   function getActiveDigest(uint32 donId, Internal.OCRPluginType pluginType) public view returns (bytes32) {
-    return s_configs[donId][pluginType][s_activeConfigIndex].configDigest;
+    return s_configs[donId][pluginType][_getActiveIndex()].configDigest;
   }
 
   /// @notice Returns the candidate config digest for for a given key.
   /// @param donId The key of the plugin to get the config digests for.
   function getCandidateDigest(uint32 donId, Internal.OCRPluginType pluginType) public view returns (bytes32) {
-    return s_configs[donId][pluginType][s_activeConfigIndex ^ 1].configDigest;
+    return s_configs[donId][pluginType][_getCandidateIndex()].configDigest;
   }
 
   /// @notice The offchain code can use this to fetch an old config which might still be in use by some remotes. Use
@@ -310,12 +310,12 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
     uint32 donId,
     Internal.OCRPluginType pluginType
   ) external view returns (VersionedConfig memory activeConfig, VersionedConfig memory candidateConfig) {
-    VersionedConfig memory storedActiveConfig = s_configs[donId][pluginType][s_activeConfigIndex];
+    VersionedConfig memory storedActiveConfig = s_configs[donId][pluginType][_getActiveIndex()];
     if (storedActiveConfig.configDigest != ZERO_DIGEST) {
       activeConfig = storedActiveConfig;
     }
 
-    VersionedConfig memory storedCandidateConfig = s_configs[donId][pluginType][s_activeConfigIndex ^ 1];
+    VersionedConfig memory storedCandidateConfig = s_configs[donId][pluginType][_getCandidateIndex()];
     if (storedCandidateConfig.configDigest != ZERO_DIGEST) {
       candidateConfig = storedCandidateConfig;
     }
@@ -353,7 +353,7 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
     uint32 newVersion = ++s_currentVersion;
     newConfigDigest = _calculateConfigDigest(donId, pluginType, abi.encode(config), newVersion);
 
-    VersionedConfig storage existingConfig = s_configs[donId][pluginType][s_activeConfigIndex ^ 1];
+    VersionedConfig storage existingConfig = s_configs[donId][pluginType][_getCandidateIndex()];
     existingConfig.configDigest = newConfigDigest;
     existingConfig.version = newVersion;
     existingConfig.config = config;
@@ -373,7 +373,7 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
       revert RevokingZeroDigestNotAllowed();
     }
 
-    uint256 candidateConfigIndex = s_activeConfigIndex ^ 1;
+    uint256 candidateConfigIndex = _getCandidateIndex();
     if (s_configs[donId][pluginType][candidateConfigIndex].configDigest != configDigest) {
       revert ConfigDigestMismatch(s_configs[donId][pluginType][candidateConfigIndex].configDigest, configDigest);
     }
@@ -400,12 +400,12 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
       revert NoOpStateTransitionNotAllowed();
     }
 
-    uint256 candidateConfigIndex = s_activeConfigIndex ^ 1;
+    uint256 candidateConfigIndex = _getCandidateIndex();
     if (s_configs[donId][pluginType][candidateConfigIndex].configDigest != digestToPromote) {
       revert ConfigDigestMismatch(s_configs[donId][pluginType][candidateConfigIndex].configDigest, digestToPromote);
     }
 
-    VersionedConfig storage activeConfig = s_configs[donId][pluginType][s_activeConfigIndex];
+    VersionedConfig storage activeConfig = s_configs[donId][pluginType][_getActiveIndex()];
     if (activeConfig.configDigest != digestToRevoke) {
       revert ConfigDigestMismatch(activeConfig.configDigest, digestToRevoke);
     }
@@ -442,6 +442,14 @@ contract CCIPHome is OwnerIsCreator, ITypeAndVersion, ICapabilityConfiguration, 
           ) & ~PREFIX_MASK
         )
     );
+  }
+
+  function _getActiveIndex() private view returns (uint32) {
+    return s_activeConfigIndex;
+  }
+
+  function _getCandidateIndex() private view returns (uint32) {
+    return s_activeConfigIndex ^ 1;
   }
 
   // ================================================================
