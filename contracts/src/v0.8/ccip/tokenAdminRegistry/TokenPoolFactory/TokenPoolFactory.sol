@@ -14,6 +14,8 @@ import {Create2} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/ut
 /// @notice A contract for deploying new tokens and token pools, and configuring them with the token admin registry
 /// @dev At the end of the transaction, the ownership transfer process will begin, but the user must accept the
 /// ownership transfer in a separate transaction.
+/// @dev The address prediction mechanism is only capable of deploying and predicting addresses for EVM based chains.
+/// adding compatibility for other chains will require additional offchain computation.
 contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
   using Create2 for bytes32;
 
@@ -29,34 +31,26 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
 
   struct RemoteTokenPoolInfo {
     uint64 remoteChainSelector; // The CCIP specific selector for the remote chain
-    // The address of the remote pool to either deploy or use as is. If
-    // the empty parameter flag is provided, the address will be predicted
-    bytes remotePoolAddress;
-    // The address of the remote token to either deploy or use as is
-    // If the empty parameter flag is provided, the address will be predicted
-    bytes remotePoolInitCode;
-    // The addresses of the remote RMNProxy and Router to use as immutable params and the factory to use in
-    RemoteChainConfig remoteChainConfig;
-    // The type of pool to deploy, as different pools require different constructor params
-    PoolType poolType;
-    // the address of the remote token
-    bytes remoteTokenAddress;
-    // The init code for the remote token if it needs to be deployed
-    // and includes all the constructor params already appended
-    bytes remoteTokenInitCode;
-    // The rate limiter config for token messages to be used in the pool.
-    // The specified rate limit will also be applied to the token pool's inbound messages as well.
-    RateLimiter.Config rateLimiterConfig;
+    bytes remotePoolAddress; // The address of the remote pool to either deploy or use as is. If empty, address
+    // will be predicted
+    bytes remotePoolInitCode; // Remote pool creation code if it needs to be deployed, without constructor params
+    // appended to the end.
+    RemoteChainConfig remoteChainConfig; // The addresses of the remote RMNProxy, Router, and factory for determining
+    // the remote address
+    PoolType poolType; // The type of pool to deploy, either Burn/Mint or Lock/Release
+    bytes remoteTokenAddress; // EVM address for remote token. If empty, the address will be predicted
+    bytes remoteTokenInitCode; // The init code to be deployed on the remote chain and includes constructor params
+    RateLimiter.Config rateLimiterConfig; // Token Pool rate limit. Values will be applied on incoming an outgoing messages
   }
 
   // solhint-disable-next-line gas-struct-packing
   struct RemoteChainConfig {
-    address remotePoolFactory; // The factory contract on the remote chain
-    address remoteRouter; // The router contract on the remote chain
+    address remotePoolFactory; // The factory contract on the remote chain which will make the deployment
+    address remoteRouter; // The router on the remote chain
     address remoteRMNProxy; // The RMNProxy contract on the remote chain
   }
 
-  string public constant typeAndVersion = "TokenPoolFactory 1.0.0-dev";
+  string public constant typeAndVersion = "TokenPoolFactory 1.7.0-dev";
 
   ITokenAdminRegistry private immutable i_tokenAdminRegistry;
   RegistryModuleOwnerCustom private immutable i_registryModuleOwnerCustom;
@@ -64,8 +58,11 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
   address private immutable i_rmnProxy;
   address private immutable i_ccipRouter;
 
-  // mapping(uint64 remoteChainSelector => RemoteChainConfig remoteConfig) private s_remoteChainConfigs;
-
+  /// @notice Construct the TokenPoolFactory
+  /// @param tokenAdminRegistry The address of the token admin registry
+  /// @param tokenAdminModule The address of the token admin module which can register the token via ownership module
+  /// @param rmnProxy The address of the RMNProxy contract token pools will be deployed with
+  /// @param ccipRouter The address of the CCIPRouter contract token pools will be deployed with
   constructor(
     ITokenAdminRegistry tokenAdminRegistry,
     RegistryModuleOwnerCustom tokenAdminModule,
@@ -87,6 +84,18 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
   // |                   Top-Level Deployment                        |
   // ================================================================
 
+  /// @notice Deploys a token and token pool with the given token information and configures it with remote token pools
+  /// @dev The token and token pool are deployed in the same transaction, and the token pool is configured with the
+  /// remote token pools. The token pool is then set in the token admin registry. Ownership of the everything is transferred
+  /// to the msg.sender, but must be accepted in a separate transaction due to 2-step ownership transfer.
+  /// @param remoteTokenPools An array of remote token pools info to be used in the pool's applyChainUpdates function
+  /// or to be predicted if the pool has not been deployed yet on the remote chain
+  /// @param tokenInitCode The creation code for the token, which includes the constructor parameters already appended
+  /// @param tokenPoolInitCode The creation code for the token pool, without the constructor parameters appended
+  /// @param salt The salt to be used in the create2 deployment of the token and token pool to ensure a unique address
+  /// @param poolType The type of pool to deploy, either Burn/Mint or Lock/Release
+  /// @return token The address of the token that was deployed
+  /// @return pool The address of the token pool that was deployed
   function deployTokenAndTokenPool(
     RemoteTokenPoolInfo[] calldata remoteTokenPools,
     bytes memory tokenInitCode,
@@ -158,7 +167,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](remoteTokenPools.length);
 
     RemoteTokenPoolInfo memory remoteTokenPool;
-    for (uint256 i = 0; i < remoteTokenPools.length; i++) {
+    for (uint256 i = 0; i < remoteTokenPools.length; ++i) {
       remoteTokenPool = remoteTokenPools[i];
 
       // If the user provides an empty byte string, indicated no token has already been deployed,
@@ -176,6 +185,9 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
       // If the user provides an empty byte string parameter, indicating the pool has not been deployed yet,
       // the address of the pool should be predicted. Otherwise use the provided address.
       if (remoteTokenPool.remotePoolAddress.length == 0) {
+
+        // Address is predicted based on the init code hash and the deployer, so the hash must first be computed
+        // using the initCode and a concatenated set of constructor parameters.
         bytes32 remotePoolInitcodeHash = _generatePoolInitcodeHash(
           remoteTokenPool.remotePoolInitCode,
           remoteTokenPool.remoteChainConfig,
@@ -203,7 +215,8 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     if (poolType == PoolType.BURN_MINT) {
       tokenPoolInitArgs = abi.encode(token, new address[](0), i_rmnProxy, i_ccipRouter);
     } else if (poolType == PoolType.LOCK_RELEASE) {
-      // Lock/Release pools have an additional boolean constructor param that must be accounted for
+      // Lock/Release pools have an additional boolean constructor parameter that must be accounted for, acceptLiquidity, 
+      // which is set to true by default in this case. Users wishing to set it to false must deploy the pool manually.
       tokenPoolInitArgs = abi.encode(token, new address[](0), i_rmnProxy, true, i_ccipRouter);
     }
 
@@ -221,17 +234,19 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
 
   /// @notice Generates the hash of the init code the pool will be deployed with
   /// @dev The init code hash is used with Create2 to predict the address of the pool on the remote chain
+  /// @dev ABI-encoding limitations prevent arbitrary constructor parameters from being used, so pool type must be
+  /// restricted to those with known types in the constructor. This function should be updated if new pool types are needed.
   /// @param initCode The init code of the pool
   /// @param remoteChainConfig The remote chain config for the pool
   /// @param remoteTokenAddress The address of the remote token
   /// @param poolType The type of pool to deploy
-  /// @return The hash of the init code
+  /// @return bytes32 hash of the init code to be used in the deterministic address calculation
   function _generatePoolInitcodeHash(
     bytes memory initCode,
     RemoteChainConfig memory remoteChainConfig,
     address remoteTokenAddress,
     PoolType poolType
-  ) private pure returns (bytes32) {
+  ) internal virtual pure returns (bytes32) {
     if (poolType == PoolType.BURN_MINT) {
       return keccak256(
         abi.encodePacked(
@@ -243,7 +258,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
         )
       );
     } else {
-      // if poolType == PoolType.LOCK_RELEASE
+      // if poolType is PoolType.LOCK_RELEASE, but may be expanded in future versions
       return keccak256(
         abi.encodePacked(
           initCode,
@@ -254,7 +269,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
         )
       );
     }
-    // Note: Future factory versions may have additional pool types which will need to be added here
+
   }
 
   /// @notice Sets the token pool address in the token admin registry for a newly deployed token pool.
