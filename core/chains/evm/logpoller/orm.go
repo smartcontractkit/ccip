@@ -316,7 +316,8 @@ func (o *DSORM) ExecPagedQuery(ctx context.Context, limit int64, end int64, quer
 	}
 
 	// Remove up to limit blocks at a time, until we've reached the limit or removed everything eligible for deletion
-	for lower, upper := start, start+limit-1; numResults < limit; lower = upper + 1 {
+	var upper int64
+	for lower := start; numResults < limit; lower = upper + 1 {
 		upper = lower + limit - 1
 		if upper > end {
 			upper = end
@@ -459,7 +460,7 @@ func (o *DSORM) SelectExcessLogIDs(ctx context.Context, limit int64) (results []
 		return results, err
 	}
 
-	o.ExecPagedQuery(ctx, limit, latestBlock.FinalizedBlockNumber, func(lower, upper int64) (int64, error) {
+	_, err = o.ExecPagedQuery(ctx, limit, latestBlock.FinalizedBlockNumber, func(lower, upper int64) (int64, error) {
 		var rowIDs []uint64
 		err = o.ds.SelectContext(ctx, &rowIDs, query, ubig.New(o.chainID), lower, upper)
 		if err != nil {
