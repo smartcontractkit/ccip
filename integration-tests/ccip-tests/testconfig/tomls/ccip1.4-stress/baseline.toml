@@ -132,7 +132,7 @@ DeltaReconcile = '5s'
 
 CommonChainConfigTOML = """
 LogPollInterval = '1s'
-LogPrunePageSize = 2000
+LogPrunePageSize = 1000
 LogKeepBlocksDepth = 4000
 
 [HeadTracker]
