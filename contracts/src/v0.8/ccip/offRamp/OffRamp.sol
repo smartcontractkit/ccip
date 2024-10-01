@@ -158,7 +158,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
 
-  /// @notice Set of enables source chain selectors
+  /// @notice Set of source chain selectors
   EnumerableSet.UintSet internal s_sourceChainSelectors;
 
   /// @notice SourceChainConfig per chain
