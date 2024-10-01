@@ -326,8 +326,20 @@ func TestORM(t *testing.T) {
 		},
 		{
 			EvmChainId:     ubig.New(th.ChainID),
+			LogIndex:       7,
+			BlockHash:      common.HexToHash("0x1239"),
+			BlockNumber:    int64(17),
+			EventSig:       topic,
+			Topics:         [][]byte{topic[:]},
+			Address:        common.HexToAddress("0x1236"),
+			TxHash:         common.HexToHash("0x1888"),
+			Data:           []byte("hello2 short retention"),
+			BlockTimestamp: time.Now(),
+		},
+		{
+			EvmChainId:     ubig.New(th.ChainID),
 			LogIndex:       8,
-			BlockHash:      common.HexToHash("0x1238"),
+			BlockHash:      common.HexToHash("0x1239"),
 			BlockNumber:    int64(17),
 			EventSig:       topic2,
 			Topics:         [][]byte{topic2[:]},
@@ -368,10 +380,9 @@ func TestORM(t *testing.T) {
 		},
 	}))
 
-	t.Log(latest.BlockNumber)
 	logs, err := o1.SelectLogsByBlockRange(ctx, 1, 17)
 	require.NoError(t, err)
-	require.Len(t, logs, 8)
+	require.Len(t, logs, 9)
 
 	logs, err = o1.SelectLogsByBlockRange(ctx, 10, 10)
 	require.NoError(t, err)
@@ -486,13 +497,13 @@ func TestORM(t *testing.T) {
 	require.Equal(t, int64(17), latest.BlockNumber)
 	logs, err = o1.SelectLogsByBlockRange(ctx, 1, latest.BlockNumber)
 	require.NoError(t, err)
-	require.Len(t, logs, 8)
+	require.Len(t, logs, 9)
 
 	// Delete expired logs with page limit
 	time.Sleep(2 * time.Millisecond) // just in case we haven't reached the end of the 1ms retention period
-	deleted, err := o1.DeleteExpiredLogs(ctx, 2)
+	deleted, err := o1.DeleteExpiredLogs(ctx, 1)
 	require.NoError(t, err)
-	assert.Equal(t, int64(2), deleted)
+	assert.Equal(t, int64(1), deleted)
 
 	// Delete expired logs without page limit
 	deleted, err = o1.DeleteExpiredLogs(ctx, 0)
@@ -934,7 +945,7 @@ func TestORM_DataWords(t *testing.T) {
 		},
 	}))
 
-	wordFilter := func(wordIdx uint8, word1, word2 uint64) []query.Expression {
+	wordFilter := func(wordIdx int, word1, word2 uint64) []query.Expression {
 		return []query.Expression{
 			logpoller.NewAddressFilter(addr),
 			logpoller.NewEventSigFilter(eventSig),
