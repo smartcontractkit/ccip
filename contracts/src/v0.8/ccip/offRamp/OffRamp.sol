@@ -21,7 +21,7 @@ import {MultiOCR3Base} from "../ocr/MultiOCR3Base.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/token/ERC20/IERC20.sol";
 import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/ERC165Checker.sol";
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice OffRamp enables OCR networks to execute multiple messages
 /// in an OffRamp in a single transaction.
@@ -977,11 +977,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       currentConfig.onRamp = newOnRamp;
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
       currentConfig.router = sourceConfigUpdate.router;
-      if (sourceConfigUpdate.isEnabled) {
-        s_supportedChainSelectors.add(sourceChainSelector);
-      } else {
-        s_supportedChainSelectors.remove(sourceChainSelector);
-      }
 
       emit SourceChainConfigSet(sourceChainSelector, currentConfig);
     }

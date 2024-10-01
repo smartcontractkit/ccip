@@ -3017,7 +3017,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
     assertEq(logEntries.length, 0);
 
-    assertEq(s_offRamp.getSupportedChainSelectors().length, 0);
+    assertEq(s_offRamp.getSourceChainSelectors().length, 0);
   }
 
   function test_AddNewChain_Success() public {
