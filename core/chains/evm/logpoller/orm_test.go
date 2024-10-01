@@ -1162,8 +1162,8 @@ type mockQueryExecutor struct {
 	mock.Mock
 }
 
-func (m *mockQueryExecutor) Exec(limitBlock int64) (int64, error) {
-	res := m.Called(limitBlock)
+func (m *mockQueryExecutor) Exec(lower, upper int64) (int64, error) {
+	res := m.Called(lower, upper)
 	return int64(res.Int(0)), res.Error(1)
 }
 
@@ -1178,13 +1178,13 @@ func TestORM_ExecPagedQuery(t *testing.T) {
 	m := mockQueryExecutor{}
 
 	queryError := errors.New("some error")
-	m.On("Exec", int64(0)).Return(0, queryError).Once()
+	m.On("Exec", int64(0), int64(0)).Return(0, queryError).Once()
 
 	// Should handle errors gracefully
 	_, err := o.ExecPagedQuery(ctx, 0, 0, m.Exec)
 	assert.ErrorIs(t, err, queryError)
 
-	m.On("Exec", int64(60)).Return(4, nil).Once()
+	m.On("Exec", int64(0), int64(60)).Return(4, nil).Once()
 
 	// Query should only get executed once with limitBlock=end if called with limit=0
 	numResults, err := o.ExecPagedQuery(ctx, 0, 60, m.Exec)
@@ -1195,18 +1195,18 @@ func TestORM_ExecPagedQuery(t *testing.T) {
 	_, err = o.ExecPagedQuery(ctx, 300, 1000, m.Exec)
 	assert.Error(t, err)
 
-	o.InsertBlock(ctx, common.HexToHash("0x1234"), 42, time.Now(), 0)
+	require.NoError(t, o.InsertBlock(ctx, common.HexToHash("0x1234"), 42, time.Now(), 0))
 
-	m.On("Exec", mock.Anything).Return(3, nil)
+	m.On("Exec", mock.Anything, mock.Anything).Return(3, nil)
 
 	// Should get called with limitBlock = 342, 642, 942, 1000
 	numResults, err = o.ExecPagedQuery(ctx, 300, 1000, m.Exec)
 	require.NoError(t, err)
 	assert.Equal(t, int64(12), numResults) // 3 results in each of 4 calls
 	m.AssertNumberOfCalls(t, "Exec", 6)    // 4 new calls, plus the prior 2
-	expectedLimitBlocks := []int64{341, 641, 941, 1000}
+	expectedLimitBlocks := [][]int64{{42, 341}, {342, 641}, {642, 941}, {942, 1000}}
 	for _, expected := range expectedLimitBlocks {
-		m.AssertCalled(t, "Exec", expected)
+		m.AssertCalled(t, "Exec", expected[0], expected[1])
 	}
 
 	// Should not go all the way to 1000, but stop after ~ 13 results have
@@ -1215,9 +1215,9 @@ func TestORM_ExecPagedQuery(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(15), numResults)
 	m.AssertNumberOfCalls(t, "Exec", 11)
-	expectedLimitBlocks = []int64{56, 71, 86, 101, 116} // 42 + 15 * n - 1 for n = 1, 2, 3, 4, 5
+	expectedLimitBlocks = [][]int64{{42, 56}, {57, 71}, {72, 86}, {87, 101}, {102, 116}} // upper[n] = 42 + 15 * n - 1 for n = 1, 2, 3, 4, 5, lower[n] = upper[n-1] + 1
 	for _, expected := range expectedLimitBlocks {
-		m.AssertCalled(t, "Exec", expected)
+		m.AssertCalled(t, "Exec", expected[0], expected[1])
 	}
 }
 
