@@ -159,7 +159,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   DynamicConfig internal s_dynamicConfig;
 
   /// @notice Set of enables source chain selectors
-  EnumerableSet.UintSet internal s_supportedChainSelectors;
+  EnumerableSet.UintSet internal s_sourceChainSelectors;
 
   /// @notice SourceChainConfig per chain
   /// (forms lane configurations from sourceChainSelector => StaticConfig.chainSelector)
@@ -927,9 +927,9 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
   /// @notice Returns all source chain configs
   /// @return sourceChainConfigs The source chain configs corresponding to all the supported chain selectors
   function getAllSourceChainConfig() external view returns (SourceChainConfig[] memory) {
-    SourceChainConfig[] memory sourceChainConfigs = new SourceChainConfig[](s_supportedChainSelectors.length());
-    for (uint256 i = 0; i < s_supportedChainSelectors.length(); ++i) {
-      sourceChainConfigs[i] = s_sourceChainConfigs[uint64(s_supportedChainSelectors.at(i))];
+    SourceChainConfig[] memory sourceChainConfigs = new SourceChainConfig[](s_sourceChainSelectors.length());
+    for (uint256 i = 0; i < s_sourceChainSelectors.length(); ++i) {
+      sourceChainConfigs[i] = s_sourceChainConfigs[uint64(s_sourceChainSelectors.at(i))];
     }
     return sourceChainConfigs;
   }
@@ -946,6 +946,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     for (uint256 i = 0; i < sourceChainConfigUpdates.length; ++i) {
       SourceChainConfigArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
       uint64 sourceChainSelector = sourceConfigUpdate.sourceChainSelector;
+      s_sourceChainSelectors.add(sourceChainSelector);
 
       if (sourceChainSelector == 0) {
         revert ZeroChainSelectorNotAllowed();

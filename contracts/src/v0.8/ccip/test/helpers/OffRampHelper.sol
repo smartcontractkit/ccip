@@ -108,7 +108,7 @@ contract OffRampHelper is OffRamp, IgnoreContractSize {
     s_roots[sourceChainSelector][root] = timestamp;
   }
 
-  function getSupportedChainSelectors() external view returns (uint256[] memory chainSelectors) {
-    return s_supportedChainSelectors.values();
+  function getSourceChainSelectors() external view returns (uint256[] memory chainSelectors) {
+    return s_sourceChainSelectors.values();
   }
 }
