@@ -67,6 +67,10 @@ contract OffRamp_constructor is OffRampSetup {
       onRamp: sourceChainConfigs[1].onRamp
     });
 
+    uint64[] memory expectedSourceChainSelectors = new uint64[](2);
+    expectedSourceChainSelectors[0] = SOURCE_CHAIN_SELECTOR_1;
+    expectedSourceChainSelectors[1] = SOURCE_CHAIN_SELECTOR_1 + 1;
+
     vm.expectEmit();
     emit OffRamp.StaticConfigSet(staticConfig);
 
@@ -134,6 +138,12 @@ contract OffRamp_constructor is OffRampSetup {
     assertEq("OffRamp 1.6.0-dev", s_offRamp.typeAndVersion());
     assertEq(OWNER, s_offRamp.owner());
     assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
+
+    uint256[] memory actualSourceChainSelectors = s_offRamp.getSupportedChainSelectors();
+    // assertion for source chain selector
+    for (uint256 i = 0; i < expectedSourceChainSelectors.length; i++) {
+      assertEq(expectedSourceChainSelectors[i], actualSourceChainSelectors[i]);
+    }
   }
 
   // Revert
@@ -3005,7 +3015,7 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
     Vm.Log[] memory logEntries = vm.getRecordedLogs();
     assertEq(logEntries.length, 0);
 
-    // assertEq(s_offRamp.getSourceChainSelectors().length, 0);
+    assertEq(s_offRamp.getSupportedChainSelectors().length, 0);
   }
 
   function test_AddNewChain_Success() public {
@@ -3058,9 +3068,8 @@ contract OffRamp_applySourceChainConfigUpdates is OffRampSetup {
 
     _assertSourceChainConfigEquality(s_offRamp.getSourceChainConfig(SOURCE_CHAIN_SELECTOR_1), expectedSourceChainConfig);
 
-    // uint64[] memory resultSourceChainSelectors = s_offRamp.getSourceChainSelectors();
-    // assertEq(resultSourceChainSelectors.length, 1);
-    // assertEq(resultSourceChainSelectors[0], SOURCE_CHAIN_SELECTOR_1);
+    uint256[] memory resultSourceChainSelectors = s_offRamp.getSupportedChainSelectors();
+    assertEq(resultSourceChainSelectors.length, 0);
   }
 
   function test_AddMultipleChains_Success() public {
