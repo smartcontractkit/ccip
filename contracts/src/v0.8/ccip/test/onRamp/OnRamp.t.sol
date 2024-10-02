@@ -844,8 +844,13 @@ contract OnRamp_applyDestChainConfigUpdates is OnRampSetup {
 
     // supports updating and adding lanes simultaneously
     configArgs = new OnRamp.DestChainConfigArgs[](2);
-    configArgs[0] = OnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter});
-    configArgs[1] = OnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999))});
+    configArgs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      allowListEnabled: false
+    });
+    configArgs[1] =
+      OnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999)), allowListEnabled: false});
     vm.expectEmit();
     emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
     vm.expectEmit();
@@ -877,8 +882,13 @@ contract OnRamp_applyAllowListUpdates is OnRampSetup {
     vm.startPrank(OWNER);
 
     OnRamp.DestChainConfigArgs[] memory configArgs = new OnRamp.DestChainConfigArgs[](2);
-    configArgs[0] = OnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter});
-    configArgs[1] = OnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999))});
+    configArgs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      allowListEnabled: false
+    });
+    configArgs[1] =
+      OnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999)), allowListEnabled: false});
     vm.expectEmit();
     emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
     vm.expectEmit();
@@ -968,8 +978,13 @@ contract OnRamp_applyAllowListUpdates is OnRampSetup {
     vm.startPrank(OWNER);
 
     OnRamp.DestChainConfigArgs[] memory configArgs = new OnRamp.DestChainConfigArgs[](2);
-    configArgs[0] = OnRamp.DestChainConfigArgs({destChainSelector: DEST_CHAIN_SELECTOR, router: s_sourceRouter});
-    configArgs[1] = OnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999))});
+    configArgs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      allowListEnabled: false
+    });
+    configArgs[1] =
+      OnRamp.DestChainConfigArgs({destChainSelector: 9999, router: IRouter(address(9999)), allowListEnabled: false});
     vm.expectEmit();
     emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, false);
     vm.expectEmit();
