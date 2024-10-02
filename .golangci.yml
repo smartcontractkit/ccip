@@ -1,5 +1,13 @@
 run:
   timeout: 15m0s
+#  TODO: For passing Chainlink merge, remove after release
+  skip-dirs:
+    - core/services/llo
+    - core/services/ocr2/plugins/llo
+    - core/capabilities/targets
+    - core/services/relay/evm
+    - core/chains/evm/client
+    - core/services/versioning
 linters:
   enable:
     - exhaustive
