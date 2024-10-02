@@ -52,7 +52,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 juelsPerFeeCoinSource = """
 ds1          [type=bridge name=voter_turnout];
@@ -108,7 +107,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 juelsPerFeeCoinSource = """
 ds1          [type=bridge name=voter_turnout];
@@ -153,7 +151,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
@@ -177,7 +174,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
@@ -203,7 +199,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
@@ -229,7 +224,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
@@ -256,7 +250,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
@@ -282,7 +275,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
@@ -306,7 +298,6 @@ chainID = 1337
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
@@ -347,7 +338,6 @@ answer1      [type=median index=0];
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 juelsPerFeeCoinSource = """
 ds1          [type=bridge name=voter_turnout];
@@ -386,7 +376,6 @@ answer1      [type=median index=0];
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 juelsPerFeeCoinSource = """
 ->
@@ -418,7 +407,6 @@ answer1      [type=median index=0];
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 [pluginConfig]
 juelsPerFeeCoinSource = """
 ds1          [type=bridge name=voter_turnout];
@@ -778,7 +766,6 @@ chainID = 4
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 
 [pluginConfig]
 `,
@@ -810,7 +797,6 @@ chainID = 4
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 
 [pluginConfig]
 PluginName="some random name"
@@ -844,7 +830,6 @@ chainID = 4
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 
 [pluginConfig]
 PluginName="some random name"
@@ -879,7 +864,6 @@ chainID = 4
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = ""
-publicKey = "0x1234567890123456789012345678901234567890"
 
 [pluginConfig]
 PluginName="some random name"
@@ -997,7 +981,6 @@ func TestOCR2OnchainSigningStrategy_Unmarshal(t *testing.T) {
 strategyName = "single-chain"
 [onchainSigningStrategy.config]
 evm = "08d14c6eed757414d72055d28de6caf06535806c6a14e450f3a2f1c854420e17"
-publicKey = "0x1234567890123456789012345678901234567890"
 `
 	oss := &envelope2{}
 	tree, err := toml.Load(payload)
@@ -1010,12 +993,9 @@ publicKey = "0x1234567890123456789012345678901234567890"
 	err = json.Unmarshal(b, oss)
 	require.NoError(t, err)
 
-	pk, err := oss.OnchainSigningStrategy.PublicKey()
-	require.NoError(t, err)
 	kbID, err := oss.OnchainSigningStrategy.KeyBundleID("evm")
 	require.NoError(t, err)
 
 	assert.False(t, oss.OnchainSigningStrategy.IsMultiChain())
-	assert.Equal(t, "0x1234567890123456789012345678901234567890", pk)
 	assert.Equal(t, "08d14c6eed757414d72055d28de6caf06535806c6a14e450f3a2f1c854420e17", kbID)
 }

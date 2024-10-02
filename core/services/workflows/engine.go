@@ -36,7 +36,7 @@ type Engine struct {
 	localNode            capabilities.Node
 	executionStates      store.Store
 	pendingStepRequests  chan stepRequest
-	triggerEvents        chan capabilities.CapabilityResponse
+	triggerEvents        chan capabilities.TriggerResponse
 	stepUpdateCh         chan store.WorkflowExecutionStep
 	wg                   sync.WaitGroup
 	stopCh               services.StopChan
@@ -319,32 +319,25 @@ func generateTriggerId(workflowID string, triggerIdx int) string {
 // registerTrigger is used during the initialization phase to bind a trigger to this workflow
 func (e *Engine) registerTrigger(ctx context.Context, t *triggerCapability, triggerIdx int) error {
 	triggerID := generateTriggerId(e.workflow.id, triggerIdx)
-	triggerInputs, err := values.NewMap(
-		map[string]any{
-			"triggerId": triggerID,
-		},
-	)
-	if err != nil {
-		return err
-	}
 
 	tc, err := values.NewMap(t.Config)
 	if err != nil {
 		return err
 	}
 
-	t.config = tc
+	t.config.Store(tc)
 
-	triggerRegRequest := capabilities.CapabilityRequest{
+	triggerRegRequest := capabilities.TriggerRegistrationRequest{
 		Metadata: capabilities.RequestMetadata{
 			WorkflowID:               e.workflow.id,
+			WorkflowOwner:            e.workflow.owner,
+			WorkflowName:             e.workflow.name,
 			WorkflowDonID:            e.localNode.WorkflowDON.ID,
 			WorkflowDonConfigVersion: e.localNode.WorkflowDON.ConfigVersion,
-			WorkflowName:             e.workflow.name,
-			WorkflowOwner:            e.workflow.owner,
+			ReferenceID:              t.Ref,
 		},
-		Config: tc,
-		Inputs: triggerInputs,
+		Config:    t.config.Load(),
+		TriggerID: triggerID,
 	}
 	eventsCh, err := t.trigger.RegisterTrigger(ctx, triggerRegRequest)
 	if err != nil {
@@ -422,12 +415,7 @@ func (e *Engine) loop(ctx context.Context) {
 				continue
 			}
 
-			te := &capabilities.TriggerEvent{}
-			err := resp.Value.UnwrapTo(te)
-			if err != nil {
-				e.logger.Errorf("could not unwrap trigger event; error %v", resp.Err)
-				continue
-			}
+			te := resp.Event
 
 			executionID, err := generateExecutionID(e.workflow.id, te.ID)
 			if err != nil {
@@ -435,7 +423,7 @@ func (e *Engine) loop(ctx context.Context) {
 				continue
 			}
 
-			err = e.startExecution(ctx, executionID, resp.Value)
+			err = e.startExecution(ctx, executionID, resp.Event.Outputs)
 			if err != nil {
 				e.logger.With(eIDKey, executionID).Errorf("failed to start execution: %v", err)
 			}
@@ -466,7 +454,7 @@ func generateExecutionID(workflowID, eventID string) (string, error) {
 }
 
 // startExecution kicks off a new workflow execution when a trigger event is received.
-func (e *Engine) startExecution(ctx context.Context, executionID string, event values.Value) error {
+func (e *Engine) startExecution(ctx context.Context, executionID string, event *values.Map) error {
 	e.logger.With("event", event, eIDKey, executionID).Debug("executing on a trigger event")
 	ec := &store.WorkflowExecution{
 		Steps: map[string]*store.WorkflowExecutionStep{
@@ -713,6 +701,10 @@ func (e *Engine) configForStep(ctx context.Context, executionID string, step *st
 		return step.config, nil
 	}
 
+	if capConfig.DefaultConfig == nil {
+		return step.config, nil
+	}
+
 	// Merge the configs for now; note that this means that a workflow can override
 	// all of the config set by the capability. This is probably not desirable in
 	// the long-term, but we don't know much about those use cases so stick to a simpler
@@ -759,6 +751,7 @@ func (e *Engine) executeStep(ctx context.Context, msg stepRequest) (*values.Map,
 			WorkflowName:             e.workflow.name,
 			WorkflowDonID:            e.localNode.WorkflowDON.ID,
 			WorkflowDonConfigVersion: e.localNode.WorkflowDON.ConfigVersion,
+			ReferenceID:              msg.stepRef,
 		},
 	}
 
@@ -771,24 +764,17 @@ func (e *Engine) executeStep(ctx context.Context, msg stepRequest) (*values.Map,
 }
 
 func (e *Engine) deregisterTrigger(ctx context.Context, t *triggerCapability, triggerIdx int) error {
-	triggerInputs, err := values.NewMap(
-		map[string]any{
-			"triggerId": generateTriggerId(e.workflow.id, triggerIdx),
-		},
-	)
-	if err != nil {
-		return err
-	}
-	deregRequest := capabilities.CapabilityRequest{
+	deregRequest := capabilities.TriggerRegistrationRequest{
 		Metadata: capabilities.RequestMetadata{
 			WorkflowID:               e.workflow.id,
 			WorkflowDonID:            e.localNode.WorkflowDON.ID,
 			WorkflowDonConfigVersion: e.localNode.WorkflowDON.ConfigVersion,
 			WorkflowName:             e.workflow.name,
 			WorkflowOwner:            e.workflow.owner,
+			ReferenceID:              t.Ref,
 		},
-		Inputs: triggerInputs,
-		Config: t.config,
+		TriggerID: generateTriggerId(e.workflow.id, triggerIdx),
+		Config:    t.config.Load(),
 	}
 
 	// if t.trigger == nil, then we haven't initialized the workflow
@@ -952,7 +938,7 @@ func NewEngine(cfg Config) (engine *Engine, err error) {
 		executionStates:      cfg.Store,
 		pendingStepRequests:  make(chan stepRequest, cfg.QueueSize),
 		stepUpdateCh:         make(chan store.WorkflowExecutionStep),
-		triggerEvents:        make(chan capabilities.CapabilityResponse),
+		triggerEvents:        make(chan capabilities.TriggerResponse),
 		stopCh:               make(chan struct{}),
 		newWorkerTimeout:     cfg.NewWorkerTimeout,
 		maxExecutionDuration: cfg.MaxExecutionDuration,

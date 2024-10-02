@@ -422,7 +422,10 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					SourceTokenData: [][]byte{},
 				},
 			},
-			expUSD: execCostUSD,
+			daOverheadGas: 100_000,
+			gasPerDAByte:  16,
+			daMultiplier:  10_000, // 1x multiplier
+			expUSD:        execCostUSD,
 		},
 		{
 			name:               "double native price",
@@ -492,23 +495,25 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					Return(tc.execEstimatorResponse...)
 			}
 
-			g := DAGasPriceEstimator{
-				execEstimator:       execEstimator,
-				l1Oracle:            nil,
-				priceEncodingLength: daGasPriceEncodingLength,
-				feeEstimatorConfig:  feeEstimatorConfig,
-			}
+			t.Run(tc.name, func(t *testing.T) {
+				g := DAGasPriceEstimator{
+					execEstimator:       execEstimator,
+					l1Oracle:            nil,
+					priceEncodingLength: daGasPriceEncodingLength,
+					feeEstimatorConfig:  feeEstimatorConfig,
+				}
 
-			costUSD, err := g.EstimateMsgCostUSD(tc.gasPrice, tc.wrappedNativePrice, tc.msg)
+				costUSD, err := g.EstimateMsgCostUSD(tc.gasPrice, tc.wrappedNativePrice, tc.msg)
 
-			switch {
-			case len(tc.execEstimatorResponse) == 4 && tc.execEstimatorResponse[3] != nil,
-				tc.execEstimatorErr != nil:
-				assert.Error(t, err)
-			default:
-				assert.NoError(t, err)
-				assert.Equal(t, tc.expUSD, costUSD)
-			}
+				switch {
+				case len(tc.execEstimatorResponse) == 4 && tc.execEstimatorResponse[3] != nil,
+					tc.execEstimatorErr != nil:
+					assert.Error(t, err)
+				default:
+					assert.NoError(t, err)
+					assert.Equal(t, tc.expUSD, costUSD)
+				}
+			})
 		})
 	}
 }

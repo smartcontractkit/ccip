@@ -7,10 +7,11 @@ import (
 	"time"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -134,14 +135,7 @@ type IncompleteDestCommitStoreReader struct {
 	cs cciptypes.CommitStoreReader
 }
 
-func NewIncompleteDestCommitStoreReader(
-	lggr logger.Logger,
-	versionFinder ccip.VersionFinder,
-	address cciptypes.Address,
-	ec client.Client,
-	lp logpoller.LogPoller,
-	feeEstimatorConfig estimatorconfig.FeeEstimatorConfigProvider,
-) (*IncompleteDestCommitStoreReader, error) {
+func NewIncompleteDestCommitStoreReader(lggr logger.Logger, versionFinder ccip.VersionFinder, address cciptypes.Address, ec client.Client, lp logpoller.LogPoller, feeEstimatorConfig estimatorconfig.FeeEstimatorConfigProvider) (*IncompleteDestCommitStoreReader, error) {
 	cs, err := ccip.NewCommitStoreReader(lggr, versionFinder, address, ec, lp, feeEstimatorConfig)
 	if err != nil {
 		return nil, err

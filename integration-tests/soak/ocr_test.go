@@ -3,6 +3,7 @@ package soak
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/havoc"
 
@@ -11,8 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
-
-	"time"
 
 	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"github.com/google/uuid"
@@ -161,6 +160,11 @@ func executeOCRSoakTest(t *testing.T, test *testsetups.OCRSoakTest, config *tc.T
 	t.Cleanup(func() {
 		if err := actions.TeardownRemoteSuite(test.TearDownVals(t)); err != nil {
 			l.Error().Err(err).Msg("Error tearing down environment")
+		} else {
+			err := test.Environment().Client.RemoveNamespace(test.Environment().Cfg.Namespace)
+			if err != nil {
+				l.Error().Err(err).Msg("Error removing namespace")
+			}
 		}
 	})
 	if test.Interrupted() {

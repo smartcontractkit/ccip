@@ -108,6 +108,7 @@ type Service interface {
 	RejectSpec(ctx context.Context, id int64) error
 	UpdateSpecDefinition(ctx context.Context, id int64, spec string) error
 
+	// Unsafe_SetConnectionsManager Only for testing
 	Unsafe_SetConnectionsManager(ConnectionsManager)
 }
 
@@ -208,7 +209,7 @@ func (s *service) RegisterManager(ctx context.Context, params RegisterManagerPar
 		var txerr error
 
 		id, txerr = tx.CreateManager(ctx, &mgr)
-		if err != nil {
+		if txerr != nil {
 			return txerr
 		}
 
@@ -218,6 +219,9 @@ func (s *service) RegisterManager(ctx context.Context, params RegisterManagerPar
 
 		return nil
 	})
+	if err != nil {
+		return 0, err
+	}
 
 	privkey, err := s.getCSAPrivateKey()
 	if err != nil {

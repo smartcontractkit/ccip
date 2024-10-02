@@ -1,5 +1,5 @@
 ## Baseline performance test on simulated environment (with chaos)
-## 30 chains / 300 lanes
+## 40 chains / 400 lanes
 ## historyDepth 200 / finalityDepth 200
 ## block_time = 1s
 ## throughput 1msg / 5s
@@ -29,7 +29,7 @@ CommitStore = '1.2.0'
 TTL = '10h'
 
 [CCIP.Env.Network]
-selected_networks = ['PRIVATE-CHAIN-1', 'PRIVATE-CHAIN-2']
+selected_networks= ['PRIVATE-CHAIN-1', 'PRIVATE-CHAIN-2']
 
 [CCIP.Env.Network.EVMNetworks.PRIVATE-CHAIN-1]
 evm_name = 'private-chain-1'
@@ -148,9 +148,9 @@ KeepEnvAlive = true
 NoOfCommitNodes = 16
 PhaseTimeout = '40m'
 NodeFunding = 1000.0
-NoOfRoutersPerPair = 1
-NoOfNetworks = 30
-MaxNoOfLanes = 300
+NoOfRoutersPerPair = 2
+NoOfNetworks = 40
+MaxNoOfLanes = 400
 
 [CCIP.Groups.load.OffRampConfig]
 BatchGasLimit = 11000000
@@ -159,11 +159,11 @@ BatchGasLimit = 11000000
 TimeoutForPriceUpdate = '15m'
 NoOfTokensPerChain = 10
 NoOfTokensWithDynamicPrice = 10
-DynamicPriceUpdateInterval = '15s'
+DynamicPriceUpdateInterval ='15s'
 CCIPOwnerTokens = true
 
 [CCIP.Groups.load.LoadProfile]
-TestDuration = '6h'
+TestDuration = '4h'
 TimeUnit = '5s'
 RequestPerUnitTime = [1]
 OptimizeSpace = true
@@ -171,7 +171,7 @@ NetworkChaosDelay = '100ms'
 
 # to represent 20%, 60%, 15%, 5% of the total messages
 [CCIP.Groups.load.LoadProfile.MsgProfile]
-Frequencies = [4, 12, 3, 1]
+Frequencies = [4,12,3,1]
 
 [[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
 MsgType = 'Token'
