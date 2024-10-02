@@ -61,13 +61,6 @@ evm_supports_eip1559 = true
 evm_default_gas_limit = 6000000
 evm_finality_depth = 200
 
-[CCIP.Env.Network.AnvilConfigs.PRIVATE-CHAIN-1]
-block_time = 1
-
-#
-[CCIP.Env.Network.AnvilConfigs.PRIVATE-CHAIN-2]
-block_time = 1
-
 [CCIP.Env.NewCLCluster]
 NoOfNodes = 17
 NodeMemory = '10Gi'
