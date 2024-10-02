@@ -3,6 +3,7 @@ package soak
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/havoc"
 
@@ -12,16 +13,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
 
-	"time"
-
 	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"github.com/google/uuid"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/havoc"
-
-	"github.com/smartcontractkit/chainlink-testing-framework/networks"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/testsetups"
