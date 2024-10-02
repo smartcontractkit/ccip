@@ -91,6 +91,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
   struct DestChainConfigArgs {
     uint64 destChainSelector; // Destination chain selector
     IRouter router; // Source router address
+    bool allowListEnabled; // Boolean indicator to specify if allowList check is enabled
   }
 
   /// @dev Struct used to apply AllowList Senders for multiple destChainSelectors
@@ -375,6 +376,7 @@ contract OnRamp is IEVM2AnyOnRampClient, ITypeAndVersion, OwnerIsCreator {
 
       DestChainConfig storage destChainConfig = s_destChainConfigs[destChainSelector];
       destChainConfig.router = destChainConfigArg.router;
+      destChainConfig.allowListEnabled = destChainConfigArg.allowListEnabled;
 
       emit DestChainConfigSet(
         destChainSelector, destChainConfig.sequenceNumber, destChainConfigArg.router, destChainConfig.allowListEnabled
