@@ -20,9 +20,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 )
 
-const OFFCHAIN_AGGREGATOR = "OffchainAggregator"
-const DECIMALS_METHOD_NAME = "decimals"
-const LATEST_ROUND_DATA_METHOD_NAME = "latestRoundData"
+const OffchainAggregator = "OffchainAggregator"
+const DecimalsMethodName = "decimals"
+const LatestRoundDataMethodName = "latestRoundData"
 
 func init() {
 	// Ensure existence of latestRoundData method on the Aggregator contract.
@@ -30,8 +30,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	ensureMethodOnContract(aggregatorABI, DECIMALS_METHOD_NAME)
-	ensureMethodOnContract(aggregatorABI, LATEST_ROUND_DATA_METHOD_NAME)
+	ensureMethodOnContract(aggregatorABI, DecimalsMethodName)
+	ensureMethodOnContract(aggregatorABI, LatestRoundDataMethodName)
 }
 
 func ensureMethodOnContract(abi abi.ABI, methodName string) {
@@ -159,7 +159,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	for i, call := range batchCalls.decimalCalls {
 		bindings = append(bindings, types.BoundContract{
 			Address: string(ccipcalc.EvmAddrToGeneric(call.ContractAddress())),
-			Name:    fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i),
+			Name:    fmt.Sprintf("%v_%v", OffchainAggregator, i),
 		})
 	}
 
@@ -172,7 +172,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	var decimalsReq uint8
 	batchGetLatestValuesRequest := make(map[string]types.ContractBatch)
 	for i, call := range batchCalls.decimalCalls {
-		contractName := fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i)
+		contractName := fmt.Sprintf("%v_%v", OffchainAggregator, i)
 		batchGetLatestValuesRequest[contractName] = append(batchGetLatestValuesRequest[contractName], types.BatchRead{
 			ReadName:  call.MethodName(),
 			ReturnVal: &decimalsReq,
@@ -180,7 +180,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	}
 
 	for i, call := range batchCalls.latestRoundDataCalls {
-		contractName := fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, i)
+		contractName := fmt.Sprintf("%v_%v", OffchainAggregator, i)
 		batchGetLatestValuesRequest[contractName] = append(batchGetLatestValuesRequest[contractName], types.BatchRead{
 			ReadName:  call.MethodName(),
 			ReturnVal: &aggregator_v3_interface.LatestRoundData{},
@@ -200,7 +200,7 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	latestRoundCR := make([]aggregator_v3_interface.LatestRoundData, 0, nbDecimalCalls)
 	var respErr error
 	for j := range nbCalls {
-		contractName := fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, j)
+		contractName := fmt.Sprintf("%v_%v", OffchainAggregator, j)
 		offchainAggregatorRespSlice := result[contractName]
 
 		for _, read := range offchainAggregatorRespSlice {
@@ -209,14 +209,14 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 				respErr = multierr.Append(respErr, fmt.Errorf("error with contract reader readName %v: %w", read.ReadName, readErr))
 				continue
 			}
-			if read.ReadName == DECIMALS_METHOD_NAME {
+			if read.ReadName == DecimalsMethodName {
 				decimal, ok := val.(*uint8)
 				if !ok {
 					return fmt.Errorf("expected type uint8 for method call %v on contract %v: %w", batchCalls.decimalCalls[j].MethodName(), batchCalls.decimalCalls[j].ContractAddress(), readErr)
 				}
 
 				decimalsCR = append(decimalsCR, *decimal)
-			} else if read.ReadName == LATEST_ROUND_DATA_METHOD_NAME {
+			} else if read.ReadName == LatestRoundDataMethodName {
 				latestRoundDataRes, ok := val.(*aggregator_v3_interface.LatestRoundData)
 				if !ok {
 					return fmt.Errorf("expected type latestRoundDataConfig for method call %v on contract %v: %w", batchCalls.latestRoundDataCalls[j].MethodName(), batchCalls.latestRoundDataCalls[j].ContractAddress(), readErr)
@@ -271,12 +271,12 @@ func (d *DynamicPriceGetter) preparePricesAndBatchCallsPerChain(tokens []cciptyp
 			chainCalls := batchCallsPerChain[aggCfg.ChainID]
 			chainCalls.decimalCalls = append(chainCalls.decimalCalls, rpclib.NewEvmCall(
 				d.aggregatorAbi,
-				DECIMALS_METHOD_NAME,
+				DecimalsMethodName,
 				aggCfg.AggregatorContractAddress,
 			))
 			chainCalls.latestRoundDataCalls = append(chainCalls.latestRoundDataCalls, rpclib.NewEvmCall(
 				d.aggregatorAbi,
-				LATEST_ROUND_DATA_METHOD_NAME,
+				LatestRoundDataMethodName,
 				aggCfg.AggregatorContractAddress,
 			))
 			chainCalls.tokenOrder = append(chainCalls.tokenOrder, tk)
