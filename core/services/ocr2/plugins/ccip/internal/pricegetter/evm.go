@@ -203,23 +203,23 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 		contractName := fmt.Sprintf("%v_%v", OFFCHAIN_AGGREGATOR, j)
 		offchainAggregatorRespSlice := result[contractName]
 
-		for i, read := range offchainAggregatorRespSlice {
+		for _, read := range offchainAggregatorRespSlice {
 			val, readErr := read.GetResult()
 			if readErr != nil {
-				respErr = multierr.Append(respErr, fmt.Errorf("error with method call %v: %w", batchCalls.decimalCalls[i].MethodName(), readErr))
+				respErr = multierr.Append(respErr, fmt.Errorf("error with contract reader readName %v: %w", read.ReadName, readErr))
 				continue
 			}
 			if read.ReadName == DECIMALS_METHOD_NAME {
 				decimal, ok := val.(*uint8)
 				if !ok {
-					return fmt.Errorf("expected type uint8 for method call %v on contract %v: %w", batchCalls.decimalCalls[i].MethodName(), batchCalls.decimalCalls[i].ContractAddress(), readErr)
+					return fmt.Errorf("expected type uint8 for method call %v on contract %v: %w", batchCalls.decimalCalls[j].MethodName(), batchCalls.decimalCalls[j].ContractAddress(), readErr)
 				}
 
 				decimalsCR = append(decimalsCR, *decimal)
 			} else if read.ReadName == LATEST_ROUND_DATA_METHOD_NAME {
 				latestRoundDataRes, ok := val.(*aggregator_v3_interface.LatestRoundData)
 				if !ok {
-					return fmt.Errorf("expected type latestRoundDataConfig for method call %v on contract %v: %w", batchCalls.latestRoundDataCalls[i/2].MethodName(), batchCalls.latestRoundDataCalls[i/2].ContractAddress(), readErr)
+					return fmt.Errorf("expected type latestRoundDataConfig for method call %v on contract %v: %w", batchCalls.latestRoundDataCalls[j].MethodName(), batchCalls.latestRoundDataCalls[j].ContractAddress(), readErr)
 				}
 
 				latestRoundCR = append(latestRoundCR, *latestRoundDataRes)
