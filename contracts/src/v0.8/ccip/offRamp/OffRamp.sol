@@ -926,12 +926,14 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice Returns all source chain configs
   /// @return sourceChainConfigs The source chain configs corresponding to all the supported chain selectors
-  function getAllSourceChainConfig() external view returns (SourceChainConfig[] memory) {
+  function getAllSourceChainConfig() external view returns (uint64[] memory, SourceChainConfig[] memory) {
     SourceChainConfig[] memory sourceChainConfigs = new SourceChainConfig[](s_sourceChainSelectors.length());
+    uint64[] memory sourceChainSelectors = new uint64[](s_sourceChainSelectors.length());
     for (uint256 i = 0; i < s_sourceChainSelectors.length(); ++i) {
-      sourceChainConfigs[i] = s_sourceChainConfigs[uint64(s_sourceChainSelectors.at(i))];
+      sourceChainSelectors[i] = uint64(s_sourceChainSelectors.at(i));
+      sourceChainConfigs[i] = s_sourceChainConfigs[sourceChainSelectors[i]];
     }
-    return sourceChainConfigs;
+    return (sourceChainSelectors, sourceChainConfigs);
   }
 
   /// @notice Updates source configs

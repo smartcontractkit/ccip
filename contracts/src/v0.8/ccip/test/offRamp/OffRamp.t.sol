@@ -127,7 +127,8 @@ contract OffRamp_constructor is OffRampSetup {
     MultiOCR3Base.OCRConfig memory gotOCRConfig = s_offRamp.latestConfigDetails(uint8(Internal.OCRPluginType.Execution));
     _assertOCRConfigEquality(expectedOCRConfig, gotOCRConfig);
 
-    OffRamp.SourceChainConfig[] memory actualSourceChainConfigs = s_offRamp.getAllSourceChainConfig();
+    (uint64[] memory actualSourceChainSelectors, OffRamp.SourceChainConfig[] memory actualSourceChainConfigs) =
+      s_offRamp.getAllSourceChainConfig();
 
     _assertSourceChainConfigEquality(actualSourceChainConfigs[0], expectedSourceChainConfig1);
     _assertSourceChainConfigEquality(actualSourceChainConfigs[1], expectedSourceChainConfig2);
@@ -137,7 +138,6 @@ contract OffRamp_constructor is OffRampSetup {
     assertEq(OWNER, s_offRamp.owner());
     assertEq(0, s_offRamp.getLatestPriceSequenceNumber());
 
-    uint256[] memory actualSourceChainSelectors = s_offRamp.getSourceChainSelectors();
     // assertion for source chain selector
     for (uint256 i = 0; i < expectedSourceChainSelectors.length; i++) {
       assertEq(expectedSourceChainSelectors[i], actualSourceChainSelectors[i]);
