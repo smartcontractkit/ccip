@@ -948,7 +948,6 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
     for (uint256 i = 0; i < sourceChainConfigUpdates.length; ++i) {
       SourceChainConfigArgs memory sourceConfigUpdate = sourceChainConfigUpdates[i];
       uint64 sourceChainSelector = sourceConfigUpdate.sourceChainSelector;
-      s_sourceChainSelectors.add(sourceChainSelector);
 
       if (sourceChainSelector == 0) {
         revert ZeroChainSelectorNotAllowed();
@@ -979,6 +978,8 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       currentConfig.onRamp = newOnRamp;
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
       currentConfig.router = sourceConfigUpdate.router;
+
+      s_sourceChainSelectors.add(sourceChainSelector);
 
       emit SourceChainConfigSet(sourceChainSelector, currentConfig);
     }
