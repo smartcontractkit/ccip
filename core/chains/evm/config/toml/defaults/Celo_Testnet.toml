@@ -1,6 +1,7 @@
 ChainID = '44787'
 ChainType = 'celo'
 FinalityDepth = 10
+FinalityTagEnabled = true
 LogPollInterval = '5s'
 MinIncomingConfirmations = 1
 NoNewHeadsThreshold = '1m'

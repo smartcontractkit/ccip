@@ -2,7 +2,7 @@
 ChainID = '1088'
 ChainType = 'metis'
 # Sequencer offers absolute finality
-FinalityDepth = 10
+FinalityDepth = 500
 FinalityTagEnabled = true
 MinIncomingConfirmations = 1
 NoNewHeadsThreshold = '0'

@@ -1,6 +1,6 @@
 ChainID = '59902'
+FinalityDepth = 3000
 ChainType = 'optimismBedrock'
-FinalityDepth = 10
 FinalityTagEnabled = true
 MinIncomingConfirmations = 1
 NoNewHeadsThreshold = '0'
