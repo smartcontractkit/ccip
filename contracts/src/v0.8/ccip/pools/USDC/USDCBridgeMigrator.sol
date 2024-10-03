@@ -1,11 +1,10 @@
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
 import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 
 import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
-
-import {Router} from "../../Router.sol";
 
 /// @notice Allows migration of a lane in a token pool from Lock/Release to CCTP supported Burn/Mint. Contract
 /// functionality is based on hard requirements defined by Circle to allow for future CCTP compatibility
@@ -26,8 +25,7 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   error NoMigrationProposalPending();
   error InvalidChainSelector();
 
-  IBurnMintERC20 internal immutable i_USDC;
-  Router internal immutable i_router;
+  IBurnMintERC20 private immutable i_USDC;
 
   address internal s_circleUSDCMigrator;
   uint64 internal s_proposedUSDCMigrationChain;
@@ -39,9 +37,8 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
 
   EnumerableSet.UintSet internal s_migratedChains;
 
-  constructor(address token, address router) {
+  constructor(address token) {
     i_USDC = IBurnMintERC20(token);
-    i_router = Router(router);
   }
 
   /// @notice Burn USDC locked for a specific lane so that destination USDC can be converted from
