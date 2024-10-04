@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
 import {IOwnable} from "../../../shared/interfaces/IOwnable.sol";
 import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
+import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
 import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
@@ -113,6 +115,9 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     // Deploy the token pool
     address pool = _createTokenPool(token, remoteTokenPools, tokenPoolInitCode, salt, poolType);
 
+    // Grant the mint and burn roles to the pool for the token
+    IBurnMintERC20(token).grantMintAndBurnRoles(pool);
+
     // Set the token pool for token in the token admin registry since this contract is the token and pool owner
     _setTokenPoolInTokenAdminRegistry(token, pool);
 
@@ -126,6 +131,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
   /// @dev Since the token already exists, this contract is not the owner and therefore cannot configure the
   /// token pool in the token admin registry in the same transaction. The user must invoke the calls to the
   /// tokenAdminRegistry manually
+  /// @dev since the token already exists, the owner must grant the mint and burn roles to the pool manually
   /// @param token The address of the existing token to be used in the token pool
   /// @param remoteTokenPools An array of remote token pools info to be used in the pool's applyChainUpdates function
   /// @param tokenPoolInitCode The creation code for the token pool

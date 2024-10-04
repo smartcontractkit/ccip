@@ -1,5 +1,7 @@
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.24;
 
+import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 import {IOwner} from "../../interfaces/IOwner.sol";
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
@@ -154,7 +156,7 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
 
     // Since the remote chain information was provided, we should be able to get the information from the newly
     // deployed token pool using the available getter functions
-    (, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
+    (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
       remoteTokenPools, // No existing remote pools
       s_tokenInitCode, // Token Init Code
       s_poolInitCode, // Pool Init Code
@@ -212,6 +214,39 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       abi.encode(newTokenAddress),
       "New Token Address should have been deployed correctly"
     );
+
+    // Check that the token pool has the correct permissions
+    vm.startPrank(poolAddress);
+    IBurnMintERC20(tokenAddress).mint(poolAddress, 1e18);
+
+    assertEq(1e18, IBurnMintERC20(tokenAddress).balanceOf(poolAddress), "Balance should be 1e18");
+
+    IBurnMintERC20(tokenAddress).burn(1e18);
+    assertEq(0, IBurnMintERC20(tokenAddress).balanceOf(poolAddress), "Balance should be 0");
+
+    vm.stopPrank();
+
+    assertEq(s_tokenAdminRegistry.getPool(tokenAddress), poolAddress, "Token Pool should be set");
+
+    // Check the token admin registry for config
+    TokenAdminRegistry.TokenConfig memory tokenConfig = s_tokenAdminRegistry.getTokenConfig(tokenAddress);
+    assertEq(tokenConfig.administrator, address(s_tokenPoolFactory), "Administrator should be set");
+    assertEq(tokenConfig.pendingAdministrator, OWNER, "Pending Administrator should be 0");
+    assertEq(tokenConfig.tokenPool, poolAddress, "Pool Address should be set");
+
+    // Accept Ownership of the token, pool, and adminRegistry
+    vm.startPrank(OWNER);
+    s_tokenAdminRegistry.acceptAdminRole(tokenAddress);
+    assertEq(s_tokenAdminRegistry.getTokenConfig(tokenAddress).administrator, OWNER, "Administrator should be set");
+    assertEq(
+      s_tokenAdminRegistry.getTokenConfig(tokenAddress).pendingAdministrator, address(0), "Administrator should be set"
+    );
+
+    OwnerIsCreator(tokenAddress).acceptOwnership();
+    OwnerIsCreator(poolAddress).acceptOwnership();
+
+    assertEq(IOwner(tokenAddress).owner(), OWNER, "Token should be controlled by the OWNER");
+    assertEq(IOwner(poolAddress).owner(), OWNER, "Pool should be controlled by the OWNER");
   }
 
   function test_createTokenPool_ExistingRemoteToken_AndPredictPool_Success() public {
