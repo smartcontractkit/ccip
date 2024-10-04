@@ -48,6 +48,43 @@ contract OnRamp_constructor is OnRampSetup {
     assertEq(address(s_sourceRouter), address(s_onRamp.getRouter(DEST_CHAIN_SELECTOR)));
   }
 
+  function test_Constructor_EnableAllowList_ForwardFromRouter_Reverts() public {
+    OnRamp.StaticConfig memory staticConfig = OnRamp.StaticConfig({
+      chainSelector: SOURCE_CHAIN_SELECTOR,
+      rmnRemote: s_mockRMNRemote,
+      nonceManager: address(s_outboundNonceManager),
+      tokenAdminRegistry: address(s_tokenAdminRegistry)
+    });
+
+    OnRamp.DynamicConfig memory dynamicConfig = _generateDynamicOnRampConfig(address(s_feeQuoter));
+
+    //Creating a DestChainConfig and setting allowListEnabled : true
+    OnRamp.DestChainConfigArgs[] memory destChainConfigs = new OnRamp.DestChainConfigArgs[](1);
+    destChainConfigs[0] = OnRamp.DestChainConfigArgs({
+      destChainSelector: DEST_CHAIN_SELECTOR,
+      router: s_sourceRouter,
+      allowListEnabled: true
+    });
+
+    vm.expectEmit();
+    emit OnRamp.ConfigSet(staticConfig, dynamicConfig);
+
+    vm.expectEmit();
+    emit OnRamp.DestChainConfigSet(DEST_CHAIN_SELECTOR, 0, s_sourceRouter, true);
+
+    OnRampHelper tempOnRamp = new OnRampHelper(staticConfig, dynamicConfig, destChainConfigs);
+
+    //Sending a message and expecting revert as allowList is enabled with no address in allowlist
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: GAS_LIMIT * 2}));
+    uint256 feeAmount = 1234567890;
+    vm.startPrank(address(s_sourceRouter));
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(tempOnRamp), feeAmount);
+    vm.expectRevert(abi.encodeWithSelector(OnRamp.SenderNotAllowed.selector, OWNER));
+    tempOnRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
+    vm.stopPrank();
+  }
+
   function test_Constructor_InvalidConfigChainSelectorEqZero_Revert() public {
     vm.expectRevert(OnRamp.InvalidConfig.selector);
     new OnRampHelper(
