@@ -24,8 +24,11 @@ func TestFeeEstimatorConfigService(t *testing.T) {
 	var expectedDestDataAvailabilityMultiplierBps int64 = 3
 
 	onRampReader := mocks.NewOnRampReader(t)
-	_, _, _, err := svc.GetDataAvailabilityConfig(ctx)
-	require.Error(t, err)
+	destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps, err := svc.GetDataAvailabilityConfig(ctx)
+	require.NoError(t, err) // if onRampReader not set, return nil error and 0 values
+	require.EqualValues(t, 0, destDataAvailabilityOverheadGas)
+	require.EqualValues(t, 0, destGasPerDataAvailabilityByte)
+	require.EqualValues(t, 0, destDataAvailabilityMultiplierBps)
 	svc.SetOnRampReader(onRampReader)
 
 	onRampReader.On("GetDynamicConfig", ctx).
@@ -35,7 +38,7 @@ func TestFeeEstimatorConfigService(t *testing.T) {
 			DestDataAvailabilityMultiplierBps: uint16(expectedDestDataAvailabilityMultiplierBps),
 		}, nil).Once()
 
-	destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps, err := svc.GetDataAvailabilityConfig(ctx)
+	destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps, err = svc.GetDataAvailabilityConfig(ctx)
 	require.NoError(t, err)
 	require.Equal(t, expectedDestDataAvailabilityOverheadGas, destDataAvailabilityOverheadGas)
 	require.Equal(t, expectedDestGasPerDataAvailabilityByte, destGasPerDataAvailabilityByte)
