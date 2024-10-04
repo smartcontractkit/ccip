@@ -94,7 +94,7 @@ type OnRampDynamicConfig struct {
 
 type OnRampStaticConfig struct {
 	ChainSelector      uint64
-	Rmn                common.Address
+	RmnRemote          common.Address
 	NonceManager       common.Address
 	TokenAdminRegistry common.Address
 }
@@ -1020,32 +1020,41 @@ func (it *OnRampCCIPMessageSentIterator) Close() error {
 
 type OnRampCCIPMessageSent struct {
 	DestChainSelector uint64
+	SequenceNumber    uint64
 	Message           InternalEVM2AnyRampMessage
 	Raw               types.Log
 }
 
-func (_OnRamp *OnRampFilterer) FilterCCIPMessageSent(opts *bind.FilterOpts, destChainSelector []uint64) (*OnRampCCIPMessageSentIterator, error) {
+func (_OnRamp *OnRampFilterer) FilterCCIPMessageSent(opts *bind.FilterOpts, destChainSelector []uint64, sequenceNumber []uint64) (*OnRampCCIPMessageSentIterator, error) {
 
 	var destChainSelectorRule []interface{}
 	for _, destChainSelectorItem := range destChainSelector {
 		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
 	}
+	var sequenceNumberRule []interface{}
+	for _, sequenceNumberItem := range sequenceNumber {
+		sequenceNumberRule = append(sequenceNumberRule, sequenceNumberItem)
+	}
 
-	logs, sub, err := _OnRamp.contract.FilterLogs(opts, "CCIPMessageSent", destChainSelectorRule)
+	logs, sub, err := _OnRamp.contract.FilterLogs(opts, "CCIPMessageSent", destChainSelectorRule, sequenceNumberRule)
 	if err != nil {
 		return nil, err
 	}
 	return &OnRampCCIPMessageSentIterator{contract: _OnRamp.contract, event: "CCIPMessageSent", logs: logs, sub: sub}, nil
 }
 
-func (_OnRamp *OnRampFilterer) WatchCCIPMessageSent(opts *bind.WatchOpts, sink chan<- *OnRampCCIPMessageSent, destChainSelector []uint64) (event.Subscription, error) {
+func (_OnRamp *OnRampFilterer) WatchCCIPMessageSent(opts *bind.WatchOpts, sink chan<- *OnRampCCIPMessageSent, destChainSelector []uint64, sequenceNumber []uint64) (event.Subscription, error) {
 
 	var destChainSelectorRule []interface{}
 	for _, destChainSelectorItem := range destChainSelector {
 		destChainSelectorRule = append(destChainSelectorRule, destChainSelectorItem)
 	}
+	var sequenceNumberRule []interface{}
+	for _, sequenceNumberItem := range sequenceNumber {
+		sequenceNumberRule = append(sequenceNumberRule, sequenceNumberItem)
+	}
 
-	logs, sub, err := _OnRamp.contract.WatchLogs(opts, "CCIPMessageSent", destChainSelectorRule)
+	logs, sub, err := _OnRamp.contract.WatchLogs(opts, "CCIPMessageSent", destChainSelectorRule, sequenceNumberRule)
 	if err != nil {
 		return nil, err
 	}
@@ -1788,7 +1797,7 @@ func (OnRampAllowListSendersRemoved) Topic() common.Hash {
 }
 
 func (OnRampCCIPMessageSent) Topic() common.Hash {
-	return common.HexToHash("0x8cd775d4a25bd349439a70817fd110144d6ab229ae1b9f54a1e5777d2041bfed")
+	return common.HexToHash("0x192442a2b2adb6a7948f097023cb6b57d29d3a7a5dd33e6666d33c39cc456f32")
 }
 
 func (OnRampConfigSet) Topic() common.Hash {
@@ -1872,9 +1881,9 @@ type OnRampInterface interface {
 
 	ParseAllowListSendersRemoved(log types.Log) (*OnRampAllowListSendersRemoved, error)
 
-	FilterCCIPMessageSent(opts *bind.FilterOpts, destChainSelector []uint64) (*OnRampCCIPMessageSentIterator, error)
+	FilterCCIPMessageSent(opts *bind.FilterOpts, destChainSelector []uint64, sequenceNumber []uint64) (*OnRampCCIPMessageSentIterator, error)
 
-	WatchCCIPMessageSent(opts *bind.WatchOpts, sink chan<- *OnRampCCIPMessageSent, destChainSelector []uint64) (event.Subscription, error)
+	WatchCCIPMessageSent(opts *bind.WatchOpts, sink chan<- *OnRampCCIPMessageSent, destChainSelector []uint64, sequenceNumber []uint64) (event.Subscription, error)
 
 	ParseCCIPMessageSent(log types.Log) (*OnRampCCIPMessageSent, error)
 

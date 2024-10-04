@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {IMessageInterceptor} from "../../interfaces/IMessageInterceptor.sol";
-import {IRMNV2} from "../../interfaces/IRMNV2.sol";
+import {IRMNRemote} from "../../interfaces/IRMNRemote.sol";
 import {IRouter} from "../../interfaces/IRouter.sol";
 
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
@@ -22,7 +22,7 @@ contract OnRamp_constructor is OnRampSetup {
   function test_Constructor_Success() public {
     OnRamp.StaticConfig memory staticConfig = OnRamp.StaticConfig({
       chainSelector: SOURCE_CHAIN_SELECTOR,
-      rmn: s_mockRMNRemote,
+      rmnRemote: s_mockRMNRemote,
       nonceManager: address(s_outboundNonceManager),
       tokenAdminRegistry: address(s_tokenAdminRegistry)
     });
@@ -53,7 +53,7 @@ contract OnRamp_constructor is OnRampSetup {
     new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: 0,
-        rmn: s_mockRMNRemote,
+        rmnRemote: s_mockRMNRemote,
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
@@ -67,7 +67,7 @@ contract OnRamp_constructor is OnRampSetup {
     s_onRamp = new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
-        rmn: IRMNV2(address(0)),
+        rmnRemote: IRMNRemote(address(0)),
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
@@ -81,7 +81,7 @@ contract OnRamp_constructor is OnRampSetup {
     new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
-        rmn: s_mockRMNRemote,
+        rmnRemote: s_mockRMNRemote,
         nonceManager: address(0),
         tokenAdminRegistry: address(s_tokenAdminRegistry)
       }),
@@ -95,7 +95,7 @@ contract OnRamp_constructor is OnRampSetup {
     new OnRampHelper(
       OnRamp.StaticConfig({
         chainSelector: SOURCE_CHAIN_SELECTOR,
-        rmn: s_mockRMNRemote,
+        rmnRemote: s_mockRMNRemote,
         nonceManager: address(s_outboundNonceManager),
         tokenAdminRegistry: address(0)
       }),
@@ -145,7 +145,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
@@ -181,7 +181,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
 
     vm.expectEmit();
     // We expect the message to be emitted with strict = false.
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
@@ -194,7 +194,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
 
     vm.expectEmit();
     // We expect the message to be emitted with strict = false.
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
@@ -206,7 +206,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
@@ -220,7 +220,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
@@ -234,7 +234,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
@@ -247,7 +247,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       uint64 sequenceNumberBefore = s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR) - 1;
 
       vm.expectEmit();
-      emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, _messageToEvent(message, i, i, 0, OWNER));
+      emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, i, _messageToEvent(message, i, i, 0, OWNER));
 
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
@@ -269,7 +269,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
       uint64 sequenceNumberBefore = s_onRamp.getExpectedNextSequenceNumber(DEST_CHAIN_SELECTOR) - 1;
 
       vm.expectEmit();
-      emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, _messageToEvent(message, i, i, 0, OWNER));
+      emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, i, _messageToEvent(message, i, i, 0, OWNER));
 
       s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, 0, OWNER);
 
@@ -287,7 +287,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
 
     vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
 
@@ -308,7 +308,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     uint256 expectedJuels = (feeAmount * conversionRate) / 1e18;
 
     vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, expectedJuels, OWNER));
+    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, expectedJuels, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
 
@@ -354,7 +354,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     Internal.EVM2AnyRampMessage memory expectedEvent = _messageToEvent(message, 1, 1, feeTokenAmount, originalSender);
 
     vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, expectedEvent);
+    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, expectedEvent.header.sequenceNumber, expectedEvent);
 
     // Assert the message Id is correct
     assertEq(
@@ -376,7 +376,7 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     s_outboundmessageInterceptor.setMessageIdValidationState(keccak256(abi.encode(message)), false);
 
     vm.expectEmit();
-    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, _messageToEvent(message, 1, 1, feeAmount, OWNER));
+    emit OnRamp.CCIPMessageSent(DEST_CHAIN_SELECTOR, 1, _messageToEvent(message, 1, 1, feeAmount, OWNER));
 
     s_onRamp.forwardFromRouter(DEST_CHAIN_SELECTOR, message, feeAmount, OWNER);
   }
