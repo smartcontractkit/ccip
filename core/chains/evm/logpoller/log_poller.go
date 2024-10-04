@@ -24,8 +24,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink-common/pkg/timeutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mathutil"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -68,7 +68,7 @@ type LogPoller interface {
 	LogsDataWordBetween(ctx context.Context, eventSig common.Hash, address common.Address, wordIndexMin, wordIndexMax int, wordValue common.Hash, confs evmtypes.Confirmations) ([]Log, error)
 
 	// chainlink-common query filtering
-	FilteredLogs(ctx context.Context, filter query.KeyFilter, limitAndSort query.LimitAndSort, queryName string) ([]Log, error)
+	FilteredLogs(ctx context.Context, filter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error)
 }
 
 type LogPollerTest interface {
@@ -638,31 +638,50 @@ func (lp *logPoller) backgroundWorkerRun() {
 	ctx, cancel := lp.stopCh.NewCtx()
 	defer cancel()
 
+	blockPruneShortInterval := lp.pollPeriod * 100
+	blockPruneInterval := blockPruneShortInterval * 10
+	logPruneShortInterval := lp.pollPeriod * 241 // no common factors with 100
+	logPruneInterval := logPruneShortInterval * 10
+
 	// Avoid putting too much pressure on the database by staggering the pruning of old blocks and logs.
 	// Usually, node after restart will have some work to boot the plugins and other services.
-	// Deferring first prune by minutes reduces risk of putting too much pressure on the database.
-	blockPruneTick := time.After(5 * time.Minute)
-	logPruneTick := time.After(10 * time.Minute)
+	// Deferring first prune by at least 5 mins reduces risk of putting too much pressure on the database.
+	blockPruneTick := time.After((5 * time.Minute) + timeutil.JitterPct(1.0).Apply(blockPruneInterval/2))
+	logPruneTick := time.After((5 * time.Minute) + timeutil.JitterPct(1.0).Apply(logPruneInterval/2))
+
+	successfulExpiredLogPrunes := 0
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-blockPruneTick:
-			blockPruneTick = time.After(utils.WithJitter(lp.pollPeriod * 1000))
+			blockPruneTick = time.After(timeutil.JitterPct(0.1).Apply(blockPruneInterval))
 			if allRemoved, err := lp.PruneOldBlocks(ctx); err != nil {
 				lp.lggr.Errorw("Unable to prune old blocks", "err", err)
 			} else if !allRemoved {
 				// Tick faster when cleanup can't keep up with the pace of new blocks
-				blockPruneTick = time.After(utils.WithJitter(lp.pollPeriod * 100))
+				blockPruneTick = time.After(timeutil.JitterPct(0.1).Apply(blockPruneShortInterval))
 			}
 		case <-logPruneTick:
-			logPruneTick = time.After(utils.WithJitter(lp.pollPeriod * 2401)) // = 7^5 avoids common factors with 1000
+			logPruneTick = time.After(timeutil.JitterPct(0.1).Apply(logPruneInterval))
 			if allRemoved, err := lp.PruneExpiredLogs(ctx); err != nil {
 				lp.lggr.Errorw("Unable to prune expired logs", "err", err)
 			} else if !allRemoved {
 				// Tick faster when cleanup can't keep up with the pace of new logs
-				logPruneTick = time.After(utils.WithJitter(lp.pollPeriod * 241))
+				logPruneTick = time.After(timeutil.JitterPct(0.1).Apply(logPruneShortInterval))
+			} else if successfulExpiredLogPrunes == 5 {
+				// Only prune unmatched logs if we've successfully pruned all expired logs at least 20 times
+				// since the last time unmatched logs were pruned
+				if allRemoved, err := lp.PruneUnmatchedLogs(ctx); err != nil {
+					lp.lggr.Errorw("Unable to prune unmatched logs", "err", err)
+				} else if !allRemoved {
+					logPruneTick = time.After(timeutil.JitterPct(0.1).Apply(logPruneShortInterval))
+				} else {
+					successfulExpiredLogPrunes = 0
+				}
+			} else {
+				successfulExpiredLogPrunes++
 			}
 		}
 	}
@@ -1075,6 +1094,7 @@ func (lp *logPoller) PruneOldBlocks(ctx context.Context) (bool, error) {
 		// No blocks saved yet.
 		return true, nil
 	}
+	lp.lggr.Errorw("Calling DeleteBlocksBefore")
 	if latestBlock.FinalizedBlockNumber <= lp.keepFinalizedBlocksDepth {
 		// No-op, keep all blocks
 		return true, nil
@@ -1086,6 +1106,7 @@ func (lp *logPoller) PruneOldBlocks(ctx context.Context) (bool, error) {
 		latestBlock.FinalizedBlockNumber-lp.keepFinalizedBlocksDepth,
 		lp.logPrunePageSize,
 	)
+	lp.lggr.Errorw("DeleteBlocksBefore returned", "logPrunePageSize", lp.logPrunePageSize, "rowsRemoved", rowsRemoved, "allRemoved", rowsRemoved < lp.logPrunePageSize)
 	return lp.logPrunePageSize == 0 || rowsRemoved < lp.logPrunePageSize, err
 }
 
@@ -1093,6 +1114,16 @@ func (lp *logPoller) PruneOldBlocks(ctx context.Context) (bool, error) {
 // Returns whether all logs eligible for pruning were removed. If logPrunePageSize is set to 0, it will always return true.
 func (lp *logPoller) PruneExpiredLogs(ctx context.Context) (bool, error) {
 	rowsRemoved, err := lp.orm.DeleteExpiredLogs(ctx, lp.logPrunePageSize)
+	return lp.logPrunePageSize == 0 || rowsRemoved < lp.logPrunePageSize, err
+}
+
+func (lp *logPoller) PruneUnmatchedLogs(ctx context.Context) (bool, error) {
+	ids, err := lp.orm.SelectUnmatchedLogIDs(ctx, lp.logPrunePageSize)
+	if err != nil {
+		return false, err
+	}
+	rowsRemoved, err := lp.orm.DeleteLogsByRowID(ctx, ids)
+
 	return lp.logPrunePageSize == 0 || rowsRemoved < lp.logPrunePageSize, err
 }
 
@@ -1518,6 +1549,25 @@ func EvmWord(i uint64) common.Hash {
 	return common.BytesToHash(b)
 }
 
-func (lp *logPoller) FilteredLogs(ctx context.Context, queryFilter query.KeyFilter, limitAndSort query.LimitAndSort, queryName string) ([]Log, error) {
+func (lp *logPoller) FilteredLogs(ctx context.Context, queryFilter []query.Expression, limitAndSort query.LimitAndSort, queryName string) ([]Log, error) {
 	return lp.orm.FilteredLogs(ctx, queryFilter, limitAndSort, queryName)
+}
+
+// Where is a query.Where wrapper that ignores the Key and returns a slice of query.Expression rather than query.KeyFilter.
+// If no expressions are provided, or an error occurs, an empty slice is returned.
+func Where(expressions ...query.Expression) ([]query.Expression, error) {
+	filter, err := query.Where(
+		"",
+		expressions...,
+	)
+
+	if err != nil {
+		return []query.Expression{}, err
+	}
+
+	if filter.Expressions == nil {
+		return []query.Expression{}, nil
+	}
+
+	return filter.Expressions, nil
 }
