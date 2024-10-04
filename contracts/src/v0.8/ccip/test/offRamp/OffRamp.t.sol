@@ -128,7 +128,7 @@ contract OffRamp_constructor is OffRampSetup {
     _assertOCRConfigEquality(expectedOCRConfig, gotOCRConfig);
 
     (uint64[] memory actualSourceChainSelectors, OffRamp.SourceChainConfig[] memory actualSourceChainConfigs) =
-      s_offRamp.getAllSourceChainConfig();
+      s_offRamp.getAllSourceChainConfigs();
 
     _assertSourceChainConfigEquality(actualSourceChainConfigs[0], expectedSourceChainConfig1);
     _assertSourceChainConfigEquality(actualSourceChainConfigs[1], expectedSourceChainConfig2);

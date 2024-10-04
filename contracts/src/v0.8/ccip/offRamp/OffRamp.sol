@@ -926,7 +926,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
 
   /// @notice Returns all source chain configs
   /// @return sourceChainConfigs The source chain configs corresponding to all the supported chain selectors
-  function getAllSourceChainConfig() external view returns (uint64[] memory, SourceChainConfig[] memory) {
+  function getAllSourceChainConfigs() external view returns (uint64[] memory, SourceChainConfig[] memory) {
     SourceChainConfig[] memory sourceChainConfigs = new SourceChainConfig[](s_sourceChainSelectors.length());
     uint64[] memory sourceChainSelectors = new uint64[](s_sourceChainSelectors.length());
     for (uint256 i = 0; i < s_sourceChainSelectors.length(); ++i) {
@@ -979,6 +979,7 @@ contract OffRamp is ITypeAndVersion, MultiOCR3Base {
       currentConfig.isEnabled = sourceConfigUpdate.isEnabled;
       currentConfig.router = sourceConfigUpdate.router;
 
+      // We don't need to check the return value, as inserting the item twice has no effect.
       s_sourceChainSelectors.add(sourceChainSelector);
 
       emit SourceChainConfigSet(sourceChainSelector, currentConfig);
