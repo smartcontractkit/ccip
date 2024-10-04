@@ -54,7 +54,6 @@ contract FactoryBurnMintERC20constructor is BurnMintERC20Setup {
     assertTrue(s_burnMintERC20.isBurner(s_alice));
     assertEq(s_burnMintERC20.balanceOf(s_alice), 1e18);
     assertEq(s_burnMintERC20.totalSupply(), 1e18);
-
   }
 }
 
@@ -127,7 +126,9 @@ contract FactoryBurnMintERC20mint is BurnMintERC20Setup {
     // Mint max supply
     s_burnMintERC20.mint(OWNER, s_burnMintERC20.maxSupply());
 
-    vm.expectRevert(abi.encodeWithSelector(FactoryBurnMintERC20.MaxSupplyExceeded.selector, s_burnMintERC20.maxSupply() + 1));
+    vm.expectRevert(
+      abi.encodeWithSelector(FactoryBurnMintERC20.MaxSupplyExceeded.selector, s_burnMintERC20.maxSupply() + 1)
+    );
 
     // Attempt to mint 1 more than max supply
     s_burnMintERC20.mint(OWNER, 1);
