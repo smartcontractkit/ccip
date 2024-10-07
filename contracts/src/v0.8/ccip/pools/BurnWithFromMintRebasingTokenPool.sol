@@ -18,7 +18,7 @@ import {TokenPool} from "./TokenPool.sol";
 contract BurnWithFromMintRebasingTokenPool is BurnWithFromMintTokenPool {
   using SafeERC20 for IBurnMintERC20;
 
-  error NegativeMintAmount(uint256 pre, uint256 post);
+  error NegativeMintAmount(uint256 amountBurned);
 
   string public constant override typeAndVersion = "BurnWithFromMintRebasingTokenPool 1.5.0";
 
@@ -41,14 +41,14 @@ contract BurnWithFromMintRebasingTokenPool is BurnWithFromMintTokenPool {
     // Mint to the receiver
     IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
-    emit Minted(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
-
     uint256 balancePost = IBurnMintERC20(address(i_token)).balanceOf(releaseOrMintIn.receiver);
 
     // Mint should not reduce the number of tokens in the receiver, if it does it will revert the call.
     if (balancePost < balancePre) {
-      revert NegativeMintAmount(balancePre, balancePost);
+      revert NegativeMintAmount(balancePre - balancePost);
     }
+
+    emit Minted(msg.sender, releaseOrMintIn.receiver, balancePost - balancePre);
 
     return Pool.ReleaseOrMintOutV1({destinationAmount: balancePost - balancePre});
   }

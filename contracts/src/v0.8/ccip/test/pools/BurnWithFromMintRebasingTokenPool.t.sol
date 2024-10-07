@@ -25,6 +25,8 @@ contract BurnWithFromMintRebasingTokenPoolSetup is BurnMintSetup {
 
     _applyChainUpdates(address(s_pool));
 
+    deal(address(s_rebasingToken), OWNER, 1e18);
+
     vm.startPrank(s_burnMintOffRamp);
   }
 }
@@ -40,11 +42,12 @@ contract BurnWithFromMintTokenPool_releaseOrMint is BurnWithFromMintRebasingToke
 
   function test_releaseOrMint_Success() public {
     uint256 amount = 1000;
+    uint256 balancePre = s_rebasingToken.balanceOf(address(OWNER));
 
     Pool.ReleaseOrMintOutV1 memory releaseOrMintOut = s_pool.releaseOrMint(_getReleaseOrMintIn(amount));
 
     assertEq(amount, releaseOrMintOut.destinationAmount);
-    assertEq(amount, s_rebasingToken.balanceOf(address(OWNER)));
+    assertEq(balancePre + amount, s_rebasingToken.balanceOf(address(OWNER)));
   }
 
   function test_releaseOrMint_rebasing_success(uint16 multiplierPercentage) public {
@@ -52,10 +55,21 @@ contract BurnWithFromMintTokenPool_releaseOrMint is BurnWithFromMintRebasingToke
     uint256 expectedAmount = amount * multiplierPercentage / 100;
     s_rebasingToken.setMultiplierPercentage(multiplierPercentage);
 
+    uint256 balancePre = s_rebasingToken.balanceOf(address(OWNER));
+
     Pool.ReleaseOrMintOutV1 memory releaseOrMintOut = s_pool.releaseOrMint(_getReleaseOrMintIn(amount));
 
     assertEq(expectedAmount, releaseOrMintOut.destinationAmount);
-    assertEq(expectedAmount, s_rebasingToken.balanceOf(address(OWNER)));
+    assertEq(balancePre + expectedAmount, s_rebasingToken.balanceOf(address(OWNER)));
+  }
+
+  function test_releaseOrMint_NegativeMintAmount_reverts() public {
+    uint256 amount = 1000;
+    s_rebasingToken.setMintShouldBurn(true);
+
+    vm.expectRevert(abi.encodeWithSelector(BurnWithFromMintRebasingTokenPool.NegativeMintAmount.selector, amount));
+
+    s_pool.releaseOrMint(_getReleaseOrMintIn(amount));
   }
 
   function _getReleaseOrMintIn(uint256 amount) internal view returns (Pool.ReleaseOrMintInV1 memory) {
