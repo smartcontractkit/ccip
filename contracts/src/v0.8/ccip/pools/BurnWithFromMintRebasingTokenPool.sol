@@ -6,18 +6,12 @@ import {IBurnMintERC20} from "../../shared/token/ERC20/IBurnMintERC20.sol";
 import {Pool} from "../libraries/Pool.sol";
 import {BurnWithFromMintTokenPool} from "./BurnWithFromMintTokenPool.sol";
 
-import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-import {TokenPool} from "./TokenPool.sol";
-
 /// @notice This pool mints and burns a 3rd-party token.
-/// @dev Pool whitelisting mode is set in the constructor and cannot be modified later.
-/// It either accepts any address as originalSender, or only accepts whitelisted originalSender.
-/// The only way to change whitelisting mode is to deploy a new pool.
-/// If that is expected, please make sure the token's burner/minter roles are adjustable.
 /// @dev This contract is a variant of BurnMintTokenPool that uses `burn(from, amount)`.
+/// @dev This contract supports minting tokens that do not mint the exact amount they are asked to mint. This can be
+/// used for rebasing tokens. NOTE: for true rebasing support, the lockOrBurn method must also be updated to support
+/// relaying the correct amount.
 contract BurnWithFromMintRebasingTokenPool is BurnWithFromMintTokenPool {
-  using SafeERC20 for IBurnMintERC20;
-
   error NegativeMintAmount(uint256 amountBurned);
 
   string public constant override typeAndVersion = "BurnWithFromMintRebasingTokenPool 1.5.0";
