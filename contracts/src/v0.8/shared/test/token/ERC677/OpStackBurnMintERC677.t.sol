@@ -6,6 +6,7 @@ import {IOptimismMintableERC20Minimal, IOptimismMintableERC20} from "../../../to
 import {IERC677} from "../../../token/ERC677/IERC677.sol";
 
 import {BurnMintERC677} from "../../../token/ERC677/BurnMintERC677.sol";
+
 import {BaseTest} from "../../BaseTest.t.sol";
 import {OpStackBurnMintERC677} from "../../../token/ERC677/OpStackBurnMintERC677.sol";
 
