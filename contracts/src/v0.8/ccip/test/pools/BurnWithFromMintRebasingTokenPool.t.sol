@@ -50,7 +50,7 @@ contract BurnWithFromMintTokenPool_releaseOrMint is BurnWithFromMintRebasingToke
     assertEq(balancePre + amount, s_rebasingToken.balanceOf(address(OWNER)));
   }
 
-  function test_releaseOrMint_rebasing_success(uint16 multiplierPercentage) public {
+  function testFuzz_releaseOrMint_rebasing_success(uint16 multiplierPercentage) public {
     uint256 amount = 1000;
     uint256 expectedAmount = amount * multiplierPercentage / 100;
     s_rebasingToken.setMultiplierPercentage(multiplierPercentage);
