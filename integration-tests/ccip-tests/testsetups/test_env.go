@@ -13,24 +13,24 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
-	ctfconfigtypes "github.com/smartcontractkit/chainlink-testing-framework/lib/config/types"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/conversions"
+	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/config"
+	ctf_config_types "github.com/smartcontractkit/chainlink-testing-framework/config/types"
+	"github.com/smartcontractkit/chainlink-testing-framework/networks"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/conversions"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/foundry"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/foundry"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/mockserver"
-	mockservercfg "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/mockserver-cfg"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver"
+	mockservercfg "github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver-cfg"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
-	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/chainlink"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/reorg"
+	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/chainlink"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/reorg"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
-	k8config "github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/config"
+	k8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/types/config/node"
@@ -257,7 +257,7 @@ func DeployLocalCluster(
 ) (*test_env.CLClusterTestEnv, func() error) {
 	selectedNetworks := testInputs.SelectedNetworks
 
-	privateEthereumNetworks := []*ctfconfig.EthereumNetworkConfig{}
+	privateEthereumNetworks := []*ctf_config.EthereumNetworkConfig{}
 	for _, network := range testInputs.EnvInput.PrivateEthereumNetworks {
 		privateEthereumNetworks = append(privateEthereumNetworks, network)
 
@@ -287,16 +287,16 @@ func DeployLocalCluster(
 		}
 
 		for _, network := range missing {
-			chainConfig := &ctfconfig.EthereumChainConfig{}
+			chainConfig := &ctf_config.EthereumChainConfig{}
 			err := chainConfig.Default()
 			if err != nil {
 				require.NoError(t, err, "failed to get default chain config: %w", err)
 			} else {
 				chainConfig.ChainID = int(network.ChainID)
-				eth1 := ctfconfigtypes.EthereumVersion_Eth1
-				geth := ctfconfigtypes.ExecutionLayer_Geth
+				eth1 := ctf_config_types.EthereumVersion_Eth1
+				geth := ctf_config_types.ExecutionLayer_Geth
 
-				privateEthereumNetworks = append(privateEthereumNetworks, &ctfconfig.EthereumNetworkConfig{
+				privateEthereumNetworks = append(privateEthereumNetworks, &ctf_config.EthereumNetworkConfig{
 					EthereumVersion:     &eth1,
 					ExecutionLayer:      &geth,
 					EthereumChainConfig: chainConfig,
@@ -490,7 +490,8 @@ func DeployEnvironments(
 							"fullnameOverride": actions.NetworkName(network.Name),
 							"image": map[string]interface{}{
 								"repository": "ghcr.io/foundry-rs/foundry",
-								"tag":        "nightly-2442e7a5fc165d7d0b022aa8b9f09dcdf675157b",
+								"tag":        "nightly-5ac78a9cd4b94dc53d1fe5e0f42372b28b5a7559",
+								//	"tag":        "nightly-ea2eff95b5c17edd3ffbdfc6daab5ce5cc80afc0",
 							},
 							"anvil": map[string]interface{}{
 								"chainId":                   fmt.Sprintf("%d", network.ChainID),

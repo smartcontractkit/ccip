@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {OCR2Abstract} from "./OCR2Abstract.sol";

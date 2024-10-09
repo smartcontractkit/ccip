@@ -5,6 +5,7 @@ import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {Router} from "../../Router.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
+import {BaseTest} from "../BaseTest.t.sol";
 import {TokenPoolHelper} from "../helpers/TokenPoolHelper.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
 
@@ -54,8 +55,8 @@ contract TokenPool_getRemotePool is TokenPoolSetup {
       remotePoolAddress: abi.encode(remotePool),
       remoteTokenAddress: abi.encode(remoteToken),
       allowed: true,
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     s_tokenPool.applyChainUpdates(chainUpdates);
 
@@ -77,8 +78,8 @@ contract TokenPool_setRemotePool is TokenPoolSetup {
       remotePoolAddress: abi.encode(initialPool),
       remoteTokenAddress: abi.encode(remoteToken),
       allowed: true,
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     s_tokenPool.applyChainUpdates(chainUpdates);
 
@@ -378,8 +379,8 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
       remotePoolAddress: abi.encode(address(2)),
       remoteTokenAddress: abi.encode(address(3)),
       allowed: true,
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     s_tokenPool.applyChainUpdates(chainUpdates);
   }
@@ -428,12 +429,12 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
 
   // Reverts
 
-  function test_OnlyOwnerOrRateLimitAdmin_Revert() public {
+  function test_OnlyOwner_Revert() public {
     vm.startPrank(STRANGER);
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.Unauthorized.selector, STRANGER));
+    vm.expectRevert("Only callable by owner");
     s_tokenPool.setChainRateLimiterConfig(
-      s_remoteChainSelector, _getOutboundRateLimiterConfig(), _getInboundRateLimiterConfig()
+      s_remoteChainSelector, getOutboundRateLimiterConfig(), getInboundRateLimiterConfig()
     );
   }
 
@@ -442,25 +443,8 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, wrongChainSelector));
     s_tokenPool.setChainRateLimiterConfig(
-      wrongChainSelector, _getOutboundRateLimiterConfig(), _getInboundRateLimiterConfig()
+      wrongChainSelector, getOutboundRateLimiterConfig(), getInboundRateLimiterConfig()
     );
-  }
-}
-
-contract LockRelease_setRateLimitAdmin is TokenPoolSetup {
-  function test_SetRateLimitAdmin_Success() public {
-    assertEq(address(0), s_tokenPool.getRateLimitAdmin());
-    s_tokenPool.setRateLimitAdmin(OWNER);
-    assertEq(OWNER, s_tokenPool.getRateLimitAdmin());
-  }
-
-  // Reverts
-
-  function test_SetRateLimitAdmin_Revert() public {
-    vm.startPrank(STRANGER);
-
-    vm.expectRevert("Only callable by owner");
-    s_tokenPool.setRateLimitAdmin(STRANGER);
   }
 }
 
@@ -475,8 +459,8 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
       remotePoolAddress: abi.encode(address(1)),
       remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     s_tokenPool.applyChainUpdates(chainUpdate);
 
@@ -506,8 +490,8 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
       remotePoolAddress: abi.encode(address(1)),
       remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     s_tokenPool.applyChainUpdates(chainUpdate);
 
@@ -547,8 +531,8 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
       remotePoolAddress: abi.encode(address(1)),
       remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     s_tokenPool.applyChainUpdates(chainUpdate);
 
@@ -571,8 +555,8 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
       remotePoolAddress: abi.encode(address(1)),
       remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     s_tokenPool.applyChainUpdates(chainUpdate);
 
@@ -602,8 +586,8 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
       remotePoolAddress: abi.encode(address(1)),
       remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     s_tokenPool.applyChainUpdates(chainUpdate);
 
@@ -643,8 +627,8 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
       remotePoolAddress: abi.encode(address(1)),
       remoteTokenAddress: abi.encode(address(2)),
       allowed: true,
-      outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: _getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     s_tokenPool.applyChainUpdates(chainUpdate);
 

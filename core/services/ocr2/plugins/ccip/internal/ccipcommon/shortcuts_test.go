@@ -145,20 +145,14 @@ func TestRetryUntilSuccess(t *testing.T) {
 	}
 
 	// Assert that RetryUntilSuccess returns the expected value when fn returns success on the 5th attempt
-	numCalls, err := RetryUntilSuccess(fn, initialDelay, maxDelay, 10)
+	numCalls, err := RetryUntilSuccess(fn, initialDelay, maxDelay)
 	assert.Nil(t, err)
 	assert.Equal(t, 5, numCalls)
 
 	// Assert that RetryUntilSuccess returns the expected value when fn returns success on the 8th attempt
 	numAttempts = 8
 	numCalls = 0
-	numCalls, err = RetryUntilSuccess(fn, initialDelay, maxDelay, 10)
+	numCalls, err = RetryUntilSuccess(fn, initialDelay, maxDelay)
 	assert.Nil(t, err)
 	assert.Equal(t, 8, numCalls)
-
-	// Assert that RetryUntilSuccess exhausts retries
-	numAttempts = 8
-	numCalls = 0
-	numCalls, err = RetryUntilSuccess(fn, initialDelay, maxDelay, 2)
-	assert.NotNil(t, err)
 }

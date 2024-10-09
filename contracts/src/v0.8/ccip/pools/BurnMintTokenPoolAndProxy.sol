@@ -8,7 +8,7 @@ import {Pool} from "../libraries/Pool.sol";
 import {LegacyPoolWrapper} from "./LegacyPoolWrapper.sol";
 
 contract BurnMintTokenPoolAndProxy is ITypeAndVersion, LegacyPoolWrapper {
-  string public constant override typeAndVersion = "BurnMintTokenPoolAndProxy 1.5.0";
+  string public constant override typeAndVersion = "BurnMintTokenPoolAndProxy 1.5.0-dev";
 
   constructor(
     IBurnMintERC20 token,
@@ -19,9 +19,12 @@ contract BurnMintTokenPoolAndProxy is ITypeAndVersion, LegacyPoolWrapper {
 
   /// @notice Burn the token in the pool
   /// @dev The _validateLockOrBurn check is an essential security check
-  function lockOrBurn(
-    Pool.LockOrBurnInV1 calldata lockOrBurnIn
-  ) external virtual override returns (Pool.LockOrBurnOutV1 memory) {
+  function lockOrBurn(Pool.LockOrBurnInV1 calldata lockOrBurnIn)
+    external
+    virtual
+    override
+    returns (Pool.LockOrBurnOutV1 memory)
+  {
     _validateLockOrBurn(lockOrBurnIn);
 
     if (!_hasLegacyPool()) {
@@ -37,13 +40,17 @@ contract BurnMintTokenPoolAndProxy is ITypeAndVersion, LegacyPoolWrapper {
 
   /// @notice Mint tokens from the pool to the recipient
   /// @dev The _validateReleaseOrMint check is an essential security check
-  function releaseOrMint(
-    Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-  ) external virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+  function releaseOrMint(Pool.ReleaseOrMintInV1 calldata releaseOrMintIn)
+    external
+    virtual
+    override
+    returns (Pool.ReleaseOrMintOutV1 memory)
+  {
     _validateReleaseOrMint(releaseOrMintIn);
 
     if (!_hasLegacyPool()) {
-      IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, releaseOrMintIn.amount);
+      // Mint to the offRamp, which forwards it to the recipient
+      IBurnMintERC20(address(i_token)).mint(msg.sender, releaseOrMintIn.amount);
     } else {
       _releaseOrMintLegacy(releaseOrMintIn);
     }

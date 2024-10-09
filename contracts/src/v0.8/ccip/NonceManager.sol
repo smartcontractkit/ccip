@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
 import {IEVM2AnyOnRamp} from "./interfaces/IEVM2AnyOnRamp.sol";
 import {INonceManager} from "./interfaces/INonceManager.sol";
 
@@ -9,7 +8,7 @@ import {AuthorizedCallers} from "../shared/access/AuthorizedCallers.sol";
 
 /// @title NonceManager
 /// @notice NonceManager contract that manages sender nonces for the on/off ramps
-contract NonceManager is INonceManager, AuthorizedCallers, ITypeAndVersion {
+contract NonceManager is INonceManager, AuthorizedCallers {
   error PreviousRampAlreadySet();
 
   event PreviousRampsUpdated(uint64 indexed remoteChainSelector, PreviousRamps prevRamp);
@@ -28,9 +27,7 @@ contract NonceManager is INonceManager, AuthorizedCallers, ITypeAndVersion {
     PreviousRamps prevRamps; // Previous on/off ramps
   }
 
-  string public constant override typeAndVersion = "NonceManager 1.6.0-dev";
-
-  /// @dev The previous on/off ramps per chain selector
+  /// @dev previous ramps
   mapping(uint64 chainSelector => PreviousRamps previousRamps) private s_previousRamps;
   /// @dev The current outbound nonce per sender used on the onramp
   mapping(uint64 destChainSelector => mapping(address sender => uint64 outboundNonce)) private s_outboundNonces;
@@ -52,10 +49,10 @@ contract NonceManager is INonceManager, AuthorizedCallers, ITypeAndVersion {
     return outboundNonce;
   }
 
-  /// @notice Returns the outbound nonce for a given sender on a given destination chain.
-  /// @param destChainSelector The destination chain selector.
-  /// @param sender The sender address.
-  /// @return outboundNonce The outbound nonce.
+  /// @notice Returns the outbound nonce for a given sender on a given destination chain
+  /// @param destChainSelector The destination chain selector
+  /// @param sender The sender address
+  /// @return The outbound nonce
   function getOutboundNonce(uint64 destChainSelector, address sender) external view returns (uint64) {
     return _getOutboundNonce(destChainSelector, sender);
   }
@@ -95,10 +92,10 @@ contract NonceManager is INonceManager, AuthorizedCallers, ITypeAndVersion {
     return true;
   }
 
-  /// @notice Returns the inbound nonce for a given sender on a given source chain.
-  /// @param sourceChainSelector The source chain selector.
-  /// @param sender The encoded sender address.
-  /// @return inboundNonce The inbound nonce.
+  /// @notice Returns the inbound nonce for a given sender on a given source chain
+  /// @param sourceChainSelector The source chain selector
+  /// @param sender The encoded sender address
+  /// @return The inbound nonce
   function getInboundNonce(uint64 sourceChainSelector, bytes calldata sender) external view returns (uint64) {
     return _getInboundNonce(sourceChainSelector, sender);
   }
@@ -121,17 +118,15 @@ contract NonceManager is INonceManager, AuthorizedCallers, ITypeAndVersion {
     return inboundNonce;
   }
 
-  /// @notice Updates the previous ramps addresses.
-  /// @param previousRampsArgs The previous on/off ramps addresses.
+  /// @notice Updates the previous ramps addresses
+  /// @param previousRampsArgs The previous on/off ramps addresses
   function applyPreviousRampsUpdates(PreviousRampsArgs[] calldata previousRampsArgs) external onlyOwner {
     for (uint256 i = 0; i < previousRampsArgs.length; ++i) {
       PreviousRampsArgs calldata previousRampsArg = previousRampsArgs[i];
 
       PreviousRamps storage prevRamps = s_previousRamps[previousRampsArg.remoteChainSelector];
 
-      // If the previous ramps are already set then they should not be updated.
-      // In versions prior to the introduction of the NonceManager contract, nonces were tracked in the on/off ramps.
-      // This config does a 1-time migration to move the nonce from on/off ramps into NonceManager
+      // If the previous ramps are already set then they should not be updated
       if (prevRamps.prevOnRamp != address(0) || prevRamps.prevOffRamp != address(0)) {
         revert PreviousRampAlreadySet();
       }
@@ -145,7 +140,7 @@ contract NonceManager is INonceManager, AuthorizedCallers, ITypeAndVersion {
 
   /// @notice Gets the previous onRamp address for the given chain selector
   /// @param chainSelector The chain selector
-  /// @return previousRamps The previous on/offRamp addresses
+  /// @return The previous onRamp address
   function getPreviousRamps(uint64 chainSelector) external view returns (PreviousRamps memory) {
     return s_previousRamps[chainSelector];
   }

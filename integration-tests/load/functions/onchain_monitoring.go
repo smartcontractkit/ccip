@@ -8,6 +8,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
+
 	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 )
 

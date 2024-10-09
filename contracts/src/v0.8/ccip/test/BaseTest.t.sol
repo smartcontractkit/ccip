@@ -3,8 +3,6 @@ pragma solidity 0.8.24;
 
 // Imports to any non-library are not allowed due to the significant cascading
 // compile time increase they cause when imported into this base test.
-
-import {IRMNRemote} from "../interfaces/IRMNRemote.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {MockRMN} from "./mocks/MockRMN.sol";
@@ -36,12 +34,12 @@ contract BaseTest is Test {
   // Onramp
   uint96 internal constant MAX_NOP_FEES_JUELS = 1e27;
   uint96 internal constant MAX_MSG_FEES_JUELS = 1e18;
-  uint32 internal constant DEST_GAS_OVERHEAD = 300_000;
+  uint32 internal constant DEST_GAS_OVERHEAD = 350_000;
   uint16 internal constant DEST_GAS_PER_PAYLOAD_BYTE = 16;
 
   uint16 internal constant DEFAULT_TOKEN_FEE_USD_CENTS = 50;
-  uint32 internal constant DEFAULT_TOKEN_DEST_GAS_OVERHEAD = 90_000;
-  uint32 internal constant DEFAULT_TOKEN_BYTES_OVERHEAD = 32;
+  uint32 internal constant DEFAULT_TOKEN_DEST_GAS_OVERHEAD = 34_000;
+  uint32 internal constant DEFAULT_TOKEN_BYTES_OVERHEAD = 50;
 
   bool private s_baseTestInitialized;
 
@@ -63,6 +61,8 @@ contract BaseTest is Test {
   // OffRamp
   uint32 internal constant MAX_DATA_SIZE = 30_000;
   uint16 internal constant MAX_TOKENS_LENGTH = 5;
+  uint32 internal constant MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS = 200_000;
+  uint32 internal constant MAX_TOKEN_POOL_TRANSFER_GAS = 50_000;
   uint16 internal constant GAS_FOR_CALL_EXACT_CHECK = 5000;
   uint32 internal constant PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS = 500;
   uint32 internal constant MAX_GAS_LIMIT = 4_000_000;
@@ -71,10 +71,6 @@ contract BaseTest is Test {
   address internal constant ADMIN = 0x11118e64e1FB0c487f25dD6D3601FF6aF8d32E4e;
 
   MockRMN internal s_mockRMN;
-  IRMNRemote internal s_mockRMNRemote;
-
-  // nonce for pseudo-random number generation, not to be exposed to test suites
-  uint256 private randNonce;
 
   function setUp() public virtual {
     // BaseTest.setUp is often called multiple times from tests' setUp due to inheritance.
@@ -90,36 +86,18 @@ contract BaseTest is Test {
     // Set the block time to a constant known value
     vm.warp(BLOCK_TIME);
 
-    // setup mock RMN & RMNRemote
     s_mockRMN = new MockRMN();
-    s_mockRMNRemote = IRMNRemote(makeAddr("MOCK RMN REMOTE"));
-    vm.etch(address(s_mockRMNRemote), bytes("fake bytecode"));
-    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSelector(IRMNRemote.verify.selector), bytes(""));
-    _setMockRMNGlobalCurse(false);
-    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(false)); // no curses by defaule
   }
 
-  function _setMockRMNGlobalCurse(bool isCursed) internal {
-    vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed()"), abi.encode(isCursed));
-  }
-
-  function _setMockRMNChainCurse(uint64 chainSelector, bool isCursed) internal {
-    vm.mockCall(
-      address(s_mockRMNRemote),
-      abi.encodeWithSignature("isCursed(bytes16)", bytes16(uint128(chainSelector))),
-      abi.encode(isCursed)
-    );
-  }
-
-  function _getOutboundRateLimiterConfig() internal pure returns (RateLimiter.Config memory) {
+  function getOutboundRateLimiterConfig() internal pure returns (RateLimiter.Config memory) {
     return RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e15});
   }
 
-  function _getInboundRateLimiterConfig() internal pure returns (RateLimiter.Config memory) {
+  function getInboundRateLimiterConfig() internal pure returns (RateLimiter.Config memory) {
     return RateLimiter.Config({isEnabled: true, capacity: 222e30, rate: 1e18});
   }
 
-  function _getSingleTokenPriceUpdateStruct(
+  function getSingleTokenPriceUpdateStruct(
     address token,
     uint224 price
   ) internal pure returns (Internal.PriceUpdates memory) {
@@ -132,18 +110,16 @@ contract BaseTest is Test {
     return priceUpdates;
   }
 
-  /// @dev returns a pseudo-random bytes32
-  function _randomBytes32() internal returns (bytes32) {
-    return keccak256(abi.encodePacked(++randNonce));
-  }
+  function getSingleGasPriceUpdateStruct(
+    uint64 chainSelector,
+    uint224 usdPerUnitGas
+  ) internal pure returns (Internal.PriceUpdates memory) {
+    Internal.GasPriceUpdate[] memory gasPriceUpdates = new Internal.GasPriceUpdate[](1);
+    gasPriceUpdates[0] = Internal.GasPriceUpdate({destChainSelector: chainSelector, usdPerUnitGas: usdPerUnitGas});
 
-  /// @dev returns a pseudo-random number
-  function _randomNum() internal returns (uint256) {
-    return uint256(_randomBytes32());
-  }
+    Internal.PriceUpdates memory priceUpdates =
+      Internal.PriceUpdates({tokenPriceUpdates: new Internal.TokenPriceUpdate[](0), gasPriceUpdates: gasPriceUpdates});
 
-  /// @dev returns a pseudo-random address
-  function _randomAddress() internal returns (address) {
-    return address(uint160(_randomNum()));
+    return priceUpdates;
   }
 }

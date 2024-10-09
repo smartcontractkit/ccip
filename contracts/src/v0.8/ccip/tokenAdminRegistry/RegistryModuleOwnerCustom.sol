@@ -12,7 +12,7 @@ contract RegistryModuleOwnerCustom is ITypeAndVersion {
 
   event AdministratorRegistered(address indexed token, address indexed administrator);
 
-  string public constant override typeAndVersion = "RegistryModuleOwnerCustom 1.5.0";
+  string public constant override typeAndVersion = "RegistryModuleOwnerCustom 1.5.0-dev";
 
   // The TokenAdminRegistry contract
   ITokenAdminRegistry internal immutable i_tokenAdminRegistry;

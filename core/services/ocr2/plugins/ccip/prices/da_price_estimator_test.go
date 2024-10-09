@@ -2,7 +2,6 @@ package prices
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"testing"
 
@@ -12,7 +11,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/rollups/mocks"
-	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 )
 
 func encodeGasPrice(daPrice, execPrice *big.Int) *big.Int {
@@ -23,13 +21,11 @@ func TestDAPriceEstimator_GetGasPrice(t *testing.T) {
 	ctx := context.Background()
 
 	testCases := []struct {
-		name            string
-		daGasPrice      *big.Int
-		execGasPrice    *big.Int
-		expPrice        *big.Int
-		modExecGasPrice *big.Int
-		modDAGasPrice   *big.Int
-		expErr          bool
+		name         string
+		daGasPrice   *big.Int
+		execGasPrice *big.Int
+		expPrice     *big.Int
+		expErr       bool
 	}{
 		{
 			name:         "base",
@@ -60,31 +56,6 @@ func TestDAPriceEstimator_GetGasPrice(t *testing.T) {
 			expErr:       false,
 		},
 		{
-			name:            "execGasPrice Modified",
-			daGasPrice:      big.NewInt(1e9),
-			execGasPrice:    big.NewInt(0),
-			modExecGasPrice: big.NewInt(1),
-			expPrice:        encodeGasPrice(big.NewInt(1e9), big.NewInt(1)),
-			expErr:          false,
-		},
-		{
-			name:          "daGasPrice Modified",
-			daGasPrice:    big.NewInt(1e9),
-			execGasPrice:  big.NewInt(0),
-			modDAGasPrice: big.NewInt(1),
-			expPrice:      encodeGasPrice(big.NewInt(1), big.NewInt(0)),
-			expErr:        false,
-		},
-		{
-			name:            "daGasPrice and execGasPrice Modified",
-			daGasPrice:      big.NewInt(1e9),
-			execGasPrice:    big.NewInt(0),
-			modDAGasPrice:   big.NewInt(1),
-			modExecGasPrice: big.NewInt(2),
-			expPrice:        encodeGasPrice(big.NewInt(1), big.NewInt(2)),
-			expErr:          false,
-		},
-		{
 			name:         "price out of bounds",
 			daGasPrice:   new(big.Int).Lsh(big.NewInt(1), daGasPriceEncodingLength),
 			execGasPrice: big.NewInt(1),
@@ -101,25 +72,10 @@ func TestDAPriceEstimator_GetGasPrice(t *testing.T) {
 			l1Oracle := mocks.NewL1Oracle(t)
 			l1Oracle.On("GasPrice", ctx).Return(assets.NewWei(tc.daGasPrice), nil)
 
-			feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
-
-			modRespExecGasPrice := tc.execGasPrice
-			if tc.modExecGasPrice != nil {
-				modRespExecGasPrice = tc.modExecGasPrice
-			}
-
-			modRespDAGasPrice := tc.daGasPrice
-			if tc.modDAGasPrice != nil {
-				modRespDAGasPrice = tc.modDAGasPrice
-			}
-			feeEstimatorConfig.On("ModifyGasPriceComponents", mock.Anything, tc.execGasPrice, tc.daGasPrice).
-				Return(modRespExecGasPrice, modRespDAGasPrice, nil)
-
 			g := DAGasPriceEstimator{
 				execEstimator:       execEstimator,
 				l1Oracle:            l1Oracle,
 				priceEncodingLength: daGasPriceEncodingLength,
-				feeEstimatorConfig:  feeEstimatorConfig,
 			}
 
 			gasPrice, err := g.GetGasPrice(ctx)
@@ -369,17 +325,14 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 	execCostUSD := big.NewInt(100_000)
 
 	testCases := []struct {
-		name                  string
-		gasPrice              *big.Int
-		wrappedNativePrice    *big.Int
-		msg                   cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta
-		daOverheadGas         int64
-		gasPerDAByte          int64
-		daMultiplier          int64
-		expUSD                *big.Int
-		onRampConfig          cciptypes.OnRampDynamicConfig
-		execEstimatorResponse []any
-		execEstimatorErr      error
+		name               string
+		gasPrice           *big.Int
+		wrappedNativePrice *big.Int
+		msg                cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta
+		daOverheadGas      int64
+		gasPerDAByte       int64
+		daMultiplier       int64
+		expUSD             *big.Int
 	}{
 		{
 			name:               "only DA overhead",
@@ -392,8 +345,10 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					SourceTokenData: [][]byte{},
 				},
 			},
-			expUSD:                new(big.Int).Add(execCostUSD, big.NewInt(100_000e9)),
-			execEstimatorResponse: []any{int64(100_000), int64(0), int64(10_000), nil},
+			daOverheadGas: 100_000,
+			gasPerDAByte:  0,
+			daMultiplier:  10_000, // 1x multiplier
+			expUSD:        new(big.Int).Add(execCostUSD, big.NewInt(100_000e9)),
 		},
 		{
 			name:               "include message data gas",
@@ -408,8 +363,10 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					},
 				},
 			},
-			expUSD:                new(big.Int).Add(execCostUSD, big.NewInt(134_208e9)),
-			execEstimatorResponse: []any{int64(100_000), int64(16), int64(10_000), nil},
+			daOverheadGas: 100_000,
+			gasPerDAByte:  16,
+			daMultiplier:  10_000, // 1x multiplier
+			expUSD:        new(big.Int).Add(execCostUSD, big.NewInt(134_208e9)),
 		},
 		{
 			name:               "zero DA price",
@@ -422,7 +379,10 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					SourceTokenData: [][]byte{},
 				},
 			},
-			expUSD: execCostUSD,
+			daOverheadGas: 100_000,
+			gasPerDAByte:  16,
+			daMultiplier:  10_000, // 1x multiplier
+			expUSD:        execCostUSD,
 		},
 		{
 			name:               "double native price",
@@ -435,8 +395,10 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					SourceTokenData: [][]byte{},
 				},
 			},
-			expUSD:                new(big.Int).Add(execCostUSD, big.NewInt(200_000e9)),
-			execEstimatorResponse: []any{int64(100_000), int64(0), int64(10_000), nil},
+			daOverheadGas: 100_000,
+			gasPerDAByte:  0,
+			daMultiplier:  10_000, // 1x multiplier
+			expUSD:        new(big.Int).Add(execCostUSD, big.NewInt(200_000e9)),
 		},
 		{
 			name:               "half multiplier",
@@ -449,66 +411,30 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					SourceTokenData: [][]byte{},
 				},
 			},
-			expUSD:                new(big.Int).Add(execCostUSD, big.NewInt(50_000e9)),
-			execEstimatorResponse: []any{int64(100_000), int64(0), int64(5_000), nil},
-		},
-		{
-			name:               "onRamp reader error",
-			gasPrice:           encodeGasPrice(big.NewInt(1e9), big.NewInt(0)), // 1 gwei DA price, 0 exec price
-			wrappedNativePrice: big.NewInt(1e18),                               // $1
-			msg: cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-					Data:            []byte{},
-					TokenAmounts:    []cciptypes.TokenAmount{},
-					SourceTokenData: [][]byte{},
-				},
-			},
-			execEstimatorResponse: []any{int64(0), int64(0), int64(0), errors.New("some reader error")},
-		},
-		{
-			name:               "execEstimator error",
-			gasPrice:           encodeGasPrice(big.NewInt(1e9), big.NewInt(0)), // 1 gwei DA price, 0 exec price
-			wrappedNativePrice: big.NewInt(1e18),                               // $1
-			msg: cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				EVM2EVMMessage: cciptypes.EVM2EVMMessage{
-					Data:            []byte{},
-					TokenAmounts:    []cciptypes.TokenAmount{},
-					SourceTokenData: [][]byte{},
-				},
-			},
-			execEstimatorErr: errors.New("some estimator error"),
+			daOverheadGas: 100_000,
+			gasPerDAByte:  0,
+			daMultiplier:  5_000, // 0.5x multiplier
+			expUSD:        new(big.Int).Add(execCostUSD, big.NewInt(50_000e9)),
 		},
 	}
 
 	for _, tc := range testCases {
+		execEstimator := NewMockGasPriceEstimator(t)
+		execEstimator.On("EstimateMsgCostUSD", mock.Anything, tc.wrappedNativePrice, tc.msg).Return(execCostUSD, nil)
+
 		t.Run(tc.name, func(t *testing.T) {
-			execEstimator := NewMockGasPriceEstimator(t)
-			execEstimator.On("EstimateMsgCostUSD", mock.Anything, tc.wrappedNativePrice, tc.msg).
-				Return(execCostUSD, tc.execEstimatorErr)
-
-			feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
-			if len(tc.execEstimatorResponse) > 0 {
-				feeEstimatorConfig.On("GetDataAvailabilityConfig", mock.Anything).
-					Return(tc.execEstimatorResponse...)
-			}
-
 			g := DAGasPriceEstimator{
 				execEstimator:       execEstimator,
 				l1Oracle:            nil,
 				priceEncodingLength: daGasPriceEncodingLength,
-				feeEstimatorConfig:  feeEstimatorConfig,
+				daOverheadGas:       tc.daOverheadGas,
+				gasPerDAByte:        tc.gasPerDAByte,
+				daMultiplier:        tc.daMultiplier,
 			}
 
 			costUSD, err := g.EstimateMsgCostUSD(tc.gasPrice, tc.wrappedNativePrice, tc.msg)
-
-			switch {
-			case len(tc.execEstimatorResponse) == 4 && tc.execEstimatorResponse[3] != nil,
-				tc.execEstimatorErr != nil:
-				assert.Error(t, err)
-			default:
-				assert.NoError(t, err)
-				assert.Equal(t, tc.expUSD, costUSD)
-			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expUSD, costUSD)
 		})
 	}
 }

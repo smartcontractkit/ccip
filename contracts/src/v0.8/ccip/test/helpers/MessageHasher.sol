@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
 import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
@@ -9,26 +9,15 @@ import {Internal} from "../../libraries/Internal.sol";
 /// @dev This is only deployed in tests and is not part of the production contracts.
 contract MessageHasher {
   function hash(Internal.Any2EVMRampMessage memory message, bytes memory onRamp) public pure returns (bytes32) {
-    return Internal._hash(
-      message,
-      keccak256(
-        abi.encode(
-          Internal.ANY_2_EVM_MESSAGE_HASH, message.header.sourceChainSelector, message.header.destChainSelector, onRamp
-        )
-      )
-    );
+    return Internal._hash(message, onRamp);
   }
 
-  function encodeTokenAmountsHashPreimage(
-    Internal.Any2EVMTokenTransfer[] memory tokenAmounts
-  ) public pure returns (bytes memory) {
-    return abi.encode(tokenAmounts);
-  }
-
-  function encodeTokenAmountsHashPreimage(
-    Internal.EVM2AnyTokenTransfer[] memory tokenAmount
-  ) public pure returns (bytes memory) {
-    return abi.encode(tokenAmount);
+  function encodeTokenAmountsHashPreimage(Internal.RampTokenAmount[] memory rampTokenAmounts)
+    public
+    pure
+    returns (bytes memory)
+  {
+    return abi.encode(rampTokenAmounts);
   }
 
   function encodeMetadataHashPreimage(

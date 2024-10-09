@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {RMN} from "../../RMN.sol";
 import {IRMN} from "../../interfaces/IRMN.sol";
+import {OwnerIsCreator} from "./../../../shared/access/OwnerIsCreator.sol";
 
 /// @notice WARNING: This contract is to be only used for testing, all methods are unprotected.
 contract MockRMN is IRMN {

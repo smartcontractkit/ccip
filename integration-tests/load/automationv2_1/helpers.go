@@ -11,6 +11,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+
 	ctf_concurrency "github.com/smartcontractkit/chainlink-testing-framework/lib/concurrency"
 	reportModel "github.com/smartcontractkit/chainlink-testing-framework/lib/testreporters"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
