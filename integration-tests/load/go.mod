@@ -505,3 +505,5 @@ replace (
 	k8s.io/client-go => k8s.io/client-go v0.25.11
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230303024457-afdc3dddf62d
 )
+
+replace github.com/smartcontractkit/chain-selectors => github.com/smartcontractkit/chain-selectors v1.0.26-0.20241009163442-35de36fcd9dc

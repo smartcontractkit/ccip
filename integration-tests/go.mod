@@ -506,3 +506,5 @@ replace (
 
 	github.com/smartcontractkit/chainlink/integration-tests => ../integration-tests
 )
+
+replace github.com/smartcontractkit/chain-selectors => github.com/smartcontractkit/chain-selectors v1.0.26-0.20241009163442-35de36fcd9dc
