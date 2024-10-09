@@ -3,6 +3,7 @@ package logpoller
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -325,7 +326,7 @@ func (r *RangeQueryer[T]) ExecPagedQuery(ctx context.Context, limit, end int64) 
 	err = r.ds.GetContext(ctx, &start, `SELECT MIN(block_number) FROM evm.log_poller_blocks
 		WHERE evm_chain_id = $1`, r.chainID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
 		}
 		return 0, err
