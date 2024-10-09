@@ -46,6 +46,9 @@
     "src/v0.8/shared/util/SortedSetValidationUtil.sol",
     "src/v0.8/liquiditymanager/interfaces/ILiquidityContainer.sol",
     "src/v0.8/keystone/interfaces/ICapabilityConfiguration.sol",
+    "src/v0.8/keystone/lib/KeystoneFeedDefaultMetadataLib.sol",
+    "src/v0.8/keystone/interfaces/IReceiver.sol",
+    "src/v0.8/keystone/KeystoneFeedsPermissionHandler.sol",
     "src/v0.8/vendor/openzeppelin-solidity",
     "src/v0.8/vendor/Context.sol",
     "src/v0.8/vendor/Pausable.sol",
@@ -61,7 +64,10 @@
     "!src/v0.8/ccip/ocr/MultiOCR3Base.sol",
     "!src/v0.8/ccip/NonceManager.sol",
     "!src/v0.8/ccip/MultiAggregateRateLimiter.sol",
-    "!src/v0.8/ccip/capability"
+    "!src/v0.8/ccip/capability",
+    "!src/v0.8/ccip/rmn",
+    "!src/v0.8/ccip/interfaces/encodingutils",
+    "!src/v0.8/ccip/FeeQuoter.sol"
   ],
   "pnpm": {
     "_comment": "See https://github.com/ethers-io/ethers.js/discussions/2849#discussioncomment-2696454",
