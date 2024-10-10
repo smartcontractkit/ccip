@@ -97,10 +97,7 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       dynamicSalt.computeAddress(keccak256(predictedPoolInitCode), address(s_tokenPoolFactory));
 
     (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
-      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
-      s_tokenInitCode,
-      s_poolInitCode,
-      FAKE_SALT
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0), s_tokenInitCode, s_poolInitCode, FAKE_SALT
     );
 
     assertNotEq(address(0), tokenAddress, "Token Address should not be 0");
@@ -196,10 +193,7 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
     // On the new token pool factory, representing a destination chain,
     // deploy a new token and a new pool
     (address newTokenAddress, address newPoolAddress) = newTokenPoolFactory.deployTokenAndTokenPool(
-      new TokenPoolFactory.RemoteTokenPoolInfo[](0),
-      s_tokenInitCode,
-      s_poolInitCode,
-      FAKE_SALT
+      new TokenPoolFactory.RemoteTokenPoolInfo[](0), s_tokenInitCode, s_poolInitCode, FAKE_SALT
     );
 
     assertEq(
@@ -287,9 +281,8 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
 
     // Since the remote chain information was provided, we should be able to get the information from the newly
     // deployed token pool using the available getter functions
-    (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
-      remoteTokenPools, s_tokenInitCode, s_poolInitCode, FAKE_SALT
-    );
+    (address tokenAddress, address poolAddress) =
+      s_tokenPoolFactory.deployTokenAndTokenPool(remoteTokenPools, s_tokenInitCode, s_poolInitCode, FAKE_SALT);
 
     assertEq(address(TokenPool(poolAddress).getToken()), tokenAddress, "Token Address should have been set locally");
 
@@ -363,9 +356,8 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       RateLimiter.Config(false, 0, 0) // rateLimiterConfig
     );
 
-    (address tokenAddress, address poolAddress) = s_tokenPoolFactory.deployTokenAndTokenPool(
-      remoteTokenPools, s_tokenInitCode, s_poolInitCode, FAKE_SALT
-    );
+    (address tokenAddress, address poolAddress) =
+      s_tokenPoolFactory.deployTokenAndTokenPool(remoteTokenPools, s_tokenInitCode, s_poolInitCode, FAKE_SALT);
 
     assertNotEq(address(0), tokenAddress, "Token Address should not be 0");
     assertNotEq(address(0), poolAddress, "Pool Address should not be 0");
@@ -410,7 +402,7 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
     TokenPoolFactory.RemoteChainConfig memory remoteChainConfig =
       TokenPoolFactory.RemoteChainConfig(address(newTokenPoolFactory), address(s_destRouter), address(s_rmnProxy));
 
-      FactoryBurnMintERC20 newLocalToken =
+    FactoryBurnMintERC20 newLocalToken =
       new FactoryBurnMintERC20("TestToken", "TEST", 18, type(uint256).max, PREMINT_AMOUNT, OWNER);
 
     FactoryBurnMintERC20 newRemoteToken =
@@ -432,7 +424,7 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       s_tokenInitCode, // remoteTokenInitCode
       RateLimiter.Config(false, 0, 0)
     );
- 
+
     // Since the remote chain information was provided, we should be able to get the information from the newly
     // deployed token pool using the available getter functions
     address poolAddress = s_tokenPoolFactory.deployTokenPoolWithExistingToken(
@@ -449,7 +441,11 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
     OwnerIsCreator(poolAddress).acceptOwnership();
 
     // Ensure that the remote Token was set to the one we predicted
-    assertEq(address(LockReleaseTokenPool(poolAddress).getToken()), address(newLocalToken), "Token Address should have been set");
+    assertEq(
+      address(LockReleaseTokenPool(poolAddress).getToken()),
+      address(newLocalToken),
+      "Token Address should have been set"
+    );
 
     LockReleaseTokenPool(poolAddress).setRebalancer(OWNER);
     assertEq(OWNER, LockReleaseTokenPool(poolAddress).getRebalancer(), "Rebalancer should be set");
@@ -480,6 +476,5 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
       address(newRemoteToken),
       "New Remote Token should be set correctly"
     );
-
   }
 }

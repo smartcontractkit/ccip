@@ -73,7 +73,8 @@ contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Bu
   /// @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
     return interfaceId == type(IERC20).interfaceId || interfaceId == type(IBurnMintERC20).interfaceId
-      || interfaceId == type(IERC165).interfaceId || interfaceId == type(IOwnable).interfaceId || interfaceId == type(IGetCCIPAdmin).interfaceId;
+      || interfaceId == type(IERC165).interfaceId || interfaceId == type(IOwnable).interfaceId
+      || interfaceId == type(IGetCCIPAdmin).interfaceId;
   }
 
   // ================================================================
