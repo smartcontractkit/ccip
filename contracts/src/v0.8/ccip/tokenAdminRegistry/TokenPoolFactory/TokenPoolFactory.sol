@@ -6,7 +6,6 @@ import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
-import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {RegistryModuleOwnerCustom} from "../RegistryModuleOwnerCustom.sol";
@@ -18,7 +17,7 @@ import {Create2} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/ut
 /// ownership transfer in a separate transaction.
 /// @dev The address prediction mechanism is only capable of deploying and predicting addresses for EVM based chains.
 /// adding compatibility for other chains will require additional offchain computation.
-contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
+contract TokenPoolFactory is ITypeAndVersion {
   using Create2 for bytes32;
 
   event RemoteChainConfigUpdated(uint64 indexed remoteChainSelector, RemoteChainConfig remoteChainConfig);
@@ -95,15 +94,13 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
   /// @param tokenInitCode The creation code for the token, which includes the constructor parameters already appended
   /// @param tokenPoolInitCode The creation code for the token pool, without the constructor parameters appended
   /// @param salt The salt to be used in the create2 deployment of the token and token pool to ensure a unique address
-  /// @param poolType The type of pool to deploy, either Burn/Mint or Lock/Release
   /// @return token The address of the token that was deployed
   /// @return pool The address of the token pool that was deployed
   function deployTokenAndTokenPool(
     RemoteTokenPoolInfo[] calldata remoteTokenPools,
     bytes memory tokenInitCode,
     bytes calldata tokenPoolInitCode,
-    bytes32 salt,
-    PoolType poolType
+    bytes32 salt
   ) external returns (address, address) {
     // Ensure a unique deployment between senders even if the same input parameter is used to prevent
     // DOS/Frontrunning attacks
@@ -113,7 +110,7 @@ contract TokenPoolFactory is OwnerIsCreator, ITypeAndVersion {
     address token = Create2.deploy(0, salt, tokenInitCode);
 
     // Deploy the token pool
-    address pool = _createTokenPool(token, remoteTokenPools, tokenPoolInitCode, salt, poolType);
+    address pool = _createTokenPool(token, remoteTokenPools, tokenPoolInitCode, salt, PoolType.BURN_MINT);
 
     // Grant the mint and burn roles to the pool for the token
     IBurnMintERC20(token).grantMintAndBurnRoles(pool);

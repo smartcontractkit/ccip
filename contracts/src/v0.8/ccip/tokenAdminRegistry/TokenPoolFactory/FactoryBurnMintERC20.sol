@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.24;
 
 import {IGetCCIPAdmin} from "../../../ccip/interfaces/IGetCCIPAdmin.sol";
 import {IOwnable} from "../../../shared/interfaces/IOwnable.sol";
@@ -70,9 +70,10 @@ contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Bu
     grantBurnRole(newOwner_);
   }
 
+  /// @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
     return interfaceId == type(IERC20).interfaceId || interfaceId == type(IBurnMintERC20).interfaceId
-      || interfaceId == type(IERC165).interfaceId || interfaceId == type(IOwnable).interfaceId;
+      || interfaceId == type(IERC165).interfaceId || interfaceId == type(IOwnable).interfaceId || interfaceId == type(IGetCCIPAdmin).interfaceId;
   }
 
   // ================================================================
