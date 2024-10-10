@@ -20,8 +20,6 @@ import {TokenAdminRegistrySetup} from "./TokenAdminRegistry.t.sol";
 
 import {Create2} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
 
-import {console2 as console} from "forge-std/console2.sol";
-
 contract TokenPoolFactorySetup is TokenAdminRegistrySetup {
   using Create2 for bytes32;
 
@@ -387,7 +385,6 @@ contract TokenPoolFactoryTests is TokenPoolFactorySetup {
 
   function test_createTokenPoolLockRelease_ExistingToken_predict_Success() public {
     vm.startPrank(OWNER);
-    bytes32 dynamicSalt = keccak256(abi.encodePacked(FAKE_SALT, OWNER));
 
     // We have to create a new factory, registry module, and token admin registry to simulate the other chain
     TokenAdminRegistry newTokenAdminRegistry = new TokenAdminRegistry();
