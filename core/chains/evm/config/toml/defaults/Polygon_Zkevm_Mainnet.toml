@@ -1,17 +1,28 @@
 ChainID = '1101'
 ChainType = 'zkevm'
-FinalityDepth = 500
-NoNewHeadsThreshold = '6m'
-MinIncomingConfirmations = 1
+FinalityTagEnabled = true
+FinalityDepth = 1000
+# checks how long to wait before after receiving "NoHeads" & marking RPC out of sync.
+# This chain in the past have had inconsistent block rate
+# average block rate of zkEVM based on past data
 LogPollInterval = '30s'
+# some concerns that subscription gave Heads much earlier than the RPC polling so
+# setting this to 15
 RPCBlockQueryDelay = 15
+# node configured default batch size.
+# ref: https://github.com/smartcontractkit/chainlink/pull/11962
 RPCDefaultBatchSize = 100
 
 [OCR]
 ContractConfirmations = 1
 
 [Transactions]
+# chain in the past have had inconsistent block rate
 ResendAfterThreshold = '3m'
+
+[Transactions.AutoPurge]
+Enabled = true
+MinAttempts = 3
 
 [GasEstimator]
 Mode = 'FeeHistory'
@@ -24,5 +35,4 @@ BumpPercent = 40
 CacheTimeout = '4s'
 
 [HeadTracker]
-# Polygon suffers from a tremendous number of re-orgs, we need to set this to something very large to be conservative enough
 HistoryDepth = 2000
