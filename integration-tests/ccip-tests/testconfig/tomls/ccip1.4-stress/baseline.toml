@@ -160,7 +160,7 @@ BatchGasLimit = 11000000
 [CCIP.Groups.load.TokenConfig]
 TimeoutForPriceUpdate = '15m'
 NoOfTokensPerChain = 10
-NoOfTokensWithDynamicPrice = 10
+NoOfTokensWithDynamicPrice = 0
 DynamicPriceUpdateInterval = '15s'
 CCIPOwnerTokens = true
 
