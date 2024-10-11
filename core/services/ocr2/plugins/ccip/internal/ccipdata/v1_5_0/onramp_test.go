@@ -159,7 +159,6 @@ func setupOnRampV1_5_0(t testing.TB, user *bind.TransactOpts, bc *client.Simulat
 		MaxPerMsgGasLimit:                 0,
 		DefaultTokenFeeUSDCents:           50,
 		DefaultTokenDestGasOverhead:       34_000,
-		DefaultTokenDestBytesOverhead:     500,
 	}
 	rateLimiterConfig := evm_2_evm_onramp.RateLimiterConfig{
 		IsEnabled: false,

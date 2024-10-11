@@ -27,7 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper_1_2_0"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -37,6 +37,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
+	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 )
@@ -166,7 +167,7 @@ func TestCommitStoreReaders(t *testing.T) {
 		MerkleRoot:  common.HexToHash("0x1"),
 	}
 	er := big.NewInt(1)
-	armAddr, _, arm, err := mock_arm_contract.DeployMockARMContract(user, ec)
+	armAddr, _, arm, err := mock_rmn_contract.DeployMockRMNContract(user, ec)
 	require.NoError(t, err)
 	addr, _, ch, err := commit_store_helper_1_0_0.DeployCommitStoreHelper(user, ec, commit_store_helper_1_0_0.CommitStoreStaticConfig{
 		ChainSelector:       testutils.SimulatedChainID.Uint64(),
@@ -192,15 +193,24 @@ func TestCommitStoreReaders(t *testing.T) {
 	lm := new(rollupMocks.L1Oracle)
 	ge.On("L1Oracle").Return(lm)
 
+	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
+	feeEstimatorConfig.On(
+		"ModifyGasPriceComponents",
+		mock.AnythingOfType("context.backgroundCtx"),
+		mock.AnythingOfType("*big.Int"),
+		mock.AnythingOfType("*big.Int"),
+	).Return(func(ctx context.Context, x, y *big.Int) (*big.Int, *big.Int, error) {
+		return x, y, nil
+	})
 	maxGasPrice := big.NewInt(1e8)
-	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp) // ge, maxGasPrice
+	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp, feeEstimatorConfig) // ge, maxGasPrice
 	require.NoError(t, err)
 	err = c10r.SetGasEstimator(ctx, ge)
 	require.NoError(t, err)
 	err = c10r.SetSourceMaxGasPrice(ctx, maxGasPrice)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&v1_0_0.CommitStore{}).String())
-	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr2), ec, lp)
+	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr2), ec, lp, feeEstimatorConfig)
 	require.NoError(t, err)
 	err = c12r.SetGasEstimator(ctx, ge)
 	require.NoError(t, err)
@@ -411,7 +421,10 @@ func TestNewCommitStoreReader(t *testing.T) {
 			if tc.expectedErr == "" {
 				lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil)
 			}
-			_, err = factory.NewCommitStoreReader(logger.Test(t), factory.NewEvmVersionFinder(), addr, c, lp)
+
+			feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
+
+			_, err = factory.NewCommitStoreReader(logger.Test(t), factory.NewEvmVersionFinder(), addr, c, lp, feeEstimatorConfig)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {

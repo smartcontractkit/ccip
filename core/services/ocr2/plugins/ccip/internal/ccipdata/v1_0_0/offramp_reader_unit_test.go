@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
+	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib/rpclibmocks"
 )
@@ -189,13 +190,15 @@ func Test_LogsAreProperlyMarkedAsFinalized(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			offrampAddress := utils.RandomAddress()
 
+			feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
+
 			lp := mocks.NewLogPoller(t)
 			lp.On("LatestBlock", mock.Anything).
 				Return(logpoller.LogPollerBlock{FinalizedBlockNumber: int64(tt.lastFinalizedBlock)}, nil)
 			lp.On("IndexedLogsTopicRange", mock.Anything, ExecutionStateChangedEvent, offrampAddress, 1, logpoller.EvmWord(minSeqNr), logpoller.EvmWord(maxSeqNr), evmtypes.Confirmations(0)).
 				Return(inputLogs, nil)
 
-			offRamp, err := NewOffRamp(logger.Test(t), offrampAddress, evmclimocks.NewClient(t), lp, nil, nil)
+			offRamp, err := NewOffRamp(logger.Test(t), offrampAddress, evmclimocks.NewClient(t), lp, nil, nil, feeEstimatorConfig)
 			require.NoError(t, err)
 			logs, err := offRamp.GetExecutionStateChangesBetweenSeqNums(testutils.Context(t), minSeqNr, maxSeqNr, 0)
 			require.NoError(t, err)

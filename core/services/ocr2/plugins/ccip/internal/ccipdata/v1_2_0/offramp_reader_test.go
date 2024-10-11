@@ -8,10 +8,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 )
 
@@ -26,7 +26,8 @@ func TestExecutionReportEncodingV120(t *testing.T) {
 		ProofFlagBits:     big.NewInt(133),
 	}
 
-	offRamp, err := v1_2_0.NewOffRamp(logger.Test(t), utils.RandomAddress(), nil, lpmocks.NewLogPoller(t), nil, nil)
+	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
+	offRamp, err := v1_2_0.NewOffRamp(logger.Test(t), utils.RandomAddress(), nil, lpmocks.NewLogPoller(t), nil, nil, feeEstimatorConfig)
 	require.NoError(t, err)
 
 	ctx := testutils.Context(t)

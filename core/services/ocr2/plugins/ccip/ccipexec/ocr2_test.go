@@ -428,8 +428,10 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	p.metricsCollector = ccip.NoopMetricsCollector
 	p.commitStoreReader = commitStore
 
+	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
+
 	lp := lpMocks.NewLogPoller(t)
-	offRampReader, err := v1_0_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil, nil)
+	offRampReader, err := v1_0_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil, nil, feeEstimatorConfig)
 	assert.NoError(t, err)
 	p.offRampReader = offRampReader
 
@@ -1376,7 +1378,9 @@ func Test_prepareTokenExecData(t *testing.T) {
 }
 
 func encodeExecutionReport(t *testing.T, report cciptypes.ExecReport) []byte {
-	reader, err := v1_2_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, nil, nil, nil)
+	feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
+
+	reader, err := v1_2_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, nil, nil, nil, feeEstimatorConfig)
 	require.NoError(t, err)
 	ctx := testutils.Context(t)
 	encodedReport, err := reader.EncodeExecutionReport(ctx, report)

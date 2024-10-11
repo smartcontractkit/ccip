@@ -10,8 +10,8 @@ import {Pool} from "../../libraries/Pool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
-import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
+import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice This contract is a proof of concept and should NOT be used in production.
 abstract contract MultiTokenPool is IPoolV1, OwnerIsCreator {
@@ -54,7 +54,7 @@ abstract contract MultiTokenPool is IPoolV1, OwnerIsCreator {
   struct ChainUpdate {
     uint64 remoteChainSelector; // ──╮ Remote chain selector
     bool allowed; // ────────────────╯ Whether the chain is allowed
-    bytes remotePoolAddress; //        Address of the remote pool, ABI encoded in the case of a remove EVM chain.
+    bytes remotePoolAddress; //        Address of the remote pool, ABI encoded in the case of a remote EVM chain.
     bytes remoteTokenAddress; //       Address of the remote token, ABI encoded in the case of a remote EVM chain.
     RateLimiter.Config outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain
     RateLimiter.Config inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain
