@@ -10,7 +10,6 @@ import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
 contract BurnMintERC20Setup is BaseTest {
-
   FactoryBurnMintERC20 internal s_burnMintERC20;
 
   address internal s_mockPool = address(6243783892);
