@@ -438,12 +438,14 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 
 	// CCIPCommit reads only when source chain is Mantle, then reports to dest chain
 	// to minimize misconfigure risk, might make sense to wire Mantle only when Commit + Mantle + IsSourceProvider
-	if r.chain.Config().EVM().ChainType() == chaintype.ChainMantle && commitPluginConfig.IsSourceProvider {
-		mantleInterceptor, iErr := mantle.NewInterceptor(ctx, r.chain.Client())
-		if iErr != nil {
-			return nil, iErr
+	if r.chain.Config().EVM().ChainID().Uint64() == 5003 || r.chain.Config().EVM().ChainID().Uint64() == 5000 {
+		if commitPluginConfig.IsSourceProvider {
+			mantleInterceptor, iErr := mantle.NewInterceptor(ctx, r.chain.Client())
+			if iErr != nil {
+				return nil, iErr
+			}
+			feeEstimatorConfig.AddGasPriceInterceptor(mantleInterceptor)
 		}
-		feeEstimatorConfig.AddGasPriceInterceptor(mantleInterceptor)
 	}
 
 	// The src chain implementation of this provider does not need a configWatcher or contractTransmitter;
@@ -519,12 +521,14 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 
 	// CCIPExec reads when dest chain is mantle, and uses it to calc boosting in batching
 	// to minimize misconfigure risk, make sense to wire Mantle only when Exec + Mantle + !IsSourceProvider
-	if r.chain.Config().EVM().ChainType() == chaintype.ChainMantle && !execPluginConfig.IsSourceProvider {
-		mantleInterceptor, iErr := mantle.NewInterceptor(ctx, r.chain.Client())
-		if iErr != nil {
-			return nil, iErr
+	if r.chain.Config().EVM().ChainID().Uint64() == 5003 || r.chain.Config().EVM().ChainID().Uint64() == 5000 {
+		if !execPluginConfig.IsSourceProvider {
+			mantleInterceptor, iErr := mantle.NewInterceptor(ctx, r.chain.Client())
+			if iErr != nil {
+				return nil, iErr
+			}
+			feeEstimatorConfig.AddGasPriceInterceptor(mantleInterceptor)
 		}
-		feeEstimatorConfig.AddGasPriceInterceptor(mantleInterceptor)
 	}
 
 	// The src chain implementation of this provider does not need a configWatcher or contractTransmitter;
