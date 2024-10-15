@@ -3,12 +3,12 @@ pragma solidity 0.8.24;
 
 import {IOwnable} from "../../../shared/interfaces/IOwnable.sol";
 import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
-import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 import {ITokenAdminRegistry} from "../../interfaces/ITokenAdminRegistry.sol";
 
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {RegistryModuleOwnerCustom} from "../RegistryModuleOwnerCustom.sol";
+import {FactoryBurnMintERC20} from "./FactoryBurnMintERC20.sol";
 
 import {Create2} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/Create2.sol";
 
@@ -113,7 +113,7 @@ contract TokenPoolFactory is ITypeAndVersion {
     address pool = _createTokenPool(token, remoteTokenPools, tokenPoolInitCode, salt, PoolType.BURN_MINT);
 
     // Grant the mint and burn roles to the pool for the token
-    IBurnMintERC20(token).grantMintAndBurnRoles(pool);
+    FactoryBurnMintERC20(token).grantMintAndBurnRoles(pool);
 
     // Set the token pool for token in the token admin registry since this contract is the token and pool owner
     _setTokenPoolInTokenAdminRegistry(token, pool);
