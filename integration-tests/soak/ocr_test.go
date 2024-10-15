@@ -18,8 +18,10 @@ import (
 	"github.com/google/uuid"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
+	"github.com/smartcontractkit/chainlink-testing-framework/havoc"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/networks"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/testsetups"
@@ -161,6 +163,11 @@ func executeOCRSoakTest(t *testing.T, test *testsetups.OCRSoakTest, config *tc.T
 	t.Cleanup(func() {
 		if err := actions.TeardownRemoteSuite(test.TearDownVals(t)); err != nil {
 			l.Error().Err(err).Msg("Error tearing down environment")
+		} else {
+			err := test.Environment().Client.RemoveNamespace(test.Environment().Cfg.Namespace)
+			if err != nil {
+				l.Error().Err(err).Msg("Error removing namespace")
+			}
 		}
 	})
 	if test.Interrupted() {

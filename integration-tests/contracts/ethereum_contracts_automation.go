@@ -148,7 +148,7 @@ type EthereumKeeperRegistry struct {
 func (v *EthereumKeeperRegistry) ReorgProtectionEnabled() bool {
 	chainId := v.client.ChainID
 	// reorg protection is disabled in polygon zkEVM and Scroll bc currently there is no way to get the block hash onchain
-	return v.version != ethereum.RegistryVersion_2_2 || (chainId != 1101 && chainId != 1442 && chainId != 2442 && chainId != 534352 && chainId != 534351)
+	return v.version < ethereum.RegistryVersion_2_2 || (chainId != 1101 && chainId != 1442 && chainId != 2442 && chainId != 534352 && chainId != 534351)
 }
 
 func (v *EthereumKeeperRegistry) ChainModuleAddress() common.Address {
@@ -1369,12 +1369,7 @@ func deployRegistry22(client *seth.Client, opts *KeeperRegistryOpts) (KeeperRegi
 		return nil, err
 	}
 
-	var allowedReadOnlyAddress common.Address
-	if chainId == networks.PolygonZkEvmMainnet.ChainID || chainId == networks.PolygonZkEvmCardona.ChainID {
-		allowedReadOnlyAddress = common.HexToAddress("0x1111111111111111111111111111111111111111")
-	} else {
-		allowedReadOnlyAddress = common.HexToAddress("0x0000000000000000000000000000000000000000")
-	}
+	allowedReadOnlyAddress := common.HexToAddress("0x0000000000000000000000000000000000000000")
 
 	logicBAbi, err := registrylogicb22.AutomationRegistryLogicBMetaData.GetAbi()
 	if err != nil {
@@ -1457,12 +1452,7 @@ func deployRegistry23(client *seth.Client, opts *KeeperRegistryOpts) (KeeperRegi
 		return nil, err
 	}
 
-	var allowedReadOnlyAddress common.Address
-	if chainId == networks.PolygonZkEvmMainnet.ChainID || chainId == networks.PolygonZkEvmCardona.ChainID {
-		allowedReadOnlyAddress = common.HexToAddress("0x1111111111111111111111111111111111111111")
-	} else {
-		allowedReadOnlyAddress = common.HexToAddress("0x0000000000000000000000000000000000000000")
-	}
+	allowedReadOnlyAddress := common.HexToAddress("0x0000000000000000000000000000000000000000")
 
 	logicCAbi, err := registrylogicc23.AutomationRegistryLogicCMetaData.GetAbi()
 	if err != nil {

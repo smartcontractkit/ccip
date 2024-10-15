@@ -179,7 +179,6 @@ func TestOCRChaos(t *testing.T) {
 			})
 
 			ms := ctfClient.ConnectMockServer(testEnvironment)
-
 			linkContract, err := contracts.DeployLinkTokenContract(l, seth)
 			require.NoError(t, err, "Error deploying link token contract")
 

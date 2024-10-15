@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink/integration-tests/utils"
+
 	"github.com/jmoiron/sqlx"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
@@ -27,12 +29,11 @@ import (
 	"github.com/scylladb/go-reflectx"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
-	ctf_concurrency "github.com/smartcontractkit/chainlink-testing-framework/lib/concurrency"
-	ctf_test_env "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
-	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/lib/utils/seth"
+	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+	ctf_concurrency "github.com/smartcontractkit/chainlink-testing-framework/concurrency"
+	ctf_test_env "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
+	"github.com/smartcontractkit/chainlink-testing-framework/logging"
+	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
@@ -1061,7 +1062,7 @@ func SetupLogPollerTestDocker(
 	evmNetwork, err := env.GetFirstEvmNetwork()
 	require.NoError(t, err, "Error getting first evm network")
 
-	chainClient, err := seth_utils.GetChainClient(testConfig, *evmNetwork)
+	chainClient, err := utils.TestAwareSethClient(t, testConfig, evmNetwork)
 	require.NoError(t, err, "Error getting seth client")
 
 	err = actions.FundChainlinkNodesFromRootAddress(l, chainClient, contracts.ChainlinkClientToChainlinkNodeWithKeysAndAddress(env.ClCluster.NodeAPIs()), big.NewFloat(chainlinkNodeFunding))

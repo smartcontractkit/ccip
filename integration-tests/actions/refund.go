@@ -19,6 +19,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
 
 	clClient "github.com/smartcontractkit/chainlink/integration-tests/client"

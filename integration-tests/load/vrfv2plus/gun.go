@@ -10,6 +10,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/seth"
+
 	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/lib/utils/seth"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 

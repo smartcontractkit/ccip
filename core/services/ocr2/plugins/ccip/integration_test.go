@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
-
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
@@ -20,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_5_0"
@@ -105,6 +104,7 @@ func TestIntegration_CCIP(t *testing.T) {
 				require.NoError(t, err)
 				priceGetterConfigJson = string(priceGetterConfigBytes)
 			}
+
 			jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, priceGetterConfigJson, "")
 
 			// track sequence number and nonce separately since nonce doesn't bump for messages with allowOutOfOrderExecution == true,

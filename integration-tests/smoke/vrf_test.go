@@ -11,11 +11,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/seth"
-
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
-	seth_utils "github.com/smartcontractkit/chainlink-testing-framework/lib/utils/seth"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions/vrf/vrfv1"
@@ -24,6 +22,7 @@ import (
 	ethcontracts "github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 	tc "github.com/smartcontractkit/chainlink/integration-tests/testconfig"
+	"github.com/smartcontractkit/chainlink/integration-tests/utils"
 )
 
 func TestVRFBasic(t *testing.T) {
@@ -205,7 +204,7 @@ func prepareVRFtestEnv(t *testing.T, l zerolog.Logger) (*test_env.CLClusterTestE
 	evmNetwork, err := env.GetFirstEvmNetwork()
 	require.NoError(t, err, "Error getting first evm network")
 
-	sethClient, err := seth_utils.GetChainClient(config, *evmNetwork)
+	sethClient, err := utils.TestAwareSethClient(t, config, evmNetwork)
 	require.NoError(t, err, "Error getting seth client")
 
 	err = actions.FundChainlinkNodesFromRootAddress(l, sethClient, contracts.ChainlinkClientToChainlinkNodeWithKeysAndAddress(env.ClCluster.NodeAPIs()), big.NewFloat(*config.Common.ChainlinkNodeFunding))
