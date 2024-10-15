@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.24;
 
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 
@@ -10,11 +10,6 @@ import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
 contract BurnMintERC20Setup is BaseTest {
-  event Transfer(address indexed from, address indexed to, uint256 value);
-  event MintAccessGranted(address indexed minter);
-  event BurnAccessGranted(address indexed burner);
-  event MintAccessRevoked(address indexed minter);
-  event BurnAccessRevoked(address indexed burner);
 
   FactoryBurnMintERC20 internal s_burnMintERC20;
 
@@ -106,7 +101,7 @@ contract FactoryBurnMintERC20mint is BurnMintERC20Setup {
     s_burnMintERC20.grantMintAndBurnRoles(OWNER);
 
     vm.expectEmit();
-    emit Transfer(address(0), OWNER, s_amount);
+    emit IERC20.Transfer(address(0), OWNER, s_amount);
 
     s_burnMintERC20.mint(OWNER, s_amount);
 
@@ -141,7 +136,7 @@ contract FactoryBurnMintERC20burn is BurnMintERC20Setup {
     deal(address(s_burnMintERC20), OWNER, s_amount);
 
     vm.expectEmit();
-    emit Transfer(OWNER, address(0), s_amount);
+    emit IERC20.Transfer(OWNER, address(0), s_amount);
 
     s_burnMintERC20.burn(s_amount);
 
@@ -263,14 +258,14 @@ contract FactoryBurnMintERC20grantRole is BurnMintERC20Setup {
     assertFalse(s_burnMintERC20.isMinter(STRANGER));
 
     vm.expectEmit();
-    emit MintAccessGranted(STRANGER);
+    emit FactoryBurnMintERC20.MintAccessGranted(STRANGER);
 
     s_burnMintERC20.grantMintAndBurnRoles(STRANGER);
 
     assertTrue(s_burnMintERC20.isMinter(STRANGER));
 
     vm.expectEmit();
-    emit MintAccessRevoked(STRANGER);
+    emit FactoryBurnMintERC20.MintAccessRevoked(STRANGER);
 
     s_burnMintERC20.revokeMintRole(STRANGER);
 
@@ -281,14 +276,14 @@ contract FactoryBurnMintERC20grantRole is BurnMintERC20Setup {
     assertFalse(s_burnMintERC20.isBurner(STRANGER));
 
     vm.expectEmit();
-    emit BurnAccessGranted(STRANGER);
+    emit FactoryBurnMintERC20.BurnAccessGranted(STRANGER);
 
     s_burnMintERC20.grantBurnRole(STRANGER);
 
     assertTrue(s_burnMintERC20.isBurner(STRANGER));
 
     vm.expectEmit();
-    emit BurnAccessRevoked(STRANGER);
+    emit FactoryBurnMintERC20.BurnAccessRevoked(STRANGER);
 
     s_burnMintERC20.revokeBurnRole(STRANGER);
 
@@ -321,9 +316,9 @@ contract FactoryBurnMintERC20grantMintAndBurnRoles is BurnMintERC20Setup {
     assertFalse(s_burnMintERC20.isBurner(STRANGER));
 
     vm.expectEmit();
-    emit MintAccessGranted(STRANGER);
+    emit FactoryBurnMintERC20.MintAccessGranted(STRANGER);
     vm.expectEmit();
-    emit BurnAccessGranted(STRANGER);
+    emit FactoryBurnMintERC20.BurnAccessGranted(STRANGER);
 
     s_burnMintERC20.grantMintAndBurnRoles(STRANGER);
 
