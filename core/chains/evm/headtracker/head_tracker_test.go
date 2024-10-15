@@ -65,9 +65,9 @@ func TestHeadTracker_New(t *testing.T) {
 	mockEth := &testutils.MockEth{
 		EthClient: ethClient,
 	}
-	ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).
+	ethClient.On("SubscribeToHeads", mock.Anything, mock.Anything).
 		Maybe().
-		Return(mockEth.NewSub(t), nil)
+		Return(nil, mockEth.NewSub(t), nil)
 
 	orm := headtracker.NewORM(*testutils.FixtureChainID, db)
 	assert.Nil(t, orm.IdempotentInsertHead(tests.Context(t), testutils.Head(1)))
@@ -147,14 +147,13 @@ func TestHeadTracker_Get(t *testing.T) {
 			mockEth := &testutils.MockEth{
 				EthClient: ethClient,
 			}
-			ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).
+			ethClient.On("SubscribeToHeads", mock.Anything).
 				Maybe().
 				Return(
-					func(ctx context.Context, ch chan<- *evmtypes.Head) ethereum.Subscription {
+					func(ctx context.Context) (<-chan *evmtypes.Head, ethereum.Subscription, error) {
 						defer close(chStarted)
-						return mockEth.NewSub(t)
+						return make(<-chan *evmtypes.Head), mockEth.NewSub(t), nil
 					},
-					func(ctx context.Context, ch chan<- *evmtypes.Head) error { return nil },
 				)
 			ethClient.On("HeadByNumber", mock.Anything, (*big.Int)(nil)).Return(testutils.Head(0), nil).Maybe()
 
@@ -200,11 +199,12 @@ func TestHeadTracker_Start_NewHeads(t *testing.T) {
 	ethClient.On("HeadByNumber", mock.Anything, mock.Anything).Return(testutils.Head(0), nil).Once()
 	// for backfill
 	ethClient.On("HeadByNumber", mock.Anything, mock.Anything).Return(testutils.Head(0), nil).Maybe()
-	ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).
+	ch := make(chan *evmtypes.Head)
+	ethClient.On("SubscribeToHeads", mock.Anything).
 		Run(func(mock.Arguments) {
 			close(chStarted)
 		}).
-		Return(sub, nil)
+		Return((<-chan *evmtypes.Head)(ch), sub, nil)
 
 	ht := createHeadTracker(t, ethClient, config.EVM(), config.EVM().HeadTracker(), orm)
 	ht.Start(t)
@@ -242,8 +242,8 @@ func TestHeadTracker_Start(t *testing.T) {
 		ethClient := evmtest.NewEthClientMockWithDefaultChain(t)
 		mockEth := &testutils.MockEth{EthClient: ethClient}
 		sub := mockEth.NewSub(t)
-		ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).Return(sub, nil).Maybe()
-		return createHeadTracker(t, ethClient, config.EVM(), config.EVM().HeadTracker(), orm)
+		ethClient.On("SubscribeToHeads", mock.Anything, mock.Anything).Return(nil, sub, nil).Maybe()
+		return createHeadTracker(t, ethClient, config.EVM(), config.EVM().HeadTracker(), opts.ORM)
 	}
 	t.Run("Starts even if failed to get initialHead", func(t *testing.T) {
 		ht := newHeadTracker(t, opts{})
@@ -270,7 +270,7 @@ func TestHeadTracker_Start(t *testing.T) {
 		head := testutils.Head(1000)
 		ht.ethClient.On("HeadByNumber", mock.Anything, (*big.Int)(nil)).Return(head, nil).Once()
 		ht.ethClient.On("LatestFinalizedBlock", mock.Anything).Return(nil, nil).Once()
-		ht.ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).Return(nil, errors.New("failed to connect")).Maybe()
+		ht.ethClient.On("SubscribeToHeads", mock.Anything, mock.Anything).Return(nil, nil, errors.New("failed to connect")).Maybe()
 		ht.Start(t)
 		tests.AssertLogEventually(t, ht.observer, "Error handling initial head")
 	})
@@ -285,7 +285,7 @@ func TestHeadTracker_Start(t *testing.T) {
 		ht.ethClient.On("LatestFinalizedBlock", mock.Anything).Return(finalizedHead, nil).Once()
 		// on backfill
 		ht.ethClient.On("LatestFinalizedBlock", mock.Anything).Return(nil, errors.New("backfill call to finalized failed")).Maybe()
-		ht.ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).Return(nil, errors.New("failed to connect")).Maybe()
+		ht.ethClient.On("SubscribeToHeads", mock.Anything, mock.Anything).Return(nil, nil, errors.New("failed to connect")).Maybe()
 		ht.Start(t)
 		tests.AssertLogEventually(t, ht.observer, "Loaded chain from DB")
 	})
@@ -299,7 +299,7 @@ func TestHeadTracker_Start(t *testing.T) {
 		require.NoError(t, ht.orm.IdempotentInsertHead(ctx, testutils.Head(finalizedHead.Number-1)))
 		// on backfill
 		ht.ethClient.On("HeadByNumber", mock.Anything, mock.Anything).Return(nil, errors.New("backfill call to finalized failed")).Maybe()
-		ht.ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).Return(nil, errors.New("failed to connect")).Maybe()
+		ht.ethClient.On("SubscribeToHeads", mock.Anything, mock.Anything).Return(nil, nil, errors.New("failed to connect")).Maybe()
 		ht.Start(t)
 		tests.AssertLogEventually(t, ht.observer, "Loaded chain from DB")
 	}
@@ -338,14 +338,14 @@ func TestHeadTracker_CallsHeadTrackableCallbacks(t *testing.T) {
 
 	chchHeaders := make(chan testutils.RawSub[*evmtypes.Head], 1)
 	mockEth := &testutils.MockEth{EthClient: ethClient}
-	ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).
+	chHead := make(chan *evmtypes.Head)
+	ethClient.On("SubscribeToHeads", mock.Anything).
 		Return(
-			func(ctx context.Context, ch chan<- *evmtypes.Head) ethereum.Subscription {
+			func(ctx context.Context) (<-chan *evmtypes.Head, ethereum.Subscription, error) {
 				sub := mockEth.NewSub(t)
-				chchHeaders <- testutils.NewRawSub(ch, sub.Err())
-				return sub
+				chchHeaders <- testutils.NewRawSub(chHead, sub.Err())
+				return chHead, sub, nil
 			},
-			func(ctx context.Context, ch chan<- *evmtypes.Head) error { return nil },
 		)
 	ethClient.On("HeadByNumber", mock.Anything, mock.Anything).Return(testutils.Head(0), nil)
 	ethClient.On("HeadByHash", mock.Anything, mock.Anything).Return(testutils.Head(0), nil).Maybe()
@@ -374,16 +374,19 @@ func TestHeadTracker_ReconnectOnError(t *testing.T) {
 
 	ethClient := testutils.NewEthClientMockWithDefaultChain(t)
 	mockEth := &testutils.MockEth{EthClient: ethClient}
-	ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).
+	chHead := make(chan *evmtypes.Head)
+	ethClient.On("SubscribeToHeads", mock.Anything).
 		Return(
-			func(ctx context.Context, ch chan<- *evmtypes.Head) ethereum.Subscription { return mockEth.NewSub(t) },
-			func(ctx context.Context, ch chan<- *evmtypes.Head) error { return nil },
+			func(ctx context.Context) (<-chan *evmtypes.Head, ethereum.Subscription, error) {
+				return chHead, mockEth.NewSub(t), nil
+			},
 		)
-	ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).Return(nil, errors.New("cannot reconnect"))
-	ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).
+	ethClient.On("SubscribeToHeads", mock.Anything).Return((<-chan *evmtypes.Head)(chHead), nil, errors.New("cannot reconnect"))
+	ethClient.On("SubscribeToHeads", mock.Anything).
 		Return(
-			func(ctx context.Context, ch chan<- *evmtypes.Head) ethereum.Subscription { return mockEth.NewSub(t) },
-			func(ctx context.Context, ch chan<- *evmtypes.Head) error { return nil },
+			func(ctx context.Context) (<-chan *evmtypes.Head, ethereum.Subscription, error) {
+				return chHead, mockEth.NewSub(t), nil
+			},
 		)
 	ethClient.On("HeadByNumber", mock.Anything, mock.Anything).Return(testutils.Head(0), nil)
 	checker := &mocks.MockHeadTrackable{}
@@ -408,16 +411,16 @@ func TestHeadTracker_ResubscribeOnSubscriptionError(t *testing.T) {
 
 	ethClient := testutils.NewEthClientMockWithDefaultChain(t)
 
+	ch := make(chan *evmtypes.Head)
 	chchHeaders := make(chan testutils.RawSub[*evmtypes.Head], 1)
 	mockEth := &testutils.MockEth{EthClient: ethClient}
-	ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).
+	ethClient.On("SubscribeToHeads", mock.Anything).
 		Return(
-			func(ctx context.Context, ch chan<- *evmtypes.Head) ethereum.Subscription {
+			func(ctx context.Context) (<-chan *evmtypes.Head, ethereum.Subscription, error) {
 				sub := mockEth.NewSub(t)
 				chchHeaders <- testutils.NewRawSub(ch, sub.Err())
-				return sub
+				return ch, sub, nil
 			},
-			func(ctx context.Context, ch chan<- *evmtypes.Head) error { return nil },
 		)
 	ethClient.On("HeadByNumber", mock.Anything, mock.Anything).Return(testutils.Head(0), nil)
 	ethClient.On("HeadByHash", mock.Anything, mock.Anything).Return(testutils.Head(0), nil).Maybe()
@@ -473,14 +476,14 @@ func TestHeadTracker_Start_LoadsLatestChain(t *testing.T) {
 
 	chchHeaders := make(chan testutils.RawSub[*evmtypes.Head], 1)
 	mockEth := &testutils.MockEth{EthClient: ethClient}
-	ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).
+	ch := make(chan *evmtypes.Head)
+	ethClient.On("SubscribeToHeads", mock.Anything).
 		Return(
-			func(ctx context.Context, ch chan<- *evmtypes.Head) ethereum.Subscription {
+			func(ctx context.Context) (<-chan *evmtypes.Head, ethereum.Subscription, error) {
 				sub := mockEth.NewSub(t)
 				chchHeaders <- testutils.NewRawSub(ch, sub.Err())
-				return sub
+				return ch, sub, nil
 			},
-			func(ctx context.Context, ch chan<- *evmtypes.Head) error { return nil },
 		)
 
 	orm := headtracker.NewORM(*testutils.FixtureChainID, db)
@@ -530,14 +533,14 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingEnabled(t *testing.T)
 
 	chchHeaders := make(chan testutils.RawSub[*evmtypes.Head], 1)
 	mockEth := &testutils.MockEth{EthClient: ethClient}
-	ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).
+	chHead := make(chan *evmtypes.Head)
+	ethClient.On("SubscribeToHeads", mock.Anything).
 		Return(
-			func(ctx context.Context, ch chan<- *evmtypes.Head) ethereum.Subscription {
+			func(ctx context.Context) (<-chan *evmtypes.Head, ethereum.Subscription, error) {
 				sub := mockEth.NewSub(t)
-				chchHeaders <- testutils.NewRawSub(ch, sub.Err())
-				return sub
+				chchHeaders <- testutils.NewRawSub(chHead, sub.Err())
+				return chHead, sub, nil
 			},
-			func(ctx context.Context, ch chan<- *evmtypes.Head) error { return nil },
 		)
 
 	// ---------------------
@@ -651,14 +654,14 @@ func TestHeadTracker_SwitchesToLongestChainWithHeadSamplingDisabled(t *testing.T
 
 	chchHeaders := make(chan testutils.RawSub[*evmtypes.Head], 1)
 	mockEth := &testutils.MockEth{EthClient: ethClient}
-	ethClient.On("SubscribeNewHead", mock.Anything, mock.Anything).
+	chHead := make(chan *evmtypes.Head)
+	ethClient.On("SubscribeToHeads", mock.Anything).
 		Return(
-			func(ctx context.Context, ch chan<- *evmtypes.Head) ethereum.Subscription {
+			func(ctx context.Context) (<-chan *evmtypes.Head, ethereum.Subscription, error) {
 				sub := mockEth.NewSub(t)
-				chchHeaders <- testutils.NewRawSub(ch, sub.Err())
-				return sub
+				chchHeaders <- testutils.NewRawSub(chHead, sub.Err())
+				return chHead, sub, nil
 			},
-			func(ctx context.Context, ch chan<- *evmtypes.Head) error { return nil },
 		)
 
 	// ---------------------
