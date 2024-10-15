@@ -984,7 +984,8 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
       uint64 destChainSelector = destChainConfigArgs[i].destChainSelector;
       DestChainConfig memory destChainConfig = destChainConfigArg.destChainConfig;
 
-      // NOTE: when supporting non-EVM chains, update chainFamilySelector validations
+      // Do not allow chain selector of zero or an invalid default gas limit.
+      // Note: Only EVM chains are supported at the moment, and more validation may be needed for other chain types.
       if (
         destChainSelector == 0 || destChainConfig.defaultTxGasLimit == 0
           || destChainConfig.chainFamilySelector != Internal.CHAIN_FAMILY_SELECTOR_EVM
@@ -993,7 +994,7 @@ contract FeeQuoter is AuthorizedCallers, IFeeQuoter, ITypeAndVersion, IReceiver,
         revert InvalidDestChainConfig(destChainSelector);
       }
 
-      // The chain family selector cannot be zero - indicates that it is a new chain
+      // Chain family selector of zero indicates that the chain has not been added yet, so emit different event
       if (s_destChainConfigs[destChainSelector].chainFamilySelector == 0) {
         emit DestChainAdded(destChainSelector, destChainConfig);
       } else {
