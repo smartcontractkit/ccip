@@ -14,6 +14,8 @@ func Generate(environment string) config.Project {
 	checkEnvironments(environment)
 	architectures := []string{"amd64", "arm64"}
 
+	architectures := []string{"amd64", "arm64"}
+
 	project := config.Project{
 		ProjectName: "ccip",
 		Version:     2,
