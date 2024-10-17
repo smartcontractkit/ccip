@@ -135,7 +135,7 @@ jobs:
           BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
           TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
         with:
-          test_command_to_run: cd ./integration-tests && go test -timeout 1h -count=1 -json -test.parallel 11 -run 'TestChaosCCIP' ./chaos 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci
+          test_command_to_run: cd ./integration-tests/ccip-tests && go test -timeout 1h -count=1 -json -test.parallel 11 -run 'TestChaosCCIP' ./chaos 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci
           test_download_vendor_packages_command: make gomod
           artifacts_location: ./integration-tests/chaos/logs
           publish_check_name: CCIP Chaos Test Results
