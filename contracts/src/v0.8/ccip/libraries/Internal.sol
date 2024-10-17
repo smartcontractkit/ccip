@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
 import {Client} from "./Client.sol";
@@ -342,6 +342,7 @@ library Internal {
     bytes extraArgs; // destination-chain specific extra args, such as the gasLimit for EVM chains
     address feeToken; // fee token
     uint256 feeTokenAmount; // fee token amount
+    uint256 feeValueJuels; // fee amount in Juels
     EVM2AnyTokenTransfer[] tokenAmounts; // array of tokens and amounts to transfer
   }
 

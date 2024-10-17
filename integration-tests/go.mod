@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/ccip/integration-tests
+module github.com/smartcontractkit/chainlink/integration-tests
 
 go 1.22.5
 
@@ -32,7 +32,7 @@ require (
 	github.com/segmentio/ksuid v1.0.4
 	github.com/shopspring/decimal v1.4.0
 	github.com/slack-go/slack v0.12.2
-	github.com/smartcontractkit/chain-selectors v1.0.23
+	github.com/smartcontractkit/chain-selectors v1.0.27
 	github.com/smartcontractkit/chainlink-automation v1.0.4
 	github.com/smartcontractkit/chainlink-common v0.2.2-0.20240723123524-e407ecd120b1
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.0
@@ -40,7 +40,6 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.50.0
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.50.2
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.50.0
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/libocr v0.0.0-20240717100443-f6226e09bee7
 	github.com/spf13/cobra v1.8.1
@@ -528,7 +527,6 @@ replace (
 	// type func(a Label, b Label) bool of func(a, b Label) bool {…} does not match inferred type func(a Label, b Label) int for func(a E, b E) int
 	github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.47.2-0.20231010075449-4b9c19fe5510
 
-	github.com/smartcontractkit/chainlink/integration-tests => ../integration-tests
 )
 
 exclude github.com/sourcegraph/sourcegraph/lib v0.0.0-20221216004406-749998a2ac74

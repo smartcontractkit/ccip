@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import {Internal} from "../libraries/Internal.sol";
 
 /// @notice This interface contains the only RMN-related functions that might be used on-chain by other CCIP contracts.
-interface IRMNV2 {
+interface IRMNRemote {
   /// @notice signature components from RMN nodes
   struct Signature {
     bytes32 r;

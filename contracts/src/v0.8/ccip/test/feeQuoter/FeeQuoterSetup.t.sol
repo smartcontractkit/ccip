@@ -162,7 +162,7 @@ contract FeeQuoterSetup is TokenSetup {
       FeeQuoter.StaticConfig({
         linkToken: s_sourceTokens[0],
         maxFeeJuelsPerMsg: MAX_MSG_FEES_JUELS,
-        stalenessThreshold: uint32(TWELVE_HOURS)
+        tokenPriceStalenessThreshold: uint32(TWELVE_HOURS)
       }),
       priceUpdaters,
       feeTokens,
@@ -254,6 +254,7 @@ contract FeeQuoterSetup is TokenSetup {
         defaultTxGasLimit: GAS_LIMIT,
         gasMultiplierWeiPerEth: 5e17,
         networkFeeUSDCents: 1_00,
+        gasPriceStalenessThreshold: uint32(TWELVE_HOURS),
         enforceOutOfOrder: false,
         chainFamilySelector: Internal.CHAIN_FAMILY_SELECTOR_EVM
       })
@@ -367,6 +368,7 @@ contract FeeQuoterFeeSetup is FeeQuoterSetup {
     uint64 seqNum,
     uint64 nonce,
     uint256 feeTokenAmount,
+    uint256 feeValueJuels,
     address originalSender,
     bytes32 metadataHash,
     TokenAdminRegistry tokenAdminRegistry
@@ -388,6 +390,7 @@ contract FeeQuoterFeeSetup is FeeQuoterSetup {
       extraArgs: Client._argsToBytes(extraArgs),
       feeToken: message.feeToken,
       feeTokenAmount: feeTokenAmount,
+      feeValueJuels: feeValueJuels,
       tokenAmounts: new Internal.EVM2AnyTokenTransfer[](message.tokenAmounts.length)
     });
 

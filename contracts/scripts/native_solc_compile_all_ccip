@@ -73,8 +73,7 @@ compileContract ccip/RMN.sol
 compileContract ccip/ARMProxy.sol
 compileContract ccip/tokenAdminRegistry/TokenAdminRegistry.sol
 compileContract ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol
-compileContract ccip/capability/CCIPConfig.sol
-compileContract ccip/capability/interfaces/IOCR3ConfigEncoder.sol
+compileContract ccip/capability/CCIPHome.sol
 compileContract ccip/NonceManager.sol
 compileContract shared/token/ERC677/BurnMintERC677.sol
 
@@ -87,6 +86,7 @@ compileContract ccip/pools/BurnWithFromMintTokenPool.sol
 compileContract ccip/pools/LockReleaseTokenPoolAndProxy.sol
 compileContract ccip/pools/BurnMintTokenPoolAndProxy.sol
 compileContract ccip/pools/BurnWithFromMintTokenPoolAndProxy.sol
+compileContract ccip/pools/BurnWithFromMintRebasingTokenPool.sol
 compileContract ccip/pools/TokenPool.sol
 
 
@@ -104,7 +104,7 @@ compileContract ccip/test/WETH9.sol
 
 
 # Encoding Utils
-compileContract ccip/CCIPEncodingUtils.sol
+compileContract ccip/interfaces/encodingutils/ICCIPEncodingUtils.sol
 
 # Customer contracts
 compileContract ccip/pools/USDC/USDCTokenPool.sol

@@ -13,6 +13,8 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig/interceptors/mantle"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
@@ -409,6 +411,18 @@ func (r *Relayer) NewCCIPCommitProvider(rargs commontypes.RelayArgs, pargs commo
 
 	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
 
+	// CCIPCommit reads only when source chain is Mantle, then reports to dest chain
+	// to minimize misconfigure risk, might make sense to wire Mantle only when Commit + Mantle + IsSourceProvider
+	if r.chain.Config().EVM().ChainID().Uint64() == 5003 || r.chain.Config().EVM().ChainID().Uint64() == 5000 {
+		if commitPluginConfig.IsSourceProvider {
+			mantleInterceptor, iErr := mantle.NewInterceptor(ctx, r.chain.Client())
+			if iErr != nil {
+				return nil, iErr
+			}
+			feeEstimatorConfig.AddGasPriceInterceptor(mantleInterceptor)
+		}
+	}
+
 	// The src chain implementation of this provider does not need a configWatcher or contractTransmitter;
 	// bail early.
 	if commitPluginConfig.IsSourceProvider {
@@ -479,6 +493,18 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 	usdcConfig := execPluginConfig.USDCConfig
 
 	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
+
+	// CCIPExec reads when dest chain is mantle, and uses it to calc boosting in batching
+	// to minimize misconfigure risk, make sense to wire Mantle only when Exec + Mantle + !IsSourceProvider
+	if r.chain.Config().EVM().ChainID().Uint64() == 5003 || r.chain.Config().EVM().ChainID().Uint64() == 5000 {
+		if !execPluginConfig.IsSourceProvider {
+			mantleInterceptor, iErr := mantle.NewInterceptor(ctx, r.chain.Client())
+			if iErr != nil {
+				return nil, iErr
+			}
+			feeEstimatorConfig.AddGasPriceInterceptor(mantleInterceptor)
+		}
+	}
 
 	// The src chain implementation of this provider does not need a configWatcher or contractTransmitter;
 	// bail early.
