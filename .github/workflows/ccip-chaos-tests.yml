@@ -130,11 +130,18 @@ jobs:
           testLogCollect: ${{ vars.TEST_LOG_COLLECT }}
           chainlinkVersion: ${{ github.sha }}
           logstreamLogTargets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
+      - name: Sets Chaos Override Config
+        id: set_chaos_config
+        shell: bash
+        run: |
+            BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ./integration-tests/ccip-tests/testconfig/tomls/ccip-chaos.toml)
+            echo "base_64_override=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_OUTPUT
+            echo "base64_config=$BASE64_CCIP_CONFIG_OVERRIDE"
       - name: Run Chaos Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@d38226be720c5ccc1ff4d3cee40608ebf264cd59 # v2.3.26
         env:
-          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
-          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
+          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_chaos_config.outputs.base64_config }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
+          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_chaos_config.outputs.base64_config }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
         with:
           test_command_to_run: cd ./integration-tests/ccip-tests && go test -timeout 1h -count=1 -json -test.parallel 11 -run 'TestChaosCCIP' ./chaos 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci
           test_download_vendor_packages_command: make gomod
