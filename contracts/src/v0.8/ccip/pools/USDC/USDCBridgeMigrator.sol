@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
@@ -153,7 +153,7 @@ abstract contract USDCBridgeMigrator is OwnerIsCreator {
   /// @dev The sum of locked tokens and excluded tokens should equal the supply of the token on the remote chain
   /// @param remoteChainSelector The chain for which the excluded tokens are being queried
   /// @return uint256 amount of tokens excluded from being burned in a CCTP-migration
-  function getExcludedTokensByChain(uint64 remoteChainSelector) public view returns (uint256) {
+  function getExcludedTokensByChain(uint64 remoteChainSelector) external view returns (uint256) {
     return s_tokensExcludedFromBurn[remoteChainSelector];
   }
 }
