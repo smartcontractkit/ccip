@@ -1363,8 +1363,11 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 			ccipEnv.NumOfCommitNodes = testConfig.TestGroupInput.NoOfCommitNodes
 			ccipEnv.NumOfExecNodes = ccipEnv.NumOfCommitNodes
 			if !pointer.GetBool(testConfig.TestGroupInput.CommitAndExecuteOnSameDON) {
-				if len(ccipEnv.CLNodesWithKeys) < 11 {
-					return fmt.Errorf("not enough CL nodes for separate commit and execution nodes")
+				if ccipEnv.NumOfExecNodes < 4 {
+					return fmt.Errorf("insufficient number of exec nodes, need at least 4, found %d", ccipEnv.NumOfExecNodes)
+				}
+				if len(ccipEnv.CLNodesWithKeys[chains[0].GetChainID().String()]) < 11 {
+					return fmt.Errorf("not enough CL nodes for separate commit and execution nodes, need at least 11 CL nodes, found %d", len(ccipEnv.CLNodesWithKeys))
 				}
 				if testConfig.TestGroupInput.NoOfCommitNodes >= totalNodes {
 					return fmt.Errorf("number of commit nodes can not be greater than total number of nodes in DON")
@@ -1373,9 +1376,6 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 				ccipEnv.CommitNodeStartIndex = 2
 				ccipEnv.ExecNodeStartIndex = 2 + testConfig.TestGroupInput.NoOfCommitNodes
 				ccipEnv.NumOfExecNodes = totalNodes - (2 + testConfig.TestGroupInput.NoOfCommitNodes)
-				if ccipEnv.NumOfExecNodes < 4 {
-					return fmt.Errorf("insufficient number of exec nodes")
-				}
 			}
 			ccipEnv.NumOfAllowedFaultyExec = (ccipEnv.NumOfExecNodes - 1) / 3
 			ccipEnv.NumOfAllowedFaultyCommit = (ccipEnv.NumOfCommitNodes - 1) / 3
