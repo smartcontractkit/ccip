@@ -8,15 +8,14 @@ import (
 )
 
 // Generate creates the goreleaser configuration based on the environment.
-var validEnvironments = []string{"devspace", "develop", "production"}
+var validEnvironments = []string{"devspace", "develop"}
 
 func Generate(environment string) config.Project {
 	checkEnvironments(environment)
-
 	architectures := []string{"amd64", "arm64"}
 
 	project := config.Project{
-		ProjectName: "chainlink",
+		ProjectName: "ccip",
 		Version:     2,
 		Env:         commonEnv(environment),
 		Before: config.Before{
@@ -60,6 +59,7 @@ func Generate(environment string) config.Project {
 		versionTemplate := `v0.0.0-{{ .Runtime.Goarch }}-{{ .Now.Format "2006-01-02-15-04-05Z" }}`
 		project.Snapshot = config.Snapshot{VersionTemplate: versionTemplate}
 		project.Nightly = config.Nightly{VersionTemplate: versionTemplate}
+		project.Git.IgnoreTags = []string{"contracts-ccip/v1.5.0-beta.0"}
 	}
 
 	// Add SBOMs if needed
