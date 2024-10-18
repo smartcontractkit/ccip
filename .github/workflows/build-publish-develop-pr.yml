@@ -26,8 +26,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - image-name: chainlink
-            goreleaser-config: .goreleaser.develop.yaml
           - image-name: ccip
             goreleaser-config: .goreleaser.ccip.develop.yaml
     runs-on: ubuntu-20.04
