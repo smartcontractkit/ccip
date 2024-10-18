@@ -167,16 +167,6 @@ golangci-lint: ## Run golangci-lint for all issues.
 	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:v1.59.1 golangci-lint run --max-issues-per-linter 0 --max-same-issues 0 > ./golangci-lint/$(shell date +%Y-%m-%d_%H:%M:%S).txt
 
 
-GORELEASER_CONFIG ?= .goreleaser.yaml
-
-.PHONY: goreleaser-dev-build
-goreleaser-dev-build: ## Run goreleaser snapshot build
-	./tools/bin/goreleaser_wrapper build --snapshot --rm-dist --config ${GORELEASER_CONFIG}
-
-.PHONY: goreleaser-dev-release
-goreleaser-dev-release: ## run goreleaser snapshot release
-	./tools/bin/goreleaser_wrapper release --snapshot --rm-dist --config ${GORELEASER_CONFIG}
-
 .PHONY: modgraph
 modgraph:
 	./tools/bin/modgraph > go.md
