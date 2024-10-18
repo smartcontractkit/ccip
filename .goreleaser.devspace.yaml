@@ -1,5 +1,5 @@
-project_name: ccip
 version: 2
+project_name: ccip
 env:
     - IMG_PRE={{ if index .Env "IMAGE_PREFIX"  }}{{ .Env.IMAGE_PREFIX }}{{ else }}localhost:5001{{ end }}
     - IMG_TAG={{ if index .Env "IMAGE_TAG" }}{{ .Env.IMAGE_TAG }}{{ else }}develop{{ end }}
@@ -96,10 +96,10 @@ before:
     hooks:
         - cmd: go mod tidy
         - cmd: ./tools/bin/goreleaser_utils before_hook
+git:
+    ignore_tags:
+        - contracts-ccip/v1.5.0-beta.0
 partial:
     by: target
 nightly:
     version_template: v0.0.0-{{ .Runtime.Goarch }}-{{ .Now.Format "2006-01-02-15-04-05Z" }}
-git:
-  ignore_tags:
-    - contracts-ccip/v1.5.0-beta.0

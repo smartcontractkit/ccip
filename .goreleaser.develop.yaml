@@ -1,5 +1,5 @@
 version: 2
-project_name: chainlink
+project_name: ccip
 env:
     - IMG_PRE={{ if index .Env "IMAGE_PREFIX"  }}{{ .Env.IMAGE_PREFIX }}{{ else }}localhost:5001{{ end }}
     - IMG_TAG={{ if index .Env "IMAGE_TAG" }}{{ .Env.IMAGE_TAG }}{{ else }}develop{{ end }}
