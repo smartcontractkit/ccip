@@ -44,6 +44,7 @@ contract CCIPTestSuite is Test {
 
   EnumerableSet.AddressSet internal s_failedTokensInitially;
   EnumerableSet.AddressSet internal s_failedTokensAfterMigration;
+  EnumerableSet.AddressSet internal s_tokenSupportDropped;
 
   constructor(
     address router
@@ -54,6 +55,12 @@ contract CCIPTestSuite is Test {
     vm.deal(address(this), 1e18 ether);
   }
 
+  function sendTokensSingleLane(
+    uint64 remoteChainSelector
+  ) external {
+    _sendTokenToChain(false, remoteChainSelector);
+  }
+
   function sendAllTokens(
     bool onlyPreviousSuccess
   ) external {
@@ -62,42 +69,12 @@ contract CCIPTestSuite is Test {
     uint256 totalSuccessfulTokens = 0;
     uint256 totalFailedTokens = 0;
     for (uint256 i = 0; i < remoteChains.length; ++i) {
-      uint256 successfulTokens = 0;
       uint64 remoteChainSelector = uint64(remoteChains[i]);
-      console2.log("Sending tokens to chain: ", remoteChainSelector);
-      RemoteChainConfig storage remoteChainConfig = s_remoteChainConfigs[remoteChainSelector];
-      address[] memory tokens = onlyPreviousSuccess ? remoteChainConfig.oldSuccessfulTokens : remoteChainConfig.tokens;
-      for (uint256 j = 0; j < tokens.length; ++j) {
-        address token = tokens[j];
-
-        bytes memory payload = abi.encodeWithSelector(this.SendTokenMsg.selector, token, remoteChainSelector);
-
-        (bool success, bytes memory retData,) = CallWithExactGas._callWithExactGasSafeReturnData(
-          payload, address(this), TX_GAS_LIMIT, GAS_FOR_CALL_WITH_EXACT_GAS, MAX_RETURN_BYTES
-        );
-
-        if (success) {
-          console2.log("[SUCCESS] token", token);
-          if (!onlyPreviousSuccess) {
-            s_remoteChainConfigs[remoteChainSelector].oldSuccessfulTokens.push(token);
-          }
-          successfulTokens++;
-        } else {
-          if (!onlyPreviousSuccess) {
-            s_failedTokensInitially.add(token);
-          } else {
-            s_failedTokensAfterMigration.add(token);
-          }
-          console2.log("[FAILURE] token", token);
-          console2.logBytes(retData);
-        }
-      }
-      console2.log("Tokens sent: success", successfulTokens, "failed", tokens.length - successfulTokens);
-      console2.log("");
-
-      totalSuccessfulTokens += successfulTokens;
-      totalFailedTokens += tokens.length - successfulTokens;
+      (uint256 numberOfSuccesses, uint256 failed) = _sendTokenToChain(onlyPreviousSuccess, remoteChainSelector);
+      totalSuccessfulTokens += numberOfSuccesses;
+      totalFailedTokens += failed;
     }
+
     console2.log("--------------------------------------- +");
     console2.log("Total sent: success", totalSuccessfulTokens, "failed", totalFailedTokens);
     console2.log("");
@@ -105,12 +82,74 @@ contract CCIPTestSuite is Test {
     for (uint256 i = 0; i < s_failedTokensInitially.length(); ++i) {
       console2.logAddress(s_failedTokensInitially.at(i));
     }
+
+    console2.log("");
+    console2.log("Tokens dropped with the migration:");
+    for (uint256 i = 0; i < s_tokenSupportDropped.length(); ++i) {
+      console2.logAddress(s_tokenSupportDropped.at(i));
+    }
+
     console2.log("");
     console2.log("Newly failing tokens after migration:");
     for (uint256 i = 0; s_failedTokensAfterMigration.length() > 0;) {
       console2.logAddress(s_failedTokensAfterMigration.at(i));
       s_failedTokensAfterMigration.remove(s_failedTokensAfterMigration.at(i));
     }
+  }
+
+  function _sendTokenToChain(
+    bool onlyPreviousSuccess,
+    uint64 remoteChainSelector
+  ) internal returns (uint256 successful, uint256 failed) {
+    uint256 successfulTokens = 0;
+
+    console2.log("Sending tokens to chain: ", remoteChainSelector);
+    RemoteChainConfig storage remoteChainConfig = s_remoteChainConfigs[remoteChainSelector];
+    address[] memory tokens = onlyPreviousSuccess ? remoteChainConfig.oldSuccessfulTokens : remoteChainConfig.tokens;
+    for (uint256 j = 0; j < tokens.length; ++j) {
+      address token = tokens[j];
+
+      (bool success, bytes memory retData,) = CallWithExactGas._callWithExactGasSafeReturnData(
+        abi.encodeWithSelector(this.SendTokenMsg.selector, token, remoteChainSelector),
+        address(this),
+        TX_GAS_LIMIT,
+        GAS_FOR_CALL_WITH_EXACT_GAS,
+        MAX_RETURN_BYTES
+      );
+
+      if (success) {
+        console2.log("[SUCCESS] token", token);
+        if (!onlyPreviousSuccess) {
+          s_remoteChainConfigs[remoteChainSelector].oldSuccessfulTokens.push(token);
+        }
+        successfulTokens++;
+        continue;
+      }
+
+      bool tokenSupportDropped =
+        keccak256(retData) == keccak256(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, token));
+
+      if (!onlyPreviousSuccess) {
+        s_failedTokensInitially.add(token);
+      } else {
+        if (tokenSupportDropped) {
+          s_tokenSupportDropped.add(token);
+        } else {
+          s_failedTokensAfterMigration.add(token);
+        }
+      }
+
+      if (tokenSupportDropped) {
+        console2.log("[DROPPED SUPPORT] token", token);
+      } else {
+        console2.log("[FAILURE] token", token);
+        console2.logBytes(retData);
+      }
+    }
+    console2.log("Tokens sent: success", successfulTokens, "failed", tokens.length - successfulTokens);
+    console2.log("");
+
+    return (successfulTokens, tokens.length - successfulTokens);
   }
 
   function SendTokenMsg(address token, uint64 destChainSelector) public {

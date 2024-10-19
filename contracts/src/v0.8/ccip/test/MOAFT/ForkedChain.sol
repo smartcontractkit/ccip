@@ -18,7 +18,7 @@ library ForkedChain {
   function _loadChainConfig(Vm vm, string memory name) internal view returns (Chain memory) {
     Chain memory chain;
     chain.rpcUrl = vm.envString(string.concat(name, "_RPC_URL"));
-    chain.block = vm.envUint(string.concat(name, "_BLOCK"));
+    chain.block = vm.envUint(string.concat(name, "_PRE_BLOCK"));
     chain.name = name;
     return chain;
   }

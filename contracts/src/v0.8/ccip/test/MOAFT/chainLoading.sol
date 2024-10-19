@@ -8,10 +8,11 @@ import {RBACTimelock} from "./ccip-owner-contracts/RBACTimelock.sol";
 
 import {console2} from "forge-std/Console2.sol";
 import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract ChainLoading is Test {
   string internal constant MAINNET = "MAINNET";
-  string internal constant ARBITRUM = "ARBITRUM";
+  string internal constant ARBITRUM = "ARB";
 
   uint256 internal constant TwentyFiveHours = 25 * 60 * 60;
 
@@ -24,6 +25,7 @@ contract ChainLoading is Test {
     CCIPSetup ccipSetup;
     string name;
     uint256 forkId;
+    uint256 postMigrationBlock;
     CCIPTestSuite testSuite;
   }
 
@@ -42,6 +44,23 @@ contract ChainLoading is Test {
     run(MAINNET);
   }
 
+  function test_Arbitrum() public {
+    run(ARBITRUM);
+  }
+
+  function test_SepoliaToArbitrum() public {
+    _loadSingleChain(MAINNET);
+    _loadSingleChain(ARBITRUM);
+
+    ForkedChainTestSetup memory chain = _activateFork(MAINNET);
+
+    vm.rollFork(chain.postMigrationBlock);
+    vm.recordLogs();
+    chain.testSuite.sendTokensSingleLane(3478487238524512106);
+
+    Vm.Log[] memory logs = vm.getRecordedLogs();
+  }
+
   function run(
     string memory chainName
   ) public {
@@ -56,20 +75,14 @@ contract ChainLoading is Test {
 
     chain.testSuite.sendAllTokens(false);
 
-    _setProposalOnMCMS(chain.mcmsSetup);
-    vm.warp(block.timestamp + TwentyFiveHours);
-    _executeProposalOnTimeLock(chain.mcmsSetup);
-
-    //    console2.logString(" +------------------------------------------------+");
-    //    console2.logString(" |          Immediately after migration           |");
-    //    console2.logString(" +------------------------------------------------+");
-    //    vm.rollFork(6807978);
-    //    chain.testSuite.sendAllTokens(true);
+    //    _setProposalOnMCMS(chain.mcmsSetup);
+    //    vm.warp(block.timestamp + TwentyFiveHours);
+    //    _executeProposalOnTimeLock(chain.mcmsSetup);
 
     console2.logString(" +------------------------------------------------+");
     console2.logString(" |                  Latest block                  |");
     console2.logString(" +------------------------------------------------+");
-    vm.rollFork(6904314);
+    vm.rollFork(chain.postMigrationBlock);
     chain.testSuite.sendAllTokens(true);
   }
 
@@ -103,6 +116,7 @@ contract ChainLoading is Test {
     //    setup.mcmsSetup.callProxyPayload = vm.envBytes(string.concat(name, "_CALL_PROXY_PAYLOAD"));
 
     setup.ccipSetup.router = vm.envAddress(string.concat(name, "_ROUTER"));
+    setup.postMigrationBlock = vm.envUint(string.concat(name, "_POST_BLOCK"));
 
     setup.name = string(name);
 
