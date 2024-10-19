@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
+import {Internal} from "../../libraries/Internal.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 
@@ -13,6 +14,7 @@ import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v5.0.2/contra
 import {console2} from "forge-std/Console2.sol";
 import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract CCIPTestSuite is Test {
   using stdStorage for StdStorage;
@@ -57,8 +59,21 @@ contract CCIPTestSuite is Test {
 
   function sendTokensSingleLane(
     uint64 remoteChainSelector
-  ) external {
-    _sendTokenToChain(false, remoteChainSelector);
+  ) external returns (Internal.EVM2EVMMessage[] memory msgs) {
+    vm.recordLogs();
+
+    (uint256 successful,) = _sendTokenToChain(false, remoteChainSelector);
+
+    Vm.Log[] memory logs = vm.getRecordedLogs();
+    Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](successful);
+    uint256 logsFound = 0;
+    for (uint256 i = 0; i < logs.length; ++i) {
+      if (logs[i].topics[0] == EVM2EVMOnRamp.CCIPSendRequested.selector) {
+        messages[logsFound] = abi.decode(logs[i].data, (Internal.EVM2EVMMessage));
+        logsFound++;
+      }
+    }
+    return messages;
   }
 
   function sendAllTokens(
@@ -169,6 +184,46 @@ contract CCIPTestSuite is Test {
         extraArgs: ""
       })
     );
+  }
+
+  function ExecuteMsgs(
+    Internal.EVM2EVMMessage[] memory messages
+  ) public {
+    if (messages.length == 0) {
+      return;
+    }
+    _loadLatestOffRampData();
+
+    uint64 sourceChainSelector = messages[0].sourceChainSelector;
+    EVM2EVMOffRamp offRamp = s_remoteChainConfigs[sourceChainSelector].NewOffRamp;
+
+    vm.startPrank(address(offRamp));
+
+    uint32[] memory gasOverrides = new uint32[](1);
+    gasOverrides[0] = 5e5;
+    //    uint32[] memory gasOverrides = new uint32[](0);
+    uint256 succeeded = 0;
+
+    for (uint256 i = 0; i < messages.length; ++i) {
+      Internal.EVM2EVMMessage memory message = messages[i];
+      try offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), gasOverrides) {
+        console2.log("Executed message with source token", message.tokenAmounts[0].token);
+        succeeded++;
+      } catch (bytes memory reason) {
+        console2.log("Failed to execute message with token", message.tokenAmounts[0].token);
+        console2.logBytes(reason);
+      }
+    }
+
+    console2.log("Executed", succeeded, "out of", messages.length);
+  }
+
+  function _loadLatestOffRampData() internal {
+    Router.OffRamp[] memory offRamps = i_router.getOffRamps();
+    for (uint256 i = 0; i < offRamps.length; ++i) {
+      Router.OffRamp memory offRamp = offRamps[i];
+      s_remoteChainConfigs[offRamp.sourceChainSelector].NewOffRamp = EVM2EVMOffRamp(offRamp.offRamp);
+    }
   }
 
   function _loadDestChainInfo() internal {

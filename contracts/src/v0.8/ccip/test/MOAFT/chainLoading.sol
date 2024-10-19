@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {Internal} from "../../libraries/Internal.sol";
 import {CCIPTestSuite} from "./CCIPTestSuite.sol";
 import {ForkedChain} from "./ForkedChain.sol";
 import {ManyChainMultiSig} from "./ccip-owner-contracts/ManyChainMultiSig.sol";
@@ -8,10 +9,9 @@ import {RBACTimelock} from "./ccip-owner-contracts/RBACTimelock.sol";
 
 import {console2} from "forge-std/Console2.sol";
 import {Test} from "forge-std/Test.sol";
-import {Vm} from "forge-std/Vm.sol";
 
 contract ChainLoading is Test {
-  string internal constant MAINNET = "MAINNET";
+  string internal constant MAINNET = "SEPOLIA";
   string internal constant ARBITRUM = "ARB";
 
   uint256 internal constant TwentyFiveHours = 25 * 60 * 60;
@@ -55,10 +55,12 @@ contract ChainLoading is Test {
     ForkedChainTestSetup memory chain = _activateFork(MAINNET);
 
     vm.rollFork(chain.postMigrationBlock);
-    vm.recordLogs();
-    chain.testSuite.sendTokensSingleLane(3478487238524512106);
 
-    Vm.Log[] memory logs = vm.getRecordedLogs();
+    Internal.EVM2EVMMessage[] memory msgs = chain.testSuite.sendTokensSingleLane(3478487238524512106);
+
+    ForkedChainTestSetup memory destChain = _activateFork(ARBITRUM);
+    vm.rollFork(destChain.postMigrationBlock);
+    destChain.testSuite.ExecuteMsgs(msgs);
   }
 
   function run(
