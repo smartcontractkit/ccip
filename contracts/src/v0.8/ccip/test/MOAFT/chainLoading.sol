@@ -4,62 +4,91 @@ pragma solidity 0.8.24;
 import {console2} from "forge-std/Console2.sol";
 import {Test} from "forge-std/Test.sol";
 
+import {ForkedChain} from "./ForkedChain.sol";
+import {ManyChainMultiSig} from "./ccip-owner-contracts/ManyChainMultiSig.sol";
+import {RBACTimelock} from "./ccip-owner-contracts/RBACTimelock.sol";
+
 contract ChainLoading is Test {
-  struct ChainConfig {
-    string rpcUrl;
-    address mcms;
-    bytes mcmcPayload;
-    address callProxy;
-    bytes callProxyPayload;
-    address router;
-    uint256 block;
+  string internal constant MAINNET = "MAINNET";
+  string internal constant ARBITRUM = "ARBITRUM";
+
+  uint256 internal constant TwentyFiveHours = 25 * 60 * 60;
+
+  string[] internal chainNames = [MAINNET];
+
+  mapping(string chainName => ForkedChainTestSetup) public s_chains;
+
+  struct ForkedChainTestSetup {
+    MCMSSetup mcmsSetup;
+    CCIPSetup ccipSetup;
     string name;
     uint256 forkId;
   }
 
-  function test() public {
-    ChainConfig memory mainnet = _loadSingleChain("MAINNET");
-    _activateFork(mainnet);
-
-    _executeMCMS(mainnet.mcms, mainnet.mcmcPayload);
+  struct MCMSSetup {
+    ManyChainMultiSig mcms;
+    bytes mcmcPayload;
+    RBACTimelock callProxy;
+    bytes callProxyPayload;
   }
 
-  function _executeMCMS(address mcms, bytes memory payload) internal {
-    if (mcms.code.length == 0) {
-      revert("MCMS address is empty");
+  struct CCIPSetup {
+    address router;
+  }
+
+  function test() public {
+    // Setup all chains
+    for (uint256 i = 0; i < chainNames.length; ++i) {
+      ForkedChainTestSetup memory chainConfig = _loadSingleChain(chainNames[i]);
+      s_chains[chainNames[i]] = chainConfig;
     }
 
-    (bool success, bytes memory result) = mcms.call(payload);
-    console2.logBytes(result);
-    assertTrue(success, "MCMS call failed");
+    // activate one
+    ForkedChainTestSetup memory chain = _activateFork(MAINNET);
+
+    _setProposalOnMCMS(chain.mcmsSetup);
+    vm.warp(block.timestamp + TwentyFiveHours);
+    _executeProposalOnTimeLock(chain.mcmsSetup);
+  }
+
+  function _setProposalOnMCMS(
+    MCMSSetup memory chain
+  ) internal {
+    // TODO
+  }
+
+  function _executeProposalOnTimeLock(
+    MCMSSetup memory chain
+  ) internal {
+    // TODO
   }
 
   function _loadSingleChain(
-    bytes memory name
-  ) internal returns (ChainConfig memory) {
-    ChainConfig memory chainConfig;
-    chainConfig.rpcUrl = vm.envString(string(bytes.concat(name, "_RPC_URL")));
-    chainConfig.mcms = vm.envAddress(string(bytes.concat(name, "_MCMS")));
-    chainConfig.mcmcPayload = vm.envBytes(string(bytes.concat(name, "_MCMS_PAYLOAD")));
-    chainConfig.callProxy = vm.envAddress(string(bytes.concat(name, "_CALL_PROXY")));
-    chainConfig.callProxyPayload = vm.envBytes(string(bytes.concat(name, "_CALL_PROXY_PAYLOAD")));
-    chainConfig.router = vm.envAddress(string(bytes.concat(name, "_ROUTER")));
-    chainConfig.block = vm.envUint(string(bytes.concat(name, "_BLOCK")));
-    chainConfig.name = string(name);
-    return chainConfig;
+    string memory name
+  ) internal view returns (ForkedChainTestSetup memory) {
+    ForkedChainTestSetup memory setup;
+    setup.mcmsSetup.mcms = ManyChainMultiSig(payable(vm.envAddress(string.concat(name, "_MCMS"))));
+    setup.mcmsSetup.mcmcPayload = vm.envBytes(string.concat(name, "_MCMS_PAYLOAD"));
+    setup.mcmsSetup.callProxy = RBACTimelock(payable(vm.envAddress(string.concat(name, "_CALL_PROXY"))));
+    setup.mcmsSetup.callProxyPayload = vm.envBytes(string.concat(name, "_CALL_PROXY_PAYLOAD"));
+
+    setup.ccipSetup.router = vm.envAddress(string.concat(name, "_ROUTER"));
+
+    setup.name = string(name);
+    return setup;
   }
 
   function _activateFork(
-    ChainConfig memory config
-  ) internal {
-    console2.logString("Activating chain");
-    console2.logString(config.name);
-
+    string memory name
+  ) internal returns (ForkedChainTestSetup memory) {
+    ForkedChainTestSetup storage config = s_chains[name];
     if (config.forkId == 0) {
-      config.forkId = vm.createFork(config.rpcUrl);
+      config.forkId = ForkedChain.LoadAndActivateFork(vm, config.name);
     }
 
+    console2.logString(string.concat("Activating chain: ", name));
+
     vm.selectFork(config.forkId);
-    vm.rollFork(config.block);
+    return config;
   }
 }
