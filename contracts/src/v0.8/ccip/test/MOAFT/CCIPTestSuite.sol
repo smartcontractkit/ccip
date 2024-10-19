@@ -17,10 +17,11 @@ import {Test} from "forge-std/Test.sol";
 contract CCIPTestSuite is Test {
   using stdStorage for StdStorage;
   using EnumerableSet for EnumerableSet.UintSet;
+  using EnumerableSet for EnumerableSet.AddressSet;
 
   bytes32 internal constant TypeAndVersion1_5_OnRamp = keccak256("EVM2EVMOnRamp 1.5.0");
 
-  uint256 internal constant TOKENS_TO_SEND = 10;
+  uint256 internal constant TOKENS_TO_SEND = 1;
   uint16 internal constant MAX_RETURN_BYTES = 4 + 8 * 32;
   uint16 internal constant GAS_FOR_CALL_WITH_EXACT_GAS = 2500;
   uint256 internal constant TX_GAS_LIMIT = 1e6;
@@ -41,6 +42,9 @@ contract CCIPTestSuite is Test {
   EnumerableSet.UintSet internal s_remoteChainSelectors;
   mapping(uint64 remoteChainSelector => RemoteChainConfig) public s_remoteChainConfigs;
 
+  EnumerableSet.AddressSet internal s_failedTokensInitially;
+  EnumerableSet.AddressSet internal s_failedTokensAfterMigration;
+
   constructor(
     address router
   ) {
@@ -50,14 +54,21 @@ contract CCIPTestSuite is Test {
     vm.deal(address(this), 1e18 ether);
   }
 
-  function sendAllTokens() external {
+  function sendAllTokens(
+    bool onlyPreviousSuccess
+  ) external {
     uint256[] memory remoteChains = s_remoteChainSelectors.values();
 
+    uint256 totalSuccessfulTokens = 0;
+    uint256 totalFailedTokens = 0;
     for (uint256 i = 0; i < remoteChains.length; ++i) {
+      uint256 successfulTokens = 0;
       uint64 remoteChainSelector = uint64(remoteChains[i]);
+      console2.log("Sending tokens to chain: ", remoteChainSelector);
       RemoteChainConfig storage remoteChainConfig = s_remoteChainConfigs[remoteChainSelector];
-      for (uint256 j = 0; j < remoteChainConfig.tokens.length; ++j) {
-        address token = remoteChainConfig.tokens[j];
+      address[] memory tokens = onlyPreviousSuccess ? remoteChainConfig.oldSuccessfulTokens : remoteChainConfig.tokens;
+      for (uint256 j = 0; j < tokens.length; ++j) {
+        address token = tokens[j];
 
         bytes memory payload = abi.encodeWithSelector(this.SendTokenMsg.selector, token, remoteChainSelector);
 
@@ -66,13 +77,39 @@ contract CCIPTestSuite is Test {
         );
 
         if (success) {
-          console2.log("SUCCESS: sent token", token);
-          s_remoteChainConfigs[remoteChainSelector].oldSuccessfulTokens.push(token);
+          console2.log("[SUCCESS] token", token);
+          if (!onlyPreviousSuccess) {
+            s_remoteChainConfigs[remoteChainSelector].oldSuccessfulTokens.push(token);
+          }
+          successfulTokens++;
         } else {
-          console2.log("FAILURE: sent token", token);
+          if (!onlyPreviousSuccess) {
+            s_failedTokensInitially.add(token);
+          } else {
+            s_failedTokensAfterMigration.add(token);
+          }
+          console2.log("[FAILURE] token", token);
           console2.logBytes(retData);
         }
       }
+      console2.log("Tokens sent: success", successfulTokens, "failed", tokens.length - successfulTokens);
+      console2.log("");
+
+      totalSuccessfulTokens += successfulTokens;
+      totalFailedTokens += tokens.length - successfulTokens;
+    }
+    console2.log("--------------------------------------- +");
+    console2.log("Total sent: success", totalSuccessfulTokens, "failed", totalFailedTokens);
+    console2.log("");
+    console2.log("Failed tokens initially:");
+    for (uint256 i = 0; i < s_failedTokensInitially.length(); ++i) {
+      console2.logAddress(s_failedTokensInitially.at(i));
+    }
+    console2.log("");
+    console2.log("Newly failing tokens after migration:");
+    for (uint256 i = 0; s_failedTokensAfterMigration.length() > 0;) {
+      console2.logAddress(s_failedTokensAfterMigration.at(i));
+      s_failedTokensAfterMigration.remove(s_failedTokensAfterMigration.at(i));
     }
   }
 
@@ -113,7 +150,8 @@ contract CCIPTestSuite is Test {
         NewOnRamp: EVM2EVMOnRamp(address(0)),
         OldOffRamp: EVM2EVMOffRamp(offRamp.offRamp),
         NewOffRamp: EVM2EVMOffRamp(address(0)),
-        tokens: i_router.getSupportedTokens(offRamp.sourceChainSelector)
+        tokens: i_router.getSupportedTokens(offRamp.sourceChainSelector),
+        oldSuccessfulTokens: new address[](0)
       });
     }
   }

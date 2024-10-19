@@ -38,21 +38,39 @@ contract ChainLoading is Test {
     address router;
   }
 
-  function test() public {
-    // Setup all chains
-    for (uint256 i = 0; i < chainNames.length; ++i) {
-      ForkedChainTestSetup memory chainConfig = _loadSingleChain(chainNames[i]);
-      s_chains[chainNames[i]] = chainConfig;
-    }
+  function test_Sepolia() public {
+    run(MAINNET);
+  }
+
+  function run(
+    string memory chainName
+  ) public {
+    _loadSingleChain(chainName);
 
     // activate one
-    ForkedChainTestSetup memory chain = _activateFork(MAINNET);
+    ForkedChainTestSetup memory chain = _activateFork(chainName);
+
+    console2.logString(" +------------------------------------------------+");
+    console2.logString(" |                Before migration                |");
+    console2.logString(" +------------------------------------------------+");
+
+    chain.testSuite.sendAllTokens(false);
 
     _setProposalOnMCMS(chain.mcmsSetup);
     vm.warp(block.timestamp + TwentyFiveHours);
     _executeProposalOnTimeLock(chain.mcmsSetup);
 
-    chain.testSuite.sendAllTokens();
+    //    console2.logString(" +------------------------------------------------+");
+    //    console2.logString(" |          Immediately after migration           |");
+    //    console2.logString(" +------------------------------------------------+");
+    //    vm.rollFork(6807978);
+    //    chain.testSuite.sendAllTokens(true);
+
+    console2.logString(" +------------------------------------------------+");
+    console2.logString(" |                  Latest block                  |");
+    console2.logString(" +------------------------------------------------+");
+    vm.rollFork(6904314);
+    chain.testSuite.sendAllTokens(true);
   }
 
   function _setProposalOnMCMS(
@@ -65,20 +83,30 @@ contract ChainLoading is Test {
     MCMSSetup memory chain
   ) internal {
     // TODO
+    //vm.rollFork(6807978);
+    //    vm.rollFork(6904314);
+  }
+
+  function _loadAllChains() internal {
+    for (uint256 i = 0; i < chainNames.length; ++i) {
+      _loadSingleChain(chainNames[i]);
+    }
   }
 
   function _loadSingleChain(
     string memory name
-  ) internal view returns (ForkedChainTestSetup memory) {
+  ) internal returns (ForkedChainTestSetup memory) {
     ForkedChainTestSetup memory setup;
-    setup.mcmsSetup.mcms = ManyChainMultiSig(payable(vm.envAddress(string.concat(name, "_MCMS"))));
-    setup.mcmsSetup.mcmcPayload = vm.envBytes(string.concat(name, "_MCMS_PAYLOAD"));
-    setup.mcmsSetup.callProxy = RBACTimelock(payable(vm.envAddress(string.concat(name, "_CALL_PROXY"))));
-    setup.mcmsSetup.callProxyPayload = vm.envBytes(string.concat(name, "_CALL_PROXY_PAYLOAD"));
+    //    setup.mcmsSetup.mcms = ManyChainMultiSig(payable(vm.envAddress(string.concat(name, "_MCMS"))));
+    //    setup.mcmsSetup.mcmcPayload = vm.envBytes(string.concat(name, "_MCMS_PAYLOAD"));
+    //    setup.mcmsSetup.callProxy = RBACTimelock(payable(vm.envAddress(string.concat(name, "_CALL_PROXY"))));
+    //    setup.mcmsSetup.callProxyPayload = vm.envBytes(string.concat(name, "_CALL_PROXY_PAYLOAD"));
 
     setup.ccipSetup.router = vm.envAddress(string.concat(name, "_ROUTER"));
 
     setup.name = string(name);
+
+    s_chains[name] = setup;
     return setup;
   }
 
