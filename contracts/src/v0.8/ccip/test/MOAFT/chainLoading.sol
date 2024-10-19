@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
-import {console2} from "forge-std/Console2.sol";
-import {Test} from "forge-std/Test.sol";
-
+import {CCIPTestSuite} from "./CCIPTestSuite.sol";
 import {ForkedChain} from "./ForkedChain.sol";
 import {ManyChainMultiSig} from "./ccip-owner-contracts/ManyChainMultiSig.sol";
 import {RBACTimelock} from "./ccip-owner-contracts/RBACTimelock.sol";
+
+import {console2} from "forge-std/Console2.sol";
+import {Test} from "forge-std/Test.sol";
 
 contract ChainLoading is Test {
   string internal constant MAINNET = "MAINNET";
@@ -23,6 +24,7 @@ contract ChainLoading is Test {
     CCIPSetup ccipSetup;
     string name;
     uint256 forkId;
+    CCIPTestSuite testSuite;
   }
 
   struct MCMSSetup {
@@ -49,6 +51,8 @@ contract ChainLoading is Test {
     _setProposalOnMCMS(chain.mcmsSetup);
     vm.warp(block.timestamp + TwentyFiveHours);
     _executeProposalOnTimeLock(chain.mcmsSetup);
+
+    chain.testSuite.sendAllTokens();
   }
 
   function _setProposalOnMCMS(
@@ -89,6 +93,12 @@ contract ChainLoading is Test {
     console2.logString(string.concat("Activating chain: ", name));
 
     vm.selectFork(config.forkId);
+
+    // If no test suite was deployed, deploy one
+    if (address(config.testSuite) == address(0)) {
+      config.testSuite = new CCIPTestSuite(config.ccipSetup.router);
+    }
+
     return config;
   }
 }
