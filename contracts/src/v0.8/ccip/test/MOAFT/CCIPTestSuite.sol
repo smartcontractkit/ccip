@@ -133,7 +133,7 @@ contract CCIPTestSuite is Test {
       );
 
       if (success) {
-        console2.log("[SUCCESS] token", token);
+        console2.log(unicode"✅ token", token);
         if (!onlyPreviousSuccess) {
           s_remoteChainConfigs[remoteChainSelector].oldSuccessfulTokens.push(token);
         }
@@ -155,9 +155,9 @@ contract CCIPTestSuite is Test {
       }
 
       if (tokenSupportDropped) {
-        console2.log("[DROPPED SUPPORT] token", token);
+        console2.log(unicode"🟠 DROPPED SUPPORT for token", token);
       } else {
-        console2.log("[FAILURE] token", token);
+        console2.log(unicode"❌ token", token);
         console2.logBytes(retData);
       }
     }
@@ -207,10 +207,10 @@ contract CCIPTestSuite is Test {
     for (uint256 i = 0; i < messages.length; ++i) {
       Internal.EVM2EVMMessage memory message = messages[i];
       try offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), gasOverrides) {
-        console2.log("Executed message with source token", message.tokenAmounts[0].token);
+        console2.log(unicode"✅ Executed message with source token", message.tokenAmounts[0].token);
         succeeded++;
       } catch (bytes memory reason) {
-        console2.log("Failed to execute message with token", message.tokenAmounts[0].token);
+        console2.log(unicode"❌ Failed to execute message with token", message.tokenAmounts[0].token);
         console2.logBytes(reason);
       }
     }
