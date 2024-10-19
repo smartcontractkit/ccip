@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {CallWithExactGas} from "../../../shared/call/CallWithExactGas.sol";
 import {Router} from "../../Router.sol";
 import {Client} from "../../libraries/Client.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
@@ -10,14 +11,19 @@ import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 import {console2} from "forge-std/Console2.sol";
+import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract CCIPTestSuite is Test {
+  using stdStorage for StdStorage;
   using EnumerableSet for EnumerableSet.UintSet;
 
   bytes32 internal constant TypeAndVersion1_5_OnRamp = keccak256("EVM2EVMOnRamp 1.5.0");
 
   uint256 internal constant TOKENS_TO_SEND = 10;
+  uint16 internal constant MAX_RETURN_BYTES = 4 + 8 * 32;
+  uint16 internal constant GAS_FOR_CALL_WITH_EXACT_GAS = 2500;
+  uint256 internal constant TX_GAS_LIMIT = 1e6;
 
   uint256 internal s_pseudoRandomSeed = uint256(keccak256(abi.encodePacked(block.timestamp, block.number)));
 
@@ -29,6 +35,7 @@ contract CCIPTestSuite is Test {
     EVM2EVMOffRamp OldOffRamp;
     EVM2EVMOffRamp NewOffRamp;
     address[] tokens;
+    address[] oldSuccessfulTokens;
   }
 
   EnumerableSet.UintSet internal s_remoteChainSelectors;
@@ -51,11 +58,19 @@ contract CCIPTestSuite is Test {
       RemoteChainConfig storage remoteChainConfig = s_remoteChainConfigs[remoteChainSelector];
       for (uint256 j = 0; j < remoteChainConfig.tokens.length; ++j) {
         address token = remoteChainConfig.tokens[j];
-        try CCIPTestSuite(address(this)).SendTokenMsg(token, remoteChainSelector) {
-          console2.logString(string.concat("SUCCESS: sent token", string(abi.encodePacked(token))));
-        } catch (bytes memory err) {
-          console2.logString(string.concat("FAILURE: sent token", string(abi.encodePacked(token))));
-          console2.logBytes(err);
+
+        bytes memory payload = abi.encodeWithSelector(this.SendTokenMsg.selector, token, remoteChainSelector);
+
+        (bool success, bytes memory retData,) = CallWithExactGas._callWithExactGasSafeReturnData(
+          payload, address(this), TX_GAS_LIMIT, GAS_FOR_CALL_WITH_EXACT_GAS, MAX_RETURN_BYTES
+        );
+
+        if (success) {
+          console2.log("SUCCESS: sent token", token);
+          s_remoteChainConfigs[remoteChainSelector].oldSuccessfulTokens.push(token);
+        } else {
+          console2.log("FAILURE: sent token", token);
+          console2.logBytes(retData);
         }
       }
     }
@@ -66,8 +81,8 @@ contract CCIPTestSuite is Test {
     tokenAmounts[0] = Client.EVMTokenAmount({token: token, amount: TOKENS_TO_SEND});
 
     deal(token, address(this), TOKENS_TO_SEND * 10);
-    IERC20(token).approve(address(i_router), TOKENS_TO_SEND);
 
+    IERC20(token).approve(address(i_router), TOKENS_TO_SEND);
     i_router.ccipSend{value: 1 ether}(
       destChainSelector,
       Client.EVM2AnyMessage({
