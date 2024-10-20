@@ -40,15 +40,15 @@ contract ChainLoading is Test {
     address router;
   }
 
-  function test_Sepolia() public {
+  function test_Chain_Sepolia() public {
     run(MAINNET);
   }
 
-  function test_Arbitrum() public {
+  function test_Chain_Arbitrum() public {
     run(ARBITRUM);
   }
 
-  function test_SepoliaToArbitrum() public {
+  function test_Lane_SepoliaToArbitrum() public {
     _loadSingleChain(MAINNET);
     _loadSingleChain(ARBITRUM);
 

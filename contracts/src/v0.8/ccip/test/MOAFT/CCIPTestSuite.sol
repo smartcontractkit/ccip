@@ -8,13 +8,43 @@ import {Internal} from "../../libraries/Internal.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 
-import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
 import {console2} from "forge-std/Console2.sol";
 import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {IERC20} from "forge-std/interfaces/IERC20.sol";
+
+library Constants {
+  function _resolveChainSelector(
+    uint64 chainSelector
+  ) internal pure returns (string memory) {
+    if (chainSelector == 3478487238524512106) {
+      return "Arbitrum Sepolia";
+    } else if (chainSelector == 8871595565390010547) {
+      return "Gnosis Chiado";
+    } else if (chainSelector == 16281711391670634445) {
+      return "Polygon Amoy";
+    } else if (chainSelector == 13264668187771770619) {
+      return "BNB Testnet";
+    } else if (chainSelector == 10344971235874465080) {
+      return "Base Testnet";
+    } else if (chainSelector == 829525985033418733) {
+      return "Mode Sepolia";
+    } else if (chainSelector == 5224473277236331295) {
+      return "Optimism Sepolia";
+    } else if (chainSelector == 16015286601757825753) {
+      return "Sepolia";
+    } else if (chainSelector == 6898391096552792247) {
+      return "ZKSync Testnet";
+    } else if (chainSelector == 14767482510784806043) {
+      return "Avax Fuji";
+    }
+
+    return "Unknown";
+  }
+}
 
 contract CCIPTestSuite is Test {
   using stdStorage for StdStorage;
@@ -47,6 +77,8 @@ contract CCIPTestSuite is Test {
   EnumerableSet.AddressSet internal s_failedTokensInitially;
   EnumerableSet.AddressSet internal s_failedTokensAfterMigration;
   EnumerableSet.AddressSet internal s_tokenSupportDropped;
+
+  mapping(address token => string) public s_tokenNames;
 
   constructor(
     address router
@@ -95,19 +127,19 @@ contract CCIPTestSuite is Test {
     console2.log("");
     console2.log("Failed tokens initially:");
     for (uint256 i = 0; i < s_failedTokensInitially.length(); ++i) {
-      console2.logAddress(s_failedTokensInitially.at(i));
+      console2.log(unicode"❓", s_failedTokensInitially.at(i), s_tokenNames[s_failedTokensInitially.at(i)]);
     }
 
     console2.log("");
     console2.log("Tokens dropped with the migration:");
     for (uint256 i = 0; i < s_tokenSupportDropped.length(); ++i) {
-      console2.logAddress(s_tokenSupportDropped.at(i));
+      console2.log(unicode"🟠", s_tokenSupportDropped.at(i), s_tokenNames[s_tokenSupportDropped.at(i)]);
     }
 
     console2.log("");
     console2.log("Newly failing tokens after migration:");
     for (uint256 i = 0; s_failedTokensAfterMigration.length() > 0;) {
-      console2.logAddress(s_failedTokensAfterMigration.at(i));
+      console2.log(unicode"❌", s_failedTokensAfterMigration.at(i), s_tokenNames[s_failedTokensAfterMigration.at(i)]);
       s_failedTokensAfterMigration.remove(s_failedTokensAfterMigration.at(i));
     }
   }
@@ -118,7 +150,7 @@ contract CCIPTestSuite is Test {
   ) internal returns (uint256 successful, uint256 failed) {
     uint256 successfulTokens = 0;
 
-    console2.log("Sending tokens to chain: ", remoteChainSelector);
+    console2.log("Sending tokens to chain: ", remoteChainSelector, Constants._resolveChainSelector(remoteChainSelector));
     RemoteChainConfig storage remoteChainConfig = s_remoteChainConfigs[remoteChainSelector];
     address[] memory tokens = onlyPreviousSuccess ? remoteChainConfig.oldSuccessfulTokens : remoteChainConfig.tokens;
     for (uint256 j = 0; j < tokens.length; ++j) {
@@ -133,7 +165,7 @@ contract CCIPTestSuite is Test {
       );
 
       if (success) {
-        console2.log(unicode"✅ token", token);
+        console2.log(unicode"✅ token", token, s_tokenNames[token]);
         if (!onlyPreviousSuccess) {
           s_remoteChainConfigs[remoteChainSelector].oldSuccessfulTokens.push(token);
         }
@@ -155,9 +187,9 @@ contract CCIPTestSuite is Test {
       }
 
       if (tokenSupportDropped) {
-        console2.log(unicode"🟠 DROPPED SUPPORT for token", token);
+        console2.log(unicode"🟠 DROPPED SUPPORT for token", token, s_tokenNames[token]);
       } else {
-        console2.log(unicode"❌ token", token);
+        console2.log(unicode"❌ broken token", token, s_tokenNames[token]);
         console2.logBytes(retData);
       }
     }
@@ -207,10 +239,18 @@ contract CCIPTestSuite is Test {
     for (uint256 i = 0; i < messages.length; ++i) {
       Internal.EVM2EVMMessage memory message = messages[i];
       try offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), gasOverrides) {
-        console2.log(unicode"✅ Executed message with source token", message.tokenAmounts[0].token);
+        console2.log(
+          unicode"✅ Executed message with source token",
+          message.tokenAmounts[0].token,
+          s_tokenNames[message.tokenAmounts[0].token]
+        );
         succeeded++;
       } catch (bytes memory reason) {
-        console2.log(unicode"❌ Failed to execute message with token", message.tokenAmounts[0].token);
+        console2.log(
+          unicode"❌ Failed to execute message with token",
+          message.tokenAmounts[0].token,
+          s_tokenNames[message.tokenAmounts[0].token]
+        );
         console2.logBytes(reason);
       }
     }
@@ -239,12 +279,18 @@ contract CCIPTestSuite is Test {
 
       s_remoteChainSelectors.add(offRamp.sourceChainSelector);
 
+      address[] memory tokens = i_router.getSupportedTokens(offRamp.sourceChainSelector);
+      for (uint256 j = 0; j < tokens.length; ++j) {
+        address token = tokens[j];
+        s_tokenNames[token] = IERC20(token).name();
+      }
+
       s_remoteChainConfigs[offRamp.sourceChainSelector] = RemoteChainConfig({
         OldOnRamp: EVM2EVMOnRamp(currentOnRamp),
         NewOnRamp: EVM2EVMOnRamp(address(0)),
         OldOffRamp: EVM2EVMOffRamp(offRamp.offRamp),
         NewOffRamp: EVM2EVMOffRamp(address(0)),
-        tokens: i_router.getSupportedTokens(offRamp.sourceChainSelector),
+        tokens: tokens,
         oldSuccessfulTokens: new address[](0)
       });
     }
