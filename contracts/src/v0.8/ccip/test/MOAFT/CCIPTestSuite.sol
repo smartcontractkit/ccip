@@ -52,6 +52,7 @@ contract CCIPTestSuite is Test {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   bytes32 internal constant TypeAndVersion1_5_OnRamp = keccak256("EVM2EVMOnRamp 1.5.0");
+  bytes32 internal constant TypeAndVersion1_5_OffRamp = keccak256("EVM2EVMOffRamp 1.5.0");
 
   uint256 internal constant TOKENS_TO_SEND = 1;
   uint16 internal constant MAX_RETURN_BYTES = 4 + 8 * 32;
@@ -232,24 +233,25 @@ contract CCIPTestSuite is Test {
     vm.startPrank(address(offRamp));
 
     uint32[] memory gasOverrides = new uint32[](1);
-    gasOverrides[0] = 5e5;
+    gasOverrides[0] = 250_000;
     //    uint32[] memory gasOverrides = new uint32[](0);
     uint256 succeeded = 0;
 
     for (uint256 i = 0; i < messages.length; ++i) {
       Internal.EVM2EVMMessage memory message = messages[i];
+      bytes memory destTokenAddressBytes =
+        abi.decode(message.sourceTokenData[0], (Internal.SourceTokenData)).destTokenAddress;
+      address destTokenAddress = abi.decode(destTokenAddressBytes, (address));
       try offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), gasOverrides) {
         console2.log(
-          unicode"✅ Executed message with source token",
-          message.tokenAmounts[0].token,
-          s_tokenNames[message.tokenAmounts[0].token]
+          unicode"✅ Executed message with source token", message.tokenAmounts[0].token, s_tokenNames[destTokenAddress]
         );
         succeeded++;
       } catch (bytes memory reason) {
         console2.log(
           unicode"❌ Failed to execute message with token",
           message.tokenAmounts[0].token,
-          s_tokenNames[message.tokenAmounts[0].token]
+          s_tokenNames[destTokenAddress]
         );
         console2.logBytes(reason);
       }
@@ -262,7 +264,12 @@ contract CCIPTestSuite is Test {
     Router.OffRamp[] memory offRamps = i_router.getOffRamps();
     for (uint256 i = 0; i < offRamps.length; ++i) {
       Router.OffRamp memory offRamp = offRamps[i];
-      s_remoteChainConfigs[offRamp.sourceChainSelector].NewOffRamp = EVM2EVMOffRamp(offRamp.offRamp);
+      EVM2EVMOffRamp currentOffRamp = EVM2EVMOffRamp(offRamp.offRamp);
+      if (keccak256(bytes(currentOffRamp.typeAndVersion())) != TypeAndVersion1_5_OffRamp) {
+        continue;
+      }
+
+      s_remoteChainConfigs[offRamp.sourceChainSelector].NewOffRamp = currentOffRamp;
     }
   }
 
