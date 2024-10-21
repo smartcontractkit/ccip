@@ -15,7 +15,7 @@
 # If you want to use a specific commit or a branch you need to switch to the internal ECR in `~/.testsecrets`
 # E2E_TEST_CHAINLINK_IMAGE="<aws account number>.dkr.ecr.<aws region>.amazonaws.com/chainlink-ccip"
 [CCIP.Env.NewCLCluster.Common.ChainlinkImage]
-version = "2.14.0-ccip1.5.0"
+version = "log_poller_id_columns"
 
 [CCIP]
 [CCIP.ContractVersions]
@@ -132,6 +132,8 @@ DeltaReconcile = '5s'
 
 CommonChainConfigTOML = """
 LogPollInterval = '1s'
+LogPrunePageSize = 5001
+LogKeepBlocksDepth = 1000
 
 [HeadTracker]
 HistoryDepth = 200
