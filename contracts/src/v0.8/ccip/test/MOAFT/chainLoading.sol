@@ -10,13 +10,52 @@ import {RBACTimelock} from "./ccip-owner-contracts/RBACTimelock.sol";
 import {console2} from "forge-std/Console2.sol";
 import {Test} from "forge-std/Test.sol";
 
+/// @notice This test tests all tokens on all chains in a forked chain environment.
+/// @dev Populate a .env file with the following variables:
+/// # Global
+/// FULL_LOGGING=false
+///
+/// # Has to match the network names as defined below
+/// SOURCE_CHAIN=<chain>
+/// DEST_CHAIN=<chain>
+///
+/// # Networks
+/// # The RPC URL for the chain, when using older pre/post migration blocks, this will need to be an archive node.
+/// <chain>_RPC_URL=''
+/// # The Router contract address
+/// <chain>_ROUTER=0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59
+/// # The block before the migration was applied. Use 0 if the migration has not been applied yet.
+/// <chain>_PRE_BLOCK=6797746
+/// # Any block after the migration was applied. Use 0 if the migration has not been applied yet.
+/// <chain>_POST_BLOCK=6904314
 contract ChainLoading is Test {
+  // Testnets
   string internal constant SEPOLIA = "SEPOLIA";
-  string internal constant ARBITRUM_SEPOLIA = "ARB_SEPOLIA";
+  string internal constant GNOSIS_TESTNET = "GNOSIS_TESTNET";
+  string internal constant BNB_TESTNET = "BNB_TESTNET";
+  string internal constant MODE_TESTNET = "MODE_TESTNET";
+  string internal constant OPT_SEPOLIA = "OPT_SEPOLIA";
+  string internal constant POLYGON_AMOY = "POLYGON_AMOY";
+  string internal constant ARB_SEPOLIA = "ARB_SEPOLIA";
+  string internal constant AVAX_FUJI = "AVAX_FUJI";
+  string internal constant BASE_SEPOLIA = "BASE_SEPOLIA";
+
+  // Mainnets
+  string internal constant BLAST = "BLAST";
+  string internal constant ETHEREUM = "ETHEREUM";
+  string internal constant GNOSIS = "GNOSIS";
+  string internal constant BNB = "BNB";
+  string internal constant MODE = "MODE";
+  string internal constant OPTIMISM = "OPTIMISM";
+  string internal constant POLYGON = "POLYGON";
+  string internal constant ARBITRUM = "ARBITRUM";
+  string internal constant AVAX = "AVAX";
+  string internal constant BASE = "BASE";
 
   uint256 internal constant FourHours = 4 * 60 * 60;
 
-  string[] internal chainNames = [SEPOLIA];
+  string[] internal s_allTestnets = [SEPOLIA, OPT_SEPOLIA, ARB_SEPOLIA];
+  string[] internal s_allMainnets = [ETHEREUM];
 
   mapping(string chainName => ForkedChainTestSetup) public s_chains;
 
@@ -40,28 +79,34 @@ contract ChainLoading is Test {
     address router;
   }
 
-  function test_Chain_Sepolia() public {
-    run(SEPOLIA);
+  function test_env_chain() public {
+    run(vm.envString("SOURCE_CHAIN"));
   }
 
-  function test_Chain_Arbitrum() public {
-    run(ARBITRUM_SEPOLIA);
+  function test_env_lane() public {
+    _run_lane(vm.envString("SOURCE_CHAIN"), vm.envString("DEST_CHAIN"));
   }
 
-  function test_Lane_SepoliaToArbitrum() public {
-    _loadSingleChain(SEPOLIA);
-    _loadSingleChain(ARBITRUM_SEPOLIA);
+  function test_all_chains() public {
+    for (uint256 i = 0; i < s_allTestnets.length; ++i) {
+      run(s_allTestnets[i]);
+    }
+  }
 
-    ForkedChainTestSetup memory chain = _activateFork(SEPOLIA);
+  function _run_lane(string memory sourceChainName, string memory destChainName) internal {
+    _loadSingleChain(sourceChainName);
+    _loadSingleChain(destChainName);
+
+    ForkedChainTestSetup memory sourceChain = _activateFork(sourceChainName);
 
     // Apply proposal on source
-    _setProposalOnMCMS(chain);
-    _executeProposalOnTimeLock(chain);
+    _setProposalOnMCMS(sourceChain);
+    _executeProposalOnTimeLock(sourceChain);
 
     // Send messages
-    Internal.EVM2EVMMessage[] memory msgs = chain.testSuite.sendTokensSingleLane(3478487238524512106);
+    Internal.EVM2EVMMessage[] memory msgs = sourceChain.testSuite.sendTokensSingleLane(3478487238524512106);
 
-    ForkedChainTestSetup memory destChain = _activateFork(ARBITRUM_SEPOLIA);
+    ForkedChainTestSetup memory destChain = _activateFork(destChainName);
 
     // Apply proposal on dest
     _setProposalOnMCMS(destChain);
@@ -105,12 +150,16 @@ contract ChainLoading is Test {
   ) internal {
     // TODO actual MCMS proposal execution. For testing, we can use chains that already have the proposal executed
     // and roll to a block after the migration.
+
+    // To find the post-migration block, search the Router for the RouterOnRampSet the event sig
+    // 0x1f7d0ec248b80e5c0dde0ee531c4fc8fdb6ce9a2b3d90f560c74acd6a7202f23
+    // There should be multiple events in the same block during the migration.
     vm.rollFork(chain.postMigrationBlock);
   }
 
   function _loadAllChains() internal {
-    for (uint256 i = 0; i < chainNames.length; ++i) {
-      _loadSingleChain(chainNames[i]);
+    for (uint256 i = 0; i < s_allTestnets.length; ++i) {
+      _loadSingleChain(s_allTestnets[i]);
     }
   }
 

@@ -24,7 +24,8 @@ library ForkedChain {
   }
 
   function _activateNewForkInstance(Vm vm, Chain memory chain) internal returns (uint256 forkId) {
-    console2.logString(string.concat("Launching new fork instance for chain: ", chain.name));
+    console2.log("");
+    console2.log("Launching new fork instance for chain: ", chain.name);
 
     return vm.createFork(chain.rpcUrl, chain.block);
   }
