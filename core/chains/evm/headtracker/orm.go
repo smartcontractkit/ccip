@@ -9,6 +9,7 @@ import (
 	pkgerrors "github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 )
@@ -81,4 +82,26 @@ func (orm *DbORM) HeadByHash(ctx context.Context, hash common.Hash) (head *evmty
 		return nil, nil
 	}
 	return head, err
+}
+
+type noopORM struct{}
+
+func (orm *noopORM) IdempotentInsertHead(ctx context.Context, head *evmtypes.Head) error {
+	return nil
+}
+
+func (orm *noopORM) TrimOldHeads(ctx context.Context, minBlockNumber int64) (err error) {
+	return nil
+}
+
+func (orm *noopORM) LatestHead(ctx context.Context) (head *evmtypes.Head, err error) {
+	return nil, nil
+}
+
+func (orm *noopORM) LatestHeads(ctx context.Context, minBlockNumer int64) (heads []*evmtypes.Head, err error) {
+	return nil, nil
+}
+
+func (orm *noopORM) HeadByHash(ctx context.Context, hash common.Hash) (head *evmtypes.Head, err error) {
+	return nil, nil
 }

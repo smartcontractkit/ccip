@@ -1024,7 +1024,11 @@ func (lp *logPoller) latestBlocks(ctx context.Context) (*evmtypes.Head, int64, e
 	}
 
 	lp.lggr.Debugw("Latest blocks read from chain", "latest", latest.Number, "finalized", finalized.BlockNumber())
-	return latest, finalized.BlockNumber(), nil
+	finalizedBN := finalized.BlockNumber()
+	if finalizedBN <= 0 {
+		finalizedBN = 1 // dirty trick for CCIP loadtest
+	}
+	return latest, finalizedBN, nil
 }
 
 // Find the first place where our chain and their chain have the same block,
@@ -1036,7 +1040,7 @@ func (lp *logPoller) findBlockAfterLCA(ctx context.Context, current *evmtypes.He
 	if err != nil {
 		return nil, err
 	}
-	blockAfterLCA := *current
+	blockAfterLCA := current
 	// We expect reorgs up to the block after latestFinalizedBlock
 	// We loop via parent instead of current so current always holds the LCA+1.
 	// If the parent block number becomes < the first finalized block our reorg is too deep.
@@ -1048,10 +1052,10 @@ func (lp *logPoller) findBlockAfterLCA(ctx context.Context, current *evmtypes.He
 		}
 		if parent.Hash == ourParentBlockHash.BlockHash {
 			// If we do have the blockhash, return blockAfterLCA
-			return &blockAfterLCA, nil
+			return blockAfterLCA, nil
 		}
 		// Otherwise get a new parent and update blockAfterLCA.
-		blockAfterLCA = *parent
+		blockAfterLCA = parent
 		parent, err = lp.ec.HeadByHash(ctx, parent.ParentHash)
 		if err != nil {
 			return nil, err
