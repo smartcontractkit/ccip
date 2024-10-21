@@ -44,6 +44,7 @@ func Test_Eth_Errors(t *testing.T) {
 			{"call failed: OldNonce, Current nonce: 22, nonce of rejected tx: 17", true, "Nethermind"},
 			{"nonce too low. allowed nonce range: 427 - 447, actual: 426", true, "zkSync"},
 			{"client error nonce too low", true, "tomlConfig"},
+			{"failed to forward tx to sequencer, please try again. Error message: 'nonce too low'", true, "Mantle"},
 		}
 
 		for _, test := range tests {
