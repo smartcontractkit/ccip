@@ -12,8 +12,13 @@ import (
 // It returns a list of transaction statuses, the retry counter, and an error if any occurred during the process.
 //
 
+type TransactionStatusWithError struct {
+	Status types.TransactionStatus
+	Error  error
+}
+
 type CCIPTransactionStatusChecker interface {
-	CheckMessageStatus(ctx context.Context, msgID string) (transactionStatuses []types.TransactionStatus, retryCounter int, err error)
+	CheckMessageStatus(ctx context.Context, msgID string) (transactionStatuses []TransactionStatusWithError, retryCounter int, err error)
 }
 
 type TxmStatusChecker struct {
@@ -28,20 +33,26 @@ func NewTxmStatusChecker(getTransactionStatus func(ctx context.Context, transact
 // It returns a slice of all statuses and the number of transactions found (-1 if none).
 // The key will follow the format: <msgID>-<counter>. TXM will be queried for each key until a NotFound error is returned.
 // The goal is to find all transactions associated with a message ID and snooze messages if they are fatal in the Execution Plugin.
-func (tsc *TxmStatusChecker) CheckMessageStatus(ctx context.Context, msgID string) ([]types.TransactionStatus, int, error) {
+func (tsc *TxmStatusChecker) CheckMessageStatus(ctx context.Context, msgID string) ([]TransactionStatusWithError, int, error) {
 	var counter int
 	const maxStatuses = 1000 // Cap the number of statuses to avoid infinite loop
 
-	allStatuses := make([]types.TransactionStatus, 0)
+	allStatuses := make([]TransactionStatusWithError, 0)
 
 	for {
 		transactionID := fmt.Sprintf("%s-%d", msgID, counter)
 		status, err := tsc.getTransactionStatus(ctx, transactionID)
+
+		statusWithError := TransactionStatusWithError{
+			Status: status,
+			Error:  err,
+		}
+
 		if err != nil && status == types.Unknown {
 			// If the status is unknown and err not nil, it means the transaction was not found
 			break
 		}
-		allStatuses = append(allStatuses, status)
+		allStatuses = append(allStatuses, statusWithError)
 		counter++
 
 		// Break the loop if the cap is reached

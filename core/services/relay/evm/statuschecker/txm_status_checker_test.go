@@ -26,7 +26,7 @@ func Test_CheckMessageStatus(t *testing.T) {
 	testCases := []struct {
 		name            string
 		setupMock       func()
-		expectedStatus  []types.TransactionStatus
+		expectedStatus  []TransactionStatusWithError
 		expectedCounter int
 		expectedError   error
 	}{
@@ -36,7 +36,7 @@ func Test_CheckMessageStatus(t *testing.T) {
 				mockTxManager.Mock = mock.Mock{}
 				mockTxManager.On("GetTransactionStatus", ctx, "test-message-id-0").Return(types.Unknown, errors.New("failed to find transaction with IdempotencyKey test-message-id-0"))
 			},
-			expectedStatus:  []types.TransactionStatus{},
+			expectedStatus:  []TransactionStatusWithError{},
 			expectedCounter: -1,
 			expectedError:   nil,
 		},
@@ -47,7 +47,7 @@ func Test_CheckMessageStatus(t *testing.T) {
 				mockTxManager.On("GetTransactionStatus", ctx, "test-message-id-0").Return(types.Finalized, nil)
 				mockTxManager.On("GetTransactionStatus", ctx, "test-message-id-1").Return(types.Unknown, errors.New("failed to find transaction with IdempotencyKey test-message-id-1"))
 			},
-			expectedStatus:  []types.TransactionStatus{types.Finalized},
+			expectedStatus:  []TransactionStatusWithError{{Status: types.Finalized, Error: nil}},
 			expectedCounter: 0,
 			expectedError:   nil,
 		},
@@ -56,10 +56,13 @@ func Test_CheckMessageStatus(t *testing.T) {
 			setupMock: func() {
 				mockTxManager.Mock = mock.Mock{}
 				mockTxManager.On("GetTransactionStatus", ctx, "test-message-id-0").Return(types.Finalized, nil)
-				mockTxManager.On("GetTransactionStatus", ctx, "test-message-id-1").Return(types.Failed, nil)
+				mockTxManager.On("GetTransactionStatus", ctx, "test-message-id-1").Return(types.Failed, errors.New("dummy error"))
 				mockTxManager.On("GetTransactionStatus", ctx, "test-message-id-2").Return(types.Unknown, errors.New("failed to find transaction with IdempotencyKey test-message-id-2"))
 			},
-			expectedStatus:  []types.TransactionStatus{types.Finalized, types.Failed},
+			expectedStatus: []TransactionStatusWithError{
+				{Status: types.Finalized, Error: nil},
+				{Status: types.Failed, Error: errors.New("dummy error")},
+			},
 			expectedCounter: 1,
 			expectedError:   nil,
 		},
@@ -70,7 +73,9 @@ func Test_CheckMessageStatus(t *testing.T) {
 				mockTxManager.On("GetTransactionStatus", ctx, "test-message-id-0").Return(types.Unknown, nil)
 				mockTxManager.On("GetTransactionStatus", ctx, "test-message-id-1").Return(types.Unknown, errors.New("failed to find transaction with IdempotencyKey test-message-id-1"))
 			},
-			expectedStatus:  []types.TransactionStatus{types.Unknown},
+			expectedStatus: []TransactionStatusWithError{
+				{Status: types.Unknown, Error: nil},
+			},
 			expectedCounter: 0,
 			expectedError:   nil,
 		},
