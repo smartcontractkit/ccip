@@ -11,12 +11,12 @@ import {console2} from "forge-std/Console2.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract ChainLoading is Test {
-  string internal constant MAINNET = "SEPOLIA";
-  string internal constant ARBITRUM = "ARB";
+  string internal constant SEPOLIA = "SEPOLIA";
+  string internal constant ARBITRUM_SEPOLIA = "ARB_SEPOLIA";
 
-  uint256 internal constant TwentyFiveHours = 25 * 60 * 60;
+  uint256 internal constant FourHours = 4 * 60 * 60;
 
-  string[] internal chainNames = [MAINNET];
+  string[] internal chainNames = [SEPOLIA];
 
   mapping(string chainName => ForkedChainTestSetup) public s_chains;
 
@@ -25,7 +25,7 @@ contract ChainLoading is Test {
     CCIPSetup ccipSetup;
     string name;
     uint256 forkId;
-    uint256 postMigrationBlock;
+    uint64 postMigrationBlock;
     CCIPTestSuite testSuite;
   }
 
@@ -41,25 +41,33 @@ contract ChainLoading is Test {
   }
 
   function test_Chain_Sepolia() public {
-    run(MAINNET);
+    run(SEPOLIA);
   }
 
   function test_Chain_Arbitrum() public {
-    run(ARBITRUM);
+    run(ARBITRUM_SEPOLIA);
   }
 
   function test_Lane_SepoliaToArbitrum() public {
-    _loadSingleChain(MAINNET);
-    _loadSingleChain(ARBITRUM);
+    _loadSingleChain(SEPOLIA);
+    _loadSingleChain(ARBITRUM_SEPOLIA);
 
-    ForkedChainTestSetup memory chain = _activateFork(MAINNET);
+    ForkedChainTestSetup memory chain = _activateFork(SEPOLIA);
 
-    vm.rollFork(chain.postMigrationBlock);
+    // Apply proposal on source
+    _setProposalOnMCMS(chain);
+    _executeProposalOnTimeLock(chain);
 
+    // Send messages
     Internal.EVM2EVMMessage[] memory msgs = chain.testSuite.sendTokensSingleLane(3478487238524512106);
 
-    ForkedChainTestSetup memory destChain = _activateFork(ARBITRUM);
-    vm.rollFork(destChain.postMigrationBlock);
+    ForkedChainTestSetup memory destChain = _activateFork(ARBITRUM_SEPOLIA);
+
+    // Apply proposal on dest
+    _setProposalOnMCMS(destChain);
+    _executeProposalOnTimeLock(destChain);
+
+    // Execute messages
     destChain.testSuite.ExecuteMsgs(msgs);
   }
 
@@ -77,29 +85,27 @@ contract ChainLoading is Test {
 
     chain.testSuite.sendAllTokens(false);
 
-    //    _setProposalOnMCMS(chain.mcmsSetup);
-    //    vm.warp(block.timestamp + TwentyFiveHours);
-    //    _executeProposalOnTimeLock(chain.mcmsSetup);
+    console2.logString(" +------------------------------------------------+");
+    console2.logString(" |                After migration                 |");
+    console2.logString(" +------------------------------------------------+");
+    _setProposalOnMCMS(chain);
+    _executeProposalOnTimeLock(chain);
 
-    console2.logString(" +------------------------------------------------+");
-    console2.logString(" |                  Latest block                  |");
-    console2.logString(" +------------------------------------------------+");
-    vm.rollFork(chain.postMigrationBlock);
     chain.testSuite.sendAllTokens(true);
   }
 
   function _setProposalOnMCMS(
-    MCMSSetup memory chain
+    ForkedChainTestSetup memory chain
   ) internal {
     // TODO
   }
 
   function _executeProposalOnTimeLock(
-    MCMSSetup memory chain
+    ForkedChainTestSetup memory chain
   ) internal {
-    // TODO
-    //vm.rollFork(6807978);
-    //    vm.rollFork(6904314);
+    // TODO actual MCMS proposal execution. For testing, we can use chains that already have the proposal executed
+    // and roll to a block after the migration.
+    vm.rollFork(chain.postMigrationBlock);
   }
 
   function _loadAllChains() internal {
@@ -118,7 +124,7 @@ contract ChainLoading is Test {
     //    setup.mcmsSetup.callProxyPayload = vm.envBytes(string.concat(name, "_CALL_PROXY_PAYLOAD"));
 
     setup.ccipSetup.router = vm.envAddress(string.concat(name, "_ROUTER"));
-    setup.postMigrationBlock = vm.envUint(string.concat(name, "_POST_BLOCK"));
+    setup.postMigrationBlock = uint64(vm.envUint(string.concat(name, "_POST_BLOCK")));
 
     setup.name = string(name);
 
@@ -134,13 +140,14 @@ contract ChainLoading is Test {
       config.forkId = ForkedChain.LoadAndActivateFork(vm, config.name);
     }
 
-    console2.logString(string.concat("Activating chain: ", name));
+    console2.log("Activating chain: ", name);
 
     vm.selectFork(config.forkId);
 
     // If no test suite was deployed, deploy one
     if (address(config.testSuite) == address(0)) {
-      config.testSuite = new CCIPTestSuite(config.ccipSetup.router);
+      bool fullLogging = vm.envBool("FULL_LOGGING");
+      config.testSuite = new CCIPTestSuite(config.ccipSetup.router, fullLogging);
     }
 
     return config;

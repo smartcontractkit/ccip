@@ -62,6 +62,7 @@ contract CCIPTestSuite is Test {
   uint256 internal s_pseudoRandomSeed = uint256(keccak256(abi.encodePacked(block.timestamp, block.number)));
 
   Router internal immutable i_router;
+  bool internal immutable i_fullLogging;
 
   struct RemoteChainConfig {
     EVM2EVMOnRamp OldOnRamp;
@@ -81,10 +82,9 @@ contract CCIPTestSuite is Test {
 
   mapping(address token => string) public s_tokenNames;
 
-  constructor(
-    address router
-  ) {
+  constructor(address router, bool fullLogging) {
     i_router = Router(router);
+    i_fullLogging = fullLogging;
     _loadDestChainInfo();
 
     vm.deal(address(this), 1e18 ether);
@@ -110,7 +110,7 @@ contract CCIPTestSuite is Test {
   }
 
   function sendAllTokens(
-    bool onlyPreviousSuccess
+    bool postMigration
   ) external {
     uint256[] memory remoteChains = s_remoteChainSelectors.values();
 
@@ -118,14 +118,21 @@ contract CCIPTestSuite is Test {
     uint256 totalFailedTokens = 0;
     for (uint256 i = 0; i < remoteChains.length; ++i) {
       uint64 remoteChainSelector = uint64(remoteChains[i]);
-      (uint256 numberOfSuccesses, uint256 failed) = _sendTokenToChain(onlyPreviousSuccess, remoteChainSelector);
+      (uint256 numberOfSuccesses, uint256 failed) = _sendTokenToChain(postMigration, remoteChainSelector);
       totalSuccessfulTokens += numberOfSuccesses;
       totalFailedTokens += failed;
     }
 
-    console2.log("--------------------------------------- +");
+    if (i_fullLogging) {
+      console2.log("--------------------------------------- +");
+    }
     console2.log("Total sent: success", totalSuccessfulTokens, "failed", totalFailedTokens);
     console2.log("");
+
+    if (!postMigration) {
+      return;
+    }
+
     console2.log("Failed tokens initially:");
     for (uint256 i = 0; i < s_failedTokensInitially.length(); ++i) {
       console2.log(unicode"❓", s_failedTokensInitially.at(i), s_tokenNames[s_failedTokensInitially.at(i)]);
@@ -146,14 +153,18 @@ contract CCIPTestSuite is Test {
   }
 
   function _sendTokenToChain(
-    bool onlyPreviousSuccess,
+    bool postMigration,
     uint64 remoteChainSelector
   ) internal returns (uint256 successful, uint256 failed) {
     uint256 successfulTokens = 0;
 
-    console2.log("Sending tokens to chain: ", remoteChainSelector, Constants._resolveChainSelector(remoteChainSelector));
+    if (i_fullLogging) {
+      console2.log(
+        "Sending tokens to chain: ", remoteChainSelector, Constants._resolveChainSelector(remoteChainSelector)
+      );
+    }
     RemoteChainConfig storage remoteChainConfig = s_remoteChainConfigs[remoteChainSelector];
-    address[] memory tokens = onlyPreviousSuccess ? remoteChainConfig.oldSuccessfulTokens : remoteChainConfig.tokens;
+    address[] memory tokens = postMigration ? remoteChainConfig.oldSuccessfulTokens : remoteChainConfig.tokens;
     for (uint256 j = 0; j < tokens.length; ++j) {
       address token = tokens[j];
 
@@ -166,8 +177,10 @@ contract CCIPTestSuite is Test {
       );
 
       if (success) {
-        console2.log(unicode"✅ token", token, s_tokenNames[token]);
-        if (!onlyPreviousSuccess) {
+        if (i_fullLogging) {
+          console2.log(unicode"✅", token, s_tokenNames[token]);
+        }
+        if (!postMigration) {
           s_remoteChainConfigs[remoteChainSelector].oldSuccessfulTokens.push(token);
         }
         successfulTokens++;
@@ -177,7 +190,7 @@ contract CCIPTestSuite is Test {
       bool tokenSupportDropped =
         keccak256(retData) == keccak256(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, token));
 
-      if (!onlyPreviousSuccess) {
+      if (!postMigration) {
         s_failedTokensInitially.add(token);
       } else {
         if (tokenSupportDropped) {
@@ -187,15 +200,19 @@ contract CCIPTestSuite is Test {
         }
       }
 
-      if (tokenSupportDropped) {
-        console2.log(unicode"🟠 DROPPED SUPPORT for token", token, s_tokenNames[token]);
-      } else {
-        console2.log(unicode"❌ broken token", token, s_tokenNames[token]);
-        console2.logBytes(retData);
+      if (i_fullLogging) {
+        if (tokenSupportDropped) {
+          console2.log(unicode"🟠 DROPPED SUPPORT", token, s_tokenNames[token]);
+        } else {
+          console2.log(unicode"❌ broken", token, s_tokenNames[token]);
+          console2.logBytes(retData);
+        }
       }
     }
-    console2.log("Tokens sent: success", successfulTokens, "failed", tokens.length - successfulTokens);
-    console2.log("");
+    if (i_fullLogging) {
+      console2.log("Tokens sent: success", successfulTokens, "failed", tokens.length - successfulTokens);
+      console2.log("");
+    }
 
     return (successfulTokens, tokens.length - successfulTokens);
   }
@@ -233,7 +250,7 @@ contract CCIPTestSuite is Test {
     vm.startPrank(address(offRamp));
 
     uint32[] memory gasOverrides = new uint32[](1);
-    gasOverrides[0] = 250_000;
+    gasOverrides[0] = 100_000;
     //    uint32[] memory gasOverrides = new uint32[](0);
     uint256 succeeded = 0;
 
