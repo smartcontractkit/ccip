@@ -14,6 +14,7 @@ import {RateLimiter} from "../../libraries/RateLimiter.sol";
 
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {HybridLockReleaseUSDCTokenPool} from "../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
+import {LOCK_RELEASE_FLAG} from "../../pools/USDC/HybridLockReleaseUSDCTokenPool.sol";
 import {USDCBridgeMigrator} from "../../pools/USDC/USDCBridgeMigrator.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
 import {BaseTest} from "../BaseTest.t.sol";
@@ -224,7 +225,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
-        sourcePoolData: abi.encode(s_usdcTokenPool.LOCK_RELEASE_FLAG()),
+        sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
         offchainTokenData: ""
       })
     );
@@ -442,7 +443,7 @@ contract HybridUSDCTokenPoolTests is USDCTokenPoolSetup {
       destGasAmount: USDC_DEST_TOKEN_GAS
     });
 
-    bytes memory sourcePoolDataLockRelease = abi.encode(s_usdcTokenPool.LOCK_RELEASE_FLAG());
+    bytes memory sourcePoolDataLockRelease = abi.encode(LOCK_RELEASE_FLAG);
 
     uint256 amount = 1e6;
 
@@ -757,7 +758,7 @@ contract HybridUSDCTokenPoolMigrationTests is HybridUSDCTokenPoolTests {
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
-        sourcePoolData: abi.encode(s_usdcTokenPool.LOCK_RELEASE_FLAG()),
+        sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
         offchainTokenData: ""
       })
     );
@@ -876,7 +877,7 @@ contract HybridUSDCTokenPoolMigrationTests is HybridUSDCTokenPoolTests {
         localToken: address(s_token),
         remoteChainSelector: SOURCE_CHAIN_SELECTOR,
         sourcePoolAddress: sourceTokenData.sourcePoolAddress,
-        sourcePoolData: abi.encode(s_usdcTokenPool.LOCK_RELEASE_FLAG()),
+        sourcePoolData: abi.encode(LOCK_RELEASE_FLAG),
         offchainTokenData: ""
       })
     );

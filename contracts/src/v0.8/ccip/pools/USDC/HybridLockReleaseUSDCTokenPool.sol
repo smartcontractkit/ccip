@@ -14,6 +14,9 @@ import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
 
+// bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
+bytes4 constant LOCK_RELEASE_FLAG = 0xfa7c07de;
+
 /// @notice A token pool for USDC which uses CCTP for supported chains and Lock/Release for all others
 /// @dev The functionality from LockReleaseTokenPool.sol has been duplicated due to lack of compiler support for shared
 /// constructors between parents
@@ -33,9 +36,6 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
 
   error LanePausedForCCTPMigration(uint64 remoteChainSelector);
   error TokenLockingNotAllowedAfterMigration(uint64 remoteChainSelector);
-
-  /// bytes4(keccak256("NO_CCTP_USE_LOCK_RELEASE"))
-  bytes4 public constant LOCK_RELEASE_FLAG = 0xfa7c07de;
 
   /// @notice The address of the liquidity provider for a specific chain.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
