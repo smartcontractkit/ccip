@@ -29,12 +29,7 @@ import (
 )
 
 const (
-<<<<<<< HEAD
-	OVERIDECONFIG = "BASE64_CCIP_CONFIG_OVERRIDE"
-
-=======
 	OVERIDECONFIG             = "BASE64_CONFIG_OVERRIDE"
->>>>>>> v2.17.0
 	ErrReadConfig             = "failed to read TOML config"
 	ErrUnmarshalConfig        = "failed to unmarshal TOML config"
 	Load               string = "load"
@@ -141,10 +136,7 @@ func NewConfig() (*Config, error) {
 			}
 		}
 	}
-<<<<<<< HEAD
-=======
 
->>>>>>> v2.17.0
 	// read secrets for all products
 	if cfg.CCIP != nil {
 		err := ctfconfig.LoadSecretEnvsFromFiles()
@@ -183,8 +175,6 @@ type Common struct {
 func (p *Common) ReadFromEnvVar() error {
 	logger := logging.GetTestLogger(nil)
 
-<<<<<<< HEAD
-=======
 	testLogCollect := ctfconfig.MustReadEnvVar_Boolean(ctfconfig.E2E_TEST_LOG_COLLECT_ENV)
 	if testLogCollect != nil {
 		if p.Logging == nil {
@@ -215,7 +205,6 @@ func (p *Common) ReadFromEnvVar() error {
 		p.Logging.LogStream.LogTargets = logstreamLogTargets
 	}
 
->>>>>>> v2.17.0
 	lokiTenantID := ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_LOKI_TENANT_ID_ENV)
 	if lokiTenantID != "" {
 		if p.Logging == nil {
@@ -300,8 +289,6 @@ func (p *Common) ReadFromEnvVar() error {
 		p.Logging.Grafana.BearerToken = &grafanaBearerToken
 	}
 
-<<<<<<< HEAD
-=======
 	selectedNetworks := ctfconfig.MustReadEnvVar_Strings(ctfconfig.E2E_TEST_SELECTED_NETWORK_ENV, ",")
 	if len(selectedNetworks) > 0 {
 		if p.Network == nil {
@@ -311,7 +298,6 @@ func (p *Common) ReadFromEnvVar() error {
 		p.Network.SelectedNetworks = selectedNetworks
 	}
 
->>>>>>> v2.17.0
 	walletKeys := ctfconfig.ReadEnvVarGroupedMap(ctfconfig.E2E_TEST_WALLET_KEY_ENV, ctfconfig.E2E_TEST_WALLET_KEYS_ENV)
 	if len(walletKeys) > 0 {
 		if p.Network == nil {
@@ -355,8 +341,6 @@ func (p *Common) ReadFromEnvVar() error {
 		p.NewCLCluster.Common.ChainlinkImage.Image = &chainlinkImage
 	}
 
-<<<<<<< HEAD
-=======
 	chainlinkVersion := ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_CHAINLINK_VERSION_ENV)
 	if chainlinkVersion != "" {
 		if p.NewCLCluster == nil {
@@ -389,7 +373,6 @@ func (p *Common) ReadFromEnvVar() error {
 		p.NewCLCluster.Common.ChainlinkImage.PostgresVersion = &chainlinkPostgresVersion
 	}
 
->>>>>>> v2.17.0
 	chainlinkUpgradeImage := ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_CHAINLINK_UPGRADE_IMAGE_ENV)
 	if chainlinkUpgradeImage != "" {
 		if p.NewCLCluster == nil {
@@ -406,8 +389,6 @@ func (p *Common) ReadFromEnvVar() error {
 		p.NewCLCluster.Common.ChainlinkUpgradeImage.Image = &chainlinkUpgradeImage
 	}
 
-<<<<<<< HEAD
-=======
 	chainlinkUpgradeVersion := ctfconfig.MustReadEnvVar_String(ctfconfig.E2E_TEST_CHAINLINK_UPGRADE_VERSION_ENV)
 	if chainlinkUpgradeVersion != "" {
 		if p.NewCLCluster == nil {
@@ -424,7 +405,6 @@ func (p *Common) ReadFromEnvVar() error {
 		p.NewCLCluster.Common.ChainlinkUpgradeImage.Version = &chainlinkUpgradeVersion
 	}
 
->>>>>>> v2.17.0
 	return nil
 }
 

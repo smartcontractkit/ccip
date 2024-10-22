@@ -13,13 +13,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-<<<<<<< HEAD
-	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
-	ctfconfigtypes "github.com/smartcontractkit/chainlink-testing-framework/lib/config/types"
-=======
 	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
 	ctf_config_types "github.com/smartcontractkit/chainlink-testing-framework/lib/config/types"
->>>>>>> v2.17.0
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/conversions"
 
@@ -58,11 +53,7 @@ func SetResourceProfile(cpu, mem string) map[string]interface{} {
 	}
 }
 
-<<<<<<< HEAD
-func setNodeConfig(nets []blockchain.EVMNetwork, nodeConfig, commonChain string, configByChain map[string]string) (*corechainlink.Config, string, error) {
-=======
 func SetNodeConfig(nets []blockchain.EVMNetwork, nodeConfig, commonChain string, configByChain map[string]string) (*corechainlink.Config, string, error) {
->>>>>>> v2.17.0
 	var tomlCfg *corechainlink.Config
 	var err error
 	var commonChainConfig *evmcfg.Chain
@@ -131,11 +122,7 @@ func ChainlinkPropsForUpdate(
 				chainConfigByChain = testInputs.EnvInput.NewCLCluster.Common.ChainConfigTOMLByChain
 			}
 
-<<<<<<< HEAD
-			_, tomlStr, err := setNodeConfig(
-=======
 			_, tomlStr, err := SetNodeConfig(
->>>>>>> v2.17.0
 				testInputs.SelectedNetworks,
 				nodeConfig, commonChainConfig, chainConfigByChain,
 			)
@@ -163,11 +150,7 @@ func ChainlinkPropsForUpdate(
 				"version": upgradeTag,
 			},
 		}
-<<<<<<< HEAD
-		_, tomlStr, err := setNodeConfig(
-=======
 		_, tomlStr, err := SetNodeConfig(
->>>>>>> v2.17.0
 			testInputs.SelectedNetworks,
 			testInputs.EnvInput.NewCLCluster.Common.BaseConfigTOML,
 			testInputs.EnvInput.NewCLCluster.Common.CommonChainConfigTOML,
@@ -233,11 +216,7 @@ func ChainlinkChart(
 				chainConfigByChain = testInputs.EnvInput.NewCLCluster.Common.ChainConfigTOMLByChain
 			}
 
-<<<<<<< HEAD
-			_, tomlStr, err := setNodeConfig(nets, nodeConfig, commonChainConfig, chainConfigByChain)
-=======
 			_, tomlStr, err := SetNodeConfig(nets, nodeConfig, commonChainConfig, chainConfigByChain)
->>>>>>> v2.17.0
 			require.NoError(t, err)
 			nodesMap = append(nodesMap, map[string]any{
 				"name": clNode.Name,
@@ -261,11 +240,8 @@ func ChainlinkChart(
 		return chainlink.New(0, clProps)
 	}
 	clProps["replicas"] = pointer.GetInt(testInputs.EnvInput.NewCLCluster.NoOfNodes)
-<<<<<<< HEAD
-	_, tomlStr, err := setNodeConfig(
-=======
+
 	_, tomlStr, err := SetNodeConfig(
->>>>>>> v2.17.0
 		nets,
 		testInputs.EnvInput.NewCLCluster.Common.BaseConfigTOML,
 		testInputs.EnvInput.NewCLCluster.Common.CommonChainConfigTOML,
@@ -282,11 +258,7 @@ func DeployLocalCluster(
 ) (*test_env.CLClusterTestEnv, func() error) {
 	selectedNetworks := testInputs.SelectedNetworks
 
-<<<<<<< HEAD
-	privateEthereumNetworks := []*ctfconfig.EthereumNetworkConfig{}
-=======
 	privateEthereumNetworks := []*ctf_config.EthereumNetworkConfig{}
->>>>>>> v2.17.0
 	for _, network := range testInputs.EnvInput.PrivateEthereumNetworks {
 		privateEthereumNetworks = append(privateEthereumNetworks, network)
 
@@ -316,27 +288,17 @@ func DeployLocalCluster(
 		}
 
 		for _, network := range missing {
-<<<<<<< HEAD
-			chainConfig := &ctfconfig.EthereumChainConfig{}
-=======
 			chainConfig := &ctf_config.EthereumChainConfig{}
->>>>>>> v2.17.0
 			err := chainConfig.Default()
 			if err != nil {
 				require.NoError(t, err, "failed to get default chain config: %w", err)
 			} else {
 				chainConfig.ChainID = int(network.ChainID)
-<<<<<<< HEAD
-				eth1 := ctfconfigtypes.EthereumVersion_Eth1
-				geth := ctfconfigtypes.ExecutionLayer_Geth
 
-				privateEthereumNetworks = append(privateEthereumNetworks, &ctfconfig.EthereumNetworkConfig{
-=======
 				eth1 := ctf_config_types.EthereumVersion_Eth1
 				geth := ctf_config_types.ExecutionLayer_Geth
 
 				privateEthereumNetworks = append(privateEthereumNetworks, &ctf_config.EthereumNetworkConfig{
->>>>>>> v2.17.0
 					EthereumVersion:     &eth1,
 					ExecutionLayer:      &geth,
 					EthereumChainConfig: chainConfig,
@@ -372,12 +334,6 @@ func DeployLocalCluster(
 	// a func to start the CL nodes asynchronously
 	deployCL := func() error {
 		noOfNodes := pointer.GetInt(testInputs.EnvInput.NewCLCluster.NoOfNodes)
-<<<<<<< HEAD
-		// if individual nodes are specified, then deploy them with specified configs
-		if len(testInputs.EnvInput.NewCLCluster.Nodes) > 0 {
-			for _, clNode := range testInputs.EnvInput.NewCLCluster.Nodes {
-				toml, _, err := setNodeConfig(
-=======
 		if env.ClCluster == nil {
 			env.ClCluster = &test_env.ClCluster{}
 		}
@@ -385,7 +341,6 @@ func DeployLocalCluster(
 		if len(testInputs.EnvInput.NewCLCluster.Nodes) > 0 {
 			for _, clNode := range testInputs.EnvInput.NewCLCluster.Nodes {
 				toml, _, err := SetNodeConfig(
->>>>>>> v2.17.0
 					selectedNetworks,
 					clNode.BaseConfigTOML,
 					clNode.CommonChainConfigTOML,
@@ -414,11 +369,7 @@ func DeployLocalCluster(
 		} else {
 			// if no individual nodes are specified, then deploy the number of nodes specified in the env input with common config
 			for i := 0; i < noOfNodes; i++ {
-<<<<<<< HEAD
-				toml, _, err := setNodeConfig(
-=======
 				toml, _, err := SetNodeConfig(
->>>>>>> v2.17.0
 					selectedNetworks,
 					testInputs.EnvInput.NewCLCluster.Common.BaseConfigTOML,
 					testInputs.EnvInput.NewCLCluster.Common.CommonChainConfigTOML,
@@ -544,12 +495,8 @@ func DeployEnvironments(
 							"fullnameOverride": actions.NetworkName(network.Name),
 							"image": map[string]interface{}{
 								"repository": "ghcr.io/foundry-rs/foundry",
-<<<<<<< HEAD
-								"tag":        "nightly-2442e7a5fc165d7d0b022aa8b9f09dcdf675157b",
-=======
 								"tag":        "nightly-5ac78a9cd4b94dc53d1fe5e0f42372b28b5a7559",
 								//	"tag":        "nightly-ea2eff95b5c17edd3ffbdfc6daab5ce5cc80afc0",
->>>>>>> v2.17.0
 							},
 							"anvil": map[string]interface{}{
 								"chainId":                   fmt.Sprintf("%d", network.ChainID),

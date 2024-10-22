@@ -6,11 +6,11 @@ go 1.22.5
 replace github.com/smartcontractkit/chainlink/v2 => ../
 
 require (
+	dario.cat/mergo v1.0.1
 	github.com/AlekSi/pointer v1.1.0
 	github.com/Khan/genqlient v0.7.0
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/avast/retry-go/v4 v4.6.0
-	github.com/aws/aws-sdk-go v1.45.25
 	github.com/barkimedes/go-deepcopy v0.0.0-20220514131651-17c30cfc62df
 	github.com/chaos-mesh/chaos-mesh/api v0.0.0-20240821051457-da69c6d9617a
 	github.com/cli/go-gh/v2 v2.0.0
@@ -19,8 +19,6 @@ require (
 	github.com/go-resty/resty/v2 v2.11.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
-	github.com/hashicorp/consul/sdk v0.16.0
-	github.com/hashicorp/go-multierror v1.1.1
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/manifoldco/promptui v0.9.0
@@ -32,13 +30,10 @@ require (
 	github.com/rs/zerolog v1.33.0
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/segmentio/ksuid v1.0.4
-	github.com/sethvargo/go-retry v0.2.4
 	github.com/shopspring/decimal v1.4.0
 	github.com/slack-go/slack v0.12.2
-	github.com/smartcontractkit/ccip-owner-contracts v0.0.0-20240919155713-f4bf4ae0b9c6
 	github.com/smartcontractkit/chain-selectors v1.0.27
 	github.com/smartcontractkit/chainlink-automation v1.0.4
-	github.com/smartcontractkit/chainlink-ccip v0.0.0-20240924115754-8858b0423283
 	github.com/smartcontractkit/chainlink-common v0.2.3-0.20240925085218-aded1b263ecc
 	github.com/smartcontractkit/chainlink-testing-framework/havoc v1.50.0
 	github.com/smartcontractkit/chainlink-testing-framework/lib v1.50.9
@@ -49,7 +44,6 @@ require (
 	github.com/smartcontractkit/libocr v0.0.0-20240717100443-f6226e09bee7
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
-	github.com/subosito/gotenv v1.6.0
 	github.com/test-go/testify v1.1.4
 	github.com/testcontainers/testcontainers-go v0.28.0
 	github.com/umbracle/ethgo v0.1.3
@@ -60,11 +54,7 @@ require (
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
 	golang.org/x/sync v0.8.0
 	golang.org/x/text v0.18.0
-	google.golang.org/grpc v1.65.0
-	google.golang.org/protobuf v1.34.2
 	gopkg.in/guregu/null.v4 v4.0.0
-	gopkg.in/yaml.v2 v2.4.0
-	gotest.tools/v3 v3.5.1
 	k8s.io/apimachinery v0.31.0
 )
 
@@ -78,7 +68,6 @@ require (
 	cosmossdk.io/depinject v1.0.0-alpha.4 // indirect
 	cosmossdk.io/errors v1.0.1 // indirect
 	cosmossdk.io/math v1.3.0 // indirect
-	dario.cat/mergo v1.0.1 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/99designs/keyring v1.2.1 // indirect
@@ -109,6 +98,7 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/avast/retry-go v3.0.0+incompatible // indirect
 	github.com/awalterschulze/gographviz v2.0.3+incompatible // indirect
+	github.com/aws/aws-sdk-go v1.45.25 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.30.4 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.27.28 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.28 // indirect
@@ -281,12 +271,14 @@ require (
 	github.com/gtank/merlin v0.1.1 // indirect
 	github.com/gtank/ristretto255 v0.1.2 // indirect
 	github.com/hashicorp/consul/api v1.28.2 // indirect
+	github.com/hashicorp/consul/sdk v0.16.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-envparse v0.1.0 // indirect
 	github.com/hashicorp/go-hclog v1.5.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-msgpack v0.5.5 // indirect
+	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-plugin v1.6.2-0.20240829161738-06afb6d7ae99 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.5 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
@@ -425,6 +417,7 @@ require (
 	github.com/status-im/keycard-go v0.2.0 // indirect
 	github.com/streamingfast/logging v0.0.0-20220405224725-2755dab2ce75 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
+	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/supranational/blst v0.3.11 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d // indirect
 	github.com/tendermint/go-amino v0.16.0 // indirect
@@ -494,10 +487,13 @@ require (
 	google.golang.org/genproto v0.0.0-20240711142825-46eb208f015d // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240822170219-fc7c04adadcd // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240822170219-fc7c04adadcd // indirect
+	google.golang.org/grpc v1.65.0 // indirect
+	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.31.0 // indirect
 	k8s.io/apiextensions-apiserver v0.31.0 // indirect

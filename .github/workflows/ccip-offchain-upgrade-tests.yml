@@ -247,8 +247,8 @@ jobs:
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@94cb11f4bd545607a2f221c6685052b3abee723d # v2.3.32
         env:
-          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
-          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
+          BASE64_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
+          TEST_BASE64_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
           ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:${{ github.sha }}
           TEST_SUITE: smoke
           TEST_ARGS: -test.timeout 30m
@@ -371,8 +371,8 @@ jobs:
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@94cb11f4bd545607a2f221c6685052b3abee723d # v2.3.32
         env:
-          BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
-          TEST_BASE64_CCIP_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
+          BASE64_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
+          TEST_BASE64_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
           ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:${{ github.sha }}
           TEST_SUITE: load
           TEST_ARGS: -test.timeout 1h

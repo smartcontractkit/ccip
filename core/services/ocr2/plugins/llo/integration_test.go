@@ -310,8 +310,8 @@ lloDonID = %d
 			assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			_, err := w.Write(channelDefinitionsJSON)
-			require.NoError(t, err)
+			_, err2 := w.Write(channelDefinitionsJSON)
+			require.NoError(t, err2)
 		}))
 		t.Cleanup(channelDefinitionsServer.Close)
 
@@ -397,14 +397,14 @@ channelDefinitionsContractFromBlock = %d`, serverURL, serverPubKey, donID, confi
 				t.Run(fmt.Sprintf("emulate mercury server verifying report (local verification) - node %x", req.pk), func(t *testing.T) {
 					rv := mercuryverifier.NewVerifier()
 
-					reportSigners, err := rv.Verify(mercuryverifier.SignedReport{
+					reportSigners, err2 := rv.Verify(mercuryverifier.SignedReport{
 						RawRs:         v["rawRs"].([][32]byte),
 						RawSs:         v["rawSs"].([][32]byte),
 						RawVs:         v["rawVs"].([32]byte),
 						ReportContext: v["reportContext"].([3][32]byte),
 						Report:        v["report"].([]byte),
 					}, fNodes, signerAddresses)
-					require.NoError(t, err)
+					require.NoError(t, err2)
 					assert.GreaterOrEqual(t, len(reportSigners), int(fNodes+1))
 					assert.Subset(t, signerAddresses, reportSigners)
 				})

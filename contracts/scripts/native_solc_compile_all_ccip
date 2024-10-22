@@ -91,7 +91,6 @@ compileContract ccip/test/helpers/BurnMintERC677Helper.sol
 compileContract ccip/test/helpers/CommitStoreHelper.sol
 compileContract ccip/test/helpers/MessageHasher.sol
 compileContract ccip/test/helpers/CCIPReaderTester.sol
-compileContract ccip/test/helpers/USDCReaderTester.sol
 compileContract ccip/test/helpers/ReportCodec.sol
 compileContract ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
 compileContract ccip/test/helpers/MultiOCR3Helper.sol
