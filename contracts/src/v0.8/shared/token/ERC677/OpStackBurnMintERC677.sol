@@ -3,9 +3,10 @@ pragma solidity ^0.8.0;
 
 import {IOptimismMintableERC20Minimal} from "../ERC20/IOptimismMintableERC20.sol";
 import {IOptimismMintableERC20} from "../ERC20/IOptimismMintableERC20.sol";
-import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
 import {BurnMintERC677} from "./BurnMintERC677.sol";
+
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 
 /// @notice A basic ERC677 compatible token contract with burn and minting roles that supports
 /// the native L2 bridging requirements of the Optimism Stack.

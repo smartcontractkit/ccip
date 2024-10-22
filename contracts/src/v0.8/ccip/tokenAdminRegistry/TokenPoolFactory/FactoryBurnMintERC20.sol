@@ -29,7 +29,6 @@ contract FactoryBurnMintERC20 is IBurnMintERC20, IGetCCIPAdmin, IERC165, ERC20Bu
   event BurnAccessGranted(address indexed burner);
   event MintAccessRevoked(address indexed minter);
   event BurnAccessRevoked(address indexed burner);
-
   event CCIPAdminTransferred(address indexed previousAdmin, address indexed newAdmin);
 
   /// @dev The number of decimals for the token

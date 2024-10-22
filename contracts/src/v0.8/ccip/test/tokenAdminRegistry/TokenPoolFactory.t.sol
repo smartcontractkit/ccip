@@ -36,7 +36,7 @@ contract TokenPoolFactorySetup is TokenAdminRegistrySetup {
   bytes internal s_tokenCreationParams;
   bytes internal s_tokenInitCode;
 
-  uint256 public constant PREMINT_AMOUNT = 1e20; // 100 tokens in 18 decimals
+  uint256 public constant PREMINT_AMOUNT = 100 ether;
 
   function setUp() public virtual override {
     TokenAdminRegistrySetup.setUp();

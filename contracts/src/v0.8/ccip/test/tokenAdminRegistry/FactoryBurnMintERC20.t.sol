@@ -12,7 +12,7 @@ import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/ut
 contract BurnMintERC20Setup is BaseTest {
   FactoryBurnMintERC20 internal s_burnMintERC20;
 
-  address internal s_mockPool = address(6243783892);
+  address internal s_mockPool = makeAddr("s_mockPool");
   uint256 internal s_amount = 1e18;
 
   address internal s_alice;
@@ -31,7 +31,7 @@ contract BurnMintERC20Setup is BaseTest {
 }
 
 contract FactoryBurnMintERC20constructor is BurnMintERC20Setup {
-  function testConstructorSuccess() public {
+  function test_Constructor_Success() public {
     string memory name = "Chainlink token v2";
     string memory symbol = "LINK2";
     uint8 decimals = 19;
@@ -52,7 +52,7 @@ contract FactoryBurnMintERC20constructor is BurnMintERC20Setup {
 }
 
 contract FactoryBurnMintERC20approve is BurnMintERC20Setup {
-  function testApproveSuccess() public {
+  function test_Approve_Success() public {
     uint256 balancePre = s_burnMintERC20.balanceOf(STRANGER);
     uint256 sendingAmount = s_amount / 2;
 
@@ -67,7 +67,7 @@ contract FactoryBurnMintERC20approve is BurnMintERC20Setup {
 
   // Reverts
 
-  function testInvalidAddressReverts() public {
+  function test_InvalidAddress_Reverts() public {
     vm.expectRevert();
 
     s_burnMintERC20.approve(address(s_burnMintERC20), s_amount);
@@ -75,7 +75,7 @@ contract FactoryBurnMintERC20approve is BurnMintERC20Setup {
 }
 
 contract FactoryBurnMintERC20transfer is BurnMintERC20Setup {
-  function testTransferSuccess() public {
+  function test_Transfer_Success() public {
     uint256 balancePre = s_burnMintERC20.balanceOf(STRANGER);
     uint256 sendingAmount = s_amount / 2;
 
@@ -86,7 +86,7 @@ contract FactoryBurnMintERC20transfer is BurnMintERC20Setup {
 
   // Reverts
 
-  function testInvalidAddressReverts() public {
+  function test_InvalidAddress_Reverts() public {
     vm.expectRevert();
 
     s_burnMintERC20.transfer(address(s_burnMintERC20), s_amount);
@@ -94,7 +94,7 @@ contract FactoryBurnMintERC20transfer is BurnMintERC20Setup {
 }
 
 contract FactoryBurnMintERC20mint is BurnMintERC20Setup {
-  function testBasicMintSuccess() public {
+  function test_BasicMint_Success() public {
     uint256 balancePre = s_burnMintERC20.balanceOf(OWNER);
 
     s_burnMintERC20.grantMintAndBurnRoles(OWNER);
@@ -109,12 +109,12 @@ contract FactoryBurnMintERC20mint is BurnMintERC20Setup {
 
   // Revert
 
-  function testSenderNotMinterReverts() public {
+  function test_SenderNotMinter_Reverts() public {
     vm.expectRevert(abi.encodeWithSelector(FactoryBurnMintERC20.SenderNotMinter.selector, OWNER));
     s_burnMintERC20.mint(STRANGER, 1e18);
   }
 
-  function testMaxSupplyExceededReverts() public {
+  function test_MaxSupplyExceeded_Reverts() public {
     changePrank(s_mockPool);
 
     // Mint max supply
@@ -130,7 +130,7 @@ contract FactoryBurnMintERC20mint is BurnMintERC20Setup {
 }
 
 contract FactoryBurnMintERC20burn is BurnMintERC20Setup {
-  function testBasicBurnSuccess() public {
+  function test_BasicBurn_Success() public {
     s_burnMintERC20.grantBurnRole(OWNER);
     deal(address(s_burnMintERC20), OWNER, s_amount);
 
@@ -144,13 +144,13 @@ contract FactoryBurnMintERC20burn is BurnMintERC20Setup {
 
   // Revert
 
-  function testSenderNotBurnerReverts() public {
+  function test_SenderNotBurner_Reverts() public {
     vm.expectRevert(abi.encodeWithSelector(FactoryBurnMintERC20.SenderNotBurner.selector, OWNER));
 
     s_burnMintERC20.burnFrom(STRANGER, s_amount);
   }
 
-  function testExceedsBalanceReverts() public {
+  function test_ExceedsBalance_Reverts() public {
     changePrank(s_mockPool);
 
     vm.expectRevert("ERC20: burn amount exceeds balance");
@@ -158,7 +158,7 @@ contract FactoryBurnMintERC20burn is BurnMintERC20Setup {
     s_burnMintERC20.burn(s_amount * 2);
   }
 
-  function testBurnFromZeroAddressReverts() public {
+  function test_BurnFromZeroAddress_Reverts() public {
     s_burnMintERC20.grantBurnRole(address(0));
     changePrank(address(0));
 
@@ -173,7 +173,7 @@ contract FactoryBurnMintERC20burnFromAlias is BurnMintERC20Setup {
     BurnMintERC20Setup.setUp();
   }
 
-  function testBurnFromSuccess() public {
+  function test_BurnFrom_Success() public {
     s_burnMintERC20.approve(s_mockPool, s_amount);
 
     changePrank(s_mockPool);
@@ -185,13 +185,13 @@ contract FactoryBurnMintERC20burnFromAlias is BurnMintERC20Setup {
 
   // Reverts
 
-  function testSenderNotBurnerReverts() public {
+  function test_SenderNotBurner_Reverts() public {
     vm.expectRevert(abi.encodeWithSelector(FactoryBurnMintERC20.SenderNotBurner.selector, OWNER));
 
     s_burnMintERC20.burn(OWNER, s_amount);
   }
 
-  function testInsufficientAllowanceReverts() public {
+  function test_InsufficientAllowance_Reverts() public {
     changePrank(s_mockPool);
 
     vm.expectRevert("ERC20: insufficient allowance");
@@ -199,7 +199,7 @@ contract FactoryBurnMintERC20burnFromAlias is BurnMintERC20Setup {
     s_burnMintERC20.burn(OWNER, s_amount);
   }
 
-  function testExceedsBalanceReverts() public {
+  function test_ExceedsBalance_Reverts() public {
     s_burnMintERC20.approve(s_mockPool, s_amount * 2);
 
     changePrank(s_mockPool);
@@ -215,7 +215,7 @@ contract FactoryBurnMintERC20burnFrom is BurnMintERC20Setup {
     BurnMintERC20Setup.setUp();
   }
 
-  function testBurnFromSuccess() public {
+  function test_BurnFrom_Success() public {
     s_burnMintERC20.approve(s_mockPool, s_amount);
 
     changePrank(s_mockPool);
@@ -227,13 +227,13 @@ contract FactoryBurnMintERC20burnFrom is BurnMintERC20Setup {
 
   // Reverts
 
-  function testSenderNotBurnerReverts() public {
+  function test_SenderNotBurner_Reverts() public {
     vm.expectRevert(abi.encodeWithSelector(FactoryBurnMintERC20.SenderNotBurner.selector, OWNER));
 
     s_burnMintERC20.burnFrom(OWNER, s_amount);
   }
 
-  function testInsufficientAllowanceReverts() public {
+  function test_InsufficientAllowance_Reverts() public {
     changePrank(s_mockPool);
 
     vm.expectRevert("ERC20: insufficient allowance");
@@ -241,7 +241,7 @@ contract FactoryBurnMintERC20burnFrom is BurnMintERC20Setup {
     s_burnMintERC20.burnFrom(OWNER, s_amount);
   }
 
-  function testExceedsBalanceReverts() public {
+  function test_ExceedsBalance_Reverts() public {
     s_burnMintERC20.approve(s_mockPool, s_amount * 2);
 
     changePrank(s_mockPool);
@@ -253,7 +253,7 @@ contract FactoryBurnMintERC20burnFrom is BurnMintERC20Setup {
 }
 
 contract FactoryBurnMintERC20grantRole is BurnMintERC20Setup {
-  function testGrantMintAccessSuccess() public {
+  function test_GrantMintAccess_Success() public {
     assertFalse(s_burnMintERC20.isMinter(STRANGER));
 
     vm.expectEmit();
@@ -271,7 +271,7 @@ contract FactoryBurnMintERC20grantRole is BurnMintERC20Setup {
     assertFalse(s_burnMintERC20.isMinter(STRANGER));
   }
 
-  function testGrantBurnAccessSuccess() public {
+  function test_GrantBurnAccess_Success() public {
     assertFalse(s_burnMintERC20.isBurner(STRANGER));
 
     vm.expectEmit();
@@ -289,7 +289,7 @@ contract FactoryBurnMintERC20grantRole is BurnMintERC20Setup {
     assertFalse(s_burnMintERC20.isBurner(STRANGER));
   }
 
-  function testGrantManySuccess() public {
+  function test_GrantMany_Success() public {
     // Since alice was already granted mint and burn roles in the setup, we will revoke them
     // and then grant them again for the purposes of the test
     s_burnMintERC20.revokeMintRole(s_alice);
@@ -310,7 +310,7 @@ contract FactoryBurnMintERC20grantRole is BurnMintERC20Setup {
 }
 
 contract FactoryBurnMintERC20grantMintAndBurnRoles is BurnMintERC20Setup {
-  function testGrantMintAndBurnRolesSuccess() public {
+  function test_GrantMintAndBurnRoles_Success() public {
     assertFalse(s_burnMintERC20.isMinter(STRANGER));
     assertFalse(s_burnMintERC20.isBurner(STRANGER));
 
@@ -327,7 +327,7 @@ contract FactoryBurnMintERC20grantMintAndBurnRoles is BurnMintERC20Setup {
 }
 
 contract FactoryBurnMintERC20decreaseApproval is BurnMintERC20Setup {
-  function testDecreaseApprovalSuccess() public {
+  function test_DecreaseApproval_Success() public {
     s_burnMintERC20.approve(s_mockPool, s_amount);
     uint256 allowance = s_burnMintERC20.allowance(OWNER, s_mockPool);
     assertEq(allowance, s_amount);
@@ -337,7 +337,7 @@ contract FactoryBurnMintERC20decreaseApproval is BurnMintERC20Setup {
 }
 
 contract FactoryBurnMintERC20increaseApproval is BurnMintERC20Setup {
-  function testIncreaseApprovalSuccess() public {
+  function test_IncreaseApproval_Success() public {
     s_burnMintERC20.approve(s_mockPool, s_amount);
     uint256 allowance = s_burnMintERC20.allowance(OWNER, s_mockPool);
     assertEq(allowance, s_amount);
@@ -347,7 +347,7 @@ contract FactoryBurnMintERC20increaseApproval is BurnMintERC20Setup {
 }
 
 contract FactoryBurnMintERC20supportsInterface is BurnMintERC20Setup {
-  function testConstructorSuccess() public view {
+  function test_SupportsInterface_Success() public view {
     assertTrue(s_burnMintERC20.supportsInterface(type(IERC20).interfaceId));
     assertTrue(s_burnMintERC20.supportsInterface(type(IBurnMintERC20).interfaceId));
     assertTrue(s_burnMintERC20.supportsInterface(type(IERC165).interfaceId));
