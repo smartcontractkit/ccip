@@ -21,3 +21,7 @@ func (f *featureConfig) UICSAKeys() bool {
 func (f *featureConfig) CCIP() bool {
 	return *f.c.CCIP
 }
+
+func (f *featureConfig) MultiFeedsManagers() bool {
+	return *f.c.MultiFeedsManagers
+}

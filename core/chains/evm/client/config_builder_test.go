@@ -37,9 +37,11 @@ func TestClientConfigBuilder(t *testing.T) {
 	finalityDepth := ptr(uint32(10))
 	finalityTagEnabled := ptr(true)
 	noNewHeadsThreshold := time.Second
+	newHeadsPollInterval := 0 * time.Second
 	chainCfg, nodePool, nodes, err := client.NewClientConfigs(selectionMode, leaseDuration, chainTypeStr, nodeConfigs,
 		pollFailureThreshold, pollInterval, syncThreshold, nodeIsSyncingEnabled, noNewHeadsThreshold, finalityDepth,
-		finalityTagEnabled, finalizedBlockOffset, enforceRepeatableRead, deathDeclarationDelay, noNewFinalizedBlocksThreshold, pollInterval)
+		finalityTagEnabled, finalizedBlockOffset, enforceRepeatableRead, deathDeclarationDelay, noNewFinalizedBlocksThreshold,
+		pollInterval, newHeadsPollInterval)
 	require.NoError(t, err)
 
 	// Validate node pool configs
@@ -52,10 +54,8 @@ func TestClientConfigBuilder(t *testing.T) {
 	require.Equal(t, *enforceRepeatableRead, nodePool.EnforceRepeatableRead())
 	require.Equal(t, deathDeclarationDelay, nodePool.DeathDeclarationDelay())
 	require.Equal(t, pollInterval, nodePool.FinalizedBlockPollInterval())
-
-	// Validate node configs
+	require.Equal(t, newHeadsPollInterval, nodePool.NewHeadsPollInterval())
 	require.Equal(t, *nodeConfigs[0].Name, *nodes[0].Name)
-	require.Equal(t, *nodeConfigs[0].WSURL, (*nodes[0].WSURL).String())
 	require.Equal(t, *nodeConfigs[0].HTTPURL, (*nodes[0].HTTPURL).String())
 
 	// Validate chain config

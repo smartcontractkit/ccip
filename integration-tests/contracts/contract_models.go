@@ -151,9 +151,13 @@ type OffchainAggregatorData struct {
 type ChainlinkNodeWithKeysAndAddress interface {
 	MustReadOCRKeys() (*client.OCRKeys, error)
 	MustReadP2PKeys() (*client.P2PKeys, error)
-	ExportEVMKeysForChain(string) ([]*client.ExportedEVMKey, error)
 	PrimaryEthAddress() (string, error)
 	EthAddresses() ([]string, error)
+	ChainlinkKeyExporter
+}
+
+type ChainlinkKeyExporter interface {
+	ExportEVMKeysForChain(string) ([]*client.ExportedEVMKey, error)
 }
 
 type ChainlinkNodeWithForwarder interface {
@@ -224,6 +228,12 @@ type Storage interface {
 type JobByInstance struct {
 	ID       string
 	Instance string
+}
+
+type MockLINKETHFeed interface {
+	Address() string
+	LatestRoundData() (*big.Int, error)
+	LatestRoundDataUpdatedAt() (*big.Int, error)
 }
 
 type MockETHLINKFeed interface {

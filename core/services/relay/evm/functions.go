@@ -8,8 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
-	"go.uber.org/multierr"
-
+	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
@@ -26,10 +25,27 @@ import (
 )
 
 type functionsProvider struct {
-	services.StateMachine
+	services.Service
+	eng *services.Engine
+
 	configWatcher       *configWatcher
 	contractTransmitter ContractTransmitter
 	logPollerWrapper    evmRelayTypes.LogPollerWrapper
+}
+
+func newFunctionsProvider(lggr logger.Logger, cw *configWatcher, ct ContractTransmitter, lpw evmRelayTypes.LogPollerWrapper) *functionsProvider {
+	p := &functionsProvider{
+		configWatcher:       cw,
+		contractTransmitter: ct,
+		logPollerWrapper:    lpw,
+	}
+	p.Service, p.eng = services.Config{
+		Name: "FunctionsProvider",
+		NewSubServices: func(lggr commonlogger.Logger) []services.Service {
+			return []services.Service{p.configWatcher, p.logPollerWrapper}
+		},
+	}.NewServiceEngine(lggr)
+	return p
 }
 
 var _ evmRelayTypes.FunctionsProvider = (*functionsProvider)(nil)
@@ -47,23 +63,6 @@ func (p *functionsProvider) FunctionsEvents() commontypes.FunctionsEvents {
 	return nil
 }
 
-func (p *functionsProvider) Start(ctx context.Context) error {
-	return p.StartOnce("FunctionsProvider", func() error {
-		if err := p.configWatcher.Start(ctx); err != nil {
-			return err
-		}
-		return p.logPollerWrapper.Start(ctx)
-	})
-}
-
-func (p *functionsProvider) Close() error {
-	return p.StopOnce("FunctionsProvider", func() (err error) {
-		err = multierr.Combine(err, p.logPollerWrapper.Close())
-		err = multierr.Combine(err, p.configWatcher.Close())
-		return
-	})
-}
-
 // Forward all calls to the underlying configWatcher
 func (p *functionsProvider) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
 	return p.configWatcher.OffchainConfigDigester()
@@ -73,15 +72,7 @@ func (p *functionsProvider) ContractConfigTracker() ocrtypes.ContractConfigTrack
 	return p.configWatcher.ContractConfigTracker()
 }
 
-func (p *functionsProvider) HealthReport() map[string]error {
-	return p.configWatcher.HealthReport()
-}
-
-func (p *functionsProvider) Name() string {
-	return p.configWatcher.Name()
-}
-
-func (p *functionsProvider) ChainReader() commontypes.ContractReader {
+func (p *functionsProvider) ContractReader() commontypes.ContractReader {
 	return nil
 }
 
@@ -127,11 +118,7 @@ func NewFunctionsProvider(ctx context.Context, chain legacyevm.Chain, rargs comm
 	} else {
 		lggr.Warn("no sending keys configured for functions plugin, not starting contract transmitter")
 	}
-	return &functionsProvider{
-		configWatcher:       configWatcher,
-		contractTransmitter: contractTransmitter,
-		logPollerWrapper:    logPollerWrapper,
-	}, nil
+	return newFunctionsProvider(lggr, configWatcher, contractTransmitter, logPollerWrapper), nil
 }
 
 func newFunctionsConfigProvider(ctx context.Context, pluginType functionsRelay.FunctionsPluginType, chain legacyevm.Chain, args commontypes.RelayArgs, fromBlock uint64, logPollerWrapper evmRelayTypes.LogPollerWrapper, lggr logger.Logger) (*configWatcher, error) {

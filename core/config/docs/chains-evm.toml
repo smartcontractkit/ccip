@@ -98,6 +98,8 @@ RPCBlockQueryDelay = 1 # Default
 # Block 64 will be treated as finalized by CL Node only when chain's latest finalized block is 65. As chain finalizes blocks in batches of 32,
 # CL Node has to wait for a whole new batch to be finalized to treat block 64 as finalized.
 FinalizedBlockOffset = 0 # Default
+# LogBroadcasterEnabled is a feature flag for LogBroadcaster, by default it's true.
+LogBroadcasterEnabled = true # Default
 # NoNewFinalizedHeadsThreshold controls how long to wait for new finalized block before `NodePool` marks rpc endpoints as
 # out-of-sync. Only applicable if `FinalityTagEnabled=true`
 #
@@ -408,6 +410,10 @@ EnforceRepeatableRead = false # Default
 # trigger declaration of `FinalizedBlockOutOfSync` due to insignificant network delays in broadcasting of the finalized state among RPCs.
 # RPC will not be picked to handle a request even if this option is set to a nonzero value.
 DeathDeclarationDelay = '10s' # Default
+# NewHeadsPollInterval define an interval for polling new block periodically using http client rather than subscribe to ws feed
+#
+# Set to 0 to disable.
+NewHeadsPollInterval = '0s' # Default
 # **ADVANCED**
 # Errors enable the node to provide custom regex patterns to match against error messages from RPCs.
 [EVM.NodePool.Errors]
@@ -439,6 +445,8 @@ TransactionAlreadyMined = '(: |^)transaction already mined' # Example
 Fatal = '(: |^)fatal' # Example
 # ServiceUnavailable is a regex pattern to match against service unavailable errors.
 ServiceUnavailable = '(: |^)service unavailable' # Example
+# TooManyResults is a regex pattern to match an eth_getLogs error indicating the result set is too large to return
+TooManyResults = '(: |^)too many results' # Example
 
 [EVM.OCR]
 # ContractConfirmations sets `OCR.ContractConfirmations` for this EVM chain.
@@ -479,3 +487,5 @@ GasLimit = 5400000 # Default
 FromAddress = '0x2a3e23c6f242F5345320814aC8a1b4E58707D292' # Example
 # ForwarderAddress is the keystone forwarder contract address on chain.
 ForwarderAddress = '0x2a3e23c6f242F5345320814aC8a1b4E58707D292' # Example
+# GasLimitDefault is the default gas limit for workflow transactions.
+GasLimitDefault = 400_000 # Default

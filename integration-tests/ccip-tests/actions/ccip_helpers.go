@@ -61,7 +61,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+<<<<<<< HEAD
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
+=======
+>>>>>>> v2.17.0
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
@@ -730,6 +733,7 @@ func (ccipModule *CCIPCommon) WriteLaneConfig(conf *laneconfig.LaneConfig) {
 	for k, v := range ccipModule.PriceAggregators {
 		priceAggrs[k.Hex()] = v.ContractAddress.Hex()
 	}
+<<<<<<< HEAD
 	conf.CommonContracts.FeeToken = ccipModule.FeeToken.Address()
 	conf.CommonContracts.BridgeTokens = btAddresses
 	conf.CommonContracts.BridgeTokenPools = btpAddresses
@@ -740,6 +744,19 @@ func (ccipModule *CCIPCommon) WriteLaneConfig(conf *laneconfig.LaneConfig) {
 	conf.CommonContracts.WrappedNative = ccipModule.WrappedNative.Hex()
 	conf.CommonContracts.Multicall = ccipModule.MulticallContract.Hex()
 
+=======
+	conf.CommonContracts = laneconfig.CommonContracts{
+		FeeToken:         ccipModule.FeeToken.Address(),
+		BridgeTokens:     btAddresses,
+		BridgeTokenPools: btpAddresses,
+		ARM:              ccipModule.RMNContract.Hex(),
+		Router:           ccipModule.Router.Address(),
+		PriceRegistry:    ccipModule.PriceRegistry.Address(),
+		PriceAggregators: priceAggrs,
+		WrappedNative:    ccipModule.WrappedNative.Hex(),
+		Multicall:        ccipModule.MulticallContract.Hex(),
+	}
+>>>>>>> v2.17.0
 	if ccipModule.TokenAdminRegistry != nil {
 		conf.CommonContracts.TokenAdminRegistry = ccipModule.TokenAdminRegistry.Address()
 	}
@@ -1648,10 +1665,14 @@ func (sourceCCIP *SourceCCIPModule) IsRequestTriggeredWithinTimeframe(timeframe 
 
 // IsPastRequestTriggeredWithinTimeframe determines the average block time and calculates the block numbers
 // within the specified timeframe. It then uses FilterCCIPSendRequested to identify the past events.
+<<<<<<< HEAD
 func (sourceCCIP *SourceCCIPModule) IsPastRequestTriggeredWithinTimeframe(
 	ctx context.Context,
 	timeframe *commonconfig.Duration,
 ) (*types.Log, error) {
+=======
+func (sourceCCIP *SourceCCIPModule) IsPastRequestTriggeredWithinTimeframe(ctx context.Context, timeframe *commonconfig.Duration) (*time.Time, error) {
+>>>>>>> v2.17.0
 	if timeframe == nil {
 		return nil, nil
 	}
@@ -1678,6 +1699,7 @@ func (sourceCCIP *SourceCCIPModule) IsPastRequestTriggeredWithinTimeframe(
 		return nil, fmt.Errorf("error while filtering CCIP send requested starting block number: %d. Error: %w", filterFromBlock, err)
 	}
 	defer func() {
+<<<<<<< HEAD
 		iterErr := iterator.Close()
 		if iterErr != nil {
 			sourceCCIP.Common.Logger.Error().Err(iterErr).Msg("Error closing iterator")
@@ -1693,6 +1715,19 @@ func (sourceCCIP *SourceCCIPModule) IsPastRequestTriggeredWithinTimeframe(
 		}
 	}
 	return latestEvent, nil
+=======
+		_ = iterator.Close()
+	}()
+	if iterator.Next() {
+		hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(iterator.Event.Raw.BlockNumber)))
+		if err != nil {
+			return nil, fmt.Errorf("error getting header for block: %d, Error: %w", iterator.Event.Raw.BlockNumber, err)
+		}
+		return pointer.ToTime(hdr.Timestamp), nil
+	}
+
+	return nil, nil
+>>>>>>> v2.17.0
 }
 
 func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
@@ -1816,7 +1851,11 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 		extraArgs, err = testhelpers.GetEVMExtraArgsV2(gasLimit, allowOutOfOrder)
 	}
 	if err != nil {
+<<<<<<< HEAD
 		return router.ClientEVM2AnyMessage{}, fmt.Errorf("failed encoding the options field: %w", err)
+=======
+		return router.ClientEVM2AnyMessage{}, fmt.Errorf("failed getting extra args: %w", err)
+>>>>>>> v2.17.0
 	}
 	// form the message for transfer
 	return router.ClientEVM2AnyMessage{
@@ -1829,7 +1868,14 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 }
 
 // SendRequest sends a CCIP request to the source chain's router contract
+<<<<<<< HEAD
 func (sourceCCIP *SourceCCIPModule) SendRequest(receiver common.Address, gasLimit *big.Int) (common.Hash, time.Duration, *big.Int, error) {
+=======
+func (sourceCCIP *SourceCCIPModule) SendRequest(
+	receiver common.Address,
+	gasLimit *big.Int,
+) (common.Hash, time.Duration, *big.Int, error) {
+>>>>>>> v2.17.0
 	var d time.Duration
 	destChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
@@ -2854,8 +2900,16 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporter
 func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) error {
 	var ccipMultipleMsg []contracts.CCIPMsgData
 	feeToken := common.HexToAddress(lane.Source.Common.FeeToken.Address())
+<<<<<<< HEAD
 	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, lane.Source.Common.AllowOutOfOrder,
 		big.NewInt(DefaultDestinationGasLimit))
+=======
+	genericMsg, err := lane.Source.CCIPMsg(
+		lane.Dest.ReceiverDapp.EthAddress,
+		lane.Source.Common.AllowOutOfOrder,
+		big.NewInt(DefaultDestinationGasLimit),
+	)
+>>>>>>> v2.17.0
 	if err != nil {
 		return fmt.Errorf("failed to form the ccip message: %w", err)
 	}
@@ -3204,7 +3258,11 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 		reqStats = append(reqStats, req.RequestStat)
 	}
 
+<<<<<<< HEAD
 	if (opts.phaseExpectedToFail == testreporters.CCIPSendRe || opts.expectAnyPhaseToFail) && opts.timeout != 0 {
+=======
+	if opts.phaseExpectedToFail == testreporters.CCIPSendRe && opts.timeout != 0 {
+>>>>>>> v2.17.0
 		timeout = opts.timeout
 	}
 	msgLogs, ccipSendReqGenAt, err := lane.Source.AssertEventCCIPSendRequested(
@@ -3232,10 +3290,13 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 			return fmt.Errorf("could not find request stat for seq number %d", seqNumber)
 		}
 
+<<<<<<< HEAD
 		if opts.expectAnyPhaseToFail && opts.timeout != 0 {
 			timeout = opts.timeout
 		}
 
+=======
+>>>>>>> v2.17.0
 		if opts.phaseExpectedToFail == testreporters.Commit && opts.timeout != 0 {
 			timeout = opts.timeout
 		}
@@ -3275,9 +3336,12 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 			return phaseErr
 		}
 	}
+<<<<<<< HEAD
 	if opts.expectAnyPhaseToFail {
 		return fmt.Errorf("expected at least any one phase to fail but no phase got failed")
 	}
+=======
+>>>>>>> v2.17.0
 	return nil
 }
 
@@ -3597,9 +3661,15 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return fmt.Errorf("failed to create source module: %w", err)
 	}
 
+<<<<<<< HEAD
 	// If AllowOutOfOrder is set globally in test config, then assumption is to set it for every lane.
 	//However, if this is set as false, and set as true for specific chain in lane_configs then apply it
 	//only for a lane where source network is of that chain.
+=======
+	// If AllowOutOfOrder is set globally in test config, the assumption is to set it for every lane.
+	// However, if this is set as false, and set as true for specific chain in lane_configs, then apply it
+	// only for a lane where source network is of that chain.
+>>>>>>> v2.17.0
 	if allowOutOfOrder {
 		lane.Source.Common.AllowOutOfOrder = true
 	}
@@ -3854,6 +3924,7 @@ func SetOCR2Config(
 	if len(execNodes) > 0 {
 		nodes = execNodes
 	}
+<<<<<<< HEAD
 
 	// Use out of order batching strategy if we expect to be sending out of order messages
 	batchingStrategyID := ccipexec.BestEffortBatchingStrategyID
@@ -3861,6 +3932,14 @@ func SetOCR2Config(
 		batchingStrategyID = ccipexec.ZKOverflowBatchingStrategyID
 	}
 	if destCCIP.OffRamp != nil {
+=======
+	if destCCIP.OffRamp != nil {
+		// Use out of order batching strategy if we expect to be sending out of order messages
+		batchingStrategyID := uint32(0)
+		if pointer.GetBool(testConf.AllowOutOfOrder) {
+			batchingStrategyID = uint32(1)
+		}
+>>>>>>> v2.17.0
 		execOffchainCfg, err := contracts.NewExecOffchainConfig(
 			1,
 			BatchGasLimit,
@@ -4122,7 +4201,10 @@ func (c *CCIPTestEnv) ConnectToExistingNodes(envConfig *testconfig.Common) error
 		if err != nil {
 			return fmt.Errorf("failed to create chainlink client: %w for node %d config %v", err, i+1, cfg)
 		}
+<<<<<<< HEAD
 		clClient.ChainlinkClient.WithRetryCount(3)
+=======
+>>>>>>> v2.17.0
 		c.CLNodes = append(c.CLNodes, clClient)
 		c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
 	}
@@ -4136,7 +4218,11 @@ func (c *CCIPTestEnv) ConnectToDeployedNodes() error {
 		for _, chainlinkNode := range c.LocalCluster.ClCluster.Nodes {
 			c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
 			c.CLNodes = append(c.CLNodes, &client.ChainlinkK8sClient{
+<<<<<<< HEAD
 				ChainlinkClient: chainlinkNode.API.WithRetryCount(3),
+=======
+				ChainlinkClient: chainlinkNode.API,
+>>>>>>> v2.17.0
 			})
 		}
 	} else {
@@ -4150,8 +4236,12 @@ func (c *CCIPTestEnv) ConnectToDeployedNodes() error {
 			return fmt.Errorf("no CL node found")
 		}
 
+<<<<<<< HEAD
 		for i := range chainlinkK8sNodes {
 			chainlinkK8sNodes[i].ChainlinkClient.WithRetryCount(3)
+=======
+		for range chainlinkK8sNodes {
+>>>>>>> v2.17.0
 			c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
 		}
 		c.CLNodes = chainlinkK8sNodes

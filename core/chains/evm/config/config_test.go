@@ -205,6 +205,25 @@ func TestChainScopedConfig(t *testing.T) {
 			assert.Equal(t, val.String(), cfg3.EVM().OperatorFactoryAddress())
 		})
 	})
+
+	t.Run("LogBroadcasterEnabled", func(t *testing.T) {
+		t.Run("turn on LogBroadcasterEnabled by default", func(t *testing.T) {
+			assert.Equal(t, true, cfg.EVM().LogBroadcasterEnabled())
+		})
+
+		t.Run("verify LogBroadcasterEnabled is set correctly", func(t *testing.T) {
+			val := false
+			cfg3 := testutils.NewTestChainScopedConfig(t, func(c *toml.EVMConfig) {
+				c.LogBroadcasterEnabled = ptr(val)
+			})
+
+			assert.Equal(t, false, cfg3.EVM().LogBroadcasterEnabled())
+		})
+
+		t.Run("use Noop logBroadcaster when LogBroadcaster is disabled", func(t *testing.T) {
+
+		})
+	})
 }
 
 func TestChainScopedConfig_BlockHistory(t *testing.T) {
@@ -361,6 +380,7 @@ func TestClientErrorsConfig(t *testing.T) {
 					TransactionAlreadyMined:           ptr("client error transaction already mined"),
 					Fatal:                             ptr("client error fatal"),
 					ServiceUnavailable:                ptr("client error service unavailable"),
+					TooManyResults:                    ptr("client error too many results"),
 				},
 			}
 		})
@@ -380,6 +400,7 @@ func TestClientErrorsConfig(t *testing.T) {
 		assert.Equal(t, "client error transaction already mined", errors.TransactionAlreadyMined())
 		assert.Equal(t, "client error fatal", errors.Fatal())
 		assert.Equal(t, "client error service unavailable", errors.ServiceUnavailable())
+		assert.Equal(t, "client error too many results", errors.TooManyResults())
 	})
 }
 
