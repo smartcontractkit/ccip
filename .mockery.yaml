@@ -43,10 +43,6 @@ packages:
   github.com/smartcontractkit/chainlink/v2/core/bridges:
     interfaces:
       ORM:
-  github.com/smartcontractkit/chainlink/v2/core/capabilities/ccip/types:
-    interfaces:
-      CCIPOracle:
-      OracleCreator:
   github.com/smartcontractkit/chainlink/v2/core/capabilities/remote/types:
     interfaces:
       Dispatcher:
@@ -349,6 +345,7 @@ packages:
         config:
           dir: core/services/relay/evm/mocks
       ChainWriter:
+      ContractReader:
   github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp:
     config:
       dir: core/gethwrappers/ccip/mocks/

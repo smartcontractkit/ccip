@@ -737,17 +737,17 @@ func testGetAllTokensStaticOnly(t *testing.T) testParameters {
 	}
 }
 
-func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.LatestRoundData) *mocks.ChainReader {
-	caller := mocks.NewChainReader(t)
+func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.LatestRoundData) *mocks.ContractReader {
+	caller := mocks.NewContractReader(t)
 
 	// Mock batch calls per chain: all decimals calls then all latestRoundData calls.
-	// bGLVR = batchGetLatestValueResult
-	//nolint:all
-	var bGLVR types.BatchGetLatestValuesResult
-	bGLVR = make(map[string]types.ContractBatchResults, 1)
+	bGLVR := make(types.BatchGetLatestValuesResult)
 
 	for i := range len(decimals) {
-		bGLVR[fmt.Sprintf("%v_%v", OffchainAggregator, i)] = make([]types.BatchReadResult, 0, 2)
+		boundContract := types.BoundContract{
+			Name: fmt.Sprintf("%v_%v", OffchainAggregator, i),
+		}
+		bGLVR[boundContract] = types.ContractBatchResults{}
 	}
 	for i, d := range decimals {
 		contractName := fmt.Sprintf("%v_%v", OffchainAggregator, i)
@@ -755,7 +755,10 @@ func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.Lat
 			ReadName: DecimalsMethodName,
 		}
 		readRes.SetResult(&d, nil)
-		bGLVR[contractName] = append(bGLVR[contractName], readRes)
+		boundContract := types.BoundContract{
+			Name: contractName,
+		}
+		bGLVR[boundContract] = append(bGLVR[boundContract], readRes)
 	}
 
 	for i, r := range rounds {
@@ -764,7 +767,10 @@ func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.Lat
 			ReadName: LatestRoundDataMethodName,
 		}
 		readRes.SetResult(&r, nil)
-		bGLVR[contractName] = append(bGLVR[contractName], readRes)
+		boundContract := types.BoundContract{
+			Name: contractName,
+		}
+		bGLVR[boundContract] = append(bGLVR[boundContract], readRes)
 	}
 
 	caller.On("Bind", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -772,8 +778,8 @@ func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.Lat
 	return caller
 }
 
-func mockErrCR(t *testing.T) *mocks.ChainReader {
-	caller := mocks.NewChainReader(t)
+func mockErrCR(t *testing.T) *mocks.ContractReader {
+	caller := mocks.NewContractReader(t)
 	caller.On("Bind", mock.Anything, mock.Anything).Return(nil).Maybe()
 	caller.On("BatchGetLatestValues", mock.Anything, mock.Anything).Return(nil, assert.AnError).Maybe()
 	return caller
