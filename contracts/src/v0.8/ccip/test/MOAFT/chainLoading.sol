@@ -24,7 +24,7 @@ import {Test} from "forge-std/Test.sol";
 /// <chain>_RPC_URL=''
 /// # The Router contract address
 /// <chain>_ROUTER=0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59
-/// # The block before the migration was applied. Use 0 if the migration has not been applied yet.
+/// # Any block before the migration was applied.
 /// <chain>_PRE_BLOCK=6797746
 /// # Any block after the migration was applied. Use 0 if the migration has not been applied yet.
 /// <chain>_POST_BLOCK=6904314
@@ -54,8 +54,18 @@ contract ChainLoading is Test {
 
   uint256 internal constant FourHours = 4 * 60 * 60;
 
-  string[] internal s_allTestnets = [SEPOLIA, OPT_SEPOLIA, ARB_SEPOLIA];
-  string[] internal s_allMainnets = [ETHEREUM];
+  string[] internal s_allTestnets = [
+    SEPOLIA,
+    GNOSIS_TESTNET,
+    BNB_TESTNET,
+    MODE_TESTNET,
+    OPT_SEPOLIA,
+    POLYGON_AMOY,
+    ARB_SEPOLIA,
+    AVAX_FUJI,
+    BASE_SEPOLIA
+  ];
+  string[] internal s_allMainnets = [BLAST, ETHEREUM, GNOSIS, BNB, MODE, OPTIMISM, POLYGON, ARBITRUM, AVAX, BASE];
 
   mapping(string chainName => ForkedChainTestSetup) public s_chains;
 
@@ -88,8 +98,8 @@ contract ChainLoading is Test {
   }
 
   function test_all_chains() public {
-    for (uint256 i = 0; i < s_allTestnets.length; ++i) {
-      run(s_allTestnets[i]);
+    for (uint256 i = 0; i < s_allMainnets.length; ++i) {
+      run(s_allMainnets[i]);
     }
   }
 
@@ -129,6 +139,11 @@ contract ChainLoading is Test {
     console2.logString(" +------------------------------------------------+");
 
     chain.testSuite.sendAllTokens(false);
+
+    if (chain.postMigrationBlock == 0) {
+      console2.logString("Migration not applied yet");
+      return;
+    }
 
     console2.logString(" +------------------------------------------------+");
     console2.logString(" |                After migration                 |");
