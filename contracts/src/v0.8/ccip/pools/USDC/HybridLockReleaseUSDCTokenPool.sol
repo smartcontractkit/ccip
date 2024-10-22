@@ -194,6 +194,7 @@ contract HybridLockReleaseUSDCTokenPool is USDCTokenPool, USDCBridgeMigrator {
     s_lockedTokensByChainSelector[remoteChainSelector] -= amount;
 
     i_token.safeTransfer(msg.sender, amount);
+
     emit ILiquidityContainer.LiquidityRemoved(msg.sender, amount);
   }
 
