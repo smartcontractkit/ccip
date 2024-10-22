@@ -72,11 +72,13 @@ ztarrepo.tar.gz
 **/test-ledger/*
 __debug_bin*
 .test_summary/
+db_dumps/
 .run.id
 integration-tests/**/traces/
 benchmark_report.csv
 benchmark_summary.json
-integration-tests/citool/output.csv
+secrets.toml
+tmp_laneconfig/
 
 # goreleaser builds
 cosign.*
@@ -97,6 +99,7 @@ core/scripts/ccip/csv/node-wallets
 *report.xml
 *report.json
 *.out
+dot_graphs/
 
 contracts/yarn.lock
 
@@ -119,7 +122,7 @@ tools/flakeytests/coverage.txt
 # Runtime test configuration that might contain secrets
 override*.toml
 
-# Pythin venv
+# Python venv
 .venv/
 
 ocr_soak_report.csv

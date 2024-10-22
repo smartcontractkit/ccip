@@ -10,10 +10,10 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 )
 
@@ -43,13 +43,7 @@ func (c *CommitStore) IsDown(ctx context.Context) (bool, error) {
 	return !unPausedAndNotCursed, nil
 }
 
-func NewCommitStore(
-	lggr logger.Logger,
-	addr common.Address,
-	ec client.Client,
-	lp logpoller.LogPoller,
-	feeEstimatorConfig ccipdata.FeeEstimatorConfigReader,
-) (*CommitStore, error) {
+func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, feeEstimatorConfig ccipdata.FeeEstimatorConfigReader) (*CommitStore, error) {
 	v120, err := v1_2_0.NewCommitStore(lggr, addr, ec, lp, feeEstimatorConfig)
 	if err != nil {
 		return nil, err

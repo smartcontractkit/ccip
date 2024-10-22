@@ -261,7 +261,7 @@ func TestConfig_Marshal(t *testing.T) {
 		FeedsManager: ptr(true),
 		LogPoller:    ptr(true),
 		UICSAKeys:    ptr(true),
-		CCIP:         ptr(false),
+		CCIP:         ptr(true),
 	}
 	full.Database = toml.Database{
 		DefaultIdleInTxSessionTimeout: commoncfg.MustNewDuration(time.Minute),
@@ -562,7 +562,7 @@ func TestConfig_Marshal(t *testing.T) {
 				LogBackfillBatchSize:         ptr[uint32](17),
 				LogPollInterval:              &minute,
 				LogKeepBlocksDepth:           ptr[uint32](100000),
-				LogPrunePageSize:             ptr[uint32](10000),
+				LogPrunePageSize:             ptr[uint32](0),
 				BackupLogPollerBlockDelay:    ptr[uint64](532),
 				MinContractPayment:           commonassets.NewLinkFromJuels(math.MaxInt64),
 				MinIncomingConfirmations:     ptr[uint32](13),
@@ -618,6 +618,7 @@ func TestConfig_Marshal(t *testing.T) {
 						TransactionAlreadyMined:           ptr[string]("(: |^)transaction already mined"),
 						Fatal:                             ptr[string]("(: |^)fatal"),
 						ServiceUnavailable:                ptr[string]("(: |^)service unavailable"),
+						TooManyResults:                    ptr[string]("(: |^)too many results"),
 					},
 				},
 				OCR: evmcfg.OCR{
@@ -776,7 +777,7 @@ Headers = ['Authorization: token', 'X-SomeOther-Header: value with spaces | and 
 FeedsManager = true
 LogPoller = true
 UICSAKeys = true
-CCIP = false
+CCIP = true
 `},
 		{"Database", Config{Core: toml.Core{Database: full.Database}}, `[Database]
 DefaultIdleInTxSessionTimeout = '1m0s'
@@ -1096,6 +1097,7 @@ L2Full = '(: |^)l2 full'
 TransactionAlreadyMined = '(: |^)transaction already mined'
 Fatal = '(: |^)fatal'
 ServiceUnavailable = '(: |^)service unavailable'
+TooManyResults = '(: |^)too many results'
 
 [EVM.OCR]
 ContractConfirmations = 11
@@ -1373,7 +1375,7 @@ func TestConfig_Validate(t *testing.T) {
 		- 1: 2 errors:
 			- ChainID: missing: required for all chains
 			- Nodes: missing: must have at least one node
-	- Aptos.0.Enabled: invalid value (1): expected *bool`},
+	- Aptos.0.Enabled: invalid value (1): expected bool`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var c Config

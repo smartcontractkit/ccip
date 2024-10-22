@@ -20,8 +20,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/chaos"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/chaos"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/testcontext"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
@@ -112,15 +112,8 @@ func (l *LoadArgs) scheduleForDest(destNetworkName string) []*wasp.Segment {
 	// if found, use that frequency for the destination network
 	// otherwise, use the default frequency
 	if l.TestCfg.TestGroupInput.LoadProfile.FrequencyByDestination != nil {
-		l.lggr.Debug().
-			Interface("FrequencyByDestination", l.TestCfg.TestGroupInput.LoadProfile.FrequencyByDestination).
-			Msg("LoadProfile provided")
 		for networkName, freq := range l.TestCfg.TestGroupInput.LoadProfile.FrequencyByDestination {
-			l.lggr.Debug().Str("Destination", destNetworkName).Str("NetworkName", networkName).Msg("Checking frequency for destination")
-			if strings.EqualFold(destNetworkName, networkName) {
-				l.lggr.Info().Str("Destination", destNetworkName).
-					Ints64("RequestPerUnitTime", freq.RequestPerUnitTime).
-					Msg("Using frequency for destination")
+			if strings.Contains(destNetworkName, networkName) {
 				return WaspSchedule(
 					freq.RequestPerUnitTime,
 					l.TestCfg.TestGroupInput.LoadProfile.TestDuration,
@@ -206,7 +199,10 @@ func (l *LoadArgs) ValidateCurseFollowedByUncurse() {
 		// try to send requests on lanes on which curse is applied on source RMN and the request should revert
 		// data-only transfer is sufficient
 		lane.Source.TransferAmount = []*big.Int{}
-		failedTx, _, _, err := lane.Source.SendRequest(lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultDestinationGasLimit))
+		failedTx, _, _, err := lane.Source.SendRequest(
+			lane.Dest.ReceiverDapp.EthAddress,
+			big.NewInt(actions.DefaultDestinationGasLimit), // gas limit
+		)
 		if lane.Source.Common.ChainClient.GetNetworkConfig().MinimumConfirmations > 0 {
 			require.Error(l.t, err)
 		} else {
@@ -276,7 +272,7 @@ func (l *LoadArgs) TriggerLoadByLane() {
 		ccipLoad := NewCCIPLoad(
 			l.TestCfg.Test, lane, l.TestCfg.TestGroupInput.PhaseTimeout.Duration(),
 			100000, l.TestCfg.TestGroupInput.LoadProfile.MsgProfile, sendMaxData,
-			l.TestCfg.TestGroupInput.SkipRequestIfAnotherRequestTriggeredWithin,
+			l.TestCfg.TestGroupInput.LoadProfile.SkipRequestIfAnotherRequestTriggeredWithin,
 		)
 		ccipLoad.BeforeAllCall()
 		// if it's not multicall set the tokens to nil to free up some space,

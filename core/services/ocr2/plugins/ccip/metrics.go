@@ -20,10 +20,6 @@ var (
 		Name: "ccip_sequence_number_counter",
 		Help: "Sequence number of the last message processed by the plugin",
 	}, []string{"plugin", "source", "dest", "ocrPhase"})
-	newReportingPluginErrorCounter = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "ccip_new_reporting_plugin_error_counter",
-		Help: "The count of the number of errors when calling NewReportingPlugin",
-	}, []string{"plugin"})
 )
 
 type ocrPhase string
@@ -39,7 +35,6 @@ type PluginMetricsCollector interface {
 	NumberOfMessagesBasedOnInterval(phase ocrPhase, seqNrMin, seqNrMax uint64)
 	UnexpiredCommitRoots(count int)
 	SequenceNumber(phase ocrPhase, seqNr uint64)
-	NewReportingPluginError()
 }
 
 type pluginMetricsCollector struct {
@@ -84,12 +79,6 @@ func (p *pluginMetricsCollector) SequenceNumber(phase ocrPhase, seqNr uint64) {
 		Set(float64(seqNr))
 }
 
-func (p *pluginMetricsCollector) NewReportingPluginError() {
-	newReportingPluginErrorCounter.
-		WithLabelValues(p.pluginName).
-		Inc()
-}
-
 var (
 	// NoopMetricsCollector is a no-op implementation of PluginMetricsCollector
 	NoopMetricsCollector PluginMetricsCollector = noop{}
@@ -107,7 +96,4 @@ func (d noop) UnexpiredCommitRoots(int) {
 }
 
 func (d noop) SequenceNumber(ocrPhase, uint64) {
-}
-
-func (d noop) NewReportingPluginError() {
 }

@@ -23,13 +23,11 @@ func TestDAPriceEstimator_GetGasPrice(t *testing.T) {
 	ctx := context.Background()
 
 	testCases := []struct {
-		name            string
-		daGasPrice      *big.Int
-		execGasPrice    *big.Int
-		expPrice        *big.Int
-		modExecGasPrice *big.Int
-		modDAGasPrice   *big.Int
-		expErr          bool
+		name         string
+		daGasPrice   *big.Int
+		execGasPrice *big.Int
+		expPrice     *big.Int
+		expErr       bool
 	}{
 		{
 			name:         "base",
@@ -60,31 +58,6 @@ func TestDAPriceEstimator_GetGasPrice(t *testing.T) {
 			expErr:       false,
 		},
 		{
-			name:            "execGasPrice Modified",
-			daGasPrice:      big.NewInt(1e9),
-			execGasPrice:    big.NewInt(0),
-			modExecGasPrice: big.NewInt(1),
-			expPrice:        encodeGasPrice(big.NewInt(1e9), big.NewInt(1)),
-			expErr:          false,
-		},
-		{
-			name:          "daGasPrice Modified",
-			daGasPrice:    big.NewInt(1e9),
-			execGasPrice:  big.NewInt(0),
-			modDAGasPrice: big.NewInt(1),
-			expPrice:      encodeGasPrice(big.NewInt(1), big.NewInt(0)),
-			expErr:        false,
-		},
-		{
-			name:            "daGasPrice and execGasPrice Modified",
-			daGasPrice:      big.NewInt(1e9),
-			execGasPrice:    big.NewInt(0),
-			modDAGasPrice:   big.NewInt(1),
-			modExecGasPrice: big.NewInt(2),
-			expPrice:        encodeGasPrice(big.NewInt(1), big.NewInt(2)),
-			expErr:          false,
-		},
-		{
 			name:         "price out of bounds",
 			daGasPrice:   new(big.Int).Lsh(big.NewInt(1), daGasPriceEncodingLength),
 			execGasPrice: big.NewInt(1),
@@ -101,25 +74,10 @@ func TestDAPriceEstimator_GetGasPrice(t *testing.T) {
 			l1Oracle := mocks.NewL1Oracle(t)
 			l1Oracle.On("GasPrice", ctx).Return(assets.NewWei(tc.daGasPrice), nil)
 
-			feeEstimatorConfig := ccipdatamocks.NewFeeEstimatorConfigReader(t)
-
-			modRespExecGasPrice := tc.execGasPrice
-			if tc.modExecGasPrice != nil {
-				modRespExecGasPrice = tc.modExecGasPrice
-			}
-
-			modRespDAGasPrice := tc.daGasPrice
-			if tc.modDAGasPrice != nil {
-				modRespDAGasPrice = tc.modDAGasPrice
-			}
-			feeEstimatorConfig.On("ModifyGasPriceComponents", mock.Anything, tc.execGasPrice, tc.daGasPrice).
-				Return(modRespExecGasPrice, modRespDAGasPrice, nil)
-
 			g := DAGasPriceEstimator{
 				execEstimator:       execEstimator,
 				l1Oracle:            l1Oracle,
 				priceEncodingLength: daGasPriceEncodingLength,
-				feeEstimatorConfig:  feeEstimatorConfig,
 			}
 
 			gasPrice, err := g.GetGasPrice(ctx)

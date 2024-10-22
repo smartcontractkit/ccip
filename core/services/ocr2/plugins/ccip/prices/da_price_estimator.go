@@ -43,7 +43,6 @@ func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (*big.Int, error) 
 		return nil, err
 	}
 	var gasPrice *big.Int = execGasPrice
-
 	if gasPrice.BitLen() > int(g.priceEncodingLength) {
 		return nil, fmt.Errorf("native gas price exceeded max range %+v", gasPrice)
 	}
@@ -57,14 +56,7 @@ func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (*big.Int, error) 
 		return nil, err
 	}
 
-	daGasPrice := daGasPriceWei.ToInt()
-
-	gasPrice, daGasPrice, err = g.feeEstimatorConfig.ModifyGasPriceComponents(ctx, gasPrice, daGasPrice)
-	if err != nil {
-		return nil, fmt.Errorf("gasPrice modification failed: %v", err)
-	}
-
-	if daGasPrice.Cmp(big.NewInt(0)) > 0 {
+	if daGasPrice := daGasPriceWei.ToInt(); daGasPrice.Cmp(big.NewInt(0)) > 0 {
 		if daGasPrice.BitLen() > int(g.priceEncodingLength) {
 			return nil, fmt.Errorf("data availability gas price exceeded max range %+v", daGasPrice)
 		}

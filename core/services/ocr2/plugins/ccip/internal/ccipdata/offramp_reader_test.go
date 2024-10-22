@@ -12,7 +12,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/headtracker"
@@ -26,7 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -158,7 +159,7 @@ func TestOffRampReaderInit(t *testing.T) {
 func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 	ctx := testutils.Context(t)
 	user, bc := ccipdata.NewSimulation(t)
-	log := logger.TestLogger(t)
+	log := logger.Test(t)
 	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log)
 	lpOpts := logpoller.Opts{
 		PollPeriod:               100 * time.Millisecond,
@@ -313,7 +314,7 @@ func setupOffRampV1_5_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 		Context: testutils.Context(t),
 	})
 	require.NoError(t, err)
-	require.Equal(t, "EVM2EVMOffRamp 1.5.0", tav)
+	require.Equal(t, "EVM2EVMOffRamp 1.5.0-dev", tav)
 	return offRampAddr
 }
 
@@ -355,7 +356,7 @@ func deployCommitStore(
 	}
 	tav, err := cs.TypeAndVersion(callOpts)
 	require.NoError(t, err)
-	require.Equal(t, "CommitStore 1.5.0", tav)
+	require.Equal(t, "CommitStore 1.5.0-dev", tav)
 	return csAddr
 }
 
@@ -410,7 +411,7 @@ func TestNewOffRampReader(t *testing.T) {
 			addr := ccipcalc.EvmAddrToGeneric(utils.RandomAddress())
 			lp := lpmocks.NewLogPoller(t)
 			lp.On("RegisterFilter", mock.Anything, mock.Anything).Return(nil).Maybe()
-			_, err = factory.NewOffRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp, nil, nil, true, feeEstimatorConfig)
+			_, err = factory.NewOffRampReader(logger.Test(t), factory.NewEvmVersionFinder(), addr, c, lp, nil, nil, true, feeEstimatorConfig)
 			if tc.expectedErr != "" {
 				assert.EqualError(t, err, tc.expectedErr)
 			} else {

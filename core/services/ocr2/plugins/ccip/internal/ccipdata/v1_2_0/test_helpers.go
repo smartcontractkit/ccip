@@ -9,37 +9,37 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 )
 
 // ApplyPriceRegistryUpdate is a helper function used in tests only.
 func ApplyPriceRegistryUpdate(t *testing.T, user *bind.TransactOpts, addr common.Address, ec client.Client, gasPrices []cciptypes.GasPrice, tokenPrices []cciptypes.TokenPrice) common.Hash {
 	require.True(t, len(gasPrices) <= 2)
-	pr, err := fee_quoter.NewFeeQuoter(addr, ec)
+	pr, err := price_registry.NewPriceRegistry(addr, ec)
 	require.NoError(t, err)
 	o, err := pr.Owner(nil)
 	require.NoError(t, err)
 	require.Equal(t, user.From, o)
-	var tps []fee_quoter.InternalTokenPriceUpdate
+	var tps []price_registry.InternalTokenPriceUpdate
 	for _, tp := range tokenPrices {
 		evmAddrs, err1 := ccipcalc.GenericAddrsToEvm(tp.Token)
 		assert.NoError(t, err1)
-		tps = append(tps, fee_quoter.InternalTokenPriceUpdate{
+		tps = append(tps, price_registry.InternalTokenPriceUpdate{
 			SourceToken: evmAddrs[0],
 			UsdPerToken: tp.Value,
 		})
 	}
-	var gps []fee_quoter.InternalGasPriceUpdate
+	var gps []price_registry.InternalGasPriceUpdate
 	for _, gp := range gasPrices {
-		gps = append(gps, fee_quoter.InternalGasPriceUpdate{
+		gps = append(gps, price_registry.InternalGasPriceUpdate{
 			DestChainSelector: gp.DestChainSelector,
 			UsdPerUnitGas:     gp.Value,
 		})
 	}
-	tx, err := pr.UpdatePrices(user, fee_quoter.InternalPriceUpdates{
+	tx, err := pr.UpdatePrices(user, price_registry.InternalPriceUpdates{
 		TokenPriceUpdates: tps,
 		GasPriceUpdates:   gps,
 	})

@@ -9,13 +9,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
@@ -167,15 +167,7 @@ func (o *OffRamp) ChangeConfig(ctx context.Context, onchainConfigBytes []byte, o
 		cciptypes.Address(destWrappedNative.String()), nil
 }
 
-func NewOffRamp(
-	lggr logger.Logger,
-	addr common.Address,
-	ec client.Client,
-	lp logpoller.LogPoller,
-	estimator gas.EvmFeeEstimator,
-	destMaxGasPrice *big.Int,
-	feeEstimatorConfig ccipdata.FeeEstimatorConfigReader,
-) (*OffRamp, error) {
+func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, destMaxGasPrice *big.Int, feeEstimatorConfig ccipdata.FeeEstimatorConfigReader) (*OffRamp, error) {
 	v120, err := v1_2_0.NewOffRamp(lggr, addr, ec, lp, estimator, destMaxGasPrice, feeEstimatorConfig)
 	if err != nil {
 		return nil, err
