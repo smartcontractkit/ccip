@@ -51,7 +51,7 @@ library Constants {
       return "Ethereum mainnet";
     } else if (chainSelector == 465200170687744372) {
       return "Gnosis";
-    } else if (chainSelector == 13274425992935471758) {
+    } else if (chainSelector == 11344663589394136015) {
       return "Binance Smart Chain";
     } else if (chainSelector == 7264351850409363825) {
       return "Mode";
@@ -249,16 +249,17 @@ contract CCIPTestSuite is Test {
     deal(token, address(this), TOKENS_TO_SEND * 10);
 
     IERC20(token).approve(address(i_router), TOKENS_TO_SEND);
-    i_router.ccipSend{value: 100 ether}(
-      destChainSelector,
-      Client.EVM2AnyMessage({
-        receiver: abi.encode(_getRandomAddress()),
-        data: "",
-        tokenAmounts: tokenAmounts,
-        feeToken: address(0),
-        extraArgs: ""
-      })
-    );
+
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+      receiver: abi.encode(_getRandomAddress()),
+      data: "",
+      tokenAmounts: tokenAmounts,
+      feeToken: address(0),
+      extraArgs: ""
+    });
+    uint256 fee = i_router.getFee(destChainSelector, message);
+
+    i_router.ccipSend{value: fee}(destChainSelector, message);
   }
 
   function ExecuteMsgs(
