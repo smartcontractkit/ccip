@@ -29,6 +29,7 @@ var (
 	nodeInterfaceABI = abihelpers.MustParseABI(arb_node_interface.NodeInterfaceMetaData.ABI)
 )
 
+// nolint
 func SendToL2(
 	env multienv.Env,
 	l1ChainID,
