@@ -238,6 +238,7 @@ func estimateAll(env multienv.Env, l1ChainID, l2ChainID uint64, rd RetryableData
 	}
 }
 
+// nolint
 func estimateRetryableGasLimit(l2Client *ethclient.Client, l2ChainID uint64, rd RetryableData) *big.Int {
 	packed, err := nodeInterfaceABI.Pack("estimateRetryableTicket",
 		rd.From,
@@ -270,6 +271,7 @@ func estimateMaxFeePerGasOnL2(l2Client *ethclient.Client) *big.Int {
 	return l2BaseFee
 }
 
+// nolint
 func estimateSubmissionFee(l1Client *ethclient.Client, l1ChainID uint64, l1BaseFee *big.Int, calldataSize uint64) *big.Int {
 	inbox, err := arbitrum_inbox.NewArbitrumInbox(ArbitrumContracts[l1ChainID]["L1Inbox"], l1Client)
 	helpers.PanicErr(err)
