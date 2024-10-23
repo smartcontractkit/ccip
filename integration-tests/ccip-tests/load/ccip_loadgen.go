@@ -10,33 +10,20 @@ import (
 	"testing"
 	"time"
 
-<<<<<<< HEAD
-=======
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
-
->>>>>>> v2.17.0
 	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog"
-<<<<<<< HEAD
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
-=======
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
-
->>>>>>> v2.17.0
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 
-<<<<<<< HEAD
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
@@ -44,16 +31,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
-=======
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
-
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
->>>>>>> v2.17.0
 )
 
 // CCIPLaneOptimized is a light-weight version of CCIPLane, It only contains elements which are used during load triggering and validation
@@ -220,10 +197,7 @@ func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.Req
 		extraArgs []byte
 		err       error
 	)
-<<<<<<< HEAD
 	// v1.5.0 and later starts using V2 extra args
-=======
->>>>>>> v2.17.0
 	matchErr := contracts.MatchContractVersionsOrAbove(map[contracts.Name]contracts.Version{
 		contracts.OnRampContract: contracts.V1_5_0,
 	})
@@ -251,16 +225,12 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	res := &wasp.Response{}
 	sourceCCIP := c.Lane.Source
 	var recentRequestFoundAt *time.Time
-<<<<<<< HEAD
 	var latestEvent *types.Log
-=======
->>>>>>> v2.17.0
 	var err error
 	// Use IsPastRequestTriggeredWithinTimeframe to check for any historical CCIP send request events
 	// within the specified timeframe for the first message. Subsequently, use the watcher method to monitor
 	// and detect any new events as they occur.
 	if c.CurrentMsgSerialNo.Load() == int64(1) {
-<<<<<<< HEAD
 		latestEvent, err = sourceCCIP.IsPastRequestTriggeredWithinTimeframe(testcontext.Get(c.t), c.SkipRequestIfAnotherRequestTriggeredWithin)
 		require.NoError(c.t, err, "error while filtering past requests")
 		if latestEvent != nil {
@@ -268,10 +238,6 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 			require.NoError(c.t, err, "error while getting header by block number")
 			recentRequestFoundAt = pointer.ToTime(hdr.Timestamp)
 		}
-=======
-		recentRequestFoundAt, err = sourceCCIP.IsPastRequestTriggeredWithinTimeframe(testcontext.Get(c.t), c.SkipRequestIfAnotherRequestTriggeredWithin)
-		require.NoError(c.t, err, "error while filtering past requests")
->>>>>>> v2.17.0
 	} else {
 		recentRequestFoundAt = sourceCCIP.IsRequestTriggeredWithinTimeframe(c.SkipRequestIfAnotherRequestTriggeredWithin)
 	}

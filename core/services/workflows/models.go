@@ -6,11 +6,11 @@ import (
 	"sync/atomic"
 
 	"github.com/dominikbraun/graph"
-	"github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/values"
 	"github.com/smartcontractkit/chainlink-common/pkg/workflows"
+	"github.com/smartcontractkit/chainlink-common/pkg/workflows/sdk"
 )
 
 // workflow is a directed graph of nodes, where each node is a step.

@@ -58,6 +58,7 @@ func ProveWithdrawal(
 	helpers.ConfirmTXMined(context.Background(), l1Client, tx, int64(l1ChainID), "ProveWithdrawal")
 }
 
+// nolint
 func ProveWithdrawalViaRebalancer(
 	env multienv.Env,
 	l1ChainID,

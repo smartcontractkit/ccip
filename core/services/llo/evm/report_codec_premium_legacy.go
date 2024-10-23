@@ -105,11 +105,11 @@ func (r ReportCodecPremiumLegacy) Pack(digest types.ConfigDigest, seqNr uint64, 
 	var ss [][32]byte
 	var vs [32]byte
 	for i, as := range sigs {
-		r, s, v, err := evmutil.SplitSignature(as.Signature)
+		rr, s, v, err := evmutil.SplitSignature(as.Signature)
 		if err != nil {
 			return nil, fmt.Errorf("eventTransmit(ev): error in SplitSignature: %w", err)
 		}
-		rs = append(rs, r)
+		rs = append(rs, rr)
 		ss = append(ss, s)
 		vs[i] = v
 	}
@@ -167,8 +167,8 @@ func LegacyReportContext(cd ocr2types.ConfigDigest, seqNr uint64) ocr2types.Repo
 	return ocr2types.ReportContext{
 		ReportTimestamp: ocr2types.ReportTimestamp{
 			ConfigDigest: cd,
-			Epoch:        uint32(epoch),
-			Round:        uint8(round),
+			Epoch:        epoch,
+			Round:        round,
 		},
 		ExtraHash: LLOExtraHash, // ExtraHash is always zero for mercury, we use LLOExtraHash here to differentiate from the legacy plugin
 	}

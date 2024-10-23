@@ -154,7 +154,7 @@ func (c *channelDefinitionCache) Start(ctx context.Context) error {
 		} else if pd != nil {
 			c.definitions = pd.Definitions
 			c.initialBlockNum = pd.BlockNum + 1
-			c.definitionsVersion = uint32(pd.Version)
+			c.definitionsVersion = pd.Version
 		} else {
 			// ensure non-nil map ready for assignment later
 			c.definitions = make(llotypes.ChannelDefinitions)
@@ -454,6 +454,7 @@ func (c *channelDefinitionCache) persist(ctx context.Context) (memoryVersion, pe
 	return
 }
 
+// nolint:revive
 // Checks persisted version and tries to save if necessary on a periodic timer
 // Simple backup in case database persistence fails
 func (c *channelDefinitionCache) failedPersistLoop() {
