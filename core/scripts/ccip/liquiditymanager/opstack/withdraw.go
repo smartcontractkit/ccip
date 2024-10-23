@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 )
 
+// nolint
 func WithdrawFromL2(
 	env multienv.Env,
 	l2ChainID uint64,
@@ -62,6 +63,7 @@ func WithdrawFromL2(
 	helpers.ConfirmTXMined(context.Background(), env.Clients[l2ChainID], tx, int64(l2ChainID), "WithdrawFromL2")
 }
 
+// nolint
 func WithdrawFromL2ViaRebalancer(
 	env multienv.Env,
 	l2ChainID,
