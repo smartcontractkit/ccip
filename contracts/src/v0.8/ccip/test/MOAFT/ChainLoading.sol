@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {Internal} from "../../libraries/Internal.sol";
 import {CCIPTestSuite} from "./CCIPTestSuite.sol";
+import {ChainSelectors} from "./ChainSelectors.sol";
 import {ForkedChain} from "./ForkedChain.sol";
 import {ManyChainMultiSig} from "./ccip-owner-contracts/ManyChainMultiSig.sol";
 import {RBACTimelock} from "./ccip-owner-contracts/RBACTimelock.sol";
@@ -29,43 +30,31 @@ import {Test} from "forge-std/Test.sol";
 /// # Any block after the migration was applied. Use 0 if the migration has not been applied yet.
 /// <chain>_POST_BLOCK=6904314
 contract ChainLoading is Test {
-  // Testnets
-  string internal constant SEPOLIA = "SEPOLIA";
-  string internal constant GNOSIS_TESTNET = "GNOSIS_TESTNET";
-  string internal constant BNB_TESTNET = "BNB_TESTNET";
-  string internal constant MODE_TESTNET = "MODE_TESTNET";
-  string internal constant OPT_SEPOLIA = "OPT_SEPOLIA";
-  string internal constant POLYGON_AMOY = "POLYGON_AMOY";
-  string internal constant ARB_SEPOLIA = "ARB_SEPOLIA";
-  string internal constant AVAX_FUJI = "AVAX_FUJI";
-  string internal constant BASE_SEPOLIA = "BASE_SEPOLIA";
-
-  // Mainnets
-  string internal constant BLAST = "BLAST";
-  string internal constant ETHEREUM = "ETHEREUM";
-  string internal constant GNOSIS = "GNOSIS";
-  string internal constant BNB = "BNB";
-  string internal constant MODE = "MODE";
-  string internal constant OPTIMISM = "OPTIMISM";
-  string internal constant POLYGON = "POLYGON";
-  string internal constant ARBITRUM = "ARBITRUM";
-  string internal constant AVAX = "AVAX";
-  string internal constant BASE = "BASE";
+  string[] public AllTestnets = [
+    ChainSelectors.SEPOLIA,
+    ChainSelectors.GNOSIS_TESTNET,
+    ChainSelectors.BNB_TESTNET,
+    ChainSelectors.MODE_TESTNET,
+    ChainSelectors.OPT_SEPOLIA,
+    ChainSelectors.POLYGON_AMOY,
+    ChainSelectors.ARB_SEPOLIA,
+    ChainSelectors.AVAX_FUJI,
+    ChainSelectors.BASE_SEPOLIA
+  ];
+  string[] public AllMainnets = [
+    ChainSelectors.BLAST,
+    ChainSelectors.ETHEREUM,
+    ChainSelectors.GNOSIS,
+    ChainSelectors.BNB,
+    ChainSelectors.MODE,
+    ChainSelectors.OPTIMISM,
+    ChainSelectors.POLYGON,
+    ChainSelectors.ARBITRUM,
+    ChainSelectors.AVAX,
+    ChainSelectors.BASE
+  ];
 
   uint256 internal constant FourHours = 4 * 60 * 60;
-
-  string[] internal s_allTestnets = [
-    SEPOLIA,
-    GNOSIS_TESTNET,
-    BNB_TESTNET,
-    MODE_TESTNET,
-    OPT_SEPOLIA,
-    POLYGON_AMOY,
-    ARB_SEPOLIA,
-    AVAX_FUJI,
-    BASE_SEPOLIA
-  ];
-  string[] internal s_allMainnets = [BLAST, ETHEREUM, GNOSIS, BNB, MODE, OPTIMISM, POLYGON, ARBITRUM, AVAX, BASE];
 
   mapping(string chainName => ForkedChainTestSetup) public s_chains;
 
@@ -94,18 +83,21 @@ contract ChainLoading is Test {
   }
 
   function test_env_lane() public {
-    _run_lane(vm.envString("SOURCE_CHAIN"), vm.envString("DEST_CHAIN"));
+    string memory destChain = ChainSelectors._resolveChainSelector(uint64(vm.envUint("REMOTE_CHAIN_SELECTOR")));
+    _run_lane(vm.envString("SOURCE_CHAIN"), destChain);
   }
 
   function test_all_chains() public {
-    for (uint256 i = 0; i < s_allMainnets.length; ++i) {
-      run(s_allMainnets[i]);
+    string[] memory chains = AllMainnets;
+    for (uint256 i = 0; i < chains.length; ++i) {
+      run(chains[i]);
     }
   }
 
   function _run_lane(string memory sourceChainName, string memory destChainName) internal {
     _loadSingleChain(sourceChainName);
     _loadSingleChain(destChainName);
+    uint64 remoteChainSelector = uint64(vm.envUint("REMOTE_CHAIN_SELECTOR"));
 
     ForkedChainTestSetup memory sourceChain = _activateFork(sourceChainName);
 
@@ -114,7 +106,7 @@ contract ChainLoading is Test {
     _executeProposalOnTimeLock(sourceChain);
 
     // Send messages
-    Internal.EVM2EVMMessage[] memory msgs = sourceChain.testSuite.sendTokensSingleLane(3478487238524512106);
+    Internal.EVM2EVMMessage[] memory msgs = sourceChain.testSuite.sendTokensSingleLane(remoteChainSelector);
 
     ForkedChainTestSetup memory destChain = _activateFork(destChainName);
 
@@ -170,12 +162,6 @@ contract ChainLoading is Test {
     // 0x1f7d0ec248b80e5c0dde0ee531c4fc8fdb6ce9a2b3d90f560c74acd6a7202f23
     // There should be multiple events in the same block during the migration.
     vm.rollFork(chain.postMigrationBlock);
-  }
-
-  function _loadAllChains() internal {
-    for (uint256 i = 0; i < s_allTestnets.length; ++i) {
-      _loadSingleChain(s_allTestnets[i]);
-    }
   }
 
   function _loadSingleChain(

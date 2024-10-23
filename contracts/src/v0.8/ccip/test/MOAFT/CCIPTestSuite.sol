@@ -7,6 +7,7 @@ import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
+import {ChainSelectors} from "./ChainSelectors.sol";
 
 import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
@@ -15,61 +16,6 @@ import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
-
-library Constants {
-  function _resolveChainSelector(
-    uint64 chainSelector
-  ) internal pure returns (string memory) {
-    // Testnets
-    if (chainSelector == 3478487238524512106) {
-      return "Arbitrum Sepolia";
-    } else if (chainSelector == 8871595565390010547) {
-      return "Gnosis Chiado";
-    } else if (chainSelector == 16281711391670634445) {
-      return "Polygon Amoy";
-    } else if (chainSelector == 13264668187771770619) {
-      return "BNB Testnet";
-    } else if (chainSelector == 10344971235874465080) {
-      return "Base Testnet";
-    } else if (chainSelector == 829525985033418733) {
-      return "Mode Sepolia";
-    } else if (chainSelector == 5224473277236331295) {
-      return "Optimism Sepolia";
-    } else if (chainSelector == 16015286601757825753) {
-      return "Sepolia";
-    } else if (chainSelector == 6898391096552792247) {
-      return "ZKSync Testnet";
-    } else if (chainSelector == 14767482510784806043) {
-      return "Avax Fuji";
-    }
-    // Mainnets
-    if (chainSelector == 5009297550715157269) {
-      return "Ethereum mainnet";
-    } else if (chainSelector == 4411394078118774322) {
-      return "Blast";
-    } else if (chainSelector == 5009297550715157269) {
-      return "Ethereum mainnet";
-    } else if (chainSelector == 465200170687744372) {
-      return "Gnosis";
-    } else if (chainSelector == 11344663589394136015) {
-      return "Binance Smart Chain";
-    } else if (chainSelector == 7264351850409363825) {
-      return "Mode";
-    } else if (chainSelector == 3734403246176062136) {
-      return "Optimism";
-    } else if (chainSelector == 4051577828743386545) {
-      return "Polygon";
-    } else if (chainSelector == 4949039107694359620) {
-      return "Arbitrum";
-    } else if (chainSelector == 6433500567565415381) {
-      return "Avalanche";
-    } else if (chainSelector == 15971525489660198786) {
-      return "Base";
-    }
-
-    return "Unknown";
-  }
-}
 
 contract CCIPTestSuite is Test {
   using stdStorage for StdStorage;
@@ -185,7 +131,7 @@ contract CCIPTestSuite is Test {
 
     if (i_fullLogging) {
       console2.log(
-        "Sending tokens to chain: ", remoteChainSelector, Constants._resolveChainSelector(remoteChainSelector)
+        "Sending tokens to chain: ", remoteChainSelector, ChainSelectors._resolveChainSelector(remoteChainSelector)
       );
     }
     RemoteChainConfig storage remoteChainConfig = s_remoteChainConfigs[remoteChainSelector];
@@ -275,9 +221,6 @@ contract CCIPTestSuite is Test {
 
     vm.startPrank(address(offRamp));
 
-    uint32[] memory gasOverrides = new uint32[](1);
-    gasOverrides[0] = 100_000;
-    //    uint32[] memory gasOverrides = new uint32[](0);
     uint256 succeeded = 0;
 
     for (uint256 i = 0; i < messages.length; ++i) {
@@ -285,18 +228,26 @@ contract CCIPTestSuite is Test {
       bytes memory destTokenAddressBytes =
         abi.decode(message.sourceTokenData[0], (Internal.SourceTokenData)).destTokenAddress;
       address destTokenAddress = abi.decode(destTokenAddressBytes, (address));
-      try offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), gasOverrides) {
-        console2.log(
-          unicode"✅ Executed message with source token", message.tokenAmounts[0].token, s_tokenNames[destTokenAddress]
-        );
-        succeeded++;
-      } catch (bytes memory reason) {
-        console2.log(
-          unicode"❌ Failed to execute message with token",
-          message.tokenAmounts[0].token,
-          s_tokenNames[destTokenAddress]
-        );
-        console2.logBytes(reason);
+
+      uint256 startingGas = 80_000;
+      uint256 maxGasToTest = 250_000;
+      uint256 increment = 10_000;
+      uint32[] memory gasOverrides = new uint32[](1);
+
+      for (uint256 j = startingGas; j <= maxGasToTest; j += increment) {
+        gasOverrides[0] = uint32(j);
+        try offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), gasOverrides) {
+          console2.log(unicode"✅ source_token", message.tokenAmounts[0].token, s_tokenNames[destTokenAddress], j);
+          succeeded++;
+          break;
+        } catch (bytes memory reason) {
+          if (j == maxGasToTest) {
+            console2.log(unicode"❌ source_token", message.tokenAmounts[0].token, s_tokenNames[destTokenAddress], j);
+            if (startingGas == maxGasToTest) {
+              console2.logBytes(reason);
+            }
+          }
+        }
       }
     }
 
