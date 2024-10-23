@@ -6,6 +6,7 @@ go 1.22.5
 replace github.com/smartcontractkit/chainlink/v2 => ../
 
 require (
+	dario.cat/mergo v1.0.1
 	github.com/AlekSi/pointer v1.1.0
 	github.com/Khan/genqlient v0.7.0
 	github.com/Masterminds/semver/v3 v3.2.1
@@ -67,7 +68,6 @@ require (
 	cosmossdk.io/depinject v1.0.0-alpha.4 // indirect
 	cosmossdk.io/errors v1.0.1 // indirect
 	cosmossdk.io/math v1.3.0 // indirect
-	dario.cat/mergo v1.0.1 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/99designs/keyring v1.2.1 // indirect

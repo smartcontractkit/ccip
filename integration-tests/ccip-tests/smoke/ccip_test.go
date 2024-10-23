@@ -3,7 +3,6 @@ package smoke
 import (
 	"fmt"
 	"math/big"
-<<<<<<< HEAD
 	"strings"
 	"testing"
 	"time"
@@ -17,39 +16,18 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/osutil"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-=======
-	"testing"
-	"time"
-
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-
-	"github.com/AlekSi/pointer"
-	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
-
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
-
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
->>>>>>> v2.17.0
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
-<<<<<<< HEAD
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
-=======
->>>>>>> v2.17.0
 )
 
 type testDefinition struct {
@@ -61,10 +39,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	t.Parallel()
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
-<<<<<<< HEAD
-=======
 	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
->>>>>>> v2.17.0
 	gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
@@ -273,14 +248,10 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				tc.lane.Source.Common.ChainClient.GetDefaultWallet(), src.Common.Router.Address(), src.TransferAmount[0]),
 			)
 			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
-<<<<<<< HEAD
 			failedTx, _, _, err := tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
 				big.NewInt(actions.DefaultDestinationGasLimit),
 			)
-=======
-			failedTx, _, _, err := tc.lane.Source.SendRequest(tc.lane.Dest.ReceiverDapp.EthAddress, big.NewInt(actions.DefaultDestinationGasLimit))
->>>>>>> v2.17.0
 			require.NoError(t, err)
 			require.Error(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			errReason, v, err := tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
@@ -941,7 +912,6 @@ func TestSmokeCCIPReorgAboveFinalityAtSource(t *testing.T) {
 	})
 }
 
-<<<<<<< HEAD
 // TestSmokeCCIPForGivenNetworkPairs is designed specifically for scheduled mainnet testing. This test checks for recent
 // transaction and skip the lanes accordingly. This test also has capability to take override input on network pairs and phase timeout.
 func TestSmokeCCIPForGivenNetworkPairs(t *testing.T) {
@@ -1059,8 +1029,6 @@ func TestSmokeCCIPForGivenNetworkPairs(t *testing.T) {
 	}
 }
 
-=======
->>>>>>> v2.17.0
 // performAboveFinalityReorgAndValidate is to perform the above finality reorg test
 func performAboveFinalityReorgAndValidate(t *testing.T, network string) {
 	t.Helper()
@@ -1103,21 +1071,13 @@ func performAboveFinalityReorgAndValidate(t *testing.T, network string) {
 			require.NoError(t, err)
 			for _, d := range resp.Data {
 				if d.Attributes.Name == logPollerName && d.Attributes.Output == "finality violated" && d.Attributes.Status == "failing" {
-<<<<<<< HEAD
 					log.Debug().Str("Node", node.ChainlinkClient.URL()).Msg("Finality violated is detected by node")
-=======
-					log.Debug().Msg("Finality violated is detected by node")
->>>>>>> v2.17.0
 					nodesDetectedViolation[node.ChainlinkClient.URL()] = true
 				}
 			}
 		}
 		return len(nodesDetectedViolation) == len(clNodes)
-<<<<<<< HEAD
 	}, 5*time.Minute, 5*time.Second, "Reorg above finality depth is not detected by every node")
-=======
-	}, 3*time.Minute, 20*time.Second, "Reorg above finality depth is not detected by every node")
->>>>>>> v2.17.0
 	log.Debug().Interface("Nodes", nodesDetectedViolation).Msg("Violation detection details")
 	// send another request and verify it fails
 	err = lane.SendRequests(1, gasLimit)

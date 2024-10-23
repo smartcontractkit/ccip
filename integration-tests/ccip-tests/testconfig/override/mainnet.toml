@@ -1081,7 +1081,6 @@ TTL = '8h'
 
 [CCIP.Env.Network]
 selected_networks = [
-<<<<<<< HEAD
     'ARBITRUM_MAINNET',
     'AVALANCHE_MAINNET',
     'BASE_MAINNET',
@@ -1156,54 +1155,6 @@ BiDirectionalLane = true
 PhaseTimeout = '20m'
 ExistingDeployment = true
 SkipRequestIfAnotherRequestTriggeredWithin = '40m'
-=======
-  'ARBITRUM_MAINNET',
-  'AVALANCHE_MAINNET',
-  'BSC_MAINNET',
-  'BASE_MAINNET',
-  'ETHEREUM_MAINNET',
-  'KROMA_MAINNET',
-  'OPTIMISM_MAINNET',
-  'POLYGON_MAINNET',
-  'WEMIX_MAINNET',
-  ]
-
-[CCIP.Groups.load]
-NetworkPairs = [
-  'ETHEREUM_MAINNET,OPTIMISM_MAINNET',
-  'ETHEREUM_MAINNET,AVALANCHE_MAINNET',
-  'ETHEREUM_MAINNET,POLYGON_MAINNET',
-  'ETHEREUM_MAINNET,BSC_MAINNET',
-  'ETHEREUM_MAINNET,ARBITRUM_MAINNET',
-  'ETHEREUM_MAINNET,BASE_MAINNET',
-  'ETHEREUM_MAINNET,WEMIX_MAINNET',
-  'AVALANCHE_MAINNET,POLYGON_MAINNET',
-  'BASE_MAINNET,OPTIMISM_MAINNET',
-  'BASE_MAINNET,ARBITRUM_MAINNET',
-  'AVALANCHE_MAINNET,BSC_MAINNET',
-  'BSC_MAINNET,POLYGON_MAINNET',
-  'OPTIMISM_MAINNET,POLYGON_MAINNET',
-  'BASE_MAINNET,BSC_MAINNET',
-  'POLYGON_MAINNET,ARBITRUM_MAINNET', # added as batch 1
-  'ARBITRUM_MAINNET,BSC_MAINNET', # added as batch 1
-  'ARBITRUM_MAINNET,OPTIMISM_MAINNET', # added as batch 1
-  'AVALANCHE_MAINNET,OPTIMISM_MAINNET', # added as batch 2
-  'AVALANCHE_MAINNET,ARBITRUM_MAINNET', # added as batch 2
-  'BASE_MAINNET,POLYGON_MAINNET', # added as batch 2
-  'BSC_MAINNET,OPTIMISM_MAINNET', # added as batch 2
-  'AVALANCHE_MAINNET,BASE_MAINNET', # added as batch 2
-  'WEMIX_MAINNET,KROMA_MAINNET',
-  'BSC_MAINNET,WEMIX_MAINNET', # added as batch 2
-  'AVALANCHE_MAINNET,WEMIX_MAINNET', # added as batch 2
-  'POLYGON_MAINNET,WEMIX_MAINNET', # added as batch 2
-  'WEMIX_MAINNET,ARBITRUM_MAINNET', # added as batch 2
-  'OPTIMISM_MAINNET,WEMIX_MAINNET' # added as batch 2
-]
-
-BiDirectionalLane = true
-PhaseTimeout = '30m'
-ExistingDeployment = true
->>>>>>> v2.17.0
 
 [CCIP.Groups.load.TokenConfig]
 NoOfTokensPerChain = 1
@@ -1214,11 +1165,7 @@ TimeUnit = '1h'
 TestDuration = '5h'
 TestRunName = 'Soak_test_mainnet'
 FailOnFirstErrorInLoad = true
-<<<<<<< HEAD
 
-=======
-SkipRequestIfAnotherRequestTriggeredWithin = '40m'
->>>>>>> v2.17.0
 
 [[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
 MsgType = 'Data'
@@ -1230,7 +1177,6 @@ AmountPerToken = 1
 [CCIP.Groups.smoke]
 # these are all the valid network pairs
 NetworkPairs = [
-<<<<<<< HEAD
     'ARBITRUM_MAINNET,BSC_MAINNET',
     'ARBITRUM_MAINNET,OPTIMISM_MAINNET',
     'AVALANCHE_MAINNET,ARBITRUM_MAINNET',
@@ -1280,36 +1226,6 @@ NetworkPairs = [
     'WEMIX_MAINNET,ARBITRUM_MAINNET',
     'WEMIX_MAINNET,KROMA_MAINNET',
     'ZKSYNC_MAINNET,ARBITRUM_MAINNET'
-=======
-  'ETHEREUM_MAINNET,OPTIMISM_MAINNET',
-  'ETHEREUM_MAINNET,AVALANCHE_MAINNET',
-  'ETHEREUM_MAINNET,POLYGON_MAINNET',
-  'ETHEREUM_MAINNET,BSC_MAINNET',
-  'ETHEREUM_MAINNET,ARBITRUM_MAINNET', 
-  'ETHEREUM_MAINNET,BASE_MAINNET',
-  'ETHEREUM_MAINNET,WEMIX_MAINNET',
-  'AVALANCHE_MAINNET,POLYGON_MAINNET',
-  'BASE_MAINNET,OPTIMISM_MAINNET',
-  'BASE_MAINNET,ARBITRUM_MAINNET',
-  'AVALANCHE_MAINNET,BSC_MAINNET',
-  'BSC_MAINNET,POLYGON_MAINNET',
-  'OPTIMISM_MAINNET,POLYGON_MAINNET',
-  'BASE_MAINNET,BSC_MAINNET',
-  'POLYGON_MAINNET,ARBITRUM_MAINNET', # added as batch 1
-  'ARBITRUM_MAINNET,BSC_MAINNET', # added as batch 1
-  'ARBITRUM_MAINNET,OPTIMISM_MAINNET', # added as batch 1 
-  'AVALANCHE_MAINNET,OPTIMISM_MAINNET', # added as batch 2
-  'AVALANCHE_MAINNET,ARBITRUM_MAINNET', # added as batch 2
-  'BASE_MAINNET,POLYGON_MAINNET', # added as batch 2
-  'BSC_MAINNET,OPTIMISM_MAINNET', # added as batch 2
-  'AVALANCHE_MAINNET,BASE_MAINNET', # added as batch 2
-  'WEMIX_MAINNET,KROMA_MAINNET',
-  'BSC_MAINNET,WEMIX_MAINNET', # added as batch 2
-  'AVALANCHE_MAINNET,WEMIX_MAINNET', # added as batch 2
-  'POLYGON_MAINNET,WEMIX_MAINNET', # added as batch 2
-  'WEMIX_MAINNET,ARBITRUM_MAINNET', # added as batch 2
-  'OPTIMISM_MAINNET,WEMIX_MAINNET' # added as batch 2
->>>>>>> v2.17.0
 ]
 
 BiDirectionalLane = true
@@ -1317,11 +1233,7 @@ PhaseTimeout = '20m'
 LocalCluster = false
 ExistingDeployment = true
 ReuseContracts = true
-<<<<<<< HEAD
 SkipRequestIfAnotherRequestTriggeredWithin = '24h'
-=======
-
->>>>>>> v2.17.0
 
 [CCIP.Groups.smoke.TokenConfig]
 NoOfTokensPerChain = 1

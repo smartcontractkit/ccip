@@ -1,35 +1,17 @@
 ## To Override the default config:
-<<<<<<< HEAD
 # example usage: make set_config override_toml=../config/config.toml
-=======
-# example usage: make set_config override_toml=../config/config.toml network_config_toml=../config/network.toml
->>>>>>> v2.17.0
 .PHONY: set_config
 set_config:
 	if [ -s "$(override_toml)" ]; then \
   			echo "Overriding config with $(override_toml)"; \
-<<<<<<< HEAD
 			echo "export BASE64_CCIP_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" > ./testconfig/override/.env; \
         	echo "export TEST_BASE64_CCIP_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" >> ./testconfig/override/.env; \
 			echo "BASE64_CCIP_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" > ./testconfig/override/debug.env; \
 			echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" >> ./testconfig/override/debug.env; \
-=======
-			echo "export BASE64_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" > ./testconfig/override/.env; \
-        	echo "export TEST_BASE64_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" >> ./testconfig/override/.env; \
-			echo "BASE64_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" > ./testconfig/override/debug.env; \
-			echo "TEST_BASE64_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" >> ./testconfig/override/debug.env; \
->>>>>>> v2.17.0
     else \
       		echo "No override config found, using default config"; \
         	echo  > ./testconfig/override/.env; \
 	fi
-<<<<<<< HEAD
-=======
-	if [ -s "$(network_config_toml)" ]; then \
-  	  echo "Overriding network config with $(network_config_toml)"; \
-      echo "export BASE64_NETWORK_CONFIG=$$(base64 -i $(network_config_toml))" >> ./testconfig/override/.env; \
-    fi
->>>>>>> v2.17.0
 
 	@echo "Checking for test secrets file in ~/.testsecrets...";
 	@if [ ! -f ~/.testsecrets ]; then \
@@ -70,13 +52,8 @@ test_smoke_ccip: set_config
 test_smoke_ccip_default: set_config
 	source ./testconfig/override/.env && \
 	DATABASE_URL=postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable	\
-<<<<<<< HEAD
 	BASE64_CCIP_CONFIG_OVERRIDE=""	\
 	TEST_BASE64_CCIP_CONFIG_OVERRIDE=""	\
-=======
-	BASE64_CONFIG_OVERRIDE=""	\
-	TEST_BASE64_CONFIG_OVERRIDE=""	\
->>>>>>> v2.17.0
 	ENV_JOB_IMAGE=""  \
 	TEST_SUITE=smoke \
 	TEST_ARGS="-test.timeout 900h" \
@@ -90,7 +67,6 @@ test_smoke_ccip_default: set_config
 .PHONY: build_ccip_image
 build_ccip_image:
 	docker build -f ../../core/chainlink.Dockerfile --build-arg COMMIT_SHA=$(git rev-parse HEAD) --build-arg CHAINLINK_USER=chainlink -t $(image):$(tag) ../../
-<<<<<<< HEAD
 
 # image: the name for the chainlink image being built, example: image=chainlink
 # tag: the tag for the chainlink image being built, example: tag=latest
@@ -98,5 +74,3 @@ build_ccip_image:
 .PHONY: build_ccip_debug_image
 build_ccip_debug_image:
 	docker build -f ../../core/chainlink.debug.Dockerfile --build-arg COMMIT_SHA=$(git rev-parse HEAD) --build-arg CHAINLINK_USER=chainlink -t $(image):$(tag) ../../
-=======
->>>>>>> v2.17.0
