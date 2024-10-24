@@ -25,6 +25,7 @@ var (
 	encoderABI = abihelpers.MustParseABI(optimism_l1_bridge_adapter_encoder.OptimismL1BridgeAdapterEncoderMetaData.ABI)
 )
 
+// nolint
 func ProveWithdrawal(
 	env multienv.Env,
 	l1ChainID,
@@ -57,6 +58,7 @@ func ProveWithdrawal(
 	helpers.ConfirmTXMined(context.Background(), l1Client, tx, int64(l1ChainID), "ProveWithdrawal")
 }
 
+// nolint
 func ProveWithdrawalViaRebalancer(
 	env multienv.Env,
 	l1ChainID,

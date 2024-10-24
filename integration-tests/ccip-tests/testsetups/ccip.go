@@ -29,8 +29,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/lib/client"
-	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
-	ctfconfigtypes "github.com/smartcontractkit/chainlink-testing-framework/lib/config/types"
+	ctf_config "github.com/smartcontractkit/chainlink-testing-framework/lib/config"
+	ctf_config_types "github.com/smartcontractkit/chainlink-testing-framework/lib/config/types"
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/lib/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
@@ -271,16 +271,16 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 				c.EnvInput.Network.AnvilConfigs[strings.ToUpper(name)] = existing
 			}
 
-			chainConfig := &ctfconfig.EthereumChainConfig{}
+			chainConfig := &ctf_config.EthereumChainConfig{}
 			err := chainConfig.Default()
 			if err != nil {
 				allError = multierr.Append(allError, fmt.Errorf("failed to get default chain config: %w", err))
 			} else {
 				chainConfig.ChainID = int(chainID)
-				eth1 := ctfconfigtypes.EthereumVersion_Eth1
-				geth := ctfconfigtypes.ExecutionLayer_Geth
+				eth1 := ctf_config_types.EthereumVersion_Eth1
+				geth := ctf_config_types.ExecutionLayer_Geth
 
-				c.EnvInput.PrivateEthereumNetworks[fmt.Sprint(chainID)] = &ctfconfig.EthereumNetworkConfig{
+				c.EnvInput.PrivateEthereumNetworks[fmt.Sprint(chainID)] = &ctf_config.EthereumNetworkConfig{
 					EthereumVersion:     &eth1,
 					ExecutionLayer:      &geth,
 					EthereumChainConfig: chainConfig,

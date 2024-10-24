@@ -35,6 +35,7 @@ var (
 	NodeConfirmedTopic = arbitrum_rollup_core.ArbRollupCoreNodeConfirmed{}.Topic()
 )
 
+// nolint
 // function executeTransaction(
 //
 //	  bytes32[] calldata proof,

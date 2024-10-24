@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
@@ -965,7 +966,7 @@ func requestAndEstimateFulfillmentCost(
 	requestLog := FindLatestRandomnessRequestedLog(t, uni.rootContract, vrfkey.PublicKey.MustHash(), nil)
 	s, err := proof.BigToSeed(requestLog.PreSeed())
 	require.NoError(t, err)
-	extraArgs, err := extraargs.ExtraArgsV1(nativePayment)
+	extraArgs, err := extraargs.EncodeV1(nativePayment)
 	require.NoError(t, err)
 	proof, rc, err := proof.GenerateProofResponseV2Plus(app.GetKeyStore().VRF(), vrfkey.ID(), proof.PreSeedDataV2Plus{
 		PreSeed:          s,

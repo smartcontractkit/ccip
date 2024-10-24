@@ -341,7 +341,7 @@ type Chain struct {
 	AutoCreateKey                *bool
 	BlockBackfillDepth           *uint32
 	BlockBackfillSkip            *bool
-	ChainType                    *chaintype.ChainTypeConfig
+	ChainType                    *chaintype.Config
 	FinalityDepth                *uint32
 	FinalityTagEnabled           *bool
 	FlagsContractAddress         *types.EIP55Address
@@ -356,6 +356,7 @@ type Chain struct {
 	NonceAutoSync                *bool
 	NoNewHeadsThreshold          *commonconfig.Duration
 	OperatorFactoryAddress       *types.EIP55Address
+	LogBroadcasterEnabled        *bool
 	RPCDefaultBatchSize          *uint32
 	RPCBlockQueryDelay           *uint16
 	FinalizedBlockOffset         *uint32
@@ -375,7 +376,7 @@ type Chain struct {
 func (c *Chain) ValidateConfig() (err error) {
 	if !c.ChainType.ChainType().IsValid() {
 		err = multierr.Append(err, commonconfig.ErrInvalid{Name: "ChainType", Value: c.ChainType.ChainType(),
-			Msg: chaintype.ErrInvalidChainType.Error()})
+			Msg: chaintype.ErrInvalid.Error()})
 	}
 
 	if c.GasEstimator.BumpTxDepth != nil && *c.GasEstimator.BumpTxDepth > *c.Transactions.MaxInFlight {
@@ -521,6 +522,7 @@ func (a *Automation) setFrom(f *Automation) {
 type Workflow struct {
 	FromAddress      *types.EIP55Address `toml:",omitempty"`
 	ForwarderAddress *types.EIP55Address `toml:",omitempty"`
+	GasLimitDefault  *uint64
 }
 
 func (m *Workflow) setFrom(f *Workflow) {
@@ -529,6 +531,10 @@ func (m *Workflow) setFrom(f *Workflow) {
 	}
 	if v := f.ForwarderAddress; v != nil {
 		m.ForwarderAddress = v
+	}
+
+	if v := f.GasLimitDefault; v != nil {
+		m.GasLimitDefault = v
 	}
 }
 
@@ -816,6 +822,7 @@ type ClientErrors struct {
 	TransactionAlreadyMined           *string `toml:",omitempty"`
 	Fatal                             *string `toml:",omitempty"`
 	ServiceUnavailable                *string `toml:",omitempty"`
+	TooManyResults                    *string `toml:",omitempty"`
 }
 
 func (r *ClientErrors) setFrom(f *ClientErrors) bool {
@@ -861,6 +868,9 @@ func (r *ClientErrors) setFrom(f *ClientErrors) bool {
 	if v := f.ServiceUnavailable; v != nil {
 		r.ServiceUnavailable = v
 	}
+	if v := f.TooManyResults; v != nil {
+		r.TooManyResults = v
+	}
 	return true
 }
 
@@ -875,6 +885,7 @@ type NodePool struct {
 	Errors                     ClientErrors `toml:",omitempty"`
 	EnforceRepeatableRead      *bool
 	DeathDeclarationDelay      *commonconfig.Duration
+	NewHeadsPollInterval       *commonconfig.Duration
 }
 
 func (p *NodePool) setFrom(f *NodePool) {
@@ -907,6 +918,11 @@ func (p *NodePool) setFrom(f *NodePool) {
 	if v := f.DeathDeclarationDelay; v != nil {
 		p.DeathDeclarationDelay = v
 	}
+
+	if v := f.NewHeadsPollInterval; v != nil {
+		p.NewHeadsPollInterval = v
+	}
+
 	p.Errors.setFrom(&f.Errors)
 }
 

@@ -8,18 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/http"
 	"strings"
 	"sync"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig/interceptors/mantle"
-
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
-	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	cciptransmitter "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/transmitter"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -32,31 +25,42 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2/reportingplugin/median/evmreportcodec"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	ocr3capability "github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/triggers"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	coretypes "github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
 	txmgrcommon "github.com/smartcontractkit/chainlink/v2/common/txmgr"
 	txm "github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo"
 	"github.com/smartcontractkit/chainlink/v2/core/services/llo/bm"
+	"github.com/smartcontractkit/chainlink/v2/core/services/llo/mercurytransmitter"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/estimatorconfig"
+	cciptransmitter "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/transmitter"
 	lloconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/llo/config"
 	mercuryconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/mercury/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/codec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/functions"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury"
 	mercuryutils "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/utils"
 	reportcodecv1 "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/v1/reportcodec"
 	reportcodecv2 "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/v2/reportcodec"
 	reportcodecv3 "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/v3/reportcodec"
+	reportcodecv4 "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/v4/reportcodec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/wsrpc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
@@ -64,7 +68,7 @@ import (
 var (
 	OCR2AggregatorTransmissionContractABI abi.ABI
 	OCR2AggregatorLogDecoder              LogDecoder
-	ChannelVerifierLogDecoder             LogDecoder
+	OCR3CapabilityLogDecoder              LogDecoder
 )
 
 func init() {
@@ -77,7 +81,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	ChannelVerifierLogDecoder, err = newChannelVerifierLogDecoder()
+	OCR3CapabilityLogDecoder, err = newOCR3CapabilityLogDecoder()
 	if err != nil {
 		panic(err)
 	}
@@ -139,10 +143,9 @@ func (u UnimplementedContractTransmitter) LatestConfigDigestAndEpoch(ctx context
 type Relayer struct {
 	ds                   sqlutil.DataSource
 	chain                legacyevm.Chain
-	lggr                 logger.Logger
+	lggr                 logger.SugaredLogger
 	ks                   CSAETHKeystore
 	mercuryPool          wsrpc.Pool
-	chainReader          commontypes.ContractReader
 	codec                commontypes.Codec
 	capabilitiesRegistry coretypes.CapabilitiesRegistry
 
@@ -152,8 +155,7 @@ type Relayer struct {
 	triggerCapability *triggers.MercuryTriggerService
 
 	// LLO/data streams
-	cdcFactory llo.ChannelDefinitionCacheFactory
-	lloORM     llo.ORM
+	cdcFactory func() (llo.ChannelDefinitionCacheFactory, error)
 }
 
 type CSAETHKeystore interface {
@@ -167,6 +169,7 @@ type RelayerOpts struct {
 	MercuryPool          wsrpc.Pool
 	TransmitterConfig    mercury.TransmitterConfig
 	CapabilitiesRegistry coretypes.CapabilitiesRegistry
+	HTTPClient           *http.Client
 }
 
 func (c RelayerOpts) Validate() error {
@@ -191,19 +194,23 @@ func NewRelayer(lggr logger.Logger, chain legacyevm.Chain, opts RelayerOpts) (*R
 	if err != nil {
 		return nil, fmt.Errorf("cannot create evm relayer: %w", err)
 	}
-	lggr = lggr.Named("Relayer")
-
+	sugared := logger.Sugared(lggr).Named("Relayer")
 	mercuryORM := mercury.NewORM(opts.DS)
-	lloORM := llo.NewORM(opts.DS, chain.ID())
-	cdcFactory := llo.NewChannelDefinitionCacheFactory(lggr, lloORM, chain.LogPoller())
+	cdcFactory := sync.OnceValues(func() (llo.ChannelDefinitionCacheFactory, error) {
+		chainSelector, err := chainselectors.SelectorFromChainId(chain.ID().Uint64())
+		if err != nil {
+			return nil, fmt.Errorf("failed to get chain selector for chain id %s: %w", chain.ID(), err)
+		}
+		lloORM := llo.NewORM(opts.DS, chainSelector)
+		return llo.NewChannelDefinitionCacheFactory(sugared, lloORM, chain.LogPoller(), opts.HTTPClient), nil
+	})
 	relayer := &Relayer{
 		ds:                   opts.DS,
 		chain:                chain,
-		lggr:                 lggr,
+		lggr:                 logger.Sugared(sugared),
 		ks:                   opts.CSAETHKeystore,
 		mercuryPool:          opts.MercuryPool,
 		cdcFactory:           cdcFactory,
-		lloORM:               lloORM,
 		mercuryORM:           mercuryORM,
 		transmitterCfg:       opts.TransmitterConfig,
 		capabilitiesRegistry: opts.CapabilitiesRegistry,
@@ -212,7 +219,12 @@ func NewRelayer(lggr logger.Logger, chain legacyevm.Chain, opts RelayerOpts) (*R
 	// Initialize write target capability if configuration is defined
 	if chain.Config().EVM().Workflow().ForwarderAddress() != nil {
 		ctx := context.Background()
-		capability, err := NewWriteTarget(ctx, relayer, chain, lggr)
+		if chain.Config().EVM().Workflow().GasLimitDefault() == nil {
+			return nil, fmt.Errorf("unable to instantiate write target as default gas limit is not set")
+		}
+
+		capability, err := NewWriteTarget(ctx, relayer, chain, *chain.Config().EVM().Workflow().GasLimitDefault(),
+			lggr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize write target: %w", err)
 		}
@@ -252,11 +264,56 @@ func (r *Relayer) HealthReport() (report map[string]error) {
 	return
 }
 
+func newOCR3CapabilityConfigProvider(ctx context.Context, lggr logger.Logger, chain legacyevm.Chain, opts *types.RelayOpts) (*configWatcher, error) {
+	if !common.IsHexAddress(opts.ContractID) {
+		return nil, errors.New("invalid contractID, expected hex address")
+	}
+
+	aggregatorAddress := common.HexToAddress(opts.ContractID)
+	offchainConfigDigester := OCR3CapabilityOffchainConfigDigester{
+		ChainID:         chain.Config().EVM().ChainID().Uint64(),
+		ContractAddress: aggregatorAddress,
+	}
+	return newContractConfigProvider(ctx, lggr, chain, opts, aggregatorAddress, OCR3CapabilityLogDecoder, offchainConfigDigester)
+}
+
+// NewPluginProvider, but customized to use a different config provider
 func (r *Relayer) NewOCR3CapabilityProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.OCR3CapabilityProvider, error) {
-	pp, err := r.NewPluginProvider(rargs, pargs)
+	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
+	ctx := context.Background()
+	lggr := logger.Sugared(r.lggr).Named("PluginProvider").Named(rargs.ExternalJobID.String())
+	relayOpts := types.NewRelayOpts(rargs)
+	relayConfig, err := relayOpts.RelayConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get relay config: %w", err)
+	}
+
+	configWatcher, err := newOCR3CapabilityConfigProvider(ctx, r.lggr, r.chain, relayOpts)
 	if err != nil {
 		return nil, err
 	}
+
+	transmitter, err := newOnChainContractTransmitter(ctx, r.lggr, rargs, r.ks.Eth(), configWatcher, configTransmitterOpts{}, OCR2AggregatorTransmissionContractABI)
+	if err != nil {
+		return nil, err
+	}
+
+	var chainReaderService ChainReaderService
+	if relayConfig.ChainReader != nil {
+		if chainReaderService, err = NewChainReaderService(ctx, lggr, r.chain.LogPoller(), r.chain.HeadTracker(), r.chain.Client(), *relayConfig.ChainReader); err != nil {
+			return nil, err
+		}
+	} else {
+		lggr.Info("ChainReader missing from RelayConfig")
+	}
+
+	pp := NewPluginProvider(
+		chainReaderService,
+		r.codec,
+		transmitter,
+		configWatcher,
+		lggr,
+	)
 
 	fromAccount, err := pp.ContractTransmitter().FromAccount()
 	if err != nil {
@@ -272,10 +329,14 @@ func (r *Relayer) NewOCR3CapabilityProvider(rargs commontypes.RelayArgs, pargs c
 func (r *Relayer) NewPluginProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.PluginProvider, error) {
 	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
 	ctx := context.Background()
+	lggr := logger.Sugared(r.lggr).Named("PluginProvider").Named(rargs.ExternalJobID.String())
+	relayOpts := types.NewRelayOpts(rargs)
+	relayConfig, err := relayOpts.RelayConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get relay config: %w", err)
+	}
 
-	lggr := r.lggr.Named("PluginProvider").Named(rargs.ExternalJobID.String())
-
-	configWatcher, err := newStandardConfigProvider(ctx, r.lggr, r.chain, types.NewRelayOpts(rargs))
+	configWatcher, err := newStandardConfigProvider(ctx, r.lggr, r.chain, relayOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -285,8 +346,17 @@ func (r *Relayer) NewPluginProvider(rargs commontypes.RelayArgs, pargs commontyp
 		return nil, err
 	}
 
+	var chainReaderService ChainReaderService
+	if relayConfig.ChainReader != nil {
+		if chainReaderService, err = NewChainReaderService(ctx, lggr, r.chain.LogPoller(), r.chain.HeadTracker(), r.chain.Client(), *relayConfig.ChainReader); err != nil {
+			return nil, err
+		}
+	} else {
+		lggr.Info("ChainReader missing from RelayConfig")
+	}
+
 	return NewPluginProvider(
-		r.chainReader,
+		chainReaderService,
 		r.codec,
 		transmitter,
 		configWatcher,
@@ -297,7 +367,7 @@ func (r *Relayer) NewPluginProvider(rargs commontypes.RelayArgs, pargs commontyp
 func (r *Relayer) NewMercuryProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.MercuryProvider, error) {
 	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
 	ctx := context.Background()
-	lggr := r.lggr.Named("MercuryProvider").Named(rargs.ExternalJobID.String())
+	lggr := logger.Sugared(r.lggr).Named("MercuryProvider").Named(rargs.ExternalJobID.String())
 	relayOpts := types.NewRelayOpts(rargs)
 	relayConfig, err := relayOpts.RelayConfig()
 	if err != nil {
@@ -361,6 +431,7 @@ func (r *Relayer) NewMercuryProvider(rargs commontypes.RelayArgs, pargs commonty
 	reportCodecV1 := reportcodecv1.NewReportCodec(*relayConfig.FeedID, lggr.Named("ReportCodecV1"))
 	reportCodecV2 := reportcodecv2.NewReportCodec(*relayConfig.FeedID, lggr.Named("ReportCodecV2"))
 	reportCodecV3 := reportcodecv3.NewReportCodec(*relayConfig.FeedID, lggr.Named("ReportCodecV3"))
+	reportCodecV4 := reportcodecv4.NewReportCodec(*relayConfig.FeedID, lggr.Named("ReportCodecV4"))
 
 	var transmitterCodec mercury.TransmitterReportDecoder
 	switch feedID.Version() {
@@ -370,12 +441,14 @@ func (r *Relayer) NewMercuryProvider(rargs commontypes.RelayArgs, pargs commonty
 		transmitterCodec = reportCodecV2
 	case 3:
 		transmitterCodec = reportCodecV3
+	case 4:
+		transmitterCodec = reportCodecV4
 	default:
 		return nil, fmt.Errorf("invalid feed version %d", feedID.Version())
 	}
 	transmitter := mercury.NewTransmitter(lggr, r.transmitterCfg, clients, privKey.PublicKey, rargs.JobID, *relayConfig.FeedID, r.mercuryORM, transmitterCodec, r.triggerCapability)
 
-	return NewMercuryProvider(cp, r.chainReader, r.codec, NewMercuryChainReader(r.chain.HeadTracker()), transmitter, reportCodecV1, reportCodecV2, reportCodecV3, lggr), nil
+	return NewMercuryProvider(cp, r.codec, NewMercuryChainReader(r.chain.HeadTracker()), transmitter, reportCodecV1, reportCodecV2, reportCodecV3, reportCodecV4, lggr), nil
 }
 
 func chainToUUID(chainID *big.Int) uuid.UUID {
@@ -604,20 +677,38 @@ func (r *Relayer) NewLLOProvider(rargs commontypes.RelayArgs, pargs commontypes.
 
 	// FIXME: Remove after benchmarking is done
 	// https://smartcontract-it.atlassian.net/browse/MERC-3487
-	var transmitter llo.Transmitter
+	var transmitter LLOTransmitter
 	if lloCfg.BenchmarkMode {
 		r.lggr.Info("Benchmark mode enabled, using dummy transmitter. NOTE: THIS WILL NOT TRANSMIT ANYTHING")
 		transmitter = bm.NewTransmitter(r.lggr, fmt.Sprintf("%x", privKey.PublicKey))
 	} else {
-		var client wsrpc.Client
-		client, err = r.mercuryPool.Checkout(context.Background(), privKey, lloCfg.ServerPubKey, lloCfg.ServerURL())
-		if err != nil {
-			return nil, err
+		clients := make(map[string]wsrpc.Client)
+		for _, server := range lloCfg.GetServers() {
+			client, err2 := r.mercuryPool.Checkout(context.Background(), privKey, server.PubKey, server.URL)
+			if err2 != nil {
+				return nil, err2
+			}
+			clients[server.URL] = client
 		}
-		transmitter = llo.NewTransmitter(r.lggr, client, privKey.PublicKey)
+		transmitter = llo.NewTransmitter(llo.TransmitterOpts{
+			Lggr:        r.lggr,
+			FromAccount: fmt.Sprintf("%x", privKey.PublicKey), // NOTE: This may need to change if we support e.g. multiple tranmsmitters, to be a composite of all keys
+			MercuryTransmitterOpts: mercurytransmitter.Opts{
+				Lggr:        r.lggr,
+				Cfg:         r.transmitterCfg,
+				Clients:     clients,
+				FromAccount: privKey.PublicKey,
+				DonID:       relayConfig.LLODONID,
+				ORM:         mercurytransmitter.NewORM(r.ds, relayConfig.LLODONID),
+			},
+		})
 	}
 
-	cdc, err := r.cdcFactory.NewCache(lloCfg)
+	cdcFactory, err := r.cdcFactory()
+	if err != nil {
+		return nil, err
+	}
+	cdc, err := cdcFactory.NewCache(lloCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -654,6 +745,8 @@ func (r *Relayer) NewConfigProvider(args commontypes.RelayArgs) (configProvider 
 	if args.ProviderType == "" {
 		if relayConfig.FeedID == nil {
 			args.ProviderType = "median"
+		} else if relayConfig.LLODONID > 0 {
+			args.ProviderType = "llo"
 		} else {
 			args.ProviderType = "mercury"
 		}
@@ -666,6 +759,8 @@ func (r *Relayer) NewConfigProvider(args commontypes.RelayArgs) (configProvider 
 		configProvider, err = newMercuryConfigProvider(ctx, lggr, r.chain, relayOpts)
 	case "llo":
 		configProvider, err = newLLOConfigProvider(ctx, lggr, r.chain, relayOpts)
+	case "ocr3-capability":
+		configProvider, err = newOCR3CapabilityConfigProvider(ctx, r.lggr, r.chain, relayOpts)
 	default:
 		return nil, fmt.Errorf("unrecognized provider type: %q", args.ProviderType)
 	}
@@ -696,16 +791,15 @@ func FilterNamesFromRelayArgs(args commontypes.RelayArgs) (filterNames []string,
 }
 
 type configWatcher struct {
-	services.StateMachine
-	lggr             logger.Logger
+	services.Service
+	eng *services.Engine
+
 	contractAddress  common.Address
 	offchainDigester ocrtypes.OffchainConfigDigester
 	configPoller     types.ConfigPoller
 	chain            legacyevm.Chain
 	runReplay        bool
 	fromBlock        uint64
-	stopCh           services.StopChan
-	wg               sync.WaitGroup
 }
 
 func newConfigWatcher(lggr logger.Logger,
@@ -716,54 +810,41 @@ func newConfigWatcher(lggr logger.Logger,
 	fromBlock uint64,
 	runReplay bool,
 ) *configWatcher {
-	return &configWatcher{
-		lggr:             lggr.Named("ConfigWatcher").Named(contractAddress.String()),
+	cw := &configWatcher{
 		contractAddress:  contractAddress,
 		offchainDigester: offchainDigester,
 		configPoller:     configPoller,
 		chain:            chain,
 		runReplay:        runReplay,
 		fromBlock:        fromBlock,
-		stopCh:           make(chan struct{}),
 	}
+	cw.Service, cw.eng = services.Config{
+		Name:           fmt.Sprintf("ConfigWatcher.%s", contractAddress),
+		NewSubServices: nil,
+		Start:          cw.start,
+		Close:          cw.close,
+	}.NewServiceEngine(lggr)
+	return cw
 }
 
-func (c *configWatcher) Name() string {
-	return c.lggr.Name()
+func (c *configWatcher) start(ctx context.Context) error {
+	if c.runReplay && c.fromBlock != 0 {
+		// Only replay if it's a brand runReplay job.
+		c.eng.Go(func(ctx context.Context) {
+			c.eng.Infow("starting replay for config", "fromBlock", c.fromBlock)
+			if err := c.configPoller.Replay(ctx, int64(c.fromBlock)); err != nil {
+				c.eng.Errorw("error replaying for config", "err", err)
+			} else {
+				c.eng.Infow("completed replaying for config", "fromBlock", c.fromBlock)
+			}
+		})
+	}
+	c.configPoller.Start()
+	return nil
 }
 
-func (c *configWatcher) Start(ctx context.Context) error {
-	return c.StartOnce(fmt.Sprintf("configWatcher %x", c.contractAddress), func() error {
-		if c.runReplay && c.fromBlock != 0 {
-			// Only replay if it's a brand runReplay job.
-			c.wg.Add(1)
-			go func() {
-				defer c.wg.Done()
-				ctx, cancel := c.stopCh.NewCtx()
-				defer cancel()
-				c.lggr.Infow("starting replay for config", "fromBlock", c.fromBlock)
-				if err := c.configPoller.Replay(ctx, int64(c.fromBlock)); err != nil {
-					c.lggr.Errorw("error replaying for config", "err", err)
-				} else {
-					c.lggr.Infow("completed replaying for config", "fromBlock", c.fromBlock)
-				}
-			}()
-		}
-		c.configPoller.Start()
-		return nil
-	})
-}
-
-func (c *configWatcher) Close() error {
-	return c.StopOnce(fmt.Sprintf("configWatcher %x", c.contractAddress), func() error {
-		close(c.stopCh)
-		c.wg.Wait()
-		return c.configPoller.Close()
-	})
-}
-
-func (c *configWatcher) HealthReport() map[string]error {
-	return map[string]error{c.Name(): c.Healthy()}
+func (c *configWatcher) close() error {
+	return c.configPoller.Close()
 }
 
 func (c *configWatcher) OffchainConfigDigester() ocrtypes.OffchainConfigDigester {
@@ -917,7 +998,7 @@ func (r *Relayer) NewMedianProvider(rargs commontypes.RelayArgs, pargs commontyp
 	// TODO https://smartcontract-it.atlassian.net/browse/BCF-2887
 	ctx := context.Background()
 
-	lggr := r.lggr.Named("MedianProvider").Named(rargs.ExternalJobID.String())
+	lggr := logger.Sugared(r.lggr).Named("MedianProvider").Named(rargs.ExternalJobID.String())
 	relayOpts := types.NewRelayOpts(rargs)
 	relayConfig, err := relayOpts.RelayConfig()
 	if err != nil {
@@ -974,7 +1055,7 @@ func (r *Relayer) NewMedianProvider(rargs commontypes.RelayArgs, pargs commontyp
 	medianProvider.chainReader = chainReaderService
 
 	if relayConfig.Codec != nil {
-		medianProvider.codec, err = NewCodec(*relayConfig.Codec)
+		medianProvider.codec, err = codec.NewCodec(*relayConfig.Codec)
 		if err != nil {
 			return nil, err
 		}
@@ -986,7 +1067,7 @@ func (r *Relayer) NewMedianProvider(rargs commontypes.RelayArgs, pargs commontyp
 }
 
 func (r *Relayer) NewAutomationProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (commontypes.AutomationProvider, error) {
-	lggr := r.lggr.Named("AutomationProvider").Named(rargs.ExternalJobID.String())
+	lggr := logger.Sugared(r.lggr).Named("AutomationProvider").Named(rargs.ExternalJobID.String())
 	ocr2keeperRelayer := NewOCR2KeeperRelayer(r.ds, r.chain, lggr.Named("OCR2KeeperRelayer"), r.ks.Eth())
 
 	return ocr2keeperRelayer.NewOCR2KeeperProvider(rargs, pargs)
@@ -1052,7 +1133,7 @@ func (p *medianProvider) ContractConfigTracker() ocrtypes.ContractConfigTracker 
 	return p.configWatcher.ContractConfigTracker()
 }
 
-func (p *medianProvider) ChainReader() commontypes.ContractReader {
+func (p *medianProvider) ContractReader() commontypes.ContractReader {
 	return p.chainReader
 }
 

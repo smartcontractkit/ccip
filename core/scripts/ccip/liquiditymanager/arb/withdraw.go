@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/liquiditymanager/generated/arbitrum_l2_bridge_adapter"
 )
 
+// nolint
 func WithdrawFromL2(
 	env multienv.Env,
 	l2ChainID uint64,

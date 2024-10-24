@@ -26,6 +26,8 @@ import (
 )
 
 // Reads L2-specific precompiles and caches the l1GasPrice set by the L2.
+//
+//nolint:unused
 type optimismL1Oracle struct {
 	services.StateMachine
 	client     l1OracleClient
@@ -50,6 +52,7 @@ type optimismL1Oracle struct {
 	blobBaseFeeCalldata       []byte
 	blobBaseFeeScalarCalldata []byte
 	decimalsCalldata          []byte
+	tokenRatioCalldata        []byte
 	isEcotoneCalldata         []byte
 	isEcotoneMethodAbi        abi.ABI
 	isFjordCalldata           []byte

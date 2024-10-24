@@ -241,7 +241,6 @@ func (l *LoadProfile) Validate() error {
 	if l.TestDuration == nil || l.TestDuration.Duration().Minutes() == 0 {
 		return fmt.Errorf("test duration should be set")
 	}
-
 	return nil
 }
 

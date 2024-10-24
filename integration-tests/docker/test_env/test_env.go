@@ -20,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/logstream"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/runid"
-
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 
 	d "github.com/smartcontractkit/chainlink/integration-tests/docker"

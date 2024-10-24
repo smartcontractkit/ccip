@@ -1,7 +1,9 @@
 package client_test
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	pkgerrors "github.com/pkg/errors"
@@ -44,6 +46,7 @@ func Test_Eth_Errors(t *testing.T) {
 			{"call failed: OldNonce, Current nonce: 22, nonce of rejected tx: 17", true, "Nethermind"},
 			{"nonce too low. allowed nonce range: 427 - 447, actual: 426", true, "zkSync"},
 			{"client error nonce too low", true, "tomlConfig"},
+			{"[Request ID: 2e952947-ffad-408b-aed9-35f3ed152001] Nonce too low. Provided nonce: 15, current nonce: 15", true, "hedera"},
 			{"failed to forward tx to sequencer, please try again. Error message: 'nonce too low'", true, "Mantle"},
 		}
 
@@ -66,6 +69,7 @@ func Test_Eth_Errors(t *testing.T) {
 			{"nonce too high", true, "Erigon"},
 			{"nonce too high. allowed nonce range: 427 - 477, actual: 527", true, "zkSync"},
 			{"client error nonce too high", true, "tomlConfig"},
+			{"[Request ID: 3ec591b4-9396-49f4-a03f-06c415a7cc6a] Nonce too high. Provided nonce: 16, current nonce: 15", true, "hedera"},
 		}
 
 		for _, test := range tests {
@@ -168,6 +172,8 @@ func Test_Eth_Errors(t *testing.T) {
 			{"max fee per gas less than block base fee", true, "zkSync"},
 			{"virtual machine entered unexpected state. please contact developers and provide transaction details that caused this error. Error description: The operator included transaction with an unacceptable gas price", true, "zkSync"},
 			{"client error terminally underpriced", true, "tomlConfig"},
+			{"gas price less than block base fee", true, "aStar"},
+			{"[Request ID: e4d09e44-19a4-4eb7-babe-270db4c2ebc9] Gas price '830000000000' is below configured minimum gas price '950000000000'", true, "hedera"},
 		}
 
 		for _, test := range tests {
@@ -217,6 +223,8 @@ func Test_Eth_Errors(t *testing.T) {
 			{"client error insufficient eth", true, "tomlConfig"},
 			{"transaction would cause overdraft", true, "Geth"},
 			{"failed to forward tx to sequencer, please try again. Error message: 'insufficient funds for gas * price + value'", true, "Mantle"},
+			{"[Request ID: 9dd78806-58c8-4e6d-89a8-a60962abe705] Error invoking RPC: transaction 0.0.3041916@1717691931.680570179 failed precheck with status INSUFFICIENT_PAYER_BALANCE", true, "hedera"},
+			{"[Request ID: 6198d2a3-590f-4724-aae5-69fecead0c49] Insufficient funds for transfer", true, "hedera"},
 		}
 		for _, test := range tests {
 			err = evmclient.NewSendErrorS(test.message)
@@ -233,6 +241,7 @@ func Test_Eth_Errors(t *testing.T) {
 			{"i/o timeout", true, "Arbitrum"},
 			{"network is unreachable", true, "Arbitrum"},
 			{"client error service unavailable", true, "tomlConfig"},
+			{"[Request ID: 825608a8-fd8a-4b5b-aea7-92999509306d] Error invoking RPC: [Request ID: 825608a8-fd8a-4b5b-aea7-92999509306d] Transaction execution returns a null value for transaction", true, "hedera"},
 		}
 		for _, test := range tests {
 			err = evmclient.NewSendErrorS(test.message)
@@ -407,6 +416,7 @@ func Test_Eth_Errors_Fatal(t *testing.T) {
 		{"failed to forward tx to sequencer, please try again. Error message: 'invalid sender'", true, "Mantle"},
 
 		{"client error fatal", true, "tomlConfig"},
+		{"[Request ID: d9711488-4c1e-4af2-bc1f-7969913d7b60] Error invoking RPC: transaction 0.0.4425573@1718213476.914320044 failed precheck with status INVALID_SIGNATURE", true, "hedera"},
 		{"invalid chain id for signer", true, "Treasure"},
 	}
 
@@ -440,4 +450,87 @@ func Test_Config_Errors(t *testing.T) {
 		assert.True(t, clientErrors.ErrIs(errors.New(testErrors.ServiceUnavailable()), evmclient.L2Full, evmclient.ServiceUnavailable))
 		assert.False(t, clientErrors.ErrIs(errors.New("some old bollocks"), evmclient.NonceTooLow))
 	})
+}
+
+func Test_IsTooManyResultsError(t *testing.T) {
+	customErrors := evmclient.NewTestClientErrors()
+
+	tests := []errorCase{
+		{`{
+		"code":-32602,
+		"message":"Log response size exceeded. You can make eth_getLogs requests with up to a 2K block range and no limit on the response size, or you can request any block range with a cap of 10K logs in the response. Based on your parameters and the response size limit, this block range should work: [0x0, 0x133e71]"}`,
+			true,
+			"alchemy",
+		}, {`{
+		"code":-32005,
+		"data":{"from":"0xCB3D","limit":10000,"to":"0x7B737"},
+		"message":"query returned more than 10000 results. Try with this block range [0xCB3D, 0x7B737]."}`,
+			true,
+			"infura",
+		}, {`{
+		"code":-32002,
+		"message":"request timed out"}`,
+			true,
+			"LinkPool-Blockdaemon-Chainstack",
+		}, {`{
+		"code":-32614,
+		"message":"eth_getLogs is limited to a 10,000 range"}`,
+			true,
+			"Quicknode",
+		}, {`{
+		"code":-32000,
+		"message":"too wide blocks range, the limit is 100"}`,
+			true,
+			"SimplyVC",
+		}, {`{
+		"message":"requested too many blocks from 0 to 16777216, maximum is set to 2048",
+		"code":-32000}`,
+			true,
+			"Drpc",
+		}, {`
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>503 Backend fetch failed</title>
+  </head>
+  <body>
+    <h1>Error 503 Backend fetch failed</h1>
+    <p>Backend fetch failed</p>
+    <h3>Guru Meditation:</h3>
+    <p>XID: 343710611</p>
+    <hr>
+    <p>Varnish cache server</p>
+  </body>
+</html>`,
+			false,
+			"Nirvana Labs"}, // This isn't an error response we can handle, but including for completeness.	},
+
+		{`{
+		"code":-32000",
+		"message":"unrelated server error"}`,
+			false,
+			"any",
+		}, {`{
+		"code":-32500,
+		"message":"unrelated error code"}`,
+			false,
+			"any2",
+		}, {fmt.Sprintf(`{
+		"code" : -43106,
+		"message" : "%s"}`, customErrors.TooManyResults()),
+			true,
+			"custom chain with error specified in toml config",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.network, func(t *testing.T) {
+			jsonRpcErr := evmclient.JsonError{}
+			err := json.Unmarshal([]byte(test.message), &jsonRpcErr)
+			if err == nil {
+				err = jsonRpcErr
+			}
+			assert.Equal(t, test.expect, evmclient.IsTooManyResults(err, &customErrors))
+		})
+	}
 }

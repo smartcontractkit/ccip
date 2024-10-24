@@ -170,18 +170,24 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 
 	// Construct request, adding a decimals and latestRound req per contract name
 	var decimalsReq uint8
-	batchGetLatestValuesRequest := make(map[string]types.ContractBatch)
+	batchGetLatestValuesRequest := make(types.BatchGetLatestValuesRequest)
 	for i, call := range batchCalls.decimalCalls {
-		contractName := fmt.Sprintf("%v_%v", OffchainAggregator, i)
-		batchGetLatestValuesRequest[contractName] = append(batchGetLatestValuesRequest[contractName], types.BatchRead{
+		boundContract := types.BoundContract{
+			Address: call.ContractAddress().Hex(),
+			Name:    fmt.Sprintf("%v_%v", OffchainAggregator, i),
+		}
+		batchGetLatestValuesRequest[boundContract] = append(batchGetLatestValuesRequest[boundContract], types.BatchRead{
 			ReadName:  call.MethodName(),
 			ReturnVal: &decimalsReq,
 		})
 	}
 
 	for i, call := range batchCalls.latestRoundDataCalls {
-		contractName := fmt.Sprintf("%v_%v", OffchainAggregator, i)
-		batchGetLatestValuesRequest[contractName] = append(batchGetLatestValuesRequest[contractName], types.BatchRead{
+		boundContract := types.BoundContract{
+			Address: call.ContractAddress().Hex(),
+			Name:    fmt.Sprintf("%v_%v", OffchainAggregator, i),
+		}
+		batchGetLatestValuesRequest[boundContract] = append(batchGetLatestValuesRequest[boundContract], types.BatchRead{
 			ReadName:  call.MethodName(),
 			ReturnVal: &aggregator_v3_interface.LatestRoundData{},
 		})
@@ -200,8 +206,11 @@ func (d *DynamicPriceGetter) performBatchCall(ctx context.Context, chainID uint6
 	latestRoundCR := make([]aggregator_v3_interface.LatestRoundData, 0, nbDecimalCalls)
 	var respErr error
 	for j := range nbCalls {
-		contractName := fmt.Sprintf("%v_%v", OffchainAggregator, j)
-		offchainAggregatorRespSlice := result[contractName]
+		boundContract := types.BoundContract{
+			Address: batchCalls.decimalCalls[j].ContractAddress().Hex(),
+			Name:    fmt.Sprintf("%v_%v", OffchainAggregator, j),
+		}
+		offchainAggregatorRespSlice := result[boundContract]
 
 		for _, read := range offchainAggregatorRespSlice {
 			val, readErr := read.GetResult()
