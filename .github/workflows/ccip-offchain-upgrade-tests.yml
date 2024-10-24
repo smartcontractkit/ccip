@@ -137,10 +137,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Build Test Image
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
-        uses: ./.github/actions/build-test-image
+        uses: smartcontractkit/.github/actions/ctf-build-test-image@a5e4f4c8fbb8e15ab2ad131552eca6ac83c4f4b3 # ctf-build-test-image@0.1.0
         with:
           # we just want to build the load tests
           suites: ccip-tests/load ccip-tests/smoke
+          tag: ${{ github.event.pull_request.head.sha || github.sha }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
