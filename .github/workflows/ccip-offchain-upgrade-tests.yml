@@ -141,7 +141,6 @@ jobs:
         with:
           # we just want to build the load tests
           suites: ccip-tests/load ccip-tests/smoke
-          tag: ${{ github.event.pull_request.head.sha || github.sha }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
