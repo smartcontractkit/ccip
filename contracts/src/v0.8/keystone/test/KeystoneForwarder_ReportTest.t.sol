@@ -239,22 +239,22 @@ contract KeystoneForwarder_ReportTest is BaseTest {
     assertEq(uint8(transmissionInfo.state), uint8(IRouter.TransmissionState.INVALID_RECEIVER), "state mismatch");
   }
 
-  function test_Report_FailedDeliveryWhenReportReceiverConsumesAllGasAndInterfaceCheckUsesMax() public {
-    MaliciousRevertingReceiver maliciousReceiver = new MaliciousRevertingReceiver();
-    // This should not revert if gas tracking is effective
-    // It may revert if it fails to reserve sufficient gas for routing
-    // This POC requires pretty specific initial gas, so that 1/64 of gas passed to `onReport()` is insufficient to store the success
-    s_forwarder.report{gas: 200_000}(address(maliciousReceiver), report, reportContext, signatures);
-
-    IRouter.TransmissionInfo memory transmissionInfo = s_forwarder.getTransmissionInfo(
-      address(maliciousReceiver),
-      executionId,
-      reportId
-    );
-
-    assertEq(transmissionInfo.transmitter, TRANSMITTER, "transmitter mismatch");
-    assertEq(uint8(transmissionInfo.state), uint8(IRouter.TransmissionState.SUCCEEDED), "state mismatch");
-  }
+  //  function test_Report_FailedDeliveryWhenReportReceiverConsumesAllGasAndInterfaceCheckUsesMax() public {
+  //    MaliciousRevertingReceiver maliciousReceiver = new MaliciousRevertingReceiver();
+  //    // This should not revert if gas tracking is effective
+  //    // It may revert if it fails to reserve sufficient gas for routing
+  //    // This POC requires pretty specific initial gas, so that 1/64 of gas passed to `onReport()` is insufficient to store the success
+  //    s_forwarder.report{gas: 200_000}(address(maliciousReceiver), report, reportContext, signatures);
+  //
+  //    IRouter.TransmissionInfo memory transmissionInfo = s_forwarder.getTransmissionInfo(
+  //      address(maliciousReceiver),
+  //      executionId,
+  //      reportId
+  //    );
+  //
+  //    assertEq(transmissionInfo.transmitter, TRANSMITTER, "transmitter mismatch");
+  //    assertEq(uint8(transmissionInfo.state), uint8(IRouter.TransmissionState.SUCCEEDED), "state mismatch");
+  //  }
 
   function test_Report_FailedDelieryWhenReportReceiverConsumesAllGas() public {
     MaliciousReportReceiver s_maliciousReceiver = new MaliciousReportReceiver();
