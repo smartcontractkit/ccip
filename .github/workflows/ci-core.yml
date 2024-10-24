@@ -326,7 +326,6 @@ jobs:
           ./runner \
             -grafana_auth=$GRAFANA_INTERNAL_BASIC_AUTH \
             -grafana_host=$GRAFANA_INTERNAL_HOST \
-            -grafana_org_id=$GRAFANA_INTERNAL_TENANT_ID \
             -gh_sha=$GITHUB_SHA \
             -gh_event_path=$GITHUB_EVENT_PATH \
             -gh_event_name=$GITHUB_EVENT_NAME \
