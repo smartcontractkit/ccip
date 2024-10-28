@@ -97,5 +97,10 @@ src = 'src/v0.8/shared'
 test = 'src/v0.8/shared/test'
 solc_version = '0.8.19'
 
+[etherscan]
+astar-mainnet = { key = "${ETHERSCAN_API_KEY}", url = "https://astar.blockscout.com/api/", chain = 592 }
+astar-shibuya = { key = "${ETHERSCAN_API_KEY}", url = "https://shibuya.blockscout.com/api/", chain = 81 }
+metis-sepolia = { key = "${ETHERSCAN_API_KEY}", url = "https://sepolia-explorer-api.metisdevops.link/api/", chain = 59902 }
+metis-andromeda = { key = "${ETHERSCAN_API_KEY}", url = "https://andromeda-explorer.metis.io/api", chain = 1088 }
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
