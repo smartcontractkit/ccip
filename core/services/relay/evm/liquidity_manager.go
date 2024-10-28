@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink/v2/common/txmgr"
@@ -140,6 +141,10 @@ type rebalancerProvider struct {
 	lmFactory           evmliquiditymanager.Factory
 	discovererFactory   discoverer.Factory
 	bridgeFactory       bridge.Factory
+}
+
+func (r *rebalancerProvider) ContractReader() types.ContractReader {
+	return nil
 }
 
 func (r *rebalancerProvider) Codec() commontypes.Codec {

@@ -74,6 +74,16 @@ docker:
 	--build-arg COMMIT_SHA=$(COMMIT_SHA) \
 	-f core/chainlink.Dockerfile .
 
+.PHONY: docker-ccip ## Build the chainlink docker image
+docker-ccip:
+	docker buildx build \
+	--build-arg COMMIT_SHA=$(COMMIT_SHA) \
+	-f core/chainlink.Dockerfile . -t chainlink-ccip:latest
+
+	docker buildx build \
+	--build-arg COMMIT_SHA=$(COMMIT_SHA) \
+	-f ccip/ccip.Dockerfile .
+
 .PHONY: docker-plugins ## Build the chainlink-plugins docker image
 docker-plugins:
 	docker buildx build \
@@ -89,7 +99,7 @@ abigen: ## Build & install abigen.
 	./tools/bin/build_abigen
 
 .PHONY: generate
-generate: pnpmdep abigen codecgen mockery protoc gomods ## Execute all go:generate commands.
+generate: abigen codecgen mockery protoc gomods ## Execute all go:generate commands.
 	gomods -w go generate -x ./...
 	mockery
 
@@ -164,8 +174,7 @@ config-docs: ## Generate core node configuration documentation
 .PHONY: golangci-lint
 golangci-lint: ## Run golangci-lint for all issues.
 	[ -d "./golangci-lint" ] || mkdir ./golangci-lint && \
-	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:v1.59.1 golangci-lint run --max-issues-per-linter 0 --max-same-issues 0 > ./golangci-lint/$(shell date +%Y-%m-%d_%H:%M:%S).txt
-
+	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:v1.59.1 golangci-lint run --max-issues-per-linter 0 --max-same-issues 0 | tee ./golangci-lint/$(shell date +%Y-%m-%d_%H:%M:%S).txt
 
 GORELEASER_CONFIG ?= .goreleaser.yaml
 
@@ -183,7 +192,7 @@ modgraph:
 
 .PHONY: test-short
 test-short: ## Run 'go test -short' and suppress uninteresting output
-	go test -short ./... | grep -v "[no test files]" | grep -v "\(cached\)"
+	go test -short ./... | grep -v "no test files" | grep -v "\(cached\)"
 
 help:
 	@echo ""

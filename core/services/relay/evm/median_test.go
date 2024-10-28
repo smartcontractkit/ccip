@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
@@ -23,7 +23,7 @@ func TestNewMedianProvider(t *testing.T) {
 	chainID := testutils.NewRandomEVMChainID()
 	chain.On("ID").Return(chainID)
 	contractID := testutils.NewAddress()
-	relayer := Relayer{lggr: lggr, chain: chain}
+	relayer := Relayer{lggr: logger.Sugared(lggr), chain: chain}
 
 	pargs := commontypes.PluginArgs{}
 

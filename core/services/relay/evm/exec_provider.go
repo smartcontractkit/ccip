@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -155,7 +156,7 @@ func (s *SrcExecProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
 	return UnimplementedContractTransmitter{}
 }
 
-func (s *SrcExecProvider) ChainReader() commontypes.ContractReader {
+func (s *SrcExecProvider) ContractReader() commontypes.ContractReader {
 	return nil
 }
 
@@ -342,7 +343,7 @@ func (d *DstExecProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
 	return d.contractTransmitter
 }
 
-func (d *DstExecProvider) ChainReader() commontypes.ContractReader {
+func (d *DstExecProvider) ContractReader() commontypes.ContractReader {
 	return nil
 }
 

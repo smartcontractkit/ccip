@@ -23,6 +23,7 @@ var (
 	rebalancerABI = abihelpers.MustParseABI(liquiditymanager.LiquidityManagerMetaData.ABI)
 )
 
+// nolint
 func SendToL2(
 	env multienv.Env,
 	l1ChainID uint64,
@@ -115,6 +116,7 @@ func scaleGasCost(gasCost uint64) uint64 {
 	return gasCost * 18 / 10
 }
 
+// nolint
 func SendToL2ViaRebalancer(
 	env multienv.Env,
 	l1ChainID,

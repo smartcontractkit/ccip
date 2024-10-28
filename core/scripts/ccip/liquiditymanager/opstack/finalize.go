@@ -22,6 +22,7 @@ const (
 	FinalizationActionFinalizeWithdrawal uint8 = 1
 )
 
+// nolint
 func FinalizeL1(
 	env multienv.Env,
 	l1ChainID,
@@ -55,6 +56,7 @@ func FinalizeL1(
 	helpers.ConfirmTXMined(context.Background(), env.Clients[l1ChainID], tx, int64(l1ChainID), "FinalizeWithdrawalTransaction")
 }
 
+// nolint
 func FinalizeWithdrawalViaRebalancer(
 	env multienv.Env,
 	l1ChainID,
