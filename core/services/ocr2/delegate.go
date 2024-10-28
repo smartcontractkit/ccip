@@ -1616,7 +1616,15 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		MetricsRegisterer:      prometheus.WrapRegistererWith(map[string]string{"job_name": jb.Name.ValueOrZero()}, prometheus.DefaultRegisterer),
 	}
 
-	var priceGetter ccip.AllTokensPriceGetter
+	priceGetter, err := d.ccipCommitPriceGetter(ctx, lggr, pluginJobSpecConfig, jb)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create price getter: %w", err)
+	}
+	return ccipcommit.NewCommitServices(ctx, d.ds, srcProvider, dstProvider, priceGetter, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, int64(srcChainID), dstChainID, logError)
+}
+
+func (d *Delegate) ccipCommitPriceGetter(ctx context.Context, lggr logger.SugaredLogger, pluginJobSpecConfig ccipconfig.CommitPluginJobSpecConfig, jb job.Job) (priceGetter ccip.AllTokensPriceGetter, err error) {
+	spec := jb.OCR2OracleSpec
 	withPipeline := strings.Trim(pluginJobSpecConfig.TokenPricesUSDPipeline, "\n\t ") != ""
 	if withPipeline {
 		priceGetter, err = ccip.NewPipelineGetter(pluginJobSpecConfig.TokenPricesUSDPipeline, d.pipelineRunner, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
@@ -1685,8 +1693,7 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 			return nil, fmt.Errorf("creating dynamic price getter: %w", err)
 		}
 	}
-
-	return ccipcommit.NewCommitServices(ctx, d.ds, srcProvider, dstProvider, priceGetter, jb, lggr, d.pipelineRunner, oracleArgsNoPlugin, d.isNewlyCreatedJob, int64(srcChainID), dstChainID, logError)
+	return priceGetter, nil
 }
 
 func newCCIPCommitPluginBytes(isSourceProvider bool, sourceStartBlock uint64, destStartBlock uint64) config.CommitPluginConfig {

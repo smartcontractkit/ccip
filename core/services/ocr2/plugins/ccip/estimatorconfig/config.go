@@ -2,7 +2,6 @@ package estimatorconfig
 
 import (
 	"context"
-	"errors"
 	"math/big"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
@@ -42,7 +41,7 @@ func (c *FeeEstimatorConfigService) SetOnRampReader(reader ccip.OnRampReader) {
 // GetDynamicConfig should be cached in the onRamp reader to avoid unnecessary on-chain calls
 func (c *FeeEstimatorConfigService) GetDataAvailabilityConfig(ctx context.Context) (destDataAvailabilityOverheadGas, destGasPerDataAvailabilityByte, destDataAvailabilityMultiplierBps int64, err error) {
 	if c.onRampReader == nil {
-		return 0, 0, 0, errors.New("no OnRampReader has been configured")
+		return 0, 0, 0, nil
 	}
 
 	cfg, err := c.onRampReader.GetDynamicConfig(ctx)
