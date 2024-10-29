@@ -198,6 +198,9 @@ before:
     hooks:
         - cmd: go mod tidy
         - cmd: ./tools/bin/goreleaser_utils before_hook
+git:
+    ignore_tags:
+        - contracts-ccip/v1.5.0-beta.0
 partial:
     by: target
 nightly:

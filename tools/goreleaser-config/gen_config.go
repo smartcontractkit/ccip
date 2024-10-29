@@ -54,12 +54,15 @@ func Generate(environment string) config.Project {
 		Changelog: config.Changelog{
 			Disable: "true",
 		},
+		Git: config.Git{
+			IgnoreTags: []string{"contracts-ccip/v1.5.0-beta.0"},
+		},
 	}
+
 	if environment == "devspace" {
 		versionTemplate := `v0.0.0-{{ .Runtime.Goarch }}-{{ .Now.Format "2006-01-02-15-04-05Z" }}`
 		project.Snapshot = config.Snapshot{VersionTemplate: versionTemplate}
 		project.Nightly = config.Nightly{VersionTemplate: versionTemplate}
-		project.Git.IgnoreTags = []string{"contracts-ccip/v1.5.0-beta.0"}
 	}
 
 	// Add SBOMs if needed
