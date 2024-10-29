@@ -2,7 +2,7 @@
 ChainID = '1088'
 ChainType = 'optimismBedrock'
 # Sequencer offers absolute finality
-FinalityDepth = 500
+FinalityDepth = 10
 FinalityTagEnabled = true
 MinIncomingConfirmations = 1
 NoNewHeadsThreshold = '0'
