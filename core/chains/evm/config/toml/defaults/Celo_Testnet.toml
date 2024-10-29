@@ -1,20 +1,30 @@
-ChainID = '44787'
-ChainType = 'celo'
-FinalityDepth = 10
-LogPollInterval = '5s'
+[[EVM]]
+ChainID = "44787"
+ChainType = "celo"
+FinalityTagEnabled = true
+FinalityDepth = 2750
+LogPollInterval = "1s"
+NoNewHeadsThreshold = "1m"
 MinIncomingConfirmations = 1
-NoNewHeadsThreshold = '1m'
-OCR.ContractConfirmations = 1
-NoNewFinalizedHeadsThreshold = '1m'
+NoNewFinalizedHeadsThreshold = "45m"
 
-[GasEstimator]
-PriceDefault = '5 gwei'
-PriceMax = '500 gwei'
-PriceMin = '5 gwei'
-BumpMin = '2 gwei'
+[EVM.GasEstimator]
+EIP1559DynamicFees = true
+PriceMin = "5 gwei"
+PriceMax = "1000 gwei"
+BumpMin = "2 gwei"
 
-[GasEstimator.BlockHistory]
-BlockHistorySize = 24
+[EVM.GasEstimator.BlockHistory]
+BlockHistorySize = 60
 
-[HeadTracker]
-HistoryDepth = 50
+[EVM.Transactions]
+ResendAfterThreshold = "30s"
+
+[EVM.HeadTracker]
+HistoryDepth = 2750
+
+[EVM.NodePool]
+SyncThreshold = 10
+
+[EVM.OCR]
+ContractConfirmations = 1
