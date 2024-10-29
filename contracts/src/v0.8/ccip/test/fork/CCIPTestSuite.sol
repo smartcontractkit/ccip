@@ -216,8 +216,7 @@ contract CCIPTestSuite is Test {
     }
     _loadLatestOffRampData();
 
-    uint64 sourceChainSelector = messages[0].sourceChainSelector;
-    EVM2EVMOffRamp offRamp = s_remoteChainConfigs[sourceChainSelector].NewOffRamp;
+    EVM2EVMOffRamp offRamp = s_remoteChainConfigs[messages[0].sourceChainSelector].NewOffRamp;
 
     vm.startPrank(address(offRamp));
 
@@ -229,13 +228,13 @@ contract CCIPTestSuite is Test {
         abi.decode(message.sourceTokenData[0], (Internal.SourceTokenData)).destTokenAddress;
       address destTokenAddress = abi.decode(destTokenAddressBytes, (address));
 
-      uint256 startingGas = 80_000;
+      uint256 startingGas = 250_000;
       uint256 maxGasToTest = 250_000;
       uint256 increment = 10_000;
       uint32[] memory gasOverrides = new uint32[](1);
 
       for (uint256 j = startingGas; j <= maxGasToTest; j += increment) {
-        gasOverrides[0] = uint32(j);
+        // gasOverrides[0] = uint32(j);
         try offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), gasOverrides) {
           console2.log(unicode"✅ source_token", message.tokenAmounts[0].token, s_tokenNames[destTokenAddress], j);
           succeeded++;

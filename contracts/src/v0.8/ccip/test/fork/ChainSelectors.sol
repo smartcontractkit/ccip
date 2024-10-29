@@ -57,8 +57,6 @@ library ChainSelectors {
       return ETHEREUM;
     } else if (chainSelector == 4411394078118774322) {
       return BLAST;
-    } else if (chainSelector == 5009297550715157269) {
-      return "Ethereum mainnet";
     } else if (chainSelector == 465200170687744372) {
       return GNOSIS;
     } else if (chainSelector == 11344663589394136015) {

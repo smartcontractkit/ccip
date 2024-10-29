@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.24;
 
+import {IOwnable} from "../../../shared/interfaces/IOwnable.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {CCIPTestSuite} from "./CCIPTestSuite.sol";
 import {ChainSelectors} from "./ChainSelectors.sol";
 import {ForkedChain} from "./ForkedChain.sol";
-import {ManyChainMultiSig} from "./ccip-owner-contracts/ManyChainMultiSig.sol";
-import {RBACTimelock} from "./ccip-owner-contracts/RBACTimelock.sol";
+import {MCMS} from "./MCMS.sol";
 
 import {console2} from "forge-std/Console2.sol";
 import {Test} from "forge-std/Test.sol";
@@ -59,19 +59,11 @@ contract ChainLoading is Test {
   mapping(string chainName => ForkedChainTestSetup) public s_chains;
 
   struct ForkedChainTestSetup {
-    MCMSSetup mcmsSetup;
     CCIPSetup ccipSetup;
     string name;
     uint256 forkId;
     uint64 postMigrationBlock;
     CCIPTestSuite testSuite;
-  }
-
-  struct MCMSSetup {
-    ManyChainMultiSig mcms;
-    bytes mcmcPayload;
-    RBACTimelock callProxy;
-    bytes callProxyPayload;
   }
 
   struct CCIPSetup {
@@ -102,7 +94,6 @@ contract ChainLoading is Test {
     ForkedChainTestSetup memory sourceChain = _activateFork(sourceChainName);
 
     // Apply proposal on source
-    _setProposalOnMCMS(sourceChain);
     _executeProposalOnTimeLock(sourceChain);
 
     // Send messages
@@ -111,7 +102,6 @@ contract ChainLoading is Test {
     ForkedChainTestSetup memory destChain = _activateFork(destChainName);
 
     // Apply proposal on dest
-    _setProposalOnMCMS(destChain);
     _executeProposalOnTimeLock(destChain);
 
     // Execute messages
@@ -134,44 +124,67 @@ contract ChainLoading is Test {
 
     if (chain.postMigrationBlock == 0) {
       console2.logString("Migration not applied yet");
-      return;
+
+      _executeProposalOnTimeLock(chain);
+    } else {
+      // To find the post-migration block, search the Router for the RouterOnRampSet the event sig
+      // 0x1f7d0ec248b80e5c0dde0ee531c4fc8fdb6ce9a2b3d90f560c74acd6a7202f23
+      // There should be multiple events in the same block during the migration.
+      vm.rollFork(chain.postMigrationBlock);
     }
 
     console2.logString(" +------------------------------------------------+");
     console2.logString(" |                After migration                 |");
     console2.logString(" +------------------------------------------------+");
-    _setProposalOnMCMS(chain);
-    _executeProposalOnTimeLock(chain);
 
     chain.testSuite.sendAllTokens(true);
-  }
-
-  function _setProposalOnMCMS(
-    ForkedChainTestSetup memory chain
-  ) internal {
-    // TODO
   }
 
   function _executeProposalOnTimeLock(
     ForkedChainTestSetup memory chain
   ) internal {
-    // TODO actual MCMS proposal execution. For testing, we can use chains that already have the proposal executed
-    // and roll to a block after the migration.
+    if (chain.postMigrationBlock != 0) {
+      console2.logString("Rolling to post-migration block");
+      // To find the post-migration block, search the Router for the RouterOnRampSet the event sig
+      // 0x1f7d0ec248b80e5c0dde0ee531c4fc8fdb6ce9a2b3d90f560c74acd6a7202f23
+      // There should be multiple events in the same block during the migration.
+      vm.rollFork(chain.postMigrationBlock);
 
-    // To find the post-migration block, search the Router for the RouterOnRampSet the event sig
-    // 0x1f7d0ec248b80e5c0dde0ee531c4fc8fdb6ce9a2b3d90f560c74acd6a7202f23
-    // There should be multiple events in the same block during the migration.
-    vm.rollFork(chain.postMigrationBlock);
+      return;
+    }
+
+    bytes memory payload = vm.envBytes(string.concat(chain.name, "_PAYLOAD"));
+    (MCMS.Call[] memory calls,,,) = abi.decode(payload, (MCMS.Call[], bytes32, bytes32, uint256));
+
+    if (calls.length == 0) {
+      console2.logString("No migration to apply");
+      return;
+    }
+    // All contracts are owned by the same contract
+    changePrank(IOwnable(calls[0].target).owner());
+
+    for (uint256 i = 0; i < calls.length; ++i) {
+      MCMS.Call memory call = calls[i];
+
+      // Exclude GHO
+      if (
+        call.target == 0x5756880B6a1EAba0175227bf02a7E87c1e02B28C
+          || call.target == 0xF168B83598516A532a85995b52504a2Fa058C068
+      ) {
+        continue;
+      }
+
+      (bool success,) = call.target.call{value: call.value}(call.data);
+      require(success, "RBACTimelock: underlying transaction reverted");
+    }
+
+    console2.logString("Migration not applied yet");
   }
 
   function _loadSingleChain(
     string memory name
   ) internal returns (ForkedChainTestSetup memory) {
     ForkedChainTestSetup memory setup;
-    //    setup.mcmsSetup.mcms = ManyChainMultiSig(payable(vm.envAddress(string.concat(name, "_MCMS"))));
-    //    setup.mcmsSetup.mcmcPayload = vm.envBytes(string.concat(name, "_MCMS_PAYLOAD"));
-    //    setup.mcmsSetup.callProxy = RBACTimelock(payable(vm.envAddress(string.concat(name, "_CALL_PROXY"))));
-    //    setup.mcmsSetup.callProxyPayload = vm.envBytes(string.concat(name, "_CALL_PROXY_PAYLOAD"));
 
     setup.ccipSetup.router = vm.envAddress(string.concat(name, "_ROUTER"));
     setup.postMigrationBlock = uint64(vm.envUint(string.concat(name, "_POST_BLOCK")));
