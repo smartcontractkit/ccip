@@ -2,12 +2,13 @@ name: Test Image Publish
 # Publish the compiled integration tests
 on:
   push:
+    tags:
+      - "v*"
     branches:
-      - develop
+      - ccip-develop
   workflow_dispatch:
 
 env:
-  ECR_TAG: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-tests:develop
   CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
 
 jobs:
@@ -37,11 +38,14 @@ jobs:
         id: tags
         if: github.event_name != 'workflow_dispatch'
         run: |
-          echo "other_tags=${ECR_TAG}" >> $GITHUB_OUTPUT
+          echo 'release_tag="${{ format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink-ccip-tests:{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.ref_name) }}"' >> $GITHUB_OUTPUT
       - name: Build Image
         uses: smartcontractkit/.github/actions/ctf-build-test-image@a5e4f4c8fbb8e15ab2ad131552eca6ac83c4f4b3 # ctf-build-test-image@0.1.0
         with:
-          other_tags: ${{ steps.tags.outputs.other_tags }}
+          other_tags: ${{ steps.tags.outputs.release_tag }}
+          repository: 'chainlink-ccip-tests'
+          tag: ${{ github.sha }}
+          suites: 'chaos migration reorg smoke soak benchmark load ccip-tests/load ccip-tests/smoke ccip-tests/chaos'
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
