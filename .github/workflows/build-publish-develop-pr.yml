@@ -43,7 +43,7 @@ jobs:
       - name: Configure aws credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
-          role-to-assume: ${{ secrets.AWS_OIDC_IAM_ROLE_BUILD_PUBLISH_DEVELOP_PR }}
+          role-to-assume: ${{ secrets.AWS_OIDC_IAM_ROLE_PUBLISH_PR_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
           mask-aws-account-id: true
           role-session-name: "merge"
@@ -97,7 +97,7 @@ jobs:
       - name: Configure aws credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
-          role-to-assume: ${{ secrets.AWS_OIDC_IAM_ROLE_BUILD_PUBLISH_DEVELOP_PR }}
+          role-to-assume: ${{ secrets.AWS_OIDC_IAM_ROLE_PUBLISH_PR_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
           mask-aws-account-id: true
           role-session-name: "split-${{ matrix.goarch }}"
