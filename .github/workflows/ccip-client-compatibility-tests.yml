@@ -11,7 +11,7 @@ on:
     inputs:
       chainlinkVersion:
         description: commit SHA or tag of the Chainlink version to test
-        required: true
+        required: false
         type: string
       evmImplementations:
         description: comma separated list of EVM implementations to test (ignored if base64TestList is used)
