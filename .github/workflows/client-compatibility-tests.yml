@@ -29,7 +29,7 @@ on:
         type: string
 
 env:
-  CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip
+  CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
   MOD_CACHE_VERSION: 2
 
@@ -283,14 +283,14 @@ jobs:
       matrix:
         mirror:
           - name: ethereum/client-go
-            expression: '^(alltools-v|v)[0-9]\.[0-9]+\.[0-9]+$'
+            expression: '^(alltools-v|v)?[0-9]\.[0-9]+\.[0-9]+$'
           - name: hyperledger/besu
-            expression: '^[0-9]+\.[0-9]+(\.[0-9]+)?$'
+            expression: 'v?^[0-9]+\.[0-9]+(\.[0-9]+)?$'
             page_size: 300
           - name: thorax/erigon
-            expression: '^v[0-9]+\.[0-9]+\.[0-9]+$'
+            expression: '^v?[0-9]+\.[0-9]+\.[0-9]+$'
           - name: nethermind/nethermind
-            expression: '^[0-9]+\.[0-9]+\.[0-9]+$'
+            expression: '^v?[0-9]+\.[0-9]+\.[0-9]+$'
           - name: tofelb/ethereum-genesis-generator
             expression: '^[0-9]+\.[0-9]+\.[0-9]+(\-slots\-per\-epoch)?'
           - name: ghcr.io/paradigmxyz/reth
@@ -386,7 +386,7 @@ jobs:
       - name: Set Up ecrimagefetcher
         shell: bash
         run: |
-          go install github.com/smartcontractkit/chainlink-testing-framework/tools/ecrimagefetcher@v1.0.1
+          go install github.com/smartcontractkit/chainlink-testing-framework/tools/ecrimagefetcher@v1.50.2
       - name: Get latest docker images from ECR
         if: ${{ github.event.inputs.base64TestList == '' }}
         env:
@@ -416,7 +416,7 @@ jobs:
 
           if [[ "$ETH_IMPLEMENTATIONS" == *"erigon"* ]]; then
             # 2.60.0 and 2.60.1 are ignored as they stopped working with CL node
-            erigon_images=$(ecrimagefetcher 'thorax/erigon' '^v[0-9]+\.[0-9]+\.[0-9]+$' ${{ env.LATEST_IMAGE_COUNT }} "<v2.60.0")
+            erigon_images=$(ecrimagefetcher 'thorax/erigon' '^v?[0-9]+\.[0-9]+\.[0-9]+$' ${{ env.LATEST_IMAGE_COUNT }} "<v2.60.0 || >v2.60.2")
             echo "ERIGON_IMAGES=$erigon_images" >> $GITHUB_ENV
             echo "Erigon latest images: $erigon_images"
           fi
