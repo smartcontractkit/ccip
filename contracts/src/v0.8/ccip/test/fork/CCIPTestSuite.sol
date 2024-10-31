@@ -25,7 +25,7 @@ contract CCIPTestSuite is Test {
   bytes32 internal constant TypeAndVersion1_5_OnRamp = keccak256("EVM2EVMOnRamp 1.5.0");
   bytes32 internal constant TypeAndVersion1_5_OffRamp = keccak256("EVM2EVMOffRamp 1.5.0");
 
-  uint256 internal constant TOKENS_TO_SEND = 1;
+  uint256 internal constant TOKENS_TO_SEND = 100;
   uint16 internal constant MAX_RETURN_BYTES = 4 + 8 * 32;
   uint16 internal constant GAS_FOR_CALL_WITH_EXACT_GAS = 2500;
   uint256 internal constant TX_GAS_LIMIT = 1e6;
