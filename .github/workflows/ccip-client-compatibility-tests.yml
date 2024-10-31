@@ -550,7 +550,7 @@ jobs:
           test_config_selected_networks: ${{ env.SELECTED_NETWORKS}}
           test_config_logging_run_id: ${{ github.run_id }}
           test_config_test_log_collect: ${{ vars.TEST_LOG_COLLECT }}
-          test_config_logstream_log_targets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
+          test_config_logstream_log_targets: "file"
           test_config_private_ethereum_network_execution_layer: ${{ matrix.evm_node.eth_implementation || 'geth' }}
           test_config_private_ethereum_network_custom_docker_image: ${{ matrix.evm_node.docker_image }}
           cl_repo: ${{ env.CHAINLINK_IMAGE }}
