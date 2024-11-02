@@ -407,6 +407,8 @@ func Test_Eth_Errors_Fatal(t *testing.T) {
 		{"failed to forward tx to sequencer, please try again. Error message: 'invalid sender'", true, "Mantle"},
 
 		{"client error fatal", true, "tomlConfig"},
+
+		{"invalid chain ID", true, "Berachain"},
 	}
 
 	for _, test := range tests {

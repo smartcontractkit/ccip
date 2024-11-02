@@ -1,0 +1,11 @@
+ChainID = '4801'
+FinalityDepth = 2500 # compat test finality_depth: ~2400, but it also threw 4000 in other round, which is it? 
+LogPollInterval = '5s' # compat test block_time:  ~0.5s 
+
+NoNewFinalizedHeadsThreshold = '10m' # with 5s threw PLENTY of [RPC's finalized state is out of sync; no new finalized heads received for 5s (last finalized head received was 4939141)]
+
+FinalityTagEnabled = true #compat test get_logs>supports_finalized_tag: returned true
+
+[GasEstimator]
+EIP1559DynamicFees = true
+Mode = 'FeeHistory'

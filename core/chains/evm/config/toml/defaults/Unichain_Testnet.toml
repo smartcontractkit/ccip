@@ -1,0 +1,11 @@
+ChainID = '1301'
+FinalityDepth = 2000 # compat test finality_depth: ~1900
+LogPollInterval = '5s' # compat test block_time:  ~1s 
+
+NoNewFinalizedHeadsThreshold = '10m' # not sure what to put here, from Worldchain set to 5s threw a huge amount of errors
+
+FinalityTagEnabled = true #compat test get_logs>supports_finalized_tag: returned true
+
+[GasEstimator]
+EIP1559DynamicFees = true
+Mode = 'FeeHistory'
