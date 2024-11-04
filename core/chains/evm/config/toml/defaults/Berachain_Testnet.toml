@@ -1,12 +1,18 @@
 ChainID = '80084'
-FinalityDepth = 10 # compat test finality_depth: 1
-LogPollInterval = '5s' # compat test block_time:  ~1.7s 
+# finality_depth: instant
+FinalityDepth = 10 
+# block_time: 5s 
+LogPollInterval = '10s' 
 
-NoNewFinalizedHeadsThreshold = '10m' # with 5s threw PLENTY of [RPC's finalized state is out of sync; no new finalized heads received for 5s (last finalized head received was 4939141)]
-
-FinalityTagEnabled = true #compat test get_logs>supports_finalized_tag: returned true
+FinalityTagEnabled = true
 
 [GasEstimator]
 EIP1559DynamicFees = true
 Mode = 'FeeHistory'
 
+[GasEstimator.FeeHistory]
+# block_time was: 5s
+CacheTimeout = '5s'
+
+[GasEstimator.BlockHistory]
+BlockHistorySize = 100

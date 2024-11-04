@@ -1,12 +1,22 @@
 ChainID = '808813'
-FinalityDepth = 900 # compat test finality_depth: ~850
-LogPollInterval = '5s' # compat test block_time:  ~0.5s 
+# OP stack https://docs.gobob.xyz/learn/introduction/op-stack
+ChainType = 'optimismBedrock'
+# finality_depth was: ~850
+FinalityDepth = 900
+# block_time was:  2s
+LogPollInterval = '5s'  
 
-NoNewFinalizedHeadsThreshold = '10m' # with 5s threw PLENTY of [RPC's finalized state is out of sync; no new finalized heads received for 5s (last finalized head received was 4939141)]
+NoNewFinalizedHeadsThreshold = '10m'
 
-FinalityTagEnabled = true #compat test get_logs>supports_finalized_tag: returned true
+FinalityTagEnabled = true
 
 [GasEstimator]
 EIP1559DynamicFees = true
 Mode = 'FeeHistory'
 
+[GasEstimator.FeeHistory]
+# block_time was: 2s
+CacheTimeout = '2s'
+
+[GasEstimator.BlockHistory]
+BlockHistorySize = 100
