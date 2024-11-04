@@ -5812,7 +5812,7 @@ Enabled = true
 [GasEstimator]
 Mode = 'BlockHistory'
 PriceDefault = '21 gwei'
-PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
+PriceMax = '100 micro'
 PriceMin = '20 gwei'
 LimitDefault = 8000000
 LimitMax = 8000000
