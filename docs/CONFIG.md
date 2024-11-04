@@ -5709,7 +5709,7 @@ Enabled = true
 [GasEstimator]
 Mode = 'BlockHistory'
 PriceDefault = '21 gwei'
-PriceMax = '100 micro'
+PriceMax = '1 micro'
 PriceMin = '20 gwei'
 LimitDefault = 8000000
 LimitMax = 8000000
@@ -5812,7 +5812,7 @@ Enabled = true
 [GasEstimator]
 Mode = 'BlockHistory'
 PriceDefault = '21 gwei'
-PriceMax = '100 micro'
+PriceMax = '1 micro'
 PriceMin = '20 gwei'
 LimitDefault = 8000000
 LimitMax = 8000000

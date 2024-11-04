@@ -5,6 +5,6 @@ LogPollInterval = "6s"
 NoNewHeadsThreshold = "10m"
 
 [GasEstimator]
-PriceMax = "100000 gwei"
+PriceMax = "1000 gwei"
 PriceDefault = "21 gwei"
 PriceMin = "20 gwei"
