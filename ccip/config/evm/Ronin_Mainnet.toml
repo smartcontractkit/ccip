@@ -5,5 +5,6 @@ LogPollInterval = "6s"
 NoNewHeadsThreshold = "10m"
 
 [GasEstimator]
+# Ronin uses default gas price of 20 gwei https://docs.skymavis.com/mavis/mpc/guides/estimate-gas#overview
 Mode = 'FeeHistory'
 PriceMax = "1000 gwei"
