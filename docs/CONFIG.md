@@ -5708,9 +5708,9 @@ Enabled = true
 
 [GasEstimator]
 Mode = 'FeeHistory'
-PriceDefault = '21 gwei'
+PriceDefault = '20 gwei'
 PriceMax = '1 micro'
-PriceMin = '20 gwei'
+PriceMin = '1 gwei'
 LimitDefault = 8000000
 LimitMax = 8000000
 LimitMultiplier = '1'
@@ -5811,9 +5811,9 @@ Enabled = true
 
 [GasEstimator]
 Mode = 'FeeHistory'
-PriceDefault = '21 gwei'
+PriceDefault = '20 gwei'
 PriceMax = '1 micro'
-PriceMin = '20 gwei'
+PriceMin = '1 gwei'
 LimitDefault = 8000000
 LimitMax = 8000000
 LimitMultiplier = '1'

@@ -7,6 +7,3 @@ NoNewHeadsThreshold = "10m"
 [GasEstimator]
 Mode = 'FeeHistory'
 PriceMax = "1000 gwei"
-# Ronin gas price is 20gwei by default but setting to 21gwei due to some issues faced during local testing https://docs.skymavis.com/mavis/mpc/guides/estimate-gas#overview.
-PriceDefault = "21 gwei"
-PriceMin = "20 gwei"
