@@ -7181,7 +7181,7 @@ TransactionPercentile = 60
 CacheTimeout = '10s'
 
 [HeadTracker]
-HistoryDepth = 2750
+HistoryDepth = 300
 MaxBufferSize = 3
 SamplingInterval = '1s'
 MaxAllowedFinalityDepth = 10000

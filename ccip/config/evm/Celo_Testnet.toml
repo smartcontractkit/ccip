@@ -21,7 +21,7 @@ BlockHistorySize = 200
 ResendAfterThreshold = '30s'
 
 [HeadTracker]
-HistoryDepth = 2750 # Same as FinalityDepth
+HistoryDepth = 300
 
 [NodePool]
 SyncThreshold = 10 # recommended for OP stack chains
