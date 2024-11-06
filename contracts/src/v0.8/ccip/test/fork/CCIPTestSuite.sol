@@ -7,18 +7,21 @@ import {Client} from "../../libraries/Client.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
-import {ChainSelectors} from "./ChainSelectors.sol";
-
-import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
-
 import {IMessageTransmitter} from "../../pools/USDC/IMessageTransmitter.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
 import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
+import {ChainSelectors} from "./ChainSelectors.sol";
+
+import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 import {console2} from "forge-std/Console2.sol";
 import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
+
+interface OldOffRamp {
+  function executeSingleMessage(Internal.EVM2EVMMessage memory message, bytes[] memory offchainTokenData) external;
+}
 
 contract CCIPTestSuite is Test {
   using stdStorage for StdStorage;
@@ -27,6 +30,7 @@ contract CCIPTestSuite is Test {
 
   bytes32 internal constant TypeAndVersion1_5_OnRamp = keccak256("EVM2EVMOnRamp 1.5.0");
   bytes32 internal constant TypeAndVersion1_5_OffRamp = keccak256("EVM2EVMOffRamp 1.5.0");
+  bytes32 internal constant TypeAndVersion1_2_OffRamp = keccak256("EVM2EVMOffRamp 1.2.0");
 
   uint256 internal constant TOKENS_TO_SEND = 100;
   uint16 internal constant MAX_RETURN_BYTES = 4 + 8 * 32;
@@ -220,9 +224,8 @@ contract CCIPTestSuite is Test {
     _loadLatestOffRampData();
 
     EVM2EVMOffRamp offRamp = s_remoteChainConfigs[messages[0].sourceChainSelector].NewOffRamp;
+    OldOffRamp oldOffRamp = OldOffRamp(address(s_remoteChainConfigs[messages[0].sourceChainSelector].OldOffRamp));
     TokenAdminRegistry tokenAdminReg = TokenAdminRegistry(offRamp.getStaticConfig().tokenAdminRegistry);
-
-    vm.startPrank(address(offRamp));
 
     uint256 succeeded = 0;
 
@@ -232,9 +235,6 @@ contract CCIPTestSuite is Test {
         abi.decode(message.sourceTokenData[0], (Internal.SourceTokenData)).destTokenAddress;
       address destTokenAddress = abi.decode(destTokenAddressBytes, (address));
 
-      uint256 startingGas = 250_000;
-      uint256 maxGasToTest = 250_000;
-      uint256 increment = 10_000;
       uint32[] memory gasOverrides = new uint32[](1);
 
       string memory tokenName = s_tokenNames[destTokenAddress];
@@ -243,57 +243,62 @@ contract CCIPTestSuite is Test {
       bytes[] memory offchainTokenData = new bytes[](message.tokenAmounts.length);
       if (isUSDCToken) {
         USDCTokenPool pool = USDCTokenPool(tokenAdminReg.getPool(destTokenAddress));
-        uint32 localDomain = pool.i_localDomainIdentifier();
-        address usdcMessageTransmitter = address(pool.i_messageTransmitter());
-        vm.mockCall(usdcMessageTransmitter, abi.encode(IMessageTransmitter.receiveMessage.selector), abi.encode(true));
-
-        Internal.SourceTokenData memory sourceTokenData =
-          abi.decode(message.sourceTokenData[0], (Internal.SourceTokenData));
-
-        USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
-          abi.decode(sourceTokenData.extraData, (USDCTokenPool.SourceTokenDataPayload));
-
-        offchainTokenData[0] =
-          _createUSDCData(sourceTokenDataPayload.sourceDomain, localDomain, sourceTokenDataPayload.nonce);
+        offchainTokenData[0] = _createUSDCData(pool, message.sourceTokenData[0]);
       }
 
-      for (uint256 j = startingGas; j <= maxGasToTest; j += increment) {
-        // gasOverrides[0] = uint32(j);
-        try offRamp.executeSingleMessage(message, offchainTokenData, gasOverrides) {
-          console2.log(unicode"✅ source_token", message.tokenAmounts[0].token, tokenName);
-          succeeded++;
-          break;
-        } catch (bytes memory reason) {
-          if (isUSDCToken) {
-            if (
-              keccak256(reason)
-                == keccak256(
-                  abi.encodeWithSelector(
-                    EVM2EVMOffRamp.ReleaseOrMintBalanceMismatch.selector, message.tokenAmounts[0].amount, 0, 0
-                  )
+      vm.startPrank(address(offRamp));
+      try offRamp.executeSingleMessage(message, offchainTokenData, gasOverrides) {
+        console2.log(unicode"✅ source_token", message.tokenAmounts[0].token, tokenName);
+        succeeded++;
+      } catch (bytes memory reason) {
+        if (
+          isUSDCToken
+            && keccak256(reason)
+              == keccak256(
+                abi.encodeWithSelector(
+                  EVM2EVMOffRamp.ReleaseOrMintBalanceMismatch.selector, message.tokenAmounts[0].amount, 0, 0
                 )
-            ) {
-              console2.log(unicode"✅ USDC Failed with expected error", message.tokenAmounts[0].token, tokenName);
-              succeeded++;
-              break;
-            }
-          }
-
-          if (j == maxGasToTest) {
-            console2.log(unicode"❌ source_token", message.tokenAmounts[0].token, tokenName);
-            if (startingGas == maxGasToTest) {
-              console2.logBytes(reason);
-            }
-          }
+              )
+        ) {
+          console2.log(unicode"✅ USDC Failed with expected error", message.tokenAmounts[0].token, tokenName);
+          succeeded++;
+          //            break;
+        } else {
+          console2.log(unicode"❌ source_token", message.tokenAmounts[0].token, tokenName);
+          console2.logBytes(reason);
         }
+      }
+
+      // Old 1.2 ramp, same message. This works because we skip all the validation
+      if (isUSDCToken) {
+        console2.log(unicode"1.2 ✅ skipping USDC", message.tokenAmounts[0].token, tokenName);
+        continue;
+      }
+
+      vm.startPrank(address(oldOffRamp));
+      try oldOffRamp.executeSingleMessage(message, offchainTokenData) {
+        console2.log(unicode"1.2 ✅ source_token", message.tokenAmounts[0].token, tokenName);
+      } catch (bytes memory reason) {
+        console2.log(unicode"1.2 ❌ source_token", message.tokenAmounts[0].token, tokenName);
+        console2.logBytes(reason);
       }
     }
 
     console2.log("Executed", succeeded, "out of", messages.length);
   }
 
-  function _createUSDCData(uint32 sourceDomain, uint32 localDomain, uint64 nonce) internal returns (bytes memory) {
-    bytes memory usdcMessage = abi.encodePacked(uint32(0), sourceDomain, localDomain, nonce);
+  function _createUSDCData(USDCTokenPool pool, bytes memory sourceTokenDataEncoded) internal returns (bytes memory) {
+    uint32 localDomain = pool.i_localDomainIdentifier();
+    address usdcMessageTransmitter = address(pool.i_messageTransmitter());
+    vm.mockCall(usdcMessageTransmitter, abi.encode(IMessageTransmitter.receiveMessage.selector), abi.encode(true));
+
+    Internal.SourceTokenData memory sourceTokenData = abi.decode(sourceTokenDataEncoded, (Internal.SourceTokenData));
+
+    USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
+      abi.decode(sourceTokenData.extraData, (USDCTokenPool.SourceTokenDataPayload));
+
+    bytes memory usdcMessage =
+      abi.encodePacked(uint32(0), sourceTokenDataPayload.sourceDomain, localDomain, sourceTokenDataPayload.nonce);
 
     return abi.encode(USDCTokenPool.MessageAndAttestation({message: usdcMessage, attestation: ""}));
   }
@@ -304,6 +309,7 @@ contract CCIPTestSuite is Test {
       Router.OffRamp memory offRamp = offRamps[i];
       EVM2EVMOffRamp currentOffRamp = EVM2EVMOffRamp(offRamp.offRamp);
       if (keccak256(bytes(currentOffRamp.typeAndVersion())) != TypeAndVersion1_5_OffRamp) {
+        s_remoteChainConfigs[offRamp.sourceChainSelector].OldOffRamp = currentOffRamp;
         continue;
       }
 
