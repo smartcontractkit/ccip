@@ -11,6 +11,9 @@ import {ChainSelectors} from "./ChainSelectors.sol";
 
 import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/structs/EnumerableSet.sol";
 
+import {IMessageTransmitter} from "../../pools/USDC/IMessageTransmitter.sol";
+import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
+import {TokenAdminRegistry} from "../../tokenAdminRegistry/TokenAdminRegistry.sol";
 import {console2} from "forge-std/Console2.sol";
 import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 import {Test} from "forge-std/Test.sol";
@@ -217,6 +220,7 @@ contract CCIPTestSuite is Test {
     _loadLatestOffRampData();
 
     EVM2EVMOffRamp offRamp = s_remoteChainConfigs[messages[0].sourceChainSelector].NewOffRamp;
+    TokenAdminRegistry tokenAdminReg = TokenAdminRegistry(offRamp.getStaticConfig().tokenAdminRegistry);
 
     vm.startPrank(address(offRamp));
 
@@ -233,15 +237,50 @@ contract CCIPTestSuite is Test {
       uint256 increment = 10_000;
       uint32[] memory gasOverrides = new uint32[](1);
 
+      string memory tokenName = s_tokenNames[destTokenAddress];
+      bool isUSDCToken = keccak256(bytes(tokenName)) == keccak256("USD Coin");
+
+      bytes[] memory offchainTokenData = new bytes[](message.tokenAmounts.length);
+      if (isUSDCToken) {
+        USDCTokenPool pool = USDCTokenPool(tokenAdminReg.getPool(destTokenAddress));
+        uint32 localDomain = pool.i_localDomainIdentifier();
+        address usdcMessageTransmitter = address(pool.i_messageTransmitter());
+        vm.mockCall(usdcMessageTransmitter, abi.encode(IMessageTransmitter.receiveMessage.selector), abi.encode(true));
+
+        Internal.SourceTokenData memory sourceTokenData =
+          abi.decode(message.sourceTokenData[0], (Internal.SourceTokenData));
+
+        USDCTokenPool.SourceTokenDataPayload memory sourceTokenDataPayload =
+          abi.decode(sourceTokenData.extraData, (USDCTokenPool.SourceTokenDataPayload));
+
+        offchainTokenData[0] =
+          _createUSDCData(sourceTokenDataPayload.sourceDomain, localDomain, sourceTokenDataPayload.nonce);
+      }
+
       for (uint256 j = startingGas; j <= maxGasToTest; j += increment) {
         // gasOverrides[0] = uint32(j);
-        try offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), gasOverrides) {
-          console2.log(unicode"✅ source_token", message.tokenAmounts[0].token, s_tokenNames[destTokenAddress], j);
+        try offRamp.executeSingleMessage(message, offchainTokenData, gasOverrides) {
+          console2.log(unicode"✅ source_token", message.tokenAmounts[0].token, tokenName);
           succeeded++;
           break;
         } catch (bytes memory reason) {
+          if (isUSDCToken) {
+            if (
+              keccak256(reason)
+                == keccak256(
+                  abi.encodeWithSelector(
+                    EVM2EVMOffRamp.ReleaseOrMintBalanceMismatch.selector, message.tokenAmounts[0].amount, 0, 0
+                  )
+                )
+            ) {
+              console2.log(unicode"✅ USDC Failed with expected error", message.tokenAmounts[0].token, tokenName);
+              succeeded++;
+              break;
+            }
+          }
+
           if (j == maxGasToTest) {
-            console2.log(unicode"❌ source_token", message.tokenAmounts[0].token, s_tokenNames[destTokenAddress], j);
+            console2.log(unicode"❌ source_token", message.tokenAmounts[0].token, tokenName);
             if (startingGas == maxGasToTest) {
               console2.logBytes(reason);
             }
@@ -251,6 +290,12 @@ contract CCIPTestSuite is Test {
     }
 
     console2.log("Executed", succeeded, "out of", messages.length);
+  }
+
+  function _createUSDCData(uint32 sourceDomain, uint32 localDomain, uint64 nonce) internal returns (bytes memory) {
+    bytes memory usdcMessage = abi.encodePacked(uint32(0), sourceDomain, localDomain, nonce);
+
+    return abi.encode(USDCTokenPool.MessageAndAttestation({message: usdcMessage, attestation: ""}));
   }
 
   function _loadLatestOffRampData() internal {
