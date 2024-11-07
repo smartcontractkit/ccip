@@ -1,0 +1,22 @@
+ChainID = '80084'
+# finality_depth: instant
+FinalityDepth = 10 
+# block_time: 5s 
+LogPollInterval = '10s' 
+
+# finality_depth * block_time / 60 secs = ~0.8  min (finality time)
+NoNewFinalizedHeadsThreshold = '5m'
+
+
+FinalityTagEnabled = true
+
+[GasEstimator]
+EIP1559DynamicFees = true
+Mode = 'FeeHistory'
+
+[GasEstimator.FeeHistory]
+# block_time was: 5s
+CacheTimeout = '5s'
+
+[GasEstimator.BlockHistory]
+BlockHistorySize = 100
