@@ -3,7 +3,7 @@ ChainType = 'hedera'
 # Considering the 3-5 (6 including a buffer) seconds of finality and 2 seconds block production
 # We set the depth to 6/2 = 3 blocks, setting to 10 for safety
 FinalityDepth = 10
-# Hedera has high TPS, so polling less often 
+# Hedera has high TPS, so polling less often
 LogPollInterval = '10s'
 MinIncomingConfirmations = 1
 
@@ -29,3 +29,8 @@ ResendAfterThreshold = '2m'
 
 [NodePool]
 SyncThreshold = 10
+
+[HeadTracker]
+# FinalityDepth < 1k => FinalityTagBypass = false
+# https://chainlink-core.slack.com/archives/C07RA1B58CC/p1730983397689179?thread_ts=1730908333.814809&cid=C07RA1B58CC
+FinalityTagBypass = false

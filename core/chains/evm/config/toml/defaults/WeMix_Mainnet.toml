@@ -14,3 +14,8 @@ ContractConfirmations = 1
 [GasEstimator]
 EIP1559DynamicFees = true
 TipCapDefault = '100 gwei'
+
+[HeadTracker]
+# FinalityDepth < 1k => FinalityTagBypass = false
+# https://chainlink-core.slack.com/archives/C07RA1B58CC/p1730983397689179?thread_ts=1730908333.814809&cid=C07RA1B58CC
+FinalityTagBypass = false
