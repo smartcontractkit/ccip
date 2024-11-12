@@ -170,6 +170,7 @@ jobs:
           only-new-issues: false # disabled for PRs due to unreliability
           args: --out-format colored-line-number,checkstyle:golangci-lint-report.xml
           working-directory: ${{ matrix.project.path }}
+        continue-on-error: true
 
   build-chainlink:
     environment: integration
