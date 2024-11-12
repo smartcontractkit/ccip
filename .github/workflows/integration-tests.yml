@@ -585,7 +585,7 @@ jobs:
           test_config_chainlink_version: ${{ inputs.evm-ref || github.sha }}
           test_config_selected_networks: ${{ env.SELECTED_NETWORKS }}
           test_config_logging_run_id: ${{ github.run_id }}
-          test_config_logstream_log_targets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
+          test_config_logstream_log_targets: "file"
           test_config_test_log_collect: ${{ vars.TEST_LOG_COLLECT }}
           cl_repo: ${{ env.CHAINLINK_IMAGE }}
           cl_image_tag: ${{ inputs.evm-ref || github.sha }}${{ matrix.product.tag_suffix }}
