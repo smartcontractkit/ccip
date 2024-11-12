@@ -159,18 +159,17 @@ jobs:
           cd ${{ matrix.project.path }}
           go build ./...
           go test -run=^# ./...
-      - name: Lint Go
-        uses: golangci/golangci-lint-action@3cfe3a4abbb849e10058ce4af15d205b6da42804 # v4.0.0
-        continue-on-error: true
-        with:
-          version: v1.59.1
-          # We already cache these directories in setup-go
-          skip-pkg-cache: true
-          skip-build-cache: true
-          # only-new-issues is only applicable to PRs, otherwise it is always set to false
-          only-new-issues: false # disabled for PRs due to unreliability
-          args: --out-format colored-line-number,checkstyle:golangci-lint-report.xml
-          working-directory: ${{ matrix.project.path }}
+#      - name: Lint Go
+#        uses: golangci/golangci-lint-action@3cfe3a4abbb849e10058ce4af15d205b6da42804 # v4.0.0
+#        with:
+#          version: v1.59.1
+#          # We already cache these directories in setup-go
+#          skip-pkg-cache: true
+#          skip-build-cache: true
+#          # only-new-issues is only applicable to PRs, otherwise it is always set to false
+#          only-new-issues: false # disabled for PRs due to unreliability
+#          args: --out-format colored-line-number,checkstyle:golangci-lint-report.xml
+#          working-directory: ${{ matrix.project.path }}
 
   build-chainlink:
     environment: integration
