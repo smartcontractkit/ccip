@@ -43,7 +43,7 @@ func NewClientConfigs(
 	deathDeclarationDelay time.Duration,
 	noNewFinalizedHeadsThreshold time.Duration,
 	finalizedBlockPollInterval time.Duration,
-	newHeadsPollInterval time.Duration,
+
 ) (commonclient.ChainConfig, evmconfig.NodePool, []*toml.Node, error) {
 	nodes, err := parseNodeConfigs(nodeCfgs)
 	if err != nil {
@@ -59,7 +59,6 @@ func NewClientConfigs(
 		EnforceRepeatableRead:      enforceRepeatableRead,
 		DeathDeclarationDelay:      commonconfig.MustNewDuration(deathDeclarationDelay),
 		FinalizedBlockPollInterval: commonconfig.MustNewDuration(finalizedBlockPollInterval),
-		NewHeadsPollInterval:       commonconfig.MustNewDuration(newHeadsPollInterval),
 	}
 	nodePoolCfg := &evmconfig.NodePoolConfig{C: nodePool}
 	chainConfig := &evmconfig.EVMConfig{
@@ -80,21 +79,15 @@ func NewClientConfigs(
 func parseNodeConfigs(nodeCfgs []NodeConfig) ([]*toml.Node, error) {
 	nodes := make([]*toml.Node, len(nodeCfgs))
 	for i, nodeCfg := range nodeCfgs {
-		var wsURL, httpURL *commonconfig.URL
-		// wsUrl requirement will be checked in EVMConfig validation
-		if nodeCfg.WSURL != nil {
-			wsURL = commonconfig.MustParseURL(*nodeCfg.WSURL)
+		if nodeCfg.WSURL == nil || nodeCfg.HTTPURL == nil {
+			return nil, fmt.Errorf("node config [%d]: missing WS or HTTP URL", i)
 		}
-
-		if nodeCfg.HTTPURL == nil {
-			return nil, fmt.Errorf("node config [%d]: missing HTTP URL", i)
-		}
-
-		httpURL = commonconfig.MustParseURL(*nodeCfg.HTTPURL)
+		wsUrl := commonconfig.MustParseURL(*nodeCfg.WSURL)
+		httpUrl := commonconfig.MustParseURL(*nodeCfg.HTTPURL)
 		node := &toml.Node{
 			Name:     nodeCfg.Name,
-			WSURL:    wsURL,
-			HTTPURL:  httpURL,
+			WSURL:    wsUrl,
+			HTTPURL:  httpUrl,
 			SendOnly: nodeCfg.SendOnly,
 			Order:    nodeCfg.Order,
 		}

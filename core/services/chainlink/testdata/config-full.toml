@@ -288,7 +288,6 @@ MinContractPayment = '9.223372036854775807 link'
 NonceAutoSync = true
 NoNewHeadsThreshold = '1m0s'
 OperatorFactoryAddress = '0xa5B85635Be42F21f94F28034B7DA440EeFF0F418'
-LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 17
 RPCBlockQueryDelay = 10
 FinalizedBlockOffset = 16
@@ -369,7 +368,6 @@ NodeIsSyncingEnabled = true
 FinalizedBlockPollInterval = '1s'
 EnforceRepeatableRead = true
 DeathDeclarationDelay = '1m0s'
-NewHeadsPollInterval = '0s'
 
 [EVM.NodePool.Errors]
 NonceTooLow = '(: |^)nonce too low'

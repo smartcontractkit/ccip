@@ -170,7 +170,6 @@ jobs:
           only-new-issues: false # disabled for PRs due to unreliability
           args: --out-format colored-line-number,checkstyle:golangci-lint-report.xml
           working-directory: ${{ matrix.project.path }}
-        continue-on-error: true
 
   build-chainlink:
     environment: integration
@@ -585,7 +584,7 @@ jobs:
           test_config_chainlink_version: ${{ inputs.evm-ref || github.sha }}
           test_config_selected_networks: ${{ env.SELECTED_NETWORKS }}
           test_config_logging_run_id: ${{ github.run_id }}
-          test_config_logstream_log_targets: "file"
+          test_config_logstream_log_targets: ${{ vars.LOGSTREAM_LOG_TARGETS }}
           test_config_test_log_collect: ${{ vars.TEST_LOG_COLLECT }}
           cl_repo: ${{ env.CHAINLINK_IMAGE }}
           cl_image_tag: ${{ inputs.evm-ref || github.sha }}${{ matrix.product.tag_suffix }}
@@ -607,7 +606,7 @@ jobs:
           go_coverage_src_dir: /var/tmp/go-coverage
           go_coverage_dest_dir: ${{ github.workspace }}/.covdata
           DEFAULT_CHAINLINK_IMAGE: ${{ env.CHAINLINK_IMAGE }}
-          DEFAULT_LOKI_TENANT_ID: "promtail"
+          DEFAULT_LOKI_TENANT_ID: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
           DEFAULT_LOKI_ENDPOINT: https://${{ secrets.GRAFANA_INTERNAL_HOST }}/loki/api/v1/push
           DEFAULT_LOKI_BASIC_AUTH: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
           DEFAULT_GRAFANA_BASE_URL: "http://localhost:8080/primary"

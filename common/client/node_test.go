@@ -20,11 +20,6 @@ type testNodeConfig struct {
 	enforceRepeatableRead      bool
 	finalizedBlockPollInterval time.Duration
 	deathDeclarationDelay      time.Duration
-	newHeadsPollInterval       time.Duration
-}
-
-func (n testNodeConfig) NewHeadsPollInterval() time.Duration {
-	return n.newHeadsPollInterval
 }
 
 func (n testNodeConfig) PollFailureThreshold() uint32 {
@@ -67,10 +62,10 @@ type testNodeOpts struct {
 	config      testNodeConfig
 	chainConfig clientMocks.ChainConfig
 	lggr        logger.Logger
-	wsuri       *url.URL
+	wsuri       url.URL
 	httpuri     *url.URL
 	name        string
-	id          int
+	id          int32
 	chainID     types.ID
 	nodeOrder   int32
 	rpc         *mockNodeClient[types.ID, Head]

@@ -23,9 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 )
 
-var (
-	ErrNotFound = errors.New("not found")
-)
+var ErrNotFound = errors.New("not found")
 
 type HasEVMConfigs interface {
 	EVMConfigs() EVMConfigs
@@ -313,38 +311,16 @@ func (c *EVMConfig) ValidateConfig() (err error) {
 		err = multierr.Append(err, commonconfig.ErrMissing{Name: "Nodes", Msg: "must have at least one node"})
 	} else {
 		var hasPrimary bool
-		var logBroadcasterEnabled bool
-		var newHeadsPollingInterval commonconfig.Duration
-		if c.LogBroadcasterEnabled != nil {
-			logBroadcasterEnabled = *c.LogBroadcasterEnabled
-		}
-
-		if c.NodePool.NewHeadsPollInterval != nil {
-			newHeadsPollingInterval = *c.NodePool.NewHeadsPollInterval
-		}
-
-		for i, n := range c.Nodes {
+		for _, n := range c.Nodes {
 			if n.SendOnly != nil && *n.SendOnly {
 				continue
 			}
-
 			hasPrimary = true
-
-			// if the node is a primary node, then the WS URL is required when
-			//	1. LogBroadcaster is enabled
-			//	2. The http polling is disabled (newHeadsPollingInterval == 0)
-			if n.WSURL == nil || n.WSURL.IsZero() {
-				if logBroadcasterEnabled {
-					err = multierr.Append(err, commonconfig.ErrMissing{Name: "Nodes", Msg: fmt.Sprintf("%vth node (primary) must have a valid WSURL when LogBroadcaster is enabled", i)})
-				} else if newHeadsPollingInterval.Duration() == 0 {
-					err = multierr.Append(err, commonconfig.ErrMissing{Name: "Nodes", Msg: fmt.Sprintf("%vth node (primary) must have a valid WSURL when http polling is disabled", i)})
-				}
-			}
+			break
 		}
-
 		if !hasPrimary {
 			err = multierr.Append(err, commonconfig.ErrMissing{Name: "Nodes",
-				Msg: "must have at least one primary node"})
+				Msg: "must have at least one primary node with WSURL"})
 		}
 	}
 
@@ -380,7 +356,6 @@ type Chain struct {
 	NonceAutoSync                *bool
 	NoNewHeadsThreshold          *commonconfig.Duration
 	OperatorFactoryAddress       *types.EIP55Address
-	LogBroadcasterEnabled        *bool
 	RPCDefaultBatchSize          *uint32
 	RPCBlockQueryDelay           *uint16
 	FinalizedBlockOffset         *uint32
@@ -900,7 +875,6 @@ type NodePool struct {
 	Errors                     ClientErrors `toml:",omitempty"`
 	EnforceRepeatableRead      *bool
 	DeathDeclarationDelay      *commonconfig.Duration
-	NewHeadsPollInterval       *commonconfig.Duration
 }
 
 func (p *NodePool) setFrom(f *NodePool) {
@@ -933,11 +907,6 @@ func (p *NodePool) setFrom(f *NodePool) {
 	if v := f.DeathDeclarationDelay; v != nil {
 		p.DeathDeclarationDelay = v
 	}
-
-	if v := f.NewHeadsPollInterval; v != nil {
-		p.NewHeadsPollInterval = v
-	}
-
 	p.Errors.setFrom(&f.Errors)
 }
 
@@ -986,8 +955,19 @@ func (n *Node) ValidateConfig() (err error) {
 		err = multierr.Append(err, commonconfig.ErrEmpty{Name: "Name", Msg: "required for all nodes"})
 	}
 
-	// relax the check here as WSURL can potentially be empty if LogBroadcaster is disabled (checked in EVMConfig Validation)
-	if n.WSURL != nil && !n.WSURL.IsZero() {
+	var sendOnly bool
+	if n.SendOnly != nil {
+		sendOnly = *n.SendOnly
+	}
+	if n.WSURL == nil {
+		if !sendOnly {
+			err = multierr.Append(err, commonconfig.ErrMissing{Name: "WSURL", Msg: "required for primary nodes"})
+		}
+	} else if n.WSURL.IsZero() {
+		if !sendOnly {
+			err = multierr.Append(err, commonconfig.ErrEmpty{Name: "WSURL", Msg: "required for primary nodes"})
+		}
+	} else {
 		switch n.WSURL.Scheme {
 		case "ws", "wss":
 		default:
