@@ -3823,7 +3823,7 @@ ChainType = 'optimismBedrock'
 FinalityDepth = 2000
 FinalityTagEnabled = true
 LogBackfillBatchSize = 1000
-LogPollInterval = '5s'
+LogPollInterval = '3s'
 LogKeepBlocksDepth = 100000
 LogPrunePageSize = 10000
 BackupLogPollerBlockDelay = 100
@@ -3877,7 +3877,7 @@ CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
 [GasEstimator.FeeHistory]
-CacheTimeout = '2s'
+CacheTimeout = '4s'
 
 [HeadTracker]
 HistoryDepth = 100
@@ -4648,7 +4648,7 @@ ChainType = 'optimismBedrock'
 FinalityDepth = 2500
 FinalityTagEnabled = true
 LogBackfillBatchSize = 1000
-LogPollInterval = '5s'
+LogPollInterval = '3s'
 LogKeepBlocksDepth = 100000
 LogPrunePageSize = 10000
 BackupLogPollerBlockDelay = 100
@@ -4702,7 +4702,7 @@ CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
 [GasEstimator.FeeHistory]
-CacheTimeout = '2s'
+CacheTimeout = '4s'
 
 [HeadTracker]
 HistoryDepth = 100
@@ -5472,7 +5472,7 @@ ChainType = 'optimismBedrock'
 FinalityDepth = 2000
 FinalityTagEnabled = true
 LogBackfillBatchSize = 1000
-LogPollInterval = '5s'
+LogPollInterval = '3s'
 LogKeepBlocksDepth = 100000
 LogPrunePageSize = 10000
 BackupLogPollerBlockDelay = 100
@@ -5526,7 +5526,7 @@ CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
 [GasEstimator.FeeHistory]
-CacheTimeout = '2s'
+CacheTimeout = '4s'
 
 [HeadTracker]
 HistoryDepth = 100
@@ -5575,7 +5575,7 @@ ChainType = 'optimismBedrock'
 FinalityDepth = 2000
 FinalityTagEnabled = true
 LogBackfillBatchSize = 1000
-LogPollInterval = '5s'
+LogPollInterval = '2s'
 LogKeepBlocksDepth = 100000
 LogPrunePageSize = 10000
 BackupLogPollerBlockDelay = 100
@@ -5587,7 +5587,7 @@ LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
-NoNewFinalizedHeadsThreshold = '10m0s'
+NoNewFinalizedHeadsThreshold = '45m0s'
 
 [Transactions]
 ForwardersEnabled = false
@@ -5629,7 +5629,7 @@ CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
 [GasEstimator.FeeHistory]
-CacheTimeout = '1s'
+CacheTimeout = '2s'
 
 [HeadTracker]
 HistoryDepth = 100
@@ -6399,7 +6399,7 @@ ChainType = 'optimismBedrock'
 FinalityDepth = 2500
 FinalityTagEnabled = true
 LogBackfillBatchSize = 1000
-LogPollInterval = '5s'
+LogPollInterval = '3s'
 LogKeepBlocksDepth = 100000
 LogPrunePageSize = 10000
 BackupLogPollerBlockDelay = 100
@@ -6453,7 +6453,7 @@ CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
 [GasEstimator.FeeHistory]
-CacheTimeout = '2s'
+CacheTimeout = '4s'
 
 [HeadTracker]
 HistoryDepth = 100
@@ -8363,7 +8363,7 @@ ChainType = 'optimismBedrock'
 FinalityDepth = 900
 FinalityTagEnabled = true
 LogBackfillBatchSize = 1000
-LogPollInterval = '5s'
+LogPollInterval = '3s'
 LogKeepBlocksDepth = 100000
 LogPrunePageSize = 10000
 BackupLogPollerBlockDelay = 100
@@ -8417,7 +8417,7 @@ CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
 [GasEstimator.FeeHistory]
-CacheTimeout = '2s'
+CacheTimeout = '4s'
 
 [HeadTracker]
 HistoryDepth = 100
@@ -8773,7 +8773,7 @@ BlockBackfillSkip = false
 FinalityDepth = 10
 FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
-LogPollInterval = '10s'
+LogPollInterval = '6s'
 LogKeepBlocksDepth = 100000
 LogPrunePageSize = 10000
 BackupLogPollerBlockDelay = 100
@@ -8827,7 +8827,7 @@ CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
 [GasEstimator.FeeHistory]
-CacheTimeout = '5s'
+CacheTimeout = '10s'
 
 [HeadTracker]
 HistoryDepth = 100
@@ -9705,7 +9705,7 @@ ChainType = 'optimismBedrock'
 FinalityDepth = 900
 FinalityTagEnabled = true
 LogBackfillBatchSize = 1000
-LogPollInterval = '5s'
+LogPollInterval = '3s'
 LogKeepBlocksDepth = 100000
 LogPrunePageSize = 10000
 BackupLogPollerBlockDelay = 100
@@ -9759,7 +9759,7 @@ CheckInclusionPercentile = 90
 TransactionPercentile = 60
 
 [GasEstimator.FeeHistory]
-CacheTimeout = '2s'
+CacheTimeout = '4s'
 
 [HeadTracker]
 HistoryDepth = 100
