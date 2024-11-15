@@ -15,6 +15,7 @@ func main() {
 	binPath := os.Args[2]
 	className := os.Args[3]
 	pkgName := os.Args[4]
+	zkBinPath := os.Args[5]
 	fmt.Println("Generating", pkgName, "contract wrapper")
 
 	cwd, err := os.Getwd() // gethwrappers directory
@@ -28,7 +29,7 @@ func main() {
 	outPath := filepath.Join(outDir, pkgName+".go")
 
 	gethwrappers2.Abigen(gethwrappers2.AbigenArgs{
-		Bin: binPath, ABI: abiPath, Out: outPath, Type: className, Pkg: pkgName,
+		Bin: binPath, ABI: abiPath, Out: outPath, Type: className, Pkg: pkgName, ZkBinPath: zkBinPath,
 	})
 
 	// Build succeeded, so update the versions db with the new contract data
