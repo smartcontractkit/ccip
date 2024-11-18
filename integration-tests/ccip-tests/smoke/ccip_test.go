@@ -1078,7 +1078,7 @@ func performAboveFinalityReorgAndValidate(t *testing.T, network string) {
 			}
 		}
 		return len(nodesDetectedViolation) >= len(clNodes)/2
-	}, 5*time.Minute, 5*time.Second, "Reorg above finality depth is not detected by every node")
+	}, 5*time.Minute, 5*time.Second, "Reorg above finality depth is not detected by half the nodes")
 	log.Debug().Interface("Nodes", nodesDetectedViolation).Msg("Violation detection details")
 	// send another request and verify it fails
 	err = lane.SendRequests(1, gasLimit)
