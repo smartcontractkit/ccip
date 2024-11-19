@@ -113,6 +113,8 @@ jobs:
     if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
     needs: [ changes ]
     environment: integration
+    outputs:
+      tag: ${{ steps.build-test-image.outputs.test_image_tag }}
     permissions:
       id-token: write
       contents: read
@@ -136,11 +138,14 @@ jobs:
           repository: smartcontractkit/ccip
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Build Test Image
+        id: build-test-image
         if: needs.changes.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         uses: smartcontractkit/.github/actions/ctf-build-test-image@a5e4f4c8fbb8e15ab2ad131552eca6ac83c4f4b3 # ctf-build-test-image@0.1.0
         with:
           # we just want to build the load tests
           suites: ccip-tests/load ccip-tests/smoke
+          repository: chainlink-ccip-tests
+          tag: ${{ github.sha }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
@@ -249,7 +254,7 @@ jobs:
         env:
           BASE64_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
           TEST_BASE64_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }},${{ steps.setup_create_base64_config_ccip.outputs.base64_config }}
-          ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:${{ github.sha }}
+          ENV_JOB_IMAGE: ${{ env.ENV_JOB_IMAGE_BASE }}:${{ needs.build-test-image.outputs.tag }}
           TEST_SUITE: smoke
           TEST_ARGS: -test.timeout 30m
           TEST_LOG_LEVEL: info
