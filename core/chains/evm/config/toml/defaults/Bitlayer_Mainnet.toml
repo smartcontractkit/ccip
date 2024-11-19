@@ -1,0 +1,16 @@
+ChainID = '200901'
+FinalityTagEnabled = false
+FinalityDepth = 21 # confirmed with Bitlayer team and reccomended by docs: https://docs.bitlayer.org/docs/Learn/BitlayerNetwork/AboutFinality/#about-finality-at-stage-bitlayer-pos-bitlayer-mainnet-v1
+
+[EVM.GasEstimator]
+EIP1559DynamicFees = true
+PriceMax = '1 gwei' # DS&A reccommended value
+PriceMin = '40 mwei' # During testing, we saw minimum gas prices ~50 mwei
+PriceDefault = '1 gwei' # As we set PriceMax to '1 gwei' and PriceDefault must be less than or equal to PriceMax
+FeeCapDefault = '1 gwei' # As we set PriceMax to '1 gwei' and FeeCapDefault must be less than or equal to PriceMax
+TipCapDefault = '0.05 gwei' # reccomended by BitLayer's docs: https://docs.bitlayer.org/docs/Learn/BitlayerNetwork/AboutGas
+
+[EVM.GasEstimator.BlockHistory]
+# Default is 8, which leads to bumpy gas prices. In CCIP
+# we want to smooth out the gas prices, so we increase the sample size.
+BlockHistorySize = 200
