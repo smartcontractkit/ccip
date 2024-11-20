@@ -57,6 +57,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/fee_quoter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
@@ -3484,6 +3485,30 @@ func (lane *CCIPLane) StartEventWatchers() error {
 			}
 		}
 	}(reportAccSub)
+
+	messageReceivedEvent := make(chan *maybe_revert_message_receiver.MessageReceived)
+	messageReceivedSub := event.Resubscribe(DefaultResubscriptionTimeout, func(_ context.Context) (event.Subscription, error) {
+		sub, err := lane.Dest.ReceiverDapp.WatchMessageReceived(nil, messageReceivedEvent)
+		if err != nil {
+			log.Error().Err(err).Msg("error in subscribing to messageReceivedEvent")
+		}
+		return sub, err
+	})
+	if messageReceivedSub == nil {
+		return fmt.Errorf("failed to subscribe to messageReceivedEvent")
+	}
+	go func(sub event.Subscription) {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case e := <-messageReceivedEvent:
+				log.Info().Msgf("messageReceivedEvent received with data: %+v", e)
+				// You could store these events in a map or other structure for validation later.
+			case <-lane.Context.Done():
+				return
+			}
+		}
+	}(messageReceivedSub)
 
 	if lane.Dest.Common.ARM != nil {
 		reportBlessedEvent := make(chan *rmn_contract.RMNContractTaggedRootBlessed)
