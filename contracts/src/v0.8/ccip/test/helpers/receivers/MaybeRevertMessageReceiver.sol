@@ -11,7 +11,13 @@ contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
   error CustomError(bytes err);
 
   event ValueReceived(uint256 amount);
-  event MessageReceived();
+  event MessageReceived(
+    bytes32 messageId,
+    uint64 sourceChainSelector,
+    bytes sender,
+    bytes data,
+    Client.EVMTokenAmount[] destTokenAmounts
+  );
 
   address private s_manager;
   bool public s_toRevert;
@@ -37,11 +43,18 @@ contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
     return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
-  function ccipReceive(Client.Any2EVMMessage calldata) external override {
+  function ccipReceive(Client.Any2EVMMessage calldata message) external override {
     if (s_toRevert) {
       revert CustomError(s_err);
     }
-    emit MessageReceived();
+
+    emit MessageReceived(
+      message.messageId,
+      message.sourceChainSelector,
+      message.sender,
+      message.data,
+      message.destTokenAmounts
+    );
   }
 
   receive() external payable {
