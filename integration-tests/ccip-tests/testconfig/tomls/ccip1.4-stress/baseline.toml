@@ -1,5 +1,5 @@
 ## Baseline performance test on simulated environment (with chaos)
-## 30 chains / 300 lanes
+## 40 chains / 350 lanes
 ## historyDepth 200 / finalityDepth 200
 ## block_time = 1s
 ## throughput 1msg / 5s
@@ -15,7 +15,7 @@
 # If you want to use a specific commit or a branch you need to switch to the internal ECR in `~/.testsecrets`
 # E2E_TEST_CHAINLINK_IMAGE="<aws account number>.dkr.ecr.<aws region>.amazonaws.com/chainlink-ccip"
 [CCIP.Env.NewCLCluster.Common.ChainlinkImage]
-version = "2.14.0-ccip1.5.0"
+version = "2.17.0-ccip1.5.11"
 
 [CCIP]
 [CCIP.ContractVersions]
@@ -149,8 +149,8 @@ NoOfCommitNodes = 16
 PhaseTimeout = '40m'
 NodeFunding = 1000.0
 NoOfRoutersPerPair = 1
-NoOfNetworks = 30
-MaxNoOfLanes = 300
+NoOfNetworks = 40
+MaxNoOfLanes = 350
 
 [CCIP.Groups.load.OffRampConfig]
 BatchGasLimit = 11000000
