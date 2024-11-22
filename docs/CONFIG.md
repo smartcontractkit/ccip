@@ -8368,7 +8368,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'optimismBedrock'
-FinalityDepth = 900
+FinalityDepth = 3150
 FinalityTagEnabled = true
 LogBackfillBatchSize = 1000
 LogPollInterval = '3s'
@@ -8383,7 +8383,7 @@ LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
-NoNewFinalizedHeadsThreshold = '35m0s'
+NoNewFinalizedHeadsThreshold = '1h50m0s'
 
 [Transactions]
 ForwardersEnabled = false
@@ -9712,7 +9712,7 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'optimismBedrock'
-FinalityDepth = 900
+FinalityDepth = 3150
 FinalityTagEnabled = true
 LogBackfillBatchSize = 1000
 LogPollInterval = '3s'
@@ -9727,7 +9727,7 @@ LogBroadcasterEnabled = true
 RPCDefaultBatchSize = 250
 RPCBlockQueryDelay = 1
 FinalizedBlockOffset = 0
-NoNewFinalizedHeadsThreshold = '35m0s'
+NoNewFinalizedHeadsThreshold = '1h50m0s'
 
 [Transactions]
 ForwardersEnabled = false
