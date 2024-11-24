@@ -80,6 +80,7 @@ func DeployZkSync%s(auth *bind.TransactOpts, backend bind.ContractBackend, param
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
+	// TODO: we should not pass nil as the first argument here, we should use auth values provided by the user
 	hash, err := wallet.DeployWithCreate(nil, zkSyncAccounts.CreateTransaction{
 		Bytecode: decodedBytes,
 		Calldata: constructor,
