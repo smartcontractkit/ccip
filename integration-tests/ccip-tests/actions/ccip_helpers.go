@@ -1816,7 +1816,7 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 		extraArgs, err = testhelpers.GetEVMExtraArgsV2(gasLimit, allowOutOfOrder)
 	}
 	if err != nil {
-		return router.ClientEVM2AnyMessage{}, fmt.Errorf("failed encoding the options field: %w", err)
+		return router.ClientEVM2AnyMessage{}, fmt.Errorf("failed getting extra args: %w", err)
 	}
 	// form the message for transfer
 	return router.ClientEVM2AnyMessage{
@@ -1829,7 +1829,10 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 }
 
 // SendRequest sends a CCIP request to the source chain's router contract
-func (sourceCCIP *SourceCCIPModule) SendRequest(receiver common.Address, gasLimit *big.Int) (common.Hash, time.Duration, *big.Int, error) {
+func (sourceCCIP *SourceCCIPModule) SendRequest(
+	receiver common.Address,
+	gasLimit *big.Int,
+) (common.Hash, time.Duration, *big.Int, error) {
 	var d time.Duration
 	destChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
@@ -2854,8 +2857,11 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporter
 func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) error {
 	var ccipMultipleMsg []contracts.CCIPMsgData
 	feeToken := common.HexToAddress(lane.Source.Common.FeeToken.Address())
-	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, lane.Source.Common.AllowOutOfOrder,
-		big.NewInt(DefaultDestinationGasLimit))
+	genericMsg, err := lane.Source.CCIPMsg(
+		lane.Dest.ReceiverDapp.EthAddress,
+		lane.Source.Common.AllowOutOfOrder,
+		big.NewInt(DefaultDestinationGasLimit),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to form the ccip message: %w", err)
 	}
@@ -3278,6 +3284,7 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 	if opts.expectAnyPhaseToFail {
 		return fmt.Errorf("expected at least any one phase to fail but no phase got failed")
 	}
+
 	return nil
 }
 
@@ -3597,9 +3604,9 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return fmt.Errorf("failed to create source module: %w", err)
 	}
 
-	// If AllowOutOfOrder is set globally in test config, then assumption is to set it for every lane.
-	//However, if this is set as false, and set as true for specific chain in lane_configs then apply it
-	//only for a lane where source network is of that chain.
+	// If AllowOutOfOrder is set globally in test config, the assumption is to set it for every lane.
+	// However, if this is set as false, and set as true for specific chain in lane_configs, then apply it
+	// only for a lane where source network is of that chain.
 	if allowOutOfOrder {
 		lane.Source.Common.AllowOutOfOrder = true
 	}
@@ -4150,8 +4157,7 @@ func (c *CCIPTestEnv) ConnectToDeployedNodes() error {
 			return fmt.Errorf("no CL node found")
 		}
 
-		for i := range chainlinkK8sNodes {
-			chainlinkK8sNodes[i].ChainlinkClient.WithRetryCount(3)
+		for range chainlinkK8sNodes {
 			c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
 		}
 		c.CLNodes = chainlinkK8sNodes

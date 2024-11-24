@@ -15,7 +15,7 @@ import (
 )
 
 type ccipAny struct {
-	SourceChainId *big.Int
+	SourceChainID *big.Int
 	Sender        []byte
 	Data          []byte
 	Tokens        []common.Address
@@ -87,7 +87,7 @@ func main() {
 		log[0].Data)
 	panicErr(err)
 	send := encodedMsg[0].(struct {
-		SourceChainId  *big.Int         `json:"sourceChainId"`
+		SourceChainID  *big.Int         `json:"sourceChainId"`
 		SequenceNumber uint64           `json:"sequenceNumber"`
 		Sender         common.Address   `json:"sender"`
 		Receiver       common.Address   `json:"receiver"`
@@ -106,7 +106,7 @@ func main() {
 {"internalType":"address[]","name":"tokens","type":"address[]"},
 {"internalType":"uint256[]","name":"amounts","type":"uint256[]"}],
 "internalType":"structCCIP.Any2EVMMessage","name":"message","type":"tuple"}]`,
-		ccipAny{send.SourceChainId, sender, send.Data, send.Tokens, send.Amounts})
+		ccipAny{send.SourceChainID, sender, send.Data, send.Tokens, send.Amounts})
 	panicErr(err)
 	a, err := dest.CallContract(context.Background(), ethereum.CallMsg{
 		From:       common.HexToAddress("0x2b7ab40413da5077e168546ea376920591aee8e7"), // offramp router

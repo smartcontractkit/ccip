@@ -19,12 +19,12 @@ import (
 // Environment variables used to configure
 // the environment for the rebalancer
 const (
-	// OWNER_KEY is the private key used to deploy contracts and send funds to the rebalancer nodes
-	OWNER_KEY = "OWNER_KEY"
-	// RPC_ is the prefix for the environment variable that contains the RPC URL for a chain
-	RPC_ = "RPC_"
-	// WS_ is the prefix for the environment variable that contains the WebSocket URL for a chain
-	WS_ = "WS_"
+	// OwnerKey is the private key used to deploy contracts and send funds to the rebalancer nodes
+	OwnerKey = "OWNER_KEY"
+	// RPCPrefix is the prefix for the environment variable that contains the RPC URL for a chain
+	RPCPrefix = "RPC_"
+	// WebSocketPerfix is the prefix for the environment variable that contains the WebSocket URL for a chain
+	WebSocketPerfix = "WS_"
 )
 
 type Env struct {
@@ -35,6 +35,7 @@ type Env struct {
 	WSURLs      map[uint64]string
 }
 
+// nolint
 func New(websocket bool, overrideNonce bool) Env {
 	env := Env{
 		Transactors: make(map[uint64]*bind.TransactOpts),
@@ -65,7 +66,7 @@ func New(websocket bool, overrideNonce bool) Env {
 }
 
 func GetRPC(chainID uint64) (string, error) {
-	envVariable := RPC_ + strconv.FormatUint(chainID, 10)
+	envVariable := RPCPrefix + strconv.FormatUint(chainID, 10)
 	rpc := os.Getenv(envVariable)
 	if rpc != "" {
 		return rpc, nil
@@ -74,7 +75,7 @@ func GetRPC(chainID uint64) (string, error) {
 }
 
 func GetWS(chainID uint64) (string, error) {
-	envVariable := WS_ + strconv.FormatUint(chainID, 10)
+	envVariable := WebSocketPerfix + strconv.FormatUint(chainID, 10)
 	ws := os.Getenv(envVariable)
 	if ws != "" {
 		return ws, nil
@@ -83,7 +84,7 @@ func GetWS(chainID uint64) (string, error) {
 }
 
 func GetTransactor(chainID *big.Int) *bind.TransactOpts {
-	ownerKey := os.Getenv(OWNER_KEY)
+	ownerKey := os.Getenv(OwnerKey)
 	if ownerKey != "" {
 		b, err := hex.DecodeString(ownerKey)
 		if err != nil {

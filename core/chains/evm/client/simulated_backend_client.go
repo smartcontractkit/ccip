@@ -320,7 +320,15 @@ func (c *SimulatedBackendClient) SubscribeNewHead(
 			case h := <-ch:
 				var head *evmtypes.Head
 				if h != nil {
-					head = &evmtypes.Head{Difficulty: h.Difficulty, Timestamp: time.Unix(int64(h.Time), 0), Number: h.Number.Int64(), Hash: h.Hash(), ParentHash: h.ParentHash, Parent: lastHead, EVMChainID: ubig.New(c.chainId)}
+					head = &evmtypes.Head{
+						Difficulty: h.Difficulty,
+						Timestamp:  time.Unix(int64(h.Time), 0), //nolint:gosec
+						Number:     h.Number.Int64(),
+						Hash:       h.Hash(),
+						ParentHash: h.ParentHash,
+						EVMChainID: ubig.New(c.chainId),
+					}
+					head.Parent.Store(lastHead)
 					lastHead = head
 				}
 				select {
@@ -419,7 +427,7 @@ func (c *SimulatedBackendClient) CallContract(ctx context.Context, msg ethereum.
 	res, err := c.b.CallContract(ctx, msg, blockNumber)
 	if err != nil {
 		dataErr := revertError{}
-		if errors.Is(err, &dataErr) {
+		if errors.As(err, &dataErr) {
 			return nil, &JsonError{Data: dataErr.ErrorData(), Message: dataErr.Error(), Code: 3}
 		}
 		// Generic revert, no data
@@ -438,7 +446,7 @@ func (c *SimulatedBackendClient) PendingCallContract(ctx context.Context, msg et
 	res, err := c.b.PendingCallContract(ctx, msg)
 	if err != nil {
 		dataErr := revertError{}
-		if errors.Is(err, &dataErr) {
+		if errors.As(err, &dataErr) {
 			return nil, &JsonError{Data: dataErr.ErrorData(), Message: dataErr.Error(), Code: 3}
 		}
 		// Generic revert, no data
