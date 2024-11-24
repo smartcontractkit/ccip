@@ -1,6 +1,6 @@
 ChainID = '59144'
-# Block time 12s, finality < 60m
-FinalityDepth = 300
+#3s block time ~ 20m finality based on committee decision
+FinalityDepth = 600
 # Blocks are only emitted when a transaction happens / no empty blocks
 NoNewHeadsThreshold = '0'
 
@@ -15,3 +15,8 @@ ResendAfterThreshold = '3m'
 # set greater than finality depth
 [HeadTracker]
 HistoryDepth = 350
+
+[Transactions.AutoPurge]
+Enabled = true
+Threshold = 50 # 50 blocks at 3s block time ~2.5 minutes
+MinAttempts = 3

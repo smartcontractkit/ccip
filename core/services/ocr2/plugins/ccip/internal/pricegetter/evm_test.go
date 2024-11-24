@@ -198,10 +198,10 @@ func testParamAggregatorOnly(t *testing.T) testParameters {
 		AnsweredInRound: big.NewInt(4000),
 	}
 	contractReaders := map[uint64]types.ContractReader{
-		uint64(101): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round1}),
-		uint64(102): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round2}),
-		uint64(103): mockCR(t, []uint8{18}, []aggregator_v3_interface.LatestRoundData{round3}),
-		uint64(104): mockCR(t, []uint8{20}, []aggregator_v3_interface.LatestRoundData{round4}),
+		uint64(101): mockCR(t, []uint8{8}, cfg, []common.Address{TK1}, []aggregator_v3_interface.LatestRoundData{round1}),
+		uint64(102): mockCR(t, []uint8{8}, cfg, []common.Address{TK2}, []aggregator_v3_interface.LatestRoundData{round2}),
+		uint64(103): mockCR(t, []uint8{18}, cfg, []common.Address{TK3}, []aggregator_v3_interface.LatestRoundData{round3}),
+		uint64(104): mockCR(t, []uint8{20}, cfg, []common.Address{TK4}, []aggregator_v3_interface.LatestRoundData{round4}),
 	}
 	expectedTokenPrices := map[common.Address]big.Int{
 		TK1: *multExp(round1.Answer, 10),         // expected in 1e18 format.
@@ -261,8 +261,8 @@ func testParamAggregatorOnlyMulti(t *testing.T) testParameters {
 		AnsweredInRound: big.NewInt(3000),
 	}
 	contractReaders := map[uint64]types.ContractReader{
-		uint64(101): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round1}),
-		uint64(102): mockCR(t, []uint8{8, 8}, []aggregator_v3_interface.LatestRoundData{round2, round3}),
+		uint64(101): mockCR(t, []uint8{8}, cfg, []common.Address{TK1}, []aggregator_v3_interface.LatestRoundData{round1}),
+		uint64(102): mockCR(t, []uint8{8, 8}, cfg, []common.Address{TK2, TK3}, []aggregator_v3_interface.LatestRoundData{round2, round3}),
 	}
 	expectedTokenPrices := map[common.Address]big.Int{
 		TK1: *multExp(round1.Answer, 10),
@@ -347,8 +347,8 @@ func testParamNoAggregatorForToken(t *testing.T) testParameters {
 		AnsweredInRound: big.NewInt(2000),
 	}
 	contractReaders := map[uint64]types.ContractReader{
-		uint64(101): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round1}),
-		uint64(102): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round2}),
+		uint64(101): mockCR(t, []uint8{8}, cfg, []common.Address{TK1}, []aggregator_v3_interface.LatestRoundData{round1}),
+		uint64(102): mockCR(t, []uint8{8}, cfg, []common.Address{TK2}, []aggregator_v3_interface.LatestRoundData{round2}),
 	}
 	expectedTokenPrices := map[common.Address]big.Int{
 		TK1: *round1.Answer,
@@ -401,8 +401,8 @@ func testParamAggregatorAndStaticValid(t *testing.T) testParameters {
 		AnsweredInRound: big.NewInt(2000),
 	}
 	contractReaders := map[uint64]types.ContractReader{
-		uint64(101): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round1}),
-		uint64(102): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round2}),
+		uint64(101): mockCR(t, []uint8{8}, cfg, []common.Address{TK1}, []aggregator_v3_interface.LatestRoundData{round1}),
+		uint64(102): mockCR(t, []uint8{8}, cfg, []common.Address{TK2}, []aggregator_v3_interface.LatestRoundData{round2}),
 	}
 	expectedTokenPrices := map[common.Address]big.Int{
 		TK1: *multExp(round1.Answer, 10),
@@ -464,9 +464,9 @@ func testParamAggregatorAndStaticTokenCollision(t *testing.T) testParameters {
 		AnsweredInRound: big.NewInt(3000),
 	}
 	contractReaders := map[uint64]types.ContractReader{
-		uint64(101): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round1}),
-		uint64(102): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round2}),
-		uint64(103): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round3}),
+		uint64(101): mockCR(t, []uint8{8}, cfg, []common.Address{TK1}, []aggregator_v3_interface.LatestRoundData{round1}),
+		uint64(102): mockCR(t, []uint8{8}, cfg, []common.Address{TK2}, []aggregator_v3_interface.LatestRoundData{round2}),
+		uint64(103): mockCR(t, []uint8{8}, cfg, []common.Address{TK3}, []aggregator_v3_interface.LatestRoundData{round3}),
 	}
 	return testParameters{
 		cfg:                        cfg,
@@ -504,7 +504,7 @@ func testParamBatchCallReturnsErr(t *testing.T) testParameters {
 		AnsweredInRound: big.NewInt(1000),
 	}
 	contractReaders := map[uint64]types.ContractReader{
-		uint64(101): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round1}),
+		uint64(101): mockCR(t, []uint8{8}, cfg, []common.Address{TK1}, []aggregator_v3_interface.LatestRoundData{round1}),
 		uint64(102): mockErrCR(t),
 	}
 	return testParameters{
@@ -563,9 +563,9 @@ func testLessInputsThanDefinedPrices(t *testing.T) testParameters {
 		AnsweredInRound: big.NewInt(3000),
 	}
 	contractReaders := map[uint64]types.ContractReader{
-		uint64(101): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round1}),
-		uint64(102): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round2}),
-		uint64(103): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round3}),
+		uint64(101): mockCR(t, []uint8{8}, cfg, []common.Address{TK1}, []aggregator_v3_interface.LatestRoundData{round1}),
+		uint64(102): mockCR(t, []uint8{8}, cfg, []common.Address{TK2}, []aggregator_v3_interface.LatestRoundData{round2}),
+		uint64(103): mockCR(t, []uint8{8}, cfg, []common.Address{TK3}, []aggregator_v3_interface.LatestRoundData{round3}),
 	}
 	expectedTokenPrices := map[common.Address]big.Int{
 		TK1: *multExp(round1.Answer, 10),
@@ -628,9 +628,9 @@ func testGetAllTokensAggregatorAndStatic(t *testing.T) testParameters {
 		AnsweredInRound: big.NewInt(3000),
 	}
 	contractReaders := map[uint64]types.ContractReader{
-		uint64(101): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round1}),
-		uint64(102): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round2}),
-		uint64(103): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round3}),
+		uint64(101): mockCR(t, []uint8{8}, cfg, []common.Address{TK1}, []aggregator_v3_interface.LatestRoundData{round1}),
+		uint64(102): mockCR(t, []uint8{8}, cfg, []common.Address{TK2}, []aggregator_v3_interface.LatestRoundData{round2}),
+		uint64(103): mockCR(t, []uint8{8}, cfg, []common.Address{TK3}, []aggregator_v3_interface.LatestRoundData{round3}),
 	}
 	expectedTokenPricesForAll := map[common.Address]big.Int{
 		TK1: *multExp(round1.Answer, 10),
@@ -688,9 +688,9 @@ func testGetAllTokensAggregatorOnly(t *testing.T) testParameters {
 		AnsweredInRound: big.NewInt(3000),
 	}
 	contractReaders := map[uint64]types.ContractReader{
-		uint64(101): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round1}),
-		uint64(102): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round2}),
-		uint64(103): mockCR(t, []uint8{8}, []aggregator_v3_interface.LatestRoundData{round3}),
+		uint64(101): mockCR(t, []uint8{8}, cfg, []common.Address{TK1}, []aggregator_v3_interface.LatestRoundData{round1}),
+		uint64(102): mockCR(t, []uint8{8}, cfg, []common.Address{TK2}, []aggregator_v3_interface.LatestRoundData{round2}),
+		uint64(103): mockCR(t, []uint8{8}, cfg, []common.Address{TK3}, []aggregator_v3_interface.LatestRoundData{round3}),
 	}
 
 	expectedTokenPricesForAll := map[common.Address]big.Int{
@@ -737,17 +737,18 @@ func testGetAllTokensStaticOnly(t *testing.T) testParameters {
 	}
 }
 
-func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.LatestRoundData) *mocks.ChainReader {
-	caller := mocks.NewChainReader(t)
+func mockCR(t *testing.T, decimals []uint8, cfg config.DynamicPriceGetterConfig, addr []common.Address, rounds []aggregator_v3_interface.LatestRoundData) *mocks.ContractReader {
+	caller := mocks.NewContractReader(t)
 
 	// Mock batch calls per chain: all decimals calls then all latestRoundData calls.
-	// bGLVR = batchGetLatestValueResult
-	//nolint:all
-	var bGLVR types.BatchGetLatestValuesResult
-	bGLVR = make(map[string]types.ContractBatchResults, 1)
+	bGLVR := make(types.BatchGetLatestValuesResult)
 
 	for i := range len(decimals) {
-		bGLVR[fmt.Sprintf("%v_%v", OffchainAggregator, i)] = make([]types.BatchReadResult, 0, 2)
+		boundContract := types.BoundContract{
+			Address: cfg.AggregatorPrices[addr[i]].AggregatorContractAddress.Hex(),
+			Name:    fmt.Sprintf("%v_%v", OffchainAggregator, i),
+		}
+		bGLVR[boundContract] = types.ContractBatchResults{}
 	}
 	for i, d := range decimals {
 		contractName := fmt.Sprintf("%v_%v", OffchainAggregator, i)
@@ -755,7 +756,11 @@ func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.Lat
 			ReadName: DecimalsMethodName,
 		}
 		readRes.SetResult(&d, nil)
-		bGLVR[contractName] = append(bGLVR[contractName], readRes)
+		boundContract := types.BoundContract{
+			Address: cfg.AggregatorPrices[addr[i]].AggregatorContractAddress.Hex(),
+			Name:    contractName,
+		}
+		bGLVR[boundContract] = append(bGLVR[boundContract], readRes)
 	}
 
 	for i, r := range rounds {
@@ -764,7 +769,11 @@ func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.Lat
 			ReadName: LatestRoundDataMethodName,
 		}
 		readRes.SetResult(&r, nil)
-		bGLVR[contractName] = append(bGLVR[contractName], readRes)
+		boundContract := types.BoundContract{
+			Address: cfg.AggregatorPrices[addr[i]].AggregatorContractAddress.Hex(),
+			Name:    contractName,
+		}
+		bGLVR[boundContract] = append(bGLVR[boundContract], readRes)
 	}
 
 	caller.On("Bind", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -772,8 +781,8 @@ func mockCR(t *testing.T, decimals []uint8, rounds []aggregator_v3_interface.Lat
 	return caller
 }
 
-func mockErrCR(t *testing.T) *mocks.ChainReader {
-	caller := mocks.NewChainReader(t)
+func mockErrCR(t *testing.T) *mocks.ContractReader {
+	caller := mocks.NewContractReader(t)
 	caller.On("Bind", mock.Anything, mock.Anything).Return(nil).Maybe()
 	caller.On("BatchGetLatestValues", mock.Anything, mock.Anything).Return(nil, assert.AnError).Maybe()
 	return caller

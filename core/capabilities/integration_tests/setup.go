@@ -21,7 +21,6 @@ import (
 	ocrTypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/keystone/generated/feeds_consumer"
-	"github.com/smartcontractkit/chainlink/v2/core/utils/testutils/heavyweight"
 
 	commoncap "github.com/smartcontractkit/chainlink-common/pkg/capabilities"
 	"github.com/smartcontractkit/chainlink-common/pkg/capabilities/consensus/ocr3"
@@ -44,6 +43,7 @@ import (
 	p2ptypes "github.com/smartcontractkit/chainlink/v2/core/services/p2p/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/v3/reportcodec"
+	"github.com/smartcontractkit/chainlink/v2/core/utils/testutils/heavyweight"
 )
 
 const (
@@ -69,8 +69,8 @@ func setupStreamDonsWithTransmissionSchedule(ctx context.Context, t *testing.T, 
 	lggr.SetLogLevel(TestLogLevel)
 
 	ethBlockchain, transactor := setupBlockchain(t, 1000, 1*time.Second)
-	capabilitiesRegistryAddr := setupCapabilitiesRegistryContract(ctx, t, workflowDonInfo.peerIDs, triggerDonInfo.peerIDs, targetDonInfo.peerIDs, transactor, ethBlockchain)
-	forwarderAddr, _ := setupForwarderContract(t, workflowDonInfo.peerIDs, workflowDonInfo.ID, 1, workflowDonInfo.F, transactor, ethBlockchain)
+	capabilitiesRegistryAddr := setupCapabilitiesRegistryContract(ctx, t, workflowDonInfo, triggerDonInfo, targetDonInfo, transactor, ethBlockchain)
+	forwarderAddr, _ := setupForwarderContract(t, workflowDonInfo, transactor, ethBlockchain)
 	consumerAddr, consumer := setupConsumerContract(t, transactor, ethBlockchain, forwarderAddr, workflowOwnerID, workflowName)
 
 	var feedIDs []string
@@ -260,9 +260,10 @@ func createDonInfo(t *testing.T, don don) donInfo {
 
 	triggerDonInfo := donInfo{
 		DON: commoncap.DON{
-			ID:      don.id,
-			Members: donPeers,
-			F:       don.f,
+			ID:            don.id,
+			Members:       donPeers,
+			F:             don.f,
+			ConfigVersion: 1,
 		},
 		peerIDs:    peerIDs,
 		keys:       donKeys,

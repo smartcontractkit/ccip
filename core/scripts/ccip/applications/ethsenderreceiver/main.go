@@ -28,6 +28,7 @@ var (
 	senderABI = abihelpers.MustParseABI(ether_sender_receiver.EtherSenderReceiverABI)
 )
 
+// nolint
 func main() {
 	switch os.Args[1] {
 	case "inject-eth-liquidity":

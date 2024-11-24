@@ -2,6 +2,7 @@ package smoke
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/osutil"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,7 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
@@ -38,6 +40,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	t.Parallel()
 	log := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, log, testconfig.Smoke)
+	require.NotNil(t, TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	gasLimit := big.NewInt(*TestCfg.TestGroupInput.MsgDetails.DestGasLimit)
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, &log, "smoke-ccip", nil, TestCfg)
 	if len(setUpOutput.Lanes) == 0 {
@@ -890,7 +893,7 @@ func TestSmokeCCIPReorgBelowFinality(t *testing.T) {
 
 // Test creates above finality reorg at destination and
 // expects ccip transactions in-flight and the one initiated after reorg
-// doesn't go through and verifies every node is able to detect reorg.
+// doesn't go through and verifies f+1 nodes are able to detect reorg.
 // Note: LogPollInterval interval is set as 1s to detect the reorg immediately
 func TestSmokeCCIPReorgAboveFinalityAtDestination(t *testing.T) {
 	t.Parallel()
@@ -901,7 +904,7 @@ func TestSmokeCCIPReorgAboveFinalityAtDestination(t *testing.T) {
 
 // Test creates above finality reorg at destination and
 // expects ccip transactions in-flight doesn't go through, the transaction initiated after reorg
-// shouldn't even get initiated and verifies every node is able to detect reorg.
+// shouldn't even get initiated and verifies f+1 nodes are able to detect reorg.
 // Note: LogPollInterval interval is set as 1s to detect the reorg immediately
 func TestSmokeCCIPReorgAboveFinalityAtSource(t *testing.T) {
 	t.Parallel()
@@ -1057,11 +1060,13 @@ func performAboveFinalityReorgAndValidate(t *testing.T, network string) {
 		logPollerName = fmt.Sprintf("EVM.%d.LogPoller", lane.SourceChain.GetChainID())
 		rs.RunReorg(rs.SrcClient, int(rs.Cfg.SrcFinalityDepth)+rs.Cfg.FinalityDelta, network, 2*time.Second)
 	}
-	clNodes := setUpOutput.Env.CLNodes
-	// assert every node is detecting the reorg (LogPollInterval is set as 1s for faster detection)
+	// DON is 3F+1, finding f+1 from the given number of nodes in the environment
+	fPlus1Nodes := int(math.Ceil(float64(len(setUpOutput.Env.CLNodes)-1)/3)) + 1
+	// assert at least f+1 nodes is detecting the reorg (LogPollInterval is set as 1s for faster detection)
+	// additional context: Commit requires 2f+1 observations, so f+1 nodes need to detect it in order to force the entire DON to stop processing messages.
 	nodesDetectedViolation := make(map[string]bool)
 	assert.Eventually(t, func() bool {
-		for _, node := range clNodes {
+		for _, node := range setUpOutput.Env.CLNodes {
 			if _, ok := nodesDetectedViolation[node.ChainlinkClient.URL()]; ok {
 				continue
 			}
@@ -1074,8 +1079,8 @@ func performAboveFinalityReorgAndValidate(t *testing.T, network string) {
 				}
 			}
 		}
-		return len(nodesDetectedViolation) == len(clNodes)
-	}, 5*time.Minute, 5*time.Second, "Reorg above finality depth is not detected by every node")
+		return len(nodesDetectedViolation) >= fPlus1Nodes
+	}, 3*time.Minute, 20*time.Second, "Reorg above finality depth is not detected by f+1 nodes")
 	log.Debug().Interface("Nodes", nodesDetectedViolation).Msg("Violation detection details")
 	// send another request and verify it fails
 	err = lane.SendRequests(1, gasLimit)

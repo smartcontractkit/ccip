@@ -1,6 +1,10 @@
 ChainID = '5003'
 ChainType = 'optimismBedrock'
-FinalityDepth = 500
+# FT and FD are both present here because the dev effort rely only on FinalityTagEnabled are still in progress.
+# We expect to be able to rely only on FinalityTagEnabled=true in the short future.
+# https://chainlink-core.slack.com/archives/C05CS33N08N/p1715102940763339?thread_ts=1715102478.537529&cid=C05CS33N08N
+FinalityDepth = 1200
+FinalityTagEnabled = true
 LogPollInterval = '2s'
 NoNewHeadsThreshold = '0'
 MinIncomingConfirmations = 1
@@ -8,7 +12,7 @@ MinIncomingConfirmations = 1
 [HeadTracker]
 HistoryDepth = 600
 
-[GasEstimator]     
+[GasEstimator]
 Mode = 'L2Suggested'
 PriceMax = '200 gwei'
 LimitDefault = 100000000

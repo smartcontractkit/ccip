@@ -44,13 +44,13 @@ func (h *BaseHandler) RevertReasonFromErrorCodeString(errorCodeString string) (s
 func (h *BaseHandler) RevertReasonFromTx(txHash string) (string, error) {
 	// Need a node URL
 	// NOTE: this node needs to run in archive mode
-	ethUrl := h.cfg.NodeURL
-	if ethUrl == "" {
+	ethURL := h.cfg.NodeURL
+	if ethURL == "" {
 		panicErr(errors.New("you must define ETH_NODE env variable"))
 	}
 	requester := h.cfg.FromAddress
 
-	ec, err := ethclient.Dial(ethUrl)
+	ec, err := ethclient.Dial(ethURL)
 	panicErr(err)
 	errorString, _ := GetErrorForTx(ec, txHash, requester)
 

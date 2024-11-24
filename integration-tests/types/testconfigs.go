@@ -31,10 +31,10 @@ type AutomationTestConfig interface {
 	tc.AutomationTestConfig
 }
 
-type KeeperBenchmarkTestConfig interface {
+type AutomationBenchmarkTestConfig interface {
 	ctf_config.GlobalTestConfig
 	tc.CommonTestConfig
-	tc.KeeperTestConfig
+	tc.AutomationTestConfig
 	ctf_config.NamedConfigurations
 	testreporters.GrafanaURLProvider
 }
@@ -50,4 +50,10 @@ type Ocr2TestConfig interface {
 	ctf_config.GlobalTestConfig
 	tc.CommonTestConfig
 	tc.Ocr2TestConfig
+}
+
+type CCIPTestConfig interface {
+	ctf_config.GlobalTestConfig
+	tc.CommonTestConfig
+	tc.CCIPTestConfig
 }
