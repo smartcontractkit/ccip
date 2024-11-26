@@ -756,14 +756,14 @@ func DeployZkSyncRMNProxyContract(auth *bind.TransactOpts, backend bind.Contract
 	if !ok {
 		return common.Address{}, nil, nil, errors.New("backend is not an ethclient")
 	}
-	fmt.Println("Deploying zksync contract")
+	
 	zksyncClient := zkSyncClient.NewClient(client.Client())
-	fmt.Println("getting wallet")
+	
 	wallet := auth.Context.Value("wallet").(*zkSyncAccounts.Wallet)
-	fmt.Println("got wallet")
-	fmt.Println("getting bytes")
+	
+	
 	decodedBytes := common.FromHex(RMNProxyContractZkBin)
-	fmt.Println("deploying")
+	
 	RMNProxyContractAbi, err := RMNProxyContractMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -779,7 +779,7 @@ func DeployZkSyncRMNProxyContract(auth *bind.TransactOpts, backend bind.Contract
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	fmt.Println("hash of tx", hash)
+	
 	receipt, err := zksyncClient.WaitMined(context.Background(), hash)
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -788,7 +788,7 @@ func DeployZkSyncRMNProxyContract(auth *bind.TransactOpts, backend bind.Contract
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	fmt.Println("tx hash", tx.Hash)
+	
 
 	ethTx := ConvertToTransaction(*tx)
 	address := receipt.ContractAddress

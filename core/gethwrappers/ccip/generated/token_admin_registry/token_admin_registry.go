@@ -1497,14 +1497,14 @@ func DeployZkSyncTokenAdminRegistry(auth *bind.TransactOpts, backend bind.Contra
 	if !ok {
 		return common.Address{}, nil, nil, errors.New("backend is not an ethclient")
 	}
-	fmt.Println("Deploying zksync contract")
+	
 	zksyncClient := zkSyncClient.NewClient(client.Client())
-	fmt.Println("getting wallet")
+	
 	wallet := auth.Context.Value("wallet").(*zkSyncAccounts.Wallet)
-	fmt.Println("got wallet")
-	fmt.Println("getting bytes")
+	
+	
 	decodedBytes := common.FromHex(TokenAdminRegistryZkBin)
-	fmt.Println("deploying")
+	
 	TokenAdminRegistryAbi, err := TokenAdminRegistryMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -1520,7 +1520,7 @@ func DeployZkSyncTokenAdminRegistry(auth *bind.TransactOpts, backend bind.Contra
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	fmt.Println("hash of tx", hash)
+	
 	receipt, err := zksyncClient.WaitMined(context.Background(), hash)
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -1529,7 +1529,7 @@ func DeployZkSyncTokenAdminRegistry(auth *bind.TransactOpts, backend bind.Contra
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	fmt.Println("tx hash", tx.Hash)
+	
 
 	ethTx := ConvertToTransaction(*tx)
 	address := receipt.ContractAddress
