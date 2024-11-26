@@ -717,13 +717,14 @@ func (c *SimulatedBackendClient) ethGetHeaderByNumber(ctx context.Context, resul
 }
 
 func (c *SimulatedBackendClient) LatestFinalizedBlock(ctx context.Context) (*evmtypes.Head, error) {
-	block := c.b.Blockchain().CurrentFinalBlock()
+	// block := c.b.Blockchain().CurrentFinalBlock()
+	block, _ := c.b.BlockByNumber(ctx, big.NewInt(0))
 	return &evmtypes.Head{
 		EVMChainID: ubig.NewI(c.chainId.Int64()),
 		Hash:       block.Hash(),
-		Number:     block.Number.Int64(),
-		ParentHash: block.ParentHash,
-		Timestamp:  time.Unix(int64(block.Time), 0),
+		// Number:     block.Number.Int64(),
+		// ParentHash: block.ParentHash,
+		// Timestamp:  time.Unix(int64(block.Time), 0),
 	}, nil
 }
 
