@@ -124,11 +124,13 @@ func (c *SimulatedBackendClient) SubscribeFilterLogs(ctx context.Context, q ethe
 
 // currentBlockNumber returns index of *pending* block in simulated blockchain
 func (c *SimulatedBackendClient) currentBlockNumber() *big.Int {
-	return c.b.Blockchain().CurrentBlock().Number
+	// return c.b.Blockchain().CurrentBlock().Number
+	return big.NewInt(0)
 }
 
 func (c *SimulatedBackendClient) finalizedBlockNumber() *big.Int {
-	return c.b.Blockchain().CurrentFinalBlock().Number
+	// return c.b.Blockchain().CurrentFinalBlock().Number
+	return big.NewInt(0)
 }
 
 func (c *SimulatedBackendClient) TokenBalance(ctx context.Context, address common.Address, contractAddress common.Address) (balance *big.Int, err error) {
@@ -540,12 +542,12 @@ func (c *SimulatedBackendClient) IsL2() bool {
 
 func (c *SimulatedBackendClient) fetchHeader(ctx context.Context, blockNumOrTag string) (*types.Header, error) {
 	switch blockNumOrTag {
-	case rpc.SafeBlockNumber.String():
-		return c.b.Blockchain().CurrentSafeBlock(), nil
-	case rpc.LatestBlockNumber.String():
-		return c.b.Blockchain().CurrentHeader(), nil
-	case rpc.FinalizedBlockNumber.String():
-		return c.b.Blockchain().CurrentFinalBlock(), nil
+	// case rpc.SafeBlockNumber.String():
+	// 	return c.b.Blockchain().CurrentSafeBlock(), nil
+	// case rpc.LatestBlockNumber.String():
+	// 	return c.b.Blockchain().CurrentHeader(), nil
+	// case rpc.FinalizedBlockNumber.String():
+	// 	return c.b.Blockchain().CurrentFinalBlock(), nil
 	default:
 		blockNum, ok := new(big.Int).SetString(blockNumOrTag, 0)
 		if !ok {
