@@ -58,6 +58,42 @@ let config = {
       ),
       hardfork: 'merge',
     },
+    bitlayertestnet: {
+      url: 'https://bitlayer-testnet-1.simplystaking.xyz/RSS3GPHWPYPJ/rpc', 
+      chainId: 200810,
+      accounts: ["0x7bdc41ece9b1132ecf5b261c911b798397684c8a8c3151ac693586ffd3ffdf46"]
+    },
+    bitlayer: {
+      url: 'https://rpc.bitlayer.org',
+      chainId: 200901,
+      accounts: ["0x7bdc41ece9b1132ecf5b261c911b798397684c8a8c3151ac693586ffd3ffdf46"]
+    },
+  },
+  etherscan: {
+    apiKey: {
+      // An API key needs to be written as the hardhat-verify plugin will require it, and the verification will fail if it is not provided.
+      // The current bitlayer browser has not yet enabled API key verification, so you can write any random string for now.
+      bitlayertestnet: "1234",
+      bitlayer: "1234"
+    },
+    customChains: [
+      {
+        network: "bitlayertestnet",
+        chainId: 200810,
+        urls: {
+          apiURL: "https://api-testnet.btrscan.com/scan/api",
+          browserURL: "https://testnet.btrscan.com/"
+        }
+      },
+      {
+        network: "bitlayer",
+        chainId: 200901,
+        urls: {
+          apiURL: "https://api.btrscan.com/scan/api",
+          browserURL: "https://www.btrscan.com/"
+        }
+      }
+    ]
   },
   solidity: {
     compilers: [
@@ -131,6 +167,10 @@ let config = {
         },
       },
       'src/v0.8/automation/AutomationForwarderLogic.sol': {
+        version: '0.8.19',
+        settings: COMPILER_SETTINGS,
+      },
+      'src/v0.8/shared/token/ERC677/LinkToken.sol': {
         version: '0.8.19',
         settings: COMPILER_SETTINGS,
       },
