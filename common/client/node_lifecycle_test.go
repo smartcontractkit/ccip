@@ -446,6 +446,7 @@ func TestUnit_NodeLifecycle_aliveLoop(t *testing.T) {
 		rpc.On("GetInterceptedChainInfo").Return(ChainInfo{}, ChainInfo{}).Once()
 		rpc.On("SubscribeToHeads", mock.Anything).Return(make(<-chan Head), newSub(t), nil).Once()
 		rpc.On("SetAliveLoopSub", mock.Anything).Once()
+		rpc.On("SetAliveLoopFinalizedHeadSub", mock.Anything).Once()
 		lggr, observedLogs := logger.TestObserved(t, zap.DebugLevel)
 		node := newDialedNode(t, testNodeOpts{
 			config: testNodeConfig{},
@@ -467,6 +468,7 @@ func TestUnit_NodeLifecycle_aliveLoop(t *testing.T) {
 		ch := make(chan Head)
 		rpc.On("SubscribeToFinalizedHeads", mock.Anything).Return((<-chan Head)(ch), newSub(t), nil).Once()
 		rpc.On("GetInterceptedChainInfo").Return(ChainInfo{}, ChainInfo{}).Once()
+		rpc.On("SetAliveLoopFinalizedHeadSub", mock.Anything).Once()
 		name := "node-" + rand.Str(5)
 		node := newSubscribedNode(t, testNodeOpts{
 			config: testNodeConfig{},
@@ -501,6 +503,7 @@ func TestUnit_NodeLifecycle_aliveLoop(t *testing.T) {
 		ch := make(chan Head)
 		close(ch)
 		rpc.On("SubscribeToFinalizedHeads", mock.Anything).Return((<-chan Head)(ch), newSub(t), nil).Once()
+		rpc.On("SetAliveLoopFinalizedHeadSub", mock.Anything).Once()
 		lggr, observedLogs := logger.TestObserved(t, zap.DebugLevel)
 		node := newSubscribedNode(t, testNodeOpts{
 			chainConfig: clientMocks.ChainConfig{
@@ -527,6 +530,7 @@ func TestUnit_NodeLifecycle_aliveLoop(t *testing.T) {
 		ch := make(chan Head, 1)
 		ch <- head{BlockNumber: 10}.ToMockHead(t)
 		rpc.On("SubscribeToFinalizedHeads", mock.Anything).Return((<-chan Head)(ch), newSub(t), nil).Once()
+		rpc.On("SetAliveLoopFinalizedHeadSub", mock.Anything).Once()
 		lggr, observed := logger.TestObserved(t, zap.DebugLevel)
 		noNewFinalizedHeadsThreshold := tests.TestInterval
 		node := newSubscribedNode(t, testNodeOpts{
@@ -560,6 +564,7 @@ func TestUnit_NodeLifecycle_aliveLoop(t *testing.T) {
 		rpc := newMockNodeClient[types.ID, Head](t)
 		rpc.On("GetInterceptedChainInfo").Return(ChainInfo{}, ChainInfo{}).Once()
 		rpc.On("SubscribeToFinalizedHeads", mock.Anything).Return(make(<-chan Head), newSub(t), nil).Once()
+		rpc.On("SetAliveLoopFinalizedHeadSub", mock.Anything).Once()
 		lggr, observed := logger.TestObserved(t, zap.DebugLevel)
 		noNewFinalizedHeadsThreshold := tests.TestInterval
 		node := newSubscribedNode(t, testNodeOpts{
@@ -593,6 +598,7 @@ func TestUnit_NodeLifecycle_aliveLoop(t *testing.T) {
 		sub.On("Err").Return((<-chan error)(errCh))
 		sub.On("Unsubscribe").Once()
 		rpc.On("SubscribeToFinalizedHeads", mock.Anything).Return((<-chan Head)(nil), sub, nil).Once()
+		rpc.On("SetAliveLoopFinalizedHeadSub", mock.Anything).Once()
 		lggr, observedLogs := logger.TestObserved(t, zap.DebugLevel)
 		node := newSubscribedNode(t, testNodeOpts{
 			chainConfig: clientMocks.ChainConfig{
@@ -1116,6 +1122,7 @@ func TestUnit_NodeLifecycle_outOfSyncLoop(t *testing.T) {
 		outOfSyncSubscription.On("Unsubscribe").Once()
 		ch := make(chan Head)
 		rpc.On("SubscribeToFinalizedHeads", mock.Anything).Return((<-chan Head)(ch), outOfSyncSubscription, nil).Once()
+		rpc.On("SetAliveLoopFinalizedHeadSub", mock.Anything).Once()
 
 		setupRPCForAliveLoop(t, rpc)
 

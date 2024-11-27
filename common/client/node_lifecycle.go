@@ -119,6 +119,7 @@ func (n *node[CHAIN_ID, HEAD, RPC]) aliveLoop() {
 		}
 
 		defer finalizedHeadsSub.Unsubscribe()
+		n.rpc.SetAliveLoopFinalizedHeadSub(finalizedHeadsSub.sub)
 	}
 
 	var pollCh <-chan time.Time

@@ -137,7 +137,8 @@ type rpcClient struct {
 	subs []ethereum.Subscription
 
 	// Need to track the aliveLoop subscription, so we do not cancel it when checking lease on the MultiNode
-	aliveLoopSub ethereum.Subscription
+	aliveLoopHeadsSub          ethereum.Subscription
+	aliveLoopFinalizedHeadsSub ethereum.Subscription
 
 	// chStopInFlight can be closed to immediately cancel all in-flight requests on
 	// this rpcClient. Closing and replacing should be serialized through
@@ -368,11 +369,18 @@ func (r *rpcClient) unsubscribeAll() {
 	}
 	r.subs = nil
 }
-func (r *rpcClient) SetAliveLoopSub(sub commontypes.Subscription) {
+func (r *rpcClient) SetAliveLoopSub(headsSub commontypes.Subscription) {
 	r.stateMu.Lock()
 	defer r.stateMu.Unlock()
 
-	r.aliveLoopSub = sub
+	r.aliveLoopHeadsSub = headsSub
+}
+
+func (r *rpcClient) SetAliveLoopFinalizedHeadSub(finalizedHeads commontypes.Subscription) {
+	r.stateMu.Lock()
+	defer r.stateMu.Unlock()
+
+	r.aliveLoopFinalizedHeadsSub = finalizedHeads
 }
 
 // SubscribersCount returns the number of client subscribed to the node
@@ -389,7 +397,7 @@ func (r *rpcClient) UnsubscribeAllExceptAliveLoop() {
 	defer r.stateMu.Unlock()
 
 	for _, s := range r.subs {
-		if s != r.aliveLoopSub {
+		if s != r.aliveLoopHeadsSub && s != r.aliveLoopFinalizedHeadsSub {
 			s.Unsubscribe()
 		}
 	}

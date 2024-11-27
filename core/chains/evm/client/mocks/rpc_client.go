@@ -1754,6 +1754,39 @@ func (_c *RPCClient_SequenceAt_Call) RunAndReturn(run func(context.Context, comm
 	return _c
 }
 
+// SetAliveLoopFinalizedHeadSub provides a mock function with given fields: _a0
+func (_m *RPCClient) SetAliveLoopFinalizedHeadSub(_a0 commontypes.Subscription) {
+	_m.Called(_a0)
+}
+
+// RPCClient_SetAliveLoopFinalizedHeadSub_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetAliveLoopFinalizedHeadSub'
+type RPCClient_SetAliveLoopFinalizedHeadSub_Call struct {
+	*mock.Call
+}
+
+// SetAliveLoopFinalizedHeadSub is a helper method to define mock.On call
+//   - _a0 commontypes.Subscription
+func (_e *RPCClient_Expecter) SetAliveLoopFinalizedHeadSub(_a0 interface{}) *RPCClient_SetAliveLoopFinalizedHeadSub_Call {
+	return &RPCClient_SetAliveLoopFinalizedHeadSub_Call{Call: _e.mock.On("SetAliveLoopFinalizedHeadSub", _a0)}
+}
+
+func (_c *RPCClient_SetAliveLoopFinalizedHeadSub_Call) Run(run func(_a0 commontypes.Subscription)) *RPCClient_SetAliveLoopFinalizedHeadSub_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(commontypes.Subscription))
+	})
+	return _c
+}
+
+func (_c *RPCClient_SetAliveLoopFinalizedHeadSub_Call) Return() *RPCClient_SetAliveLoopFinalizedHeadSub_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *RPCClient_SetAliveLoopFinalizedHeadSub_Call) RunAndReturn(run func(commontypes.Subscription)) *RPCClient_SetAliveLoopFinalizedHeadSub_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetAliveLoopSub provides a mock function with given fields: _a0
 func (_m *RPCClient) SetAliveLoopSub(_a0 commontypes.Subscription) {
 	_m.Called(_a0)

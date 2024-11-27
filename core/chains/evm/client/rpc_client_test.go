@@ -318,6 +318,25 @@ func TestRPCClient_SubscribeNewHead(t *testing.T) {
 		require.NoError(t, err)
 		checkClosedRPCClientShouldRemoveExistingSub(t, ctx, sub, rpc)
 	})
+	t.Run("UnsubscribeAllExceptAliveLoop should keep finalized heads subscription open", func(t *testing.T) {
+		server := testutils.NewWSServer(t, chainId, serverCallBack)
+		wsURL := server.WSURL()
+
+		rpc := client.NewRPCClient(lggr, wsURL, &url.URL{}, "rpc", 1, chainId, commonclient.Primary, 1, 0, commonclient.QueryTimeout, commonclient.QueryTimeout, "")
+		defer rpc.Close()
+		require.NoError(t, rpc.Dial(ctx))
+
+		_, sub, err := rpc.SubscribeToFinalizedHeads(tests.Context(t))
+		require.NoError(t, err)
+		rpc.SetAliveLoopFinalizedHeadSub(sub)
+		rpc.UnsubscribeAllExceptAliveLoop()
+		select {
+		case <-sub.Err():
+			t.Fatal("Expected subscription to remain open")
+		default:
+		}
+		checkClosedRPCClientShouldRemoveExistingSub(t, ctx, sub, rpc)
+	})
 	t.Run("Subscription error is properly wrapper", func(t *testing.T) {
 		server := testutils.NewWSServer(t, chainId, serverCallBack)
 		wsURL := server.WSURL()

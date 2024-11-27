@@ -1379,6 +1379,39 @@ func (_c *mockRPC_SequenceAt_Call[CHAIN_ID, SEQ, ADDR, BLOCK_HASH, TX, TX_HASH, 
 	return _c
 }
 
+// SetAliveLoopFinalizedHeadSub provides a mock function with given fields: _a0
+func (_m *mockRPC[CHAIN_ID, SEQ, ADDR, BLOCK_HASH, TX, TX_HASH, EVENT, EVENT_OPS, TX_RECEIPT, FEE, HEAD, BATCH_ELEM]) SetAliveLoopFinalizedHeadSub(_a0 types.Subscription) {
+	_m.Called(_a0)
+}
+
+// mockRPC_SetAliveLoopFinalizedHeadSub_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetAliveLoopFinalizedHeadSub'
+type mockRPC_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID types.ID, SEQ types.Sequence, ADDR types.Hashable, BLOCK_HASH types.Hashable, TX interface{}, TX_HASH types.Hashable, EVENT interface{}, EVENT_OPS interface{}, TX_RECEIPT types.Receipt[TX_HASH, BLOCK_HASH], FEE feetypes.Fee, HEAD types.Head[BLOCK_HASH], BATCH_ELEM interface{}] struct {
+	*mock.Call
+}
+
+// SetAliveLoopFinalizedHeadSub is a helper method to define mock.On call
+//   - _a0 types.Subscription
+func (_e *mockRPC_Expecter[CHAIN_ID, SEQ, ADDR, BLOCK_HASH, TX, TX_HASH, EVENT, EVENT_OPS, TX_RECEIPT, FEE, HEAD, BATCH_ELEM]) SetAliveLoopFinalizedHeadSub(_a0 interface{}) *mockRPC_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, SEQ, ADDR, BLOCK_HASH, TX, TX_HASH, EVENT, EVENT_OPS, TX_RECEIPT, FEE, HEAD, BATCH_ELEM] {
+	return &mockRPC_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, SEQ, ADDR, BLOCK_HASH, TX, TX_HASH, EVENT, EVENT_OPS, TX_RECEIPT, FEE, HEAD, BATCH_ELEM]{Call: _e.mock.On("SetAliveLoopFinalizedHeadSub", _a0)}
+}
+
+func (_c *mockRPC_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, SEQ, ADDR, BLOCK_HASH, TX, TX_HASH, EVENT, EVENT_OPS, TX_RECEIPT, FEE, HEAD, BATCH_ELEM]) Run(run func(_a0 types.Subscription)) *mockRPC_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, SEQ, ADDR, BLOCK_HASH, TX, TX_HASH, EVENT, EVENT_OPS, TX_RECEIPT, FEE, HEAD, BATCH_ELEM] {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.Subscription))
+	})
+	return _c
+}
+
+func (_c *mockRPC_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, SEQ, ADDR, BLOCK_HASH, TX, TX_HASH, EVENT, EVENT_OPS, TX_RECEIPT, FEE, HEAD, BATCH_ELEM]) Return() *mockRPC_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, SEQ, ADDR, BLOCK_HASH, TX, TX_HASH, EVENT, EVENT_OPS, TX_RECEIPT, FEE, HEAD, BATCH_ELEM] {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *mockRPC_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, SEQ, ADDR, BLOCK_HASH, TX, TX_HASH, EVENT, EVENT_OPS, TX_RECEIPT, FEE, HEAD, BATCH_ELEM]) RunAndReturn(run func(types.Subscription)) *mockRPC_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, SEQ, ADDR, BLOCK_HASH, TX, TX_HASH, EVENT, EVENT_OPS, TX_RECEIPT, FEE, HEAD, BATCH_ELEM] {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetAliveLoopSub provides a mock function with given fields: _a0
 func (_m *mockRPC[CHAIN_ID, SEQ, ADDR, BLOCK_HASH, TX, TX_HASH, EVENT, EVENT_OPS, TX_RECEIPT, FEE, HEAD, BATCH_ELEM]) SetAliveLoopSub(_a0 types.Subscription) {
 	_m.Called(_a0)
