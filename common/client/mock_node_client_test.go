@@ -400,6 +400,39 @@ func (_c *mockNodeClient_IsSyncing_Call[CHAIN_ID, HEAD]) RunAndReturn(run func(c
 	return _c
 }
 
+// SetAliveLoopFinalizedHeadSub provides a mock function with given fields: _a0
+func (_m *mockNodeClient[CHAIN_ID, HEAD]) SetAliveLoopFinalizedHeadSub(_a0 types.Subscription) {
+	_m.Called(_a0)
+}
+
+// mockNodeClient_SetAliveLoopFinalizedHeadSub_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetAliveLoopFinalizedHeadSub'
+type mockNodeClient_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID types.ID, HEAD Head] struct {
+	*mock.Call
+}
+
+// SetAliveLoopFinalizedHeadSub is a helper method to define mock.On call
+//   - _a0 types.Subscription
+func (_e *mockNodeClient_Expecter[CHAIN_ID, HEAD]) SetAliveLoopFinalizedHeadSub(_a0 interface{}) *mockNodeClient_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, HEAD] {
+	return &mockNodeClient_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, HEAD]{Call: _e.mock.On("SetAliveLoopFinalizedHeadSub", _a0)}
+}
+
+func (_c *mockNodeClient_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, HEAD]) Run(run func(_a0 types.Subscription)) *mockNodeClient_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, HEAD] {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(types.Subscription))
+	})
+	return _c
+}
+
+func (_c *mockNodeClient_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, HEAD]) Return() *mockNodeClient_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, HEAD] {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *mockNodeClient_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, HEAD]) RunAndReturn(run func(types.Subscription)) *mockNodeClient_SetAliveLoopFinalizedHeadSub_Call[CHAIN_ID, HEAD] {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SetAliveLoopSub provides a mock function with given fields: _a0
 func (_m *mockNodeClient[CHAIN_ID, HEAD]) SetAliveLoopSub(_a0 types.Subscription) {
 	_m.Called(_a0)

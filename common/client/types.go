@@ -66,6 +66,7 @@ type NodeClient[
 	ClientVersion(context.Context) (string, error)
 	SubscribersCount() int32
 	SetAliveLoopSub(types.Subscription)
+	SetAliveLoopFinalizedHeadSub(types.Subscription)
 	UnsubscribeAllExceptAliveLoop()
 	IsSyncing(ctx context.Context) (bool, error)
 	SubscribeToFinalizedHeads(_ context.Context) (<-chan HEAD, types.Subscription, error)
