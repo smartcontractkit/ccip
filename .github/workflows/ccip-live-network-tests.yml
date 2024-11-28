@@ -146,8 +146,6 @@ jobs:
       contents: read
     env:
       CHAINLINK_ENV_USER: ${{ github.actor }}
-      SLACK_API_KEY: ${{ secrets.QA_SLACK_API_KEY }}
-      SLACK_CHANNEL: ${{ secrets.QA_SLACK_CHANNEL }}
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
       CHAINLINK_TEST_VERSION: ${{ github.sha }}
@@ -248,8 +246,6 @@ jobs:
       contents: read
     env:
       CHAINLINK_ENV_USER: ${{ github.actor }}
-      SLACK_API_KEY: ${{ secrets.QA_SLACK_API_KEY }}
-      SLACK_CHANNEL: ${{ secrets.QA_SLACK_CHANNEL }}
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
     strategy:
@@ -417,7 +413,7 @@ jobs:
         uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
         id: slack
         with:
-          channel-id: "#test-run-notifications"
+          channel-id: "#ccip-testing"
           payload: |
             {
               "attachments": [

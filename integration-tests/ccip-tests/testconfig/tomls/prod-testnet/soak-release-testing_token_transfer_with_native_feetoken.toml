@@ -501,8 +501,19 @@ Data = """
       "router": "0xA8C0c11bf64AF62CDCA6f93D3769B88BdD7cb93D",
       "price_registry": "0xa1ed3A3aA29166C9c8448654A8cA6b7916BC8379",
       "wrapped_native": "0x4200000000000000000000000000000000000001",
-      "src_contracts": null,
-      "dest_contracts": null
+      "src_contracts": {
+        "WeMix Testnet": {
+          "on_ramp": "0xa81418c332d3E04338B058Ab39b1baf53029F638",
+          "deployed_at": 0
+        }
+      },
+      "dest_contracts": {
+        "WeMix Testnet": {
+          "off_ramp": "0x42Dde725C4f05C237a00B582Bb7457e208d3A17C",
+          "commit_store": "0xb116E9a90534354dA59CF93a87c1E9711c0Aaa2c",
+          "receiver_dapp": "0xea387241d834D04CC408f4C2FE7ef2c477E4B3E7"
+        }
+      }
     },
     "Metis Sepolia": {
       "is_native_fee_token": true,
@@ -890,6 +901,10 @@ Data = """
           "on_ramp": "0xd25B8c70CB43022Bdc3aC417E2Cf5159294d95A1",
           "deployed_at": 0
         },
+        "Kroma Sepolia": {
+          "on_ramp": "0x1De2Ca07eEee7F524Fe5edA6C8FFFb79F67b05E9",
+          "deployed_at": 0
+        },
         "Optimism Sepolia": {
           "on_ramp": "0xB37607C6BD4562F32967dE87D14663D59e3f655d",
           "deployed_at": 0
@@ -917,6 +932,11 @@ Data = """
         "BSC Testnet": {
           "off_ramp": "0xb858077FbE1E55cD7a9092Eb6d5403e068c14EAf",
           "commit_store": "0x0EF13C7c95C27A9EA477363a26a09Cff44ba38F9",
+          "receiver_dapp": "0xea387241d834D04CC408f4C2FE7ef2c477E4B3E7"
+        },
+        "Kroma Sepolia": {
+          "off_ramp": "0x78d8154e1216F4791086bFa078Aaf07dcD2bD3C6",
+          "commit_store": "0xe67AAfbE6025e730Cf47a414BEFf2106FF231dB1",
           "receiver_dapp": "0xea387241d834D04CC408f4C2FE7ef2c477E4B3E7"
         },
         "Optimism Sepolia": {
@@ -991,30 +1011,54 @@ selected_networks = [
 
 [CCIP.Groups.load]
 NetworkPairs = [
-  'AVALANCHE_FUJI,ARBITRUM_SEPOLIA',
-  'AVALANCHE_FUJI,BASE_SEPOLIA',
-  'AVALANCHE_FUJI,OPTIMISM_SEPOLIA',
-  'AVALANCHE_FUJI,POLYGON_AMOY',
-  'AVALANCHE_FUJI,GNOSIS_CHIADO',
+  'SEPOLIA,AVALANCHE_FUJI',
+#  'SEPOLIA,BSC_TESTNET',
+  'SEPOLIA,CELO_ALFAJORES',
+  'SEPOLIA,ARBITRUM_SEPOLIA',
+  'SEPOLIA,BASE_SEPOLIA',
+  'SEPOLIA,BLAST_SEPOLIA',
+  'SEPOLIA,MODE_SEPOLIA',
+  'SEPOLIA,OPTIMISM_SEPOLIA',
+  'SEPOLIA,POLYGON_AMOY',
+  'SEPOLIA,WEMIX_TESTNET',
+  'SEPOLIA,GNOSIS_CHIADO',
+  'SEPOLIA,METIS_SEPOLIA',
+  'SEPOLIA,ZKSYNC_SEPOLIA',
+
+#  'AVALANCHE_FUJI,BSC_TESTNET',
+#  'AVALANCHE_FUJI,ARBITRUM_SEPOLIA',
+#  'AVALANCHE_FUJI,BASE_SEPOLIA',
+#  'AVALANCHE_FUJI,OPTIMISM_SEPOLIA',
+#  'AVALANCHE_FUJI,POLYGON_AMOY',
+#  'AVALANCHE_FUJI,WEMIX_TESTNET',
+#  'AVALANCHE_FUJI,GNOSIS_CHIADO',
+
+#  'BSC_TESTNET,BASE_SEPOLIA',
+#  'BSC_TESTNET,POLYGON_AMOY',
+#  'BSC_TESTNET,WEMIX_TESTNET',
+#  'BSC_TESTNET,GNOSIS_CHIADO',
+
   'ARBITRUM_SEPOLIA,BASE_SEPOLIA',
   'ARBITRUM_SEPOLIA,OPTIMISM_SEPOLIA',
-  'ARBITRUM_SEPOLIA,SEPOLIA',
+  'ARBITRUM_SEPOLIA,WEMIX_TESTNET',
   'ARBITRUM_SEPOLIA,GNOSIS_CHIADO',
+
   'BASE_SEPOLIA,MODE_SEPOLIA',
   'BASE_SEPOLIA,OPTIMISM_SEPOLIA',
   'BASE_SEPOLIA,GNOSIS_CHIADO',
-  'SEPOLIA,MODE_SEPOLIA',
-  'SEPOLIA,CELO_ALFAJORES',
-  'SEPOLIA,METIS_SEPOLIA',
-  'SEPOLIA,BLAST_SEPOLIA',
-  'SEPOLIA,ZKSYNC_SEPOLIA',
-  'KROMA_SEPOLIA,WEMIX_TESTNET',
+
+  #  'KROMA_SEPOLIA,WEMIX_TESTNET',
+
+  'OPTIMISM_SEPOLIA,POLYGON_AMOY',
+  'OPTIMISM_SEPOLIA,WEMIX_TESTNET',
   'OPTIMISM_SEPOLIA,GNOSIS_CHIADO',
-  'BSC_TESTNET,GNOSIS_CHIADO',
+
+  'POLYGON_AMOY,WEMIX_TESTNET',
+  'POLYGON_AMOY,GNOSIS_CHIADO',
 ]
 
 BiDirectionalLane = true
-PhaseTimeout = '20m'
+PhaseTimeout = '45m'
 ExistingDeployment = true
 
 [CCIP.Groups.load.TokenConfig]
@@ -1028,7 +1072,7 @@ TestRunName = 'SoakTest_prod_testnet'
 FailOnFirstErrorInLoad = true
 
 [[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
-MsgType = 'Data'
+MsgType = 'DataWithToken'
 DestGasLimit = 0
 DataLength = 100
 NoOfTokens = 1
