@@ -657,7 +657,7 @@ func deployContracts(
 
 		// deploy lock/release pool targeting the weth9 contract
 		lockReleasePoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
-			owner, backend, wethAddress, []common.Address{}, armProxyAddress, true, routerAddress)
+			owner, backend, wethAddress, 18, []common.Address{}, armProxyAddress, true, routerAddress)
 		require.NoError(t, err, "failed to deploy LockReleaseTokenPool contract")
 		backend.Commit()
 		lockReleasePool, err := lock_release_token_pool.NewLockReleaseTokenPool(lockReleasePoolAddress, backend)

@@ -73,6 +73,8 @@ var (
 	SourceChainSelector = uint64(11787463284727550157)
 	DestChainID         = uint64(1337)
 	DestChainSelector   = uint64(3379446385462418246)
+
+	TokenDecimals = uint8(18)
 )
 
 // Backwards compat, in principle these statuses are version dependent
@@ -785,6 +787,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		sourceUser,
 		sourceChain,
 		sourceLinkTokenAddress,
+		TokenDecimals,
 		[]common.Address{},
 		armProxySourceAddress,
 		true,
@@ -801,6 +804,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		sourceUser,
 		sourceChain,
 		sourceWeth9addr,
+		TokenDecimals,
 		[]common.Address{},
 		armProxySourceAddress,
 		true,
@@ -819,6 +823,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		destUser,
 		destChain,
 		destLinkTokenAddress,
+		TokenDecimals,
 		[]common.Address{},
 		armProxyDestAddress,
 		true,
@@ -848,6 +853,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		destUser,
 		destChain,
 		destWeth9addr,
+		TokenDecimals,
 		[]common.Address{},
 		armProxyDestAddress,
 		true,
@@ -882,11 +888,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	_, err = sourceLinkPool.ApplyChainUpdates(
 		sourceUser,
+		[]uint64{},
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
 			RemoteChainSelector: DestChainSelector,
-			RemotePoolAddress:   abiEncodedDestLinkPool,
+			RemotePoolAddresses: [][]byte{abiEncodedDestLinkPool},
 			RemoteTokenAddress:  abiEncodedDestLinkTokenAddress,
-			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
@@ -907,11 +913,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	_, err = sourceWeth9Pool.ApplyChainUpdates(
 		sourceUser,
+		[]uint64{},
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
 			RemoteChainSelector: DestChainSelector,
-			RemotePoolAddress:   abiEncodedDestWrappedPool,
+			RemotePoolAddresses: [][]byte{abiEncodedDestWrappedPool},
 			RemoteTokenAddress:  abiEncodedDestWrappedTokenAddr,
-			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
@@ -933,11 +939,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	_, err = destLinkPool.ApplyChainUpdates(
 		destUser,
+		[]uint64{},
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
 			RemoteChainSelector: SourceChainSelector,
-			RemotePoolAddress:   abiEncodedSourceLinkPool,
+			RemotePoolAddresses: [][]byte{abiEncodedSourceLinkPool},
 			RemoteTokenAddress:  abiEncodedSourceLinkTokenAddr,
-			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
@@ -958,11 +964,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	_, err = destWrappedPool.ApplyChainUpdates(
 		destUser,
+		[]uint64{},
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
 			RemoteChainSelector: SourceChainSelector,
-			RemotePoolAddress:   abiEncodedSourceWrappedPool,
+			RemotePoolAddresses: [][]byte{abiEncodedSourceWrappedPool},
 			RemoteTokenAddress:  abiEncodedSourceWrappedTokenAddr,
-			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
