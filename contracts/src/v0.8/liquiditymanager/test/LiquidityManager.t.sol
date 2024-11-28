@@ -71,7 +71,7 @@ contract LiquidityManagerSetup is LiquidityManagerBaseTest {
     s_wethBridgeAdapter = new MockL1BridgeAdapter(IERC20(address(s_l1Weth)), true);
     s_wethLockReleaseTokenPool = new LockReleaseTokenPool(
       IERC20(address(s_l1Weth)),
-    18,
+      18,
       new address[](0),
       address(1),
       true,
@@ -273,7 +273,7 @@ contract LiquidityManager_rebalanceLiquidity is LiquidityManagerSetup {
     MockL1BridgeAdapter remoteBridgeAdapter = new MockL1BridgeAdapter(s_l2Token, false);
     LockReleaseTokenPool remotePool = new LockReleaseTokenPool(
       s_l2Token,
-    18,
+      18,
       new address[](0),
       address(1),
       true,
@@ -403,7 +403,7 @@ contract LiquidityManager_rebalanceLiquidity is LiquidityManagerSetup {
     MockL1BridgeAdapter remoteBridgeAdapter = new MockL1BridgeAdapter(s_l2Token, false);
     LockReleaseTokenPool remotePool = new LockReleaseTokenPool(
       s_l2Token,
-    18,
+      18,
       new address[](0),
       address(1),
       true,
@@ -525,7 +525,7 @@ contract LiquidityManager_rebalanceLiquidity is LiquidityManagerSetup {
     MockL1BridgeAdapter remoteBridgeAdapter = new MockL1BridgeAdapter(IERC20(address(s_l2Weth)), true);
     LockReleaseTokenPool remotePool = new LockReleaseTokenPool(
       IERC20(address(s_l2Weth)),
-    18,
+      18,
       new address[](0),
       address(1),
       true,
@@ -821,7 +821,7 @@ contract LiquidityManager_setLocalLiquidityContainer is LiquidityManagerSetup {
   function test_setLocalLiquidityContainerSuccess() external {
     LockReleaseTokenPool newPool = new LockReleaseTokenPool(
       s_l1Token,
-    18,
+      18,
       new address[](0),
       address(1),
       true,
