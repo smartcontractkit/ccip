@@ -43,7 +43,9 @@ contract MultiRampsE2E is OnRampSetup, OffRampSetup {
     for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
       address token = s_sourceTokens[i];
       address pool = address(
-        new LockReleaseTokenPool(IERC20(token), new address[](0), address(s_mockRMN), true, address(s_sourceRouter2))
+        new LockReleaseTokenPool(
+          IERC20(token), DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMN), true, address(s_sourceRouter2)
+        )
       );
 
       s_sourcePoolByDestPool[s_destPoolBySourceToken[token]] = pool;

@@ -15,9 +15,10 @@ contract ReentrantMaliciousTokenPool is TokenPool {
   constructor(
     address facade,
     IERC20 token,
+    uint8 localTokenDecimals,
     address rmnProxy,
     address router
-  ) TokenPool(token, new address[](0), rmnProxy, router) {
+  ) TokenPool(token, localTokenDecimals, new address[](0), rmnProxy, router) {
     i_facade = facade;
   }
 
@@ -26,15 +27,20 @@ contract ReentrantMaliciousTokenPool is TokenPool {
     Pool.LockOrBurnInV1 calldata lockOrBurnIn
   ) external override returns (Pool.LockOrBurnOutV1 memory) {
     if (s_attacked) {
-      return
-        Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+      return Pool.LockOrBurnOutV1({
+        destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+        destPoolData: _encodeLocalDecimals()
+      });
     }
 
     s_attacked = true;
 
     FacadeClient(i_facade).send(lockOrBurnIn.amount);
     emit Burned(msg.sender, lockOrBurnIn.amount);
-    return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+    return Pool.LockOrBurnOutV1({
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: _encodeLocalDecimals()
+    });
   }
 
   function releaseOrMint(

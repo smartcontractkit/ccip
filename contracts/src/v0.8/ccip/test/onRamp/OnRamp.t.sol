@@ -531,7 +531,11 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     vm.startPrank(OWNER);
 
     MaybeRevertingBurnMintTokenPool newPool = new MaybeRevertingBurnMintTokenPool(
-      BurnMintERC677(sourceETH), new address[](0), address(s_mockRMNRemote), address(s_sourceRouter)
+      BurnMintERC677(sourceETH),
+      DEFAULT_TOKEN_DECIMALS,
+      new address[](0),
+      address(s_mockRMNRemote),
+      address(s_sourceRouter)
     );
     BurnMintERC677(sourceETH).grantMintAndBurnRoles(address(newPool));
     deal(address(sourceETH), address(newPool), type(uint256).max);
@@ -539,17 +543,19 @@ contract OnRamp_forwardFromRouter is OnRampSetup {
     // Add TokenPool to OnRamp
     s_tokenAdminRegistry.setPool(sourceETH, address(newPool));
 
+    bytes[] memory remotePoolAddresses = new bytes[](1);
+    remotePoolAddresses[0] = abi.encode(s_destTokenPool);
+
     // Allow chain in TokenPool
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      remotePoolAddress: abi.encode(s_destTokenPool),
+      remotePoolAddresses: remotePoolAddresses,
       remoteTokenAddress: abi.encode(s_destToken),
-      allowed: true,
       outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
-    newPool.applyChainUpdates(chainUpdates);
+    newPool.applyChainUpdates(new uint64[](0), chainUpdates);
 
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(address(sourceETH), 1000);
 

@@ -223,7 +223,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, FeeQuoterSetup {
         Internal.SourceTokenData({
           sourcePoolAddress: abi.encode(s_sourcePoolByToken[message.tokenAmounts[i].token]),
           destTokenAddress: abi.encode(s_destTokenBySourceToken[message.tokenAmounts[i].token]),
-          extraData: "",
+          extraData: abi.encode(DEFAULT_TOKEN_DECIMALS),
           destGasAmount: tokenTransferFeeConfig.isEnabled
             ? tokenTransferFeeConfig.destGasOverhead
             : DEFAULT_TOKEN_DEST_GAS_OVERHEAD
