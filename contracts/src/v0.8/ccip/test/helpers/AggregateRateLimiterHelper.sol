@@ -4,9 +4,13 @@ pragma solidity 0.8.24;
 import "../../AggregateRateLimiter.sol";
 
 contract AggregateRateLimiterHelper is AggregateRateLimiter {
-  constructor(RateLimiter.Config memory config) AggregateRateLimiter(config) {}
+  constructor(
+    RateLimiter.Config memory config
+  ) AggregateRateLimiter(config) {}
 
-  function rateLimitValue(uint256 value) public {
+  function rateLimitValue(
+    uint256 value
+  ) public {
     _rateLimitValue(value);
   }
 

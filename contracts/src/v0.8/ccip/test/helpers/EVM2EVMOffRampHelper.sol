@@ -14,7 +14,9 @@ contract EVM2EVMOffRampHelper is EVM2EVMOffRamp, IgnoreContractSize {
     _setExecutionState(sequenceNumber, state);
   }
 
-  function getExecutionStateBitMap(uint64 bitmapIndex) public view returns (uint256) {
+  function getExecutionStateBitMap(
+    uint64 bitmapIndex
+  ) public view returns (uint256) {
     return s_executionStates[bitmapIndex];
   }
 
@@ -49,7 +51,9 @@ contract EVM2EVMOffRampHelper is EVM2EVMOffRamp, IgnoreContractSize {
     return _trialExecute(message, offchainTokenData, tokenGasOverrides);
   }
 
-  function report(bytes calldata executableMessages) external {
+  function report(
+    bytes calldata executableMessages
+  ) external {
     _report(executableMessages);
   }
 

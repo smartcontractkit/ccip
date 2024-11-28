@@ -96,7 +96,9 @@ abstract contract TokenPool1_2 is IPoolPriorTo1_5, OwnerIsCreator, IERC165 {
   }
 
   /// @inheritdoc IERC165
-  function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
+  function supportsInterface(
+    bytes4 interfaceId
+  ) public pure virtual override returns (bool) {
     return interfaceId == type(IPoolPriorTo1_5).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
@@ -106,13 +108,17 @@ abstract contract TokenPool1_2 is IPoolPriorTo1_5, OwnerIsCreator, IERC165 {
 
   /// @notice Checks whether something is a permissioned onRamp on this contract.
   /// @return true if the given address is a permissioned onRamp.
-  function isOnRamp(address onRamp) public view returns (bool) {
+  function isOnRamp(
+    address onRamp
+  ) public view returns (bool) {
     return s_onRamps.contains(onRamp);
   }
 
   /// @notice Checks whether something is a permissioned offRamp on this contract.
   /// @return true if the given address is a permissioned offRamp.
-  function isOffRamp(address offRamp) public view returns (bool) {
+  function isOffRamp(
+    address offRamp
+  ) public view returns (bool) {
     return s_offRamps.contains(offRamp);
   }
 
@@ -195,24 +201,32 @@ abstract contract TokenPool1_2 is IPoolPriorTo1_5, OwnerIsCreator, IERC165 {
   // ================================================================
 
   /// @notice Consumes outbound rate limiting capacity in this pool
-  function _consumeOnRampRateLimit(uint256 amount) internal {
+  function _consumeOnRampRateLimit(
+    uint256 amount
+  ) internal {
     s_onRampRateLimits[msg.sender]._consume(amount, address(i_token));
   }
 
   /// @notice Consumes inbound rate limiting capacity in this pool
-  function _consumeOffRampRateLimit(uint256 amount) internal {
+  function _consumeOffRampRateLimit(
+    uint256 amount
+  ) internal {
     s_offRampRateLimits[msg.sender]._consume(amount, address(i_token));
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @return The token bucket.
-  function currentOnRampRateLimiterState(address onRamp) external view returns (RateLimiter.TokenBucket memory) {
+  function currentOnRampRateLimiterState(
+    address onRamp
+  ) external view returns (RateLimiter.TokenBucket memory) {
     return s_onRampRateLimits[onRamp]._currentTokenBucketState();
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @return The token bucket.
-  function currentOffRampRateLimiterState(address offRamp) external view returns (RateLimiter.TokenBucket memory) {
+  function currentOffRampRateLimiterState(
+    address offRamp
+  ) external view returns (RateLimiter.TokenBucket memory) {
     return s_offRampRateLimits[offRamp]._currentTokenBucketState();
   }
 
@@ -254,7 +268,9 @@ abstract contract TokenPool1_2 is IPoolPriorTo1_5, OwnerIsCreator, IERC165 {
   // │                          Allowlist                           │
   // ================================================================
 
-  modifier checkAllowList(address sender) {
+  modifier checkAllowList(
+    address sender
+  ) {
     if (i_allowlistEnabled && !s_allowList.contains(sender)) revert SenderNotAllowed(sender);
     _;
   }

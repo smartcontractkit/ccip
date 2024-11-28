@@ -67,7 +67,9 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
 }
 
 contract EVM2EVMOnRamp_payNops_fuzz is EVM2EVMOnRampSetup {
-  function test_Fuzz_NopPayNops_Success(uint96 nopFeesJuels) public {
+  function test_Fuzz_NopPayNops_Success(
+    uint96 nopFeesJuels
+  ) public {
     (EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights, uint256 weightsTotal) = s_onRamp.getNops();
     // To avoid NoFeesToPay
     vm.assume(nopFeesJuels > weightsTotal);
@@ -1045,7 +1047,9 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
     return (tokenAmount * ratio) / 1e5;
   }
 
-  function configUSDCentToWei(uint256 usdCent) internal pure returns (uint256) {
+  function configUSDCentToWei(
+    uint256 usdCent
+  ) internal pure returns (uint256) {
     return usdCent * 1e16;
   }
 }

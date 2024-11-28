@@ -23,7 +23,9 @@ contract MockCommitStore is ICommitStore {
     return s_expectedNextSequenceNumber;
   }
 
-  function setExpectedNextSequenceNumber(uint64 nextSeqNum) external {
+  function setExpectedNextSequenceNumber(
+    uint64 nextSeqNum
+  ) external {
     s_expectedNextSequenceNumber = nextSeqNum;
   }
 

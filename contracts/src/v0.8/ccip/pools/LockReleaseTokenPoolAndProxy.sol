@@ -76,7 +76,9 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
   }
 
   // @inheritdoc IERC165
-  function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
+  function supportsInterface(
+    bytes4 interfaceId
+  ) public pure virtual override returns (bool) {
     return interfaceId == type(ILiquidityContainer).interfaceId || super.supportsInterface(interfaceId);
   }
 
@@ -88,7 +90,9 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
 
   /// @notice Sets the LiquidityManager address.
   /// @dev Only callable by the owner.
-  function setRebalancer(address rebalancer) external onlyOwner {
+  function setRebalancer(
+    address rebalancer
+  ) external onlyOwner {
     s_rebalancer = rebalancer;
   }
 
@@ -100,7 +104,9 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
 
   /// @notice Adds liquidity to the pool. The tokens should be approved first.
   /// @param amount The amount of liquidity to provide.
-  function provideLiquidity(uint256 amount) external {
+  function provideLiquidity(
+    uint256 amount
+  ) external {
     if (!i_acceptLiquidity) revert LiquidityNotAccepted();
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
@@ -110,7 +116,9 @@ contract LockReleaseTokenPoolAndProxy is LegacyPoolWrapper, ILiquidityContainer,
 
   /// @notice Removed liquidity to the pool. The tokens will be sent to msg.sender.
   /// @param amount The amount of liquidity to remove.
-  function withdrawLiquidity(uint256 amount) external {
+  function withdrawLiquidity(
+    uint256 amount
+  ) external {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
     if (i_token.balanceOf(address(this)) < amount) revert InsufficientLiquidity();

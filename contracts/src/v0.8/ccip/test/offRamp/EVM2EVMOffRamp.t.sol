@@ -248,7 +248,9 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertEq(startingBalance + amounts[0], dstToken0.balanceOf(message.receiver));
   }
 
-  function test_Fuzz_getSenderNonce(uint8 trialExecutions) public {
+  function test_Fuzz_getSenderNonce(
+    uint8 trialExecutions
+  ) public {
     vm.assume(trialExecutions > 1);
 
     Internal.EVM2EVMMessage[] memory messages;
@@ -279,7 +281,9 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertEq(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore, "sender nonce is not as expected");
   }
 
-  function test_Fuzz_getSenderNonceWithPrevOffRamp_Success(uint8 trialExecutions) public {
+  function test_Fuzz_getSenderNonceWithPrevOffRamp_Success(
+    uint8 trialExecutions
+  ) public {
     vm.assume(trialExecutions > 1);
     // Fuzz a random nonce for getSenderNonce
     test_Fuzz_getSenderNonce(trialExecutions);
@@ -543,7 +547,9 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     assertEq(uint64(2), s_offRamp.getSenderNonce(OWNER));
   }
 
-  function test_Fuzz_InterleavingOrderedAndUnorderedMessages_Success(bool[7] memory orderings) public {
+  function test_Fuzz_InterleavingOrderedAndUnorderedMessages_Success(
+    bool[7] memory orderings
+  ) public {
     Internal.EVM2EVMMessage[] memory messages = new Internal.EVM2EVMMessage[](orderings.length);
     // number of tokens needs to be capped otherwise we hit UnsupportedNumberOfTokens.
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](3);
@@ -981,7 +987,9 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), new uint32[](0));
   }
 
-  function _generateMsgWithoutTokens(uint256 gasLimit) internal view returns (Internal.EVM2EVMMessage memory) {
+  function _generateMsgWithoutTokens(
+    uint256 gasLimit
+  ) internal view returns (Internal.EVM2EVMMessage memory) {
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
     message.gasLimit = gasLimit;
     message.data = "";
@@ -2055,7 +2063,9 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   /// forge-config: default.fuzz.runs = 32
   /// forge-config: ccip.fuzz.runs = 1024
   // Uint256 gives a good range of values to test, both inside and outside of the eth address space.
-  function test_Fuzz__releaseOrMintTokens_AnyRevertIsCaught_Success(uint256 destPool) public {
+  function test_Fuzz__releaseOrMintTokens_AnyRevertIsCaught_Success(
+    uint256 destPool
+  ) public {
     // Input 447301751254033913445893214690834296930546521452, which is 0x4E59B44847B379578588920CA78FBF26C0B4956C
     // triggers some Create2Deployer and causes it to fail
     vm.assume(destPool != 447301751254033913445893214690834296930546521452);
@@ -2165,7 +2175,9 @@ contract EVM2EVMOffRamp_updateRateLimitTokens is EVM2EVMOffRampSetup {
     assertEq(adds[1].destToken, destTokens[0]);
   }
 
-  function test_Fuzz_UpdateRateLimitTokens(uint8 numTokens) public {
+  function test_Fuzz_UpdateRateLimitTokens(
+    uint8 numTokens
+  ) public {
     // Needs to be more than 1 so that the division doesn't round down and the even makes the comparisons simpler
     vm.assume(numTokens > 1 && numTokens % 2 == 0);
 

@@ -5,7 +5,9 @@ import {GLOBAL_CURSE_SUBJECT, OWNER_CURSE_VOTE_ADDR, RMN} from "../../RMN.sol";
 import {RMNSetup, makeCursesHash, makeSubjects} from "./RMNSetup.t.sol";
 
 contract RMN_voteToBless_Benchmark is RMNSetup {
-  function test_RootSuccess_gas(uint256 n) internal {
+  function test_RootSuccess_gas(
+    uint256 n
+  ) internal {
     vm.prank(BLESS_VOTER_1);
     s_rmn.voteToBless(makeTaggedRootsInclusive(1, n));
   }
@@ -151,7 +153,9 @@ contract RMN_lazyVoteToCurseUpdate_Benchmark is RMN_voteToCurse_Benchmark {
 contract RMN_setConfig_Benchmark is RMNSetup {
   uint256 s_numVoters;
 
-  function configWithVoters(uint256 numVoters) internal pure returns (RMN.Config memory) {
+  function configWithVoters(
+    uint256 numVoters
+  ) internal pure returns (RMN.Config memory) {
     RMN.Config memory cfg =
       RMN.Config({voters: new RMN.Voter[](numVoters), blessWeightThreshold: 1, curseWeightThreshold: 1});
     for (uint256 i = 1; i <= numVoters; ++i) {

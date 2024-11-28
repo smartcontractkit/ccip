@@ -36,7 +36,9 @@ abstract contract LegacyPoolWrapper is TokenPool {
   // Legacy fallbacks for older token pools that do not implement the new interface.
 
   /// @notice Legacy fallback for the 1.4 token pools.
-  function getOnRamp(uint64) external view returns (address onRampAddress) {
+  function getOnRamp(
+    uint64
+  ) external view returns (address onRampAddress) {
     return address(this);
   }
 
@@ -48,7 +50,9 @@ abstract contract LegacyPoolWrapper is TokenPool {
   /// @notice Configures the legacy fallback option. If the previous pool is set, this pool will act as a proxy for
   /// the legacy pool.
   /// @param prevPool The address of the previous pool.
-  function setPreviousPool(IPoolPriorTo1_5 prevPool) external onlyOwner {
+  function setPreviousPool(
+    IPoolPriorTo1_5 prevPool
+  ) external onlyOwner {
     IPoolPriorTo1_5 oldPrevPool = s_previousPool;
     s_previousPool = prevPool;
 
@@ -64,7 +68,9 @@ abstract contract LegacyPoolWrapper is TokenPool {
     return address(s_previousPool) != address(0);
   }
 
-  function _lockOrBurnLegacy(Pool.LockOrBurnInV1 memory lockOrBurnIn) internal {
+  function _lockOrBurnLegacy(
+    Pool.LockOrBurnInV1 memory lockOrBurnIn
+  ) internal {
     i_token.safeTransfer(address(s_previousPool), lockOrBurnIn.amount);
     s_previousPool.lockOrBurn(
       lockOrBurnIn.originalSender, lockOrBurnIn.receiver, lockOrBurnIn.amount, lockOrBurnIn.remoteChainSelector, ""
@@ -78,7 +84,9 @@ abstract contract LegacyPoolWrapper is TokenPool {
   /// offRamp. This is due to the older pools sending funds directly to the receiver, while the new pools do a hop
   /// through the offRamp to ensure the correct tokens are sent.
   /// @dev Since extraData has never been used in LockRelease or MintBurn token pools, we can safely ignore it.
-  function _releaseOrMintLegacy(Pool.ReleaseOrMintInV1 memory releaseOrMintIn) internal {
+  function _releaseOrMintLegacy(
+    Pool.ReleaseOrMintInV1 memory releaseOrMintIn
+  ) internal {
     s_previousPool.releaseOrMint(
       releaseOrMintIn.originalSender,
       releaseOrMintIn.receiver,

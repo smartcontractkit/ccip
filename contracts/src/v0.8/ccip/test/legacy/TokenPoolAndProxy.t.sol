@@ -595,7 +595,9 @@ contract LockReleaseTokenPoolPoolAndProxy_canAcceptLiquidity is LockReleaseToken
 }
 
 contract LockReleaseTokenPoolPoolAndProxy_provideLiquidity is LockReleaseTokenPoolAndProxySetup {
-  function test_Fuzz_ProvideLiquidity_Success(uint256 amount) public {
+  function test_Fuzz_ProvideLiquidity_Success(
+    uint256 amount
+  ) public {
     uint256 balancePre = s_token.balanceOf(OWNER);
     s_token.approve(address(s_lockReleaseTokenPoolAndProxy), amount);
 
@@ -614,7 +616,9 @@ contract LockReleaseTokenPoolPoolAndProxy_provideLiquidity is LockReleaseTokenPo
     s_lockReleaseTokenPoolAndProxy.provideLiquidity(1);
   }
 
-  function test_Fuzz_ExceedsAllowance(uint256 amount) public {
+  function test_Fuzz_ExceedsAllowance(
+    uint256 amount
+  ) public {
     vm.assume(amount > 0);
     vm.expectRevert("ERC20: insufficient allowance");
     s_lockReleaseTokenPoolAndProxy.provideLiquidity(amount);
@@ -630,7 +634,9 @@ contract LockReleaseTokenPoolPoolAndProxy_provideLiquidity is LockReleaseTokenPo
 }
 
 contract LockReleaseTokenPoolPoolAndProxy_withdrawalLiquidity is LockReleaseTokenPoolAndProxySetup {
-  function test_Fuzz_WithdrawalLiquidity_Success(uint256 amount) public {
+  function test_Fuzz_WithdrawalLiquidity_Success(
+    uint256 amount
+  ) public {
     uint256 balancePre = s_token.balanceOf(OWNER);
     s_token.approve(address(s_lockReleaseTokenPoolAndProxy), amount);
     s_lockReleaseTokenPoolAndProxy.provideLiquidity(amount);

@@ -50,7 +50,9 @@ contract BurnWithFromMintTokenPool_releaseOrMint is BurnWithFromMintRebasingToke
     assertEq(balancePre + amount, s_rebasingToken.balanceOf(address(OWNER)));
   }
 
-  function testFuzz_releaseOrMint_rebasing_success(uint16 multiplierPercentage) public {
+  function testFuzz_releaseOrMint_rebasing_success(
+    uint16 multiplierPercentage
+  ) public {
     uint256 amount = 1000;
     uint256 expectedAmount = amount * multiplierPercentage / 100;
     s_rebasingToken.setMultiplierPercentage(multiplierPercentage);
@@ -72,7 +74,9 @@ contract BurnWithFromMintTokenPool_releaseOrMint is BurnWithFromMintRebasingToke
     s_pool.releaseOrMint(_getReleaseOrMintIn(amount));
   }
 
-  function _getReleaseOrMintIn(uint256 amount) internal view returns (Pool.ReleaseOrMintInV1 memory) {
+  function _getReleaseOrMintIn(
+    uint256 amount
+  ) internal view returns (Pool.ReleaseOrMintInV1 memory) {
     return Pool.ReleaseOrMintInV1({
       originalSender: bytes(""),
       receiver: OWNER,
