@@ -12,7 +12,7 @@ contract TokenPoolHelper is TokenPool {
     address[] memory allowlist,
     address rmnProxy,
     address router
-  ) TokenPool(token, allowlist, rmnProxy, router) {}
+  ) TokenPool(token, 18, allowlist, rmnProxy, router) {}
 
   function lockOrBurn(
     Pool.LockOrBurnInV1 calldata lockOrBurnIn

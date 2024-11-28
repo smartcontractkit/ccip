@@ -14,6 +14,9 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 import {MaybeRevertingBurnMintTokenPool} from "../helpers/MaybeRevertingBurnMintTokenPool.sol";
 import "./EVM2EVMOnRampSetup.t.sol";
 
+import {IERC20Metadata} from
+  "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
 contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
   function test_Constructor_Success() public {
     EVM2EVMOnRamp.StaticConfig memory staticConfig = EVM2EVMOnRamp.StaticConfig({
@@ -571,7 +574,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
       Internal.SourceTokenData({
         sourcePoolAddress: abi.encode(s_sourcePoolByToken[changedToken]),
         destTokenAddress: abi.encode(s_destTokenBySourceToken[changedToken]),
-        extraData: "",
+        extraData: abi.encode(DEFAULT_TOKEN_DECIMALS),
         // The user will be billed either the default or the override, so we send the exact amount that we billed for
         // to the destination chain to be used for the token releaseOrMint and transfer.
         destGasAmount: tokenTransferFeeConfigArgs[0].destGasOverhead
@@ -772,7 +775,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     vm.startPrank(OWNER);
 
     MaybeRevertingBurnMintTokenPool newPool = new MaybeRevertingBurnMintTokenPool(
-      BurnMintERC677(sourceETH), new address[](0), address(s_mockRMN), address(s_sourceRouter)
+      BurnMintERC677(sourceETH), DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMN), address(s_sourceRouter)
     );
     BurnMintERC677(sourceETH).grantMintAndBurnRoles(address(newPool));
     deal(address(sourceETH), address(newPool), type(uint256).max);
@@ -780,17 +783,19 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     // Add TokenPool to OnRamp
     s_tokenAdminRegistry.setPool(sourceETH, address(newPool));
 
+    bytes[] memory remotePoolAddresses = new bytes[](1);
+    remotePoolAddresses[0] = abi.encode(s_destTokenPool);
+
     // Allow chain in TokenPool
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      remotePoolAddress: abi.encode(s_destTokenPool),
+      remotePoolAddresses: remotePoolAddresses,
       remoteTokenAddress: abi.encode(s_destToken),
-      allowed: true,
       outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
-    newPool.applyChainUpdates(chainUpdates);
+    newPool.applyChainUpdates(new uint64[](0), chainUpdates);
 
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(address(sourceETH), 1000);
 
@@ -997,34 +1002,47 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
     s_tokenAdminRegistry.acceptAdminRole(CUSTOM_TOKEN);
 
     LockReleaseTokenPool wrappedNativePool = new LockReleaseTokenPool(
-      IERC20(s_sourceRouter.getWrappedNative()), new address[](0), address(s_mockRMN), true, address(s_sourceRouter)
+      IERC20(s_sourceRouter.getWrappedNative()),
+      DEFAULT_TOKEN_DECIMALS,
+      new address[](0),
+      address(s_mockRMN),
+      true,
+      address(s_sourceRouter)
     );
+
+    bytes[] memory remotePoolAddresses = new bytes[](1);
+    remotePoolAddresses[0] = abi.encode(address(111111));
 
     TokenPool.ChainUpdate[] memory wrappedNativeChainUpdate = new TokenPool.ChainUpdate[](1);
     wrappedNativeChainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      remotePoolAddress: abi.encode(address(111111)),
+      remotePoolAddresses: remotePoolAddresses,
       remoteTokenAddress: abi.encode(s_destToken),
-      allowed: true,
       outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
-    wrappedNativePool.applyChainUpdates(wrappedNativeChainUpdate);
+    wrappedNativePool.applyChainUpdates(new uint64[](0), wrappedNativeChainUpdate);
     s_tokenAdminRegistry.setPool(s_sourceRouter.getWrappedNative(), address(wrappedNativePool));
 
-    LockReleaseTokenPool customPool = new LockReleaseTokenPool(
-      IERC20(CUSTOM_TOKEN), new address[](0), address(s_mockRMN), true, address(s_sourceRouter)
+    vm.mockCall(
+      CUSTOM_TOKEN, abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(DEFAULT_TOKEN_DECIMALS)
     );
+
+    LockReleaseTokenPool customPool = new LockReleaseTokenPool(
+      IERC20(CUSTOM_TOKEN), DEFAULT_TOKEN_DECIMALS, new address[](0), address(s_mockRMN), true, address(s_sourceRouter)
+    );
+
+    remotePoolAddresses[0] = abi.encode(makeAddr("random"));
+
     TokenPool.ChainUpdate[] memory customChainUpdate = new TokenPool.ChainUpdate[](1);
     customChainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: DEST_CHAIN_SELECTOR,
-      remotePoolAddress: abi.encode(makeAddr("random")),
+      remotePoolAddresses: remotePoolAddresses,
       remoteTokenAddress: abi.encode(s_destToken),
-      allowed: true,
       outboundRateLimiterConfig: _getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: _getInboundRateLimiterConfig()
     });
-    customPool.applyChainUpdates(customChainUpdate);
+    customPool.applyChainUpdates(new uint64[](0), customChainUpdate);
     s_tokenAdminRegistry.setPool(CUSTOM_TOKEN, address(customPool));
 
     s_feeTokenPrice = s_sourceTokenPrices[0];
