@@ -27,10 +27,7 @@
   },
   "files": [
     "src/v0.8/ccip/**/*.sol",
-    "src/v0.8/shared/access/ConfirmedOwner.sol",
-    "src/v0.8/shared/access/ConfirmedOwnerWithProposal.sol",
-    "src/v0.8/shared/access/OwnerIsCreator.sol",
-    "src/v0.8/shared/access/AuthorizedCallers.sol",
+    "src/v0.8/shared/access/*.sol",
     "src/v0.8/shared/call/CallWithExactGas.sol",
     "src/v0.8/shared/enumerable/EnumerableMapBytes32.sol",
     "src/v0.8/shared/enumerable/EnumerableMapAddresses.sol",
