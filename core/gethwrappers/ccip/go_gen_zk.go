@@ -20,3 +20,5 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/WETH9/WETH9.abi ../../../contracts/solc/v0.8.24/WETH9/WETH9.bin WETH9 weth9 ../../../contracts/zksolc/v0.8.24/WETH9/WETH9.sol/WETH9.zbin
 
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/SelfFundedPingPong/SelfFundedPingPong.abi ../../../contracts/solc/v0.8.24/SelfFundedPingPong/SelfFundedPingPong.bin SelfFundedPingPong self_funded_ping_pong ../../../contracts/zksolc/v0.8.24/SelfFundedPingPong/SelfFundedPingPong.sol/SelfFundedPingPong.zbin
+
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/Storage/Storage.abi ../../../contracts/solc/v0.8.24/Storage/Storage.bin Storage storage ../../../contracts/zksolc/v0.8.24/Storage/Storage.sol/Storage.zbin

@@ -88,148 +88,149 @@ compileContractZK () {
 
 
 
-
+compileContract ccip/Storage.sol
+compileContractZK ccip/Storage.sol
 # Solc produces and overwrites intermediary contracts.
 # Contracts should be ordered in reverse-import-complexity-order to minimize overwrite risks.
-compileContract ccip/offRamp/EVM2EVMOffRamp.sol
-compileContract ccip/offRamp/OffRamp.sol
-compileContract ccip/rmn/RMNRemote.sol
-compileContract ccip/applications/PingPongDemo.sol
-compileContract ccip/applications/SelfFundedPingPong.sol
-compileContract ccip/applications/EtherSenderReceiver.sol
-compileContract ccip/onRamp/OnRamp.sol
-compileContract ccip/onRamp/EVM2EVMOnRamp.sol
-compileContract ccip/CommitStore.sol
-compileContract ccip/MultiAggregateRateLimiter.sol
-compileContract ccip/Router.sol
-compileContract ccip/FeeQuoter.sol
-compileContract ccip/RMN.sol
-compileContract ccip/ARMProxy.sol
-compileContract ccip/tokenAdminRegistry/TokenAdminRegistry.sol
-compileContract ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol
-compileContract ccip/capability/CCIPHome.sol
-compileContract ccip/NonceManager.sol
-compileContract shared/token/ERC677/BurnMintERC677.sol
-compileContract ccip/PriceRegistry.sol
+# compileContract ccip/offRamp/EVM2EVMOffRamp.sol
+# compileContract ccip/offRamp/OffRamp.sol
+# compileContract ccip/rmn/RMNRemote.sol
+# compileContract ccip/applications/PingPongDemo.sol
+# compileContract ccip/applications/SelfFundedPingPong.sol
+# compileContract ccip/applications/EtherSenderReceiver.sol
+# compileContract ccip/onRamp/OnRamp.sol
+# compileContract ccip/onRamp/EVM2EVMOnRamp.sol
+# compileContract ccip/CommitStore.sol
+# compileContract ccip/MultiAggregateRateLimiter.sol
+# compileContract ccip/Router.sol
+# compileContract ccip/FeeQuoter.sol
+# compileContract ccip/RMN.sol
+# compileContract ccip/ARMProxy.sol
+# compileContract ccip/tokenAdminRegistry/TokenAdminRegistry.sol
+# compileContract ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol
+# compileContract ccip/capability/CCIPHome.sol
+# compileContract ccip/NonceManager.sol
+# compileContract shared/token/ERC677/BurnMintERC677.sol
+# compileContract ccip/PriceRegistry.sol
 
 
-# Pools
-compileContract ccip/pools/LockReleaseTokenPool.sol
-compileContract ccip/pools/BurnMintTokenPool.sol
-compileContract ccip/pools/BurnFromMintTokenPool.sol
-compileContract ccip/pools/BurnWithFromMintTokenPool.sol
-compileContract ccip/pools/LockReleaseTokenPoolAndProxy.sol
-compileContract ccip/pools/BurnMintTokenPoolAndProxy.sol
-compileContract ccip/pools/BurnWithFromMintTokenPoolAndProxy.sol
-compileContract ccip/pools/BurnWithFromMintRebasingTokenPool.sol
-compileContract ccip/pools/TokenPool.sol
+# # Pools
+# compileContract ccip/pools/LockReleaseTokenPool.sol
+# compileContract ccip/pools/BurnMintTokenPool.sol
+# compileContract ccip/pools/BurnFromMintTokenPool.sol
+# compileContract ccip/pools/BurnWithFromMintTokenPool.sol
+# compileContract ccip/pools/LockReleaseTokenPoolAndProxy.sol
+# compileContract ccip/pools/BurnMintTokenPoolAndProxy.sol
+# compileContract ccip/pools/BurnWithFromMintTokenPoolAndProxy.sol
+# compileContract ccip/pools/BurnWithFromMintRebasingTokenPool.sol
+# compileContract ccip/pools/TokenPool.sol
 
 
-# Test helpers
-compileContract ccip/test/helpers/BurnMintERC677Helper.sol
-compileContract ccip/test/helpers/CommitStoreHelper.sol
-compileContract ccip/test/helpers/MessageHasher.sol
-compileContract ccip/test/helpers/CCIPReaderTester.sol
-compileContract ccip/test/helpers/ReportCodec.sol
-compileContract ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
-compileContract ccip/test/helpers/MultiOCR3Helper.sol
-compileContract ccip/test/mocks/MockE2EUSDCTokenMessenger.sol
-compileContract ccip/test/mocks/MockE2EUSDCTransmitter.sol
-compileContract ccip/test/WETH9.sol
+# # Test helpers
+# compileContract ccip/test/helpers/BurnMintERC677Helper.sol
+# compileContract ccip/test/helpers/CommitStoreHelper.sol
+# compileContract ccip/test/helpers/MessageHasher.sol
+# compileContract ccip/test/helpers/CCIPReaderTester.sol
+# compileContract ccip/test/helpers/ReportCodec.sol
+# compileContract ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
+# compileContract ccip/test/helpers/MultiOCR3Helper.sol
+# compileContract ccip/test/mocks/MockE2EUSDCTokenMessenger.sol
+# compileContract ccip/test/mocks/MockE2EUSDCTransmitter.sol
+# compileContract ccip/test/WETH9.sol
 
 
-# Encoding Utils
-compileContract ccip/interfaces/encodingutils/ICCIPEncodingUtils.sol
+# # Encoding Utils
+# compileContract ccip/interfaces/encodingutils/ICCIPEncodingUtils.sol
 
-# Customer contracts
-compileContract ccip/pools/USDC/USDCTokenPool.sol
+# # Customer contracts
+# compileContract ccip/pools/USDC/USDCTokenPool.sol
 
-compileContract tests/MockV3Aggregator.sol
-
-
+# compileContract tests/MockV3Aggregator.sol
 
 
-compileContractZK ccip/offRamp/EVM2EVMOffRamp.sol
-compileContractZK ccip/offRamp/OffRamp.sol
-compileContractZK ccip/rmn/RMNRemote.sol
-compileContractZK ccip/applications/PingPongDemo.sol
-compileContractZK ccip/applications/SelfFundedPingPong.sol
-compileContractZK ccip/applications/EtherSenderReceiver.sol
-compileContractZK ccip/onRamp/OnRamp.sol
-compileContractZK ccip/onRamp/EVM2EVMOnRamp.sol
-compileContractZK ccip/CommitStore.sol
-compileContractZK ccip/MultiAggregateRateLimiter.sol
-compileContractZK ccip/Router.sol
-compileContractZK ccip/FeeQuoter.sol
-compileContractZK ccip/RMN.sol
-compileContractZK ccip/ARMProxy.sol
-compileContractZK ccip/tokenAdminRegistry/TokenAdminRegistry.sol
-compileContractZK ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol
-compileContractZK ccip/capability/CCIPHome.sol
-compileContractZK ccip/NonceManager.sol
-compileContractZK shared/token/ERC677/BurnMintERC677.sol
-compileContractZK ccip/PriceRegistry.sol
 
 
-# Pools
-compileContractZK ccip/pools/LockReleaseTokenPool.sol
-compileContractZK ccip/pools/BurnMintTokenPool.sol
-compileContractZK ccip/pools/BurnFromMintTokenPool.sol
-compileContractZK ccip/pools/BurnWithFromMintTokenPool.sol
-compileContractZK ccip/pools/LockReleaseTokenPoolAndProxy.sol
-compileContractZK ccip/pools/BurnMintTokenPoolAndProxy.sol
-compileContractZK ccip/pools/BurnWithFromMintTokenPoolAndProxy.sol
-compileContractZK ccip/pools/BurnWithFromMintRebasingTokenPool.sol
-compileContractZK ccip/pools/TokenPool.sol
+# compileContractZK ccip/offRamp/EVM2EVMOffRamp.sol
+# compileContractZK ccip/offRamp/OffRamp.sol
+# compileContractZK ccip/rmn/RMNRemote.sol
+# compileContractZK ccip/applications/PingPongDemo.sol
+# compileContractZK ccip/applications/SelfFundedPingPong.sol
+# compileContractZK ccip/applications/EtherSenderReceiver.sol
+# compileContractZK ccip/onRamp/OnRamp.sol
+# compileContractZK ccip/onRamp/EVM2EVMOnRamp.sol
+# compileContractZK ccip/CommitStore.sol
+# compileContractZK ccip/MultiAggregateRateLimiter.sol
+# compileContractZK ccip/Router.sol
+# compileContractZK ccip/FeeQuoter.sol
+# compileContractZK ccip/RMN.sol
+# compileContractZK ccip/ARMProxy.sol
+# compileContractZK ccip/tokenAdminRegistry/TokenAdminRegistry.sol
+# compileContractZK ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol
+# compileContractZK ccip/capability/CCIPHome.sol
+# compileContractZK ccip/NonceManager.sol
+# compileContractZK shared/token/ERC677/BurnMintERC677.sol
+# compileContractZK ccip/PriceRegistry.sol
 
 
-# Test helpers
-compileContractZK ccip/test/helpers/BurnMintERC677Helper.sol
-compileContractZK ccip/test/helpers/CommitStoreHelper.sol
-compileContractZK ccip/test/helpers/MessageHasher.sol
-compileContractZK ccip/test/helpers/CCIPReaderTester.sol
-compileContractZK ccip/test/helpers/ReportCodec.sol
-compileContractZK ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
-compileContractZK ccip/test/helpers/MultiOCR3Helper.sol
-compileContractZK ccip/test/mocks/MockE2EUSDCTokenMessenger.sol
-compileContractZK ccip/test/mocks/MockE2EUSDCTransmitter.sol
-# this breaks with paybale error
-compileContractZK ccip/test/WETH9.sol
+# # Pools
+# compileContractZK ccip/pools/LockReleaseTokenPool.sol
+# compileContractZK ccip/pools/BurnMintTokenPool.sol
+# compileContractZK ccip/pools/BurnFromMintTokenPool.sol
+# compileContractZK ccip/pools/BurnWithFromMintTokenPool.sol
+# compileContractZK ccip/pools/LockReleaseTokenPoolAndProxy.sol
+# compileContractZK ccip/pools/BurnMintTokenPoolAndProxy.sol
+# compileContractZK ccip/pools/BurnWithFromMintTokenPoolAndProxy.sol
+# compileContractZK ccip/pools/BurnWithFromMintRebasingTokenPool.sol
+# compileContractZK ccip/pools/TokenPool.sol
 
 
-# Encoding Utils
-compileContractZK ccip/interfaces/encodingutils/ICCIPEncodingUtils.sol
+# # Test helpers
+# compileContractZK ccip/test/helpers/BurnMintERC677Helper.sol
+# compileContractZK ccip/test/helpers/CommitStoreHelper.sol
+# compileContractZK ccip/test/helpers/MessageHasher.sol
+# compileContractZK ccip/test/helpers/CCIPReaderTester.sol
+# compileContractZK ccip/test/helpers/ReportCodec.sol
+# compileContractZK ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
+# compileContractZK ccip/test/helpers/MultiOCR3Helper.sol
+# compileContractZK ccip/test/mocks/MockE2EUSDCTokenMessenger.sol
+# compileContractZK ccip/test/mocks/MockE2EUSDCTransmitter.sol
+# # this breaks with paybale error
+# compileContractZK ccip/test/WETH9.sol
 
-# Customer contracts
-compileContractZK ccip/pools/USDC/USDCTokenPool.sol
 
-compileContractZK tests/MockV3Aggregator.sol
+# # Encoding Utils
+# compileContractZK ccip/interfaces/encodingutils/ICCIPEncodingUtils.sol
+
+# # Customer contracts
+# compileContractZK ccip/pools/USDC/USDCTokenPool.sol
+
+# compileContractZK tests/MockV3Aggregator.sol
 
 
-SOLC_VERSION="0.8.19"
-solc-select install $SOLC_VERSION
-solc-select use $SOLC_VERSION
-export SOLC_VERSION=$SOLC_VERSION
+# SOLC_VERSION="0.8.19"
+# solc-select install $SOLC_VERSION
+# solc-select use $SOLC_VERSION
+# export SOLC_VERSION=$SOLC_VERSION
 
-compileContractShared () {
-  local contract
-  contract=$(basename "$1" ".sol")
+# compileContractShared () {
+#   local contract
+#   contract=$(basename "$1" ".sol")
 
-  solc --overwrite --optimize --optimize-runs $OPTIMIZE_RUNS --metadata-hash none \
-      -o "$ROOT"/contracts/solc/v$SOLC_VERSION/"$contract" \
-      --abi --bin --allow-paths "$ROOT"/contracts/src/v0.8\
-      "$ROOT"/contracts/src/v0.8/"$1"
-}
+#   solc --overwrite --optimize --optimize-runs $OPTIMIZE_RUNS --metadata-hash none \
+#       -o "$ROOT"/contracts/solc/v$SOLC_VERSION/"$contract" \
+#       --abi --bin --allow-paths "$ROOT"/contracts/src/v0.8\
+#       "$ROOT"/contracts/src/v0.8/"$1"
+# }
 
-compileContractSharedZK () {
-  local contract
-  contract=$(basename "$1" ".sol")
+# compileContractSharedZK () {
+#   local contract
+#   contract=$(basename "$1" ".sol")
 
-  zksolc --overwrite -O3 \
-    -o "$ROOT"/contracts/zksolc/v$SOLC_VERSION/"$contract" \
-    --bin --allow-paths "$ROOT"/contracts/src/v0.8 \
-    "$ROOT"/contracts/src/v0.8/"$1"
-}
+#   zksolc --overwrite -O3 \
+#     -o "$ROOT"/contracts/zksolc/v$SOLC_VERSION/"$contract" \
+#     --bin --allow-paths "$ROOT"/contracts/src/v0.8 \
+#     "$ROOT"/contracts/src/v0.8/"$1"
+# }
 
-compileContractShared shared/token/ERC677/LinkToken.sol
-compileContractSharedZK shared/token/ERC677/LinkToken.sol
+# compileContractShared shared/token/ERC677/LinkToken.sol
+# compileContractSharedZK shared/token/ERC677/LinkToken.sol

@@ -38,6 +38,8 @@ rmn_proxy_contract: ../../../contracts/solc/v0.8.24/ARMProxy/ARMProxy.abi ../../
 rmn_remote: ../../../contracts/solc/v0.8.24/RMNRemote/RMNRemote.abi ../../../contracts/solc/v0.8.24/RMNRemote/RMNRemote.bin 8d7f0e4581acac5c6b42c7cca1c06e699fdcf9dbca782dde153b7d190cdbe9bc
 router: ../../../contracts/solc/v0.8.24/Router/Router.abi ../../../contracts/solc/v0.8.24/Router/Router.bin 2e4f0a7826c8abb49d882bb49fc5ff20a186dbd3137624b9097ffed903ae4888
 self_funded_ping_pong: ../../../contracts/solc/v0.8.24/SelfFundedPingPong/SelfFundedPingPong.abi ../../../contracts/solc/v0.8.24/SelfFundedPingPong/SelfFundedPingPong.bin 8ea5d75dbc3f8afd90d22c4a665a94e02892259cd16520c1c6b4cf0dc80c9148
+storage: ../../../contracts/solc/v0.8.24/Storage/Storage.abi ../../../contracts/solc/v0.8.24/Storage/Storage.bin 9b024adc8bca1941c8b9110f8f495a70c188a521fdf05ff38273f19569f4e8b4
+storage_contract: ../../../contracts/solc/v0.8.24/Storage/Storage.abi ../../../contracts/solc/v0.8.24/Storage/Storage.bin 9b024adc8bca1941c8b9110f8f495a70c188a521fdf05ff38273f19569f4e8b4
 token_admin_registry: ../../../contracts/solc/v0.8.24/TokenAdminRegistry/TokenAdminRegistry.abi ../../../contracts/solc/v0.8.24/TokenAdminRegistry/TokenAdminRegistry.bin 942be7d1681ac102e0615bee13f76838ebb0b261697cf1270d2bf82c12e57aeb
 token_pool: ../../../contracts/solc/v0.8.24/TokenPool/TokenPool.abi ../../../contracts/solc/v0.8.24/TokenPool/TokenPool.bin 7c01fd89f5153baa4d7409d14beabb3f861abfbf8880d3c6d06802cc398570f9
 usdc_token_pool: ../../../contracts/solc/v0.8.24/USDCTokenPool/USDCTokenPool.abi ../../../contracts/solc/v0.8.24/USDCTokenPool/USDCTokenPool.bin 8e7eae4c7277ce4a0092cca815c046cc49094028c23d2d113de9335fa4358030
