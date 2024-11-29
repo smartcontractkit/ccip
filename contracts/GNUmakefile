@@ -43,7 +43,7 @@ mockery: $(mockery) ## Install mockery.
 
 .PHONY: foundry
 foundry: ## Install foundry.
-	foundryup --version nightly-515a4cc8aba1627a717a1057ff4f09c8cd3bf51f
+	foundryup --version nightly-fb5f0e1c4d9b9b0861be3e3bd07963524c5ac08e
 
 .PHONY: foundry-refresh
 foundry-refresh: foundry

@@ -93,7 +93,9 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     s_offRamp.execute(execReport, new EVM2EVMOffRamp.GasLimitOverride[](0));
   }
 
-  function sendRequest(uint64 expectedSeqNum) public returns (Internal.EVM2EVMMessage memory) {
+  function sendRequest(
+    uint64 expectedSeqNum
+  ) public returns (Internal.EVM2EVMMessage memory) {
     Client.EVM2AnyMessage memory message = _generateTokenMessage();
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_SELECTOR, message);
 

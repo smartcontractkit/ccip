@@ -505,6 +505,7 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(tokenAddr str
 				auth,
 				wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
 				token,
+				testhelpers.TokenDecimals,
 				[]common.Address{},
 				rmnProxy,
 				true,

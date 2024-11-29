@@ -1002,7 +1002,9 @@ contract RMN_permaBlessing is RMNSetup {
     return new address[](0);
   }
 
-  function addresses(address a) private pure returns (address[] memory) {
+  function addresses(
+    address a
+  ) private pure returns (address[] memory) {
     address[] memory arr = new address[](1);
     arr[0] = a;
     return arr;

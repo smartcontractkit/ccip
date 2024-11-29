@@ -20,21 +20,24 @@ contract BurnWithFromMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion
 
   constructor(
     IBurnMintERC20 token,
+    uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
     address router
-  ) TokenPool(token, allowlist, rmnProxy, router) {
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
     // Some tokens allow burning from the sender without approval, but not all do.
     // To be safe, we approve the pool to burn from the pool.
     token.safeIncreaseAllowance(address(this), type(uint256).max);
   }
 
   /// @inheritdoc BurnMintTokenPoolAbstract
-  function _burn(uint256 amount) internal virtual override {
+  function _burn(
+    uint256 amount
+  ) internal virtual override {
     IBurnMintERC20(address(i_token)).burn(address(this), amount);
   }
 
   function typeAndVersion() external pure virtual override returns (string memory) {
-    return "BurnWithFromMintTokenPool 1.5.0";
+    return "BurnWithFromMintTokenPool 1.5.1";
   }
 }

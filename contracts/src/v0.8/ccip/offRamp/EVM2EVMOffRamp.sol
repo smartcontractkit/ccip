@@ -187,7 +187,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   /// @param sequenceNumber The sequence number of the message to get the execution state for.
   /// @return The current execution state of the message.
   /// @dev we use the literal number 128 because using a constant increased gas usage.
-  function getExecutionState(uint64 sequenceNumber) public view returns (Internal.MessageExecutionState) {
+  function getExecutionState(
+    uint64 sequenceNumber
+  ) public view returns (Internal.MessageExecutionState) {
     return Internal.MessageExecutionState(
       (s_executionStates[sequenceNumber / 128] >> ((sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH))
         & MESSAGE_EXECUTION_STATE_MASK
@@ -211,7 +213,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   }
 
   /// @inheritdoc IAny2EVMOffRamp
-  function getSenderNonce(address sender) external view returns (uint64 nonce) {
+  function getSenderNonce(
+    address sender
+  ) external view returns (uint64 nonce) {
     uint256 senderNonce = s_senderNonce[sender];
 
     if (senderNonce == 0) {
@@ -276,7 +280,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   /// @notice Entrypoint for execution, called by the OCR network
   /// @dev Expects an encoded ExecutionReport
   /// @dev Supplies no GasLimitOverrides as the DON will only execute with the original gas limits.
-  function _report(bytes calldata report) internal override {
+  function _report(
+    bytes calldata report
+  ) internal override {
     _execute(abi.decode(report, (Internal.ExecutionReport)), new GasLimitOverride[](0));
   }
 
@@ -540,7 +546,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   }
 
   /// @notice creates a unique hash to be used in message hashing.
-  function _metadataHash(bytes32 prefix) internal view returns (bytes32) {
+  function _metadataHash(
+    bytes32 prefix
+  ) internal view returns (bytes32) {
     return keccak256(abi.encode(prefix, i_sourceChainSelector, i_chainSelector, i_onRamp));
   }
 
@@ -570,7 +578,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   }
 
   /// @notice Sets the dynamic config. This function is called during `setOCR2Config` flow
-  function _beforeSetConfig(bytes memory onchainConfig) internal override {
+  function _beforeSetConfig(
+    bytes memory onchainConfig
+  ) internal override {
     DynamicConfig memory dynamicConfig = abi.decode(onchainConfig, (DynamicConfig));
 
     if (dynamicConfig.router == address(0)) revert ZeroAddressNotAllowed();
@@ -789,7 +799,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   // ================================================================
 
   /// @notice Reverts as this contract should not access CCIP messages
-  function ccipReceive(Client.Any2EVMMessage calldata) external pure {
+  function ccipReceive(
+    Client.Any2EVMMessage calldata
+  ) external pure {
     // solhint-disable-next-line
     revert();
   }

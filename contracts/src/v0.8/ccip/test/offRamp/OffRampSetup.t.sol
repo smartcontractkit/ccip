@@ -188,7 +188,9 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     _setupMultipleOffRampsFromConfigs(sourceChainConfigs);
   }
 
-  function _setupMultipleOffRampsFromConfigs(OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs) internal {
+  function _setupMultipleOffRampsFromConfigs(
+    OffRamp.SourceChainConfigArgs[] memory sourceChainConfigs
+  ) internal {
     s_offRamp.applySourceChainConfigUpdates(sourceChainConfigs);
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
@@ -223,7 +225,9 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
   uint32 internal constant MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS = 200_000;
   uint32 internal constant MAX_TOKEN_POOL_TRANSFER_GAS = 50_000;
 
-  function _generateDynamicOffRampConfig(address feeQuoter) internal pure returns (OffRamp.DynamicConfig memory) {
+  function _generateDynamicOffRampConfig(
+    address feeQuoter
+  ) internal pure returns (OffRamp.DynamicConfig memory) {
     return OffRamp.DynamicConfig({
       permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
       feeQuoter: feeQuoter,
@@ -463,7 +467,9 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     s_offRamp.commit(reportContext, abi.encode(commitReport), rs, ss, rawVs);
   }
 
-  function _execute(Internal.ExecutionReportSingleChain[] memory reports) internal {
+  function _execute(
+    Internal.ExecutionReportSingleChain[] memory reports
+  ) internal {
     bytes32[3] memory reportContext = [s_configDigestExec, s_configDigestExec, s_configDigestExec];
 
     vm.startPrank(s_validTransmitters[0]);
@@ -526,7 +532,9 @@ contract OffRampSetup is FeeQuoterSetup, MultiOCR3BaseSetup {
     }
   }
 
-  function _assertNoEmit(bytes32 eventSelector) internal {
+  function _assertNoEmit(
+    bytes32 eventSelector
+  ) internal {
     Vm.Log[] memory logs = vm.getRecordedLogs();
 
     for (uint256 i = 0; i < logs.length; i++) {

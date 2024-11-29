@@ -243,6 +243,7 @@ func deployTokenPoolAndRebalancer(
 		transactor,
 		client,
 		tokenAddress,
+		18,
 		[]common.Address{},
 		armProxyAddress,
 		true,

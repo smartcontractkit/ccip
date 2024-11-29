@@ -6,7 +6,9 @@ import {IRMN} from "../../interfaces/IRMN.sol";
 
 import {Test} from "forge-std/Test.sol";
 
-function makeSubjects(bytes16 a) pure returns (bytes16[] memory) {
+function makeSubjects(
+  bytes16 a
+) pure returns (bytes16[] memory) {
   bytes16[] memory subjects = new bytes16[](1);
   subjects[0] = a;
   return subjects;
@@ -20,14 +22,18 @@ function makeSubjects(bytes16 a, bytes16 b) pure returns (bytes16[] memory) {
 }
 
 // in order from earliest to latest curse ids
-function makeCursesHashFromList(bytes32[] memory curseIds) pure returns (bytes28 cursesHash) {
+function makeCursesHashFromList(
+  bytes32[] memory curseIds
+) pure returns (bytes28 cursesHash) {
   for (uint256 i = 0; i < curseIds.length; ++i) {
     cursesHash = bytes28(keccak256(abi.encode(cursesHash, curseIds[i])));
   }
 }
 
 // hides the ugliness from tests
-function makeCursesHash(bytes32 a) pure returns (bytes28) {
+function makeCursesHash(
+  bytes32 a
+) pure returns (bytes28) {
   bytes32[] memory curseIds = new bytes32[](1);
   curseIds[0] = a;
   return makeCursesHashFromList(curseIds);
@@ -102,20 +108,28 @@ contract RMNSetup is Test {
     return votes;
   }
 
-  function makeTaggedRootSingleton(uint256 index) internal pure returns (IRMN.TaggedRoot[] memory) {
+  function makeTaggedRootSingleton(
+    uint256 index
+  ) internal pure returns (IRMN.TaggedRoot[] memory) {
     return makeTaggedRootsInclusive(index, index);
   }
 
-  function makeTaggedRoot(uint256 index) internal pure returns (IRMN.TaggedRoot memory) {
+  function makeTaggedRoot(
+    uint256 index
+  ) internal pure returns (IRMN.TaggedRoot memory) {
     return makeTaggedRootSingleton(index)[0];
   }
 
-  function makeTaggedRootHash(uint256 index) internal pure returns (bytes32) {
+  function makeTaggedRootHash(
+    uint256 index
+  ) internal pure returns (bytes32) {
     IRMN.TaggedRoot memory taggedRoot = makeTaggedRootSingleton(index)[0];
     return keccak256(abi.encode(taggedRoot.commitStore, taggedRoot.root));
   }
 
-  function makeCurseId(uint256 index) internal pure returns (bytes16) {
+  function makeCurseId(
+    uint256 index
+  ) internal pure returns (bytes16) {
     return bytes16(uint128(index));
   }
 
@@ -137,7 +151,9 @@ contract RMNSetup is Test {
     return false;
   }
 
-  function getWeightOfVotesToBlessRoot(IRMN.TaggedRoot memory taggedRoot_) internal view returns (uint16) {
+  function getWeightOfVotesToBlessRoot(
+    IRMN.TaggedRoot memory taggedRoot_
+  ) internal view returns (uint16) {
     (, uint16 weight,) = s_rmn.getBlessProgress(taggedRoot_);
     return weight;
   }
