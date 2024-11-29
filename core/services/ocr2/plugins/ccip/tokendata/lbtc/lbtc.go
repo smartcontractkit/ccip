@@ -80,13 +80,6 @@ type attestationResponse struct {
 	Attestations []messageAttestationResponse `json:"attestations"`
 }
 
-type SourceTokenData struct {
-	sourcePoolAddress []byte
-	destTokenAddress  []byte
-	extraData         []byte
-	destGasAmount     uint32
-}
-
 // TODO: Implement encoding/decoding
 
 var _ tokendata.Reader = &TokenDataReader{}
@@ -206,6 +199,14 @@ func (s *TokenDataReader) getLBTCMessageBody(ctx context.Context, msg cciptypes.
 }
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, lbtcMessageHash [32]byte) (attestationResponse, error) {
+	_, _, _, err := s.httpClient.Get(ctx, "", s.attestationApiTimeout)
+	switch {
+	case errors.Is(err, tokendata.ErrRateLimit):
+		s.setCoolDownPeriod(defaultCoolDownDuration)
+		return attestationResponse{}, tokendata.ErrRateLimit
+	case err != nil:
+		return attestationResponse{}, err
+	}
 	return attestationResponse{}, nil
 }
 
