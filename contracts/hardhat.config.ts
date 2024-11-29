@@ -22,7 +22,10 @@ subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(
     const paths = await runSuper()
     const noTests = paths.filter((p: string) => !p.endsWith('.t.sol'))
     const noCCIP = noTests.filter((p: string) => !p.includes('/v0.8/ccip'))
-    return noCCIP.filter(
+    const noKeystone = noCCIP.filter(
+      (p: string) => !p.includes('/v0.8/keystone'),
+    )
+    return noKeystone.filter(
       (p: string) => !p.includes('src/v0.8/vendor/forge-std'),
     )
   },
