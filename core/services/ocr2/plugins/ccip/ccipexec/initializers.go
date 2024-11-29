@@ -121,6 +121,20 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 		}
 		tokenDataProviders[cciptypes.Address(pluginConfig.USDCConfig.SourceTokenAddress.String())] = usdcReader
 	}
+	// init lbtc token data provider
+	if pluginConfig.LBTCConfig.AttestationAPI != "" {
+		lggr.Infof("LBTC token data provider enabled")
+		err2 := pluginConfig.LBTCConfig.ValidateLBTCConfig()
+		if err2 != nil {
+			return nil, err2
+		}
+
+		lbtcReader, err2 := srcProvider.NewTokenDataReader(ctx, ccip.EvmAddrToGeneric(pluginConfig.LBTCConfig.SourceTokenAddress))
+		if err2 != nil {
+			return nil, fmt.Errorf("new usdc reader: %w", err2)
+		}
+		tokenDataProviders[cciptypes.Address(pluginConfig.LBTCConfig.SourceTokenAddress.String())] = lbtcReader
+	}
 
 	// Prom wrappers
 	onRampReader = observability.NewObservedOnRampReader(onRampReader, srcChainID, ccip.ExecPluginLabel)

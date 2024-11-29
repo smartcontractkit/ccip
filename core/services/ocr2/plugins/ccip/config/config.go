@@ -172,9 +172,5 @@ func (lc *LBTCConfig) ValidateLBTCConfig() error {
 	if lc.SourceTokenAddress == utils.ZeroAddress {
 		return errors.New("LBTCConfig: SourceTokenAddress is required")
 	}
-	if lc.SourceMessageTransmitterAddress == utils.ZeroAddress {
-		return errors.New("LBTCConfig: SourceMessageTransmitterAddress is required")
-	}
-
 	return nil
 }

@@ -2,18 +2,21 @@ package lbtc
 
 import (
 	"context"
-	"errors"
+	"crypto/sha256"
+	"fmt"
 	"net/url"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/pkg/errors"
+	"golang.org/x/time/rate"
+
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/http"
-	"golang.org/x/time/rate"
 )
 
 // TODO: double check the validty of default values for lombard's API after checking docs
@@ -55,7 +58,6 @@ var (
 
 type TokenDataReader struct {
 	lggr                  logger.Logger
-	lbtcReader            ccipdata.LBTCReader
 	httpClient            http.IHttpClient
 	attestationApi        *url.URL
 	attestationApiTimeout time.Duration
@@ -78,13 +80,19 @@ type attestationResponse struct {
 	Attestations []messageAttestationResponse `json:"attestations"`
 }
 
+type SourceTokenData struct {
+	sourcePoolAddress []byte
+	destTokenAddress  []byte
+	extraData         []byte
+	destGasAmount     uint32
+}
+
 // TODO: Implement encoding/decoding
 
 var _ tokendata.Reader = &TokenDataReader{}
 
 func NewLBTCTokenDataReader(
 	lggr logger.Logger,
-	lbtcReader ccipdata.LBTCReader,
 	lbtcAttestationApi *url.URL,
 	lbtcAttestationApiTimeoutSeconds int,
 	lbtcTokenAddress common.Address,
@@ -103,7 +111,6 @@ func NewLBTCTokenDataReader(
 
 	return &TokenDataReader{
 		lggr:                  lggr,
-		lbtcReader:            lbtcReader,
 		httpClient:            http.NewObservedIHttpClient(&http.HttpClient{}),
 		attestationApi:        lbtcAttestationApi,
 		attestationApiTimeout: timeout,
@@ -121,7 +128,6 @@ func NewLBTCTokenDataReaderWithHttpClient(
 ) *TokenDataReader {
 	return &TokenDataReader{
 		lggr:                  origin.lggr,
-		lbtcReader:            origin.lbtcReader,
 		httpClient:            httpClient,
 		attestationApi:        origin.attestationApi,
 		attestationApiTimeout: origin.attestationApiTimeout,
@@ -133,13 +139,78 @@ func NewLBTCTokenDataReaderWithHttpClient(
 
 // ReadTokenData queries the LBTC attestation API.
 func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenIndex int) ([]byte, error) {
-	// TODO: Implement
+	if tokenIndex < 0 || tokenIndex >= len(msg.TokenAmounts) {
+		return nil, fmt.Errorf("token index out of bounds")
+	}
+
+	if s.inCoolDownPeriod() {
+		// rate limiting cool-down period, we prevent new requests from being sent
+		return nil, tokendata.ErrRequestsBlocked
+	}
+
+	if s.rate != nil {
+		// Wait blocks until it the attestation API can be called or the
+		// context is Done.
+		if waitErr := s.rate.Wait(ctx); waitErr != nil {
+			return nil, fmt.Errorf("lbtc rate limiting error: %w", waitErr)
+		}
+	}
+
+	messageBody, err := s.getLBTCMessageBody(ctx, msg, tokenIndex)
+	if err != nil {
+		return []byte{}, errors.Wrap(err, "failed getting the LBTC message body")
+	}
+
+	msgID := hexutil.Encode(msg.MessageID[:])
+	messageBodyHash := sha256.Sum256(messageBody)
+	messageBodyHashHex := hexutil.Encode(messageBodyHash[:])
+	s.lggr.Infow("Calling attestation API", "messageBodyHash", messageBodyHashHex, "messageID", msgID)
+
+	attestationResp, err := s.callAttestationApi(ctx, messageBodyHash)
+	if err != nil {
+		return nil, err
+	}
+	if attestationResp.Attestations == nil || len(attestationResp.Attestations) == 0 {
+		return nil, errors.New("attestation response is empty")
+	}
+	if len(attestationResp.Attestations) > 1 {
+		s.lggr.Warnw("Multiple attestations received, expected one", "attestations", attestationResp.Attestations)
+	}
+	var attestation messageAttestationResponse
+	for _, attestationCandidate := range attestationResp.Attestations {
+		if attestationCandidate.MessageHash == messageBodyHashHex {
+			attestation = attestationCandidate
+		}
+	}
+	s.lggr.Infow("Got response from attestation API", "messageID", msgID,
+		"attestationStatus", attestation.Status, "attestation", attestation)
+	switch attestation.Status {
+	case attestationStatusSessionApproved:
+		messageAndAttestation, err := encodeMessageAndAttestation(messageBody, attestation.Attestation)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode messageAndAttestation : %w", err)
+		}
+		return messageAndAttestation, nil
+	case attestationStatusPending:
+		return nil, tokendata.ErrNotReady
+	case attestationStatusSubmitted:
+		return nil, tokendata.ErrNotReady
+	default:
+		s.lggr.Errorw("Unexpected response from attestation API", "attestation", attestation)
+		return nil, ErrUnknownResponse
+	}
+}
+
+func (s *TokenDataReader) getLBTCMessageBody(ctx context.Context, msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenIndex int) ([]byte, error) {
 	return nil, nil
 }
 
-func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (attestationResponse, error) {
-	// TODO: Implement after checking API docs
+func (s *TokenDataReader) callAttestationApi(ctx context.Context, lbtcMessageHash [32]byte) (attestationResponse, error) {
 	return attestationResponse{}, nil
+}
+
+func encodeMessageAndAttestation(messageBody []byte, attestation string) ([]byte, error) {
+	return nil, nil
 }
 
 func (s *TokenDataReader) setCoolDownPeriod(d time.Duration) {
