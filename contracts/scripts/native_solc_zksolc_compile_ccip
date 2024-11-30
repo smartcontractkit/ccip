@@ -6,7 +6,7 @@ echo " ┌───────────────────────�
 echo " │          Compiling CCIP contracts...         │"
 echo " └──────────────────────────────────────────────┘"
 
-SOLC_VERSION="0.8.24"
+SOLC_VERSION="0.8.19"
 OPTIMIZE_RUNS=26000
 OPTIMIZE_RUNS_OFFRAMP=18000
 OPTIMIZE_RUNS_ONRAMP=4100
@@ -15,7 +15,7 @@ OPTIMIZE_RUNS_MULTI_OFFRAMP=800
 
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 python3 -m pip install --require-hashes -r "$SCRIPTPATH"/requirements.txt
-solc-select install $SOLC_VERSION
+# solc-select install $SOLC_VERSION
 solc-select use $SOLC_VERSION
 export SOLC_VERSION=$SOLC_VERSION
 
@@ -87,9 +87,18 @@ compileContractZK () {
 }
 
 
+# compileContract ccip/Storage.sol
+# compileContractZK ccip/Storage.sol
 
-compileContract ccip/Storage.sol
-compileContractZK ccip/Storage.sol
+# compileContract ccip/EVMCustom.sol
+# compileContractZK ccip/EVMCustom.sol
+
+compileContract ccip/RBACTimelock.sol
+compileContractZK ccip/RBACTimelock.sol
+
+compileContract ccip/manyChainMultisig.sol
+compileContractZK ccip/manyChainMultisig.sol
+
 # Solc produces and overwrites intermediary contracts.
 # Contracts should be ordered in reverse-import-complexity-order to minimize overwrite risks.
 # compileContract ccip/offRamp/EVM2EVMOffRamp.sol
@@ -207,16 +216,17 @@ compileContractZK ccip/Storage.sol
 # compileContractZK tests/MockV3Aggregator.sol
 
 
-# SOLC_VERSION="0.8.19"
+# SOLC_VERSION="0.5.16"
 # solc-select install $SOLC_VERSION
 # solc-select use $SOLC_VERSION
 # export SOLC_VERSION=$SOLC_VERSION
+
 
 # compileContractShared () {
 #   local contract
 #   contract=$(basename "$1" ".sol")
 
-#   solc --overwrite --optimize --optimize-runs $OPTIMIZE_RUNS --metadata-hash none \
+#   solc --overwrite --optimize --optimize-runs $OPTIMIZE_RUNS \
 #       -o "$ROOT"/contracts/solc/v$SOLC_VERSION/"$contract" \
 #       --abi --bin --allow-paths "$ROOT"/contracts/src/v0.8\
 #       "$ROOT"/contracts/src/v0.8/"$1"
@@ -232,5 +242,7 @@ compileContractZK ccip/Storage.sol
 #     "$ROOT"/contracts/src/v0.8/"$1"
 # }
 
+# compileContractShared ccip/opCodes.sol
+# compileContractSharedZK ccip/opCodes.sol
 # compileContractShared shared/token/ERC677/LinkToken.sol
 # compileContractSharedZK shared/token/ERC677/LinkToken.sol
