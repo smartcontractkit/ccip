@@ -1,7 +1,6 @@
 package ccipdata
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
@@ -39,7 +38,7 @@ func (d lbtcPayload) Validate() error {
 }
 
 type LBTCReader interface {
-	GetLBTCMessageInTx(ctx context.Context, payloadHash []byte, txHash string) ([]byte, error)
+	GetLBTCMessageInTx(ctx context.Context, payloadHash [32]byte, txHash string) ([]byte, error)
 	Close() error
 }
 
@@ -83,7 +82,7 @@ func NewLBTCReaderWithCache(lggr logger.Logger, jobID string, transmitter common
 	return r, nil
 }
 
-func (r *LBTCReaderImpl) GetLBTCMessageInTx(ctx context.Context, payloadHash []byte, txHash string) ([]byte, error) {
+func (r *LBTCReaderImpl) GetLBTCMessageInTx(ctx context.Context, payloadHash [32]byte, txHash string) ([]byte, error) {
 	var lpLogs []logpoller.Log
 
 	// fetch all the lbtc logs for the provided tx hash
@@ -113,11 +112,11 @@ func (r *LBTCReaderImpl) GetLBTCMessageInTx(ctx context.Context, payloadHash []b
 	}
 	for _, log := range lpLogs {
 		topics := log.GetTopics()
-		if currentPayloadHash := topics[3]; bytes.Equal(currentPayloadHash[:], payloadHash) {
+		if currentPayloadHash := topics[3]; currentPayloadHash == payloadHash {
 			return parseLBTCDepositPayload(log.Data)
 		}
 	}
-	return nil, fmt.Errorf("payload with hash=%s not found in logs", hexutil.Encode(payloadHash))
+	return nil, fmt.Errorf("payload with hash=%s not found in logs", hexutil.Encode(payloadHash[:]))
 }
 
 func parseLBTCDepositPayload(logData []byte) ([]byte, error) {

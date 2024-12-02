@@ -1,7 +1,6 @@
 package lbtc
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -262,17 +261,23 @@ func (s *TokenDataReader) getLBTCPayloadAndHash(ctx context.Context, msg cciptyp
 	if err != nil {
 		return nil, [32]byte{}, err
 	}
-	payloadHash := decodedSourceTokenData.ExtraData
-	if len(payloadHash) != 32 {
-		s.lggr.Warnw("SourceTokenData.extraData is not 32 bytes. LBTC Attestation probably disabled onchain", "payloadHash", payloadHash)
+	destTokenData := decodedSourceTokenData.ExtraData
+	var payloadHash [32]byte
+	if len(destTokenData) != 32 {
+		payloadHash = sha256.Sum256(destTokenData)
+		s.lggr.Warnw("SourceTokenData.extraData size is not 32. It could be a LBTC payload, not LBTC payload sha256. "+
+			"Probably this message is sent when LBTC attestation was disabled onchain. Will use sha256 from this value",
+			"destTokenData", destTokenData, "newPayloadHash", payloadHash)
+	} else {
+		payloadHash = [32]byte(destTokenData)
 	}
-	payload, err := s.lbtcReader.GetLBTCMessageInTx(ctx, payloadHash, msg.TxHash)
+	actualPayload, err := s.lbtcReader.GetLBTCMessageInTx(ctx, payloadHash, msg.TxHash)
 	if err != nil {
 		return nil, [32]byte{}, err
 	}
-	actualPayloadHash := sha256.Sum256(payload)
-	if bytes.Equal(actualPayloadHash[:], payloadHash) {
-		return payload, [32]byte(payloadHash), nil
+	actualPayloadHash := sha256.Sum256(actualPayload)
+	if actualPayloadHash == payloadHash {
+		return actualPayload, payloadHash, nil
 	}
 	return nil, [32]byte{}, fmt.Errorf("payload hash mismatch: expected %x, got %x", payloadHash, actualPayloadHash)
 }

@@ -51,7 +51,7 @@ func Test_MockLogPoller(t *testing.T) {
 				LogWithPayload(t, 20, payload),
 			}, nil)
 
-		data, err := reader.GetLBTCMessageInTx(context.Background(), payloadHash[:], "0x0001")
+		data, err := reader.GetLBTCMessageInTx(context.Background(), payloadHash, "0x0001")
 		assert.NoError(t, err)
 		assert.Equal(t, payload, data)
 	})
@@ -67,7 +67,7 @@ func Test_MockLogPoller(t *testing.T) {
 				LogWithPayload(t, 30, []byte("0x2222")),
 			}, nil)
 
-		data, err := reader.GetLBTCMessageInTx(context.Background(), payloadHash[:], "0x0001")
+		data, err := reader.GetLBTCMessageInTx(context.Background(), payloadHash, "0x0001")
 		assert.NoError(t, err)
 		assert.Equal(t, payload, data)
 	})
@@ -82,7 +82,7 @@ func Test_MockLogPoller(t *testing.T) {
 				LogWithPayload(t, 30, []byte("0x2222")),
 			}, nil)
 
-		data, err := reader.GetLBTCMessageInTx(context.Background(), payloadHash[:], "0x0001")
+		data, err := reader.GetLBTCMessageInTx(context.Background(), payloadHash, "0x0001")
 		assert.Nil(t, data)
 		assert.Errorf(t, err, "payload with hash=%s not found in logs", payloadHash)
 	})
@@ -94,7 +94,7 @@ func Test_MockLogPoller(t *testing.T) {
 		lp.On("IndexedLogsByTxHash", mock.Anything, reader.eventID, reader.transmitterAddress, mock.Anything).
 			Return([]logpoller.Log{}, nil)
 
-		data, err := reader.GetLBTCMessageInTx(context.Background(), payloadHash[:], "0x0001")
+		data, err := reader.GetLBTCMessageInTx(context.Background(), payloadHash, "0x0001")
 		assert.Nil(t, data)
 		assert.Errorf(t, err, "payload with hash=%s not found in logs", payloadHash)
 	})
@@ -105,7 +105,7 @@ func Test_MockLogPoller(t *testing.T) {
 		require.NoError(t, err)
 		r, err := NewLBTCReaderWithCache(lggr, "job_1", utils.RandomAddress(), nil, rCache, false)
 		require.NoError(t, err)
-		data, err := r.GetLBTCMessageInTx(context.Background(), payloadHash[:], "0x0001")
+		data, err := r.GetLBTCMessageInTx(context.Background(), payloadHash, "0x0001")
 		assert.NoError(t, err)
 		assert.Equal(t, payload, data)
 	})
@@ -146,7 +146,7 @@ func Test_SimulatedLogPoller_FoundMultiple(t *testing.T) {
 	reader, err := NewLBTCReader(lggr, "job_1", transmitter, lp, true)
 	require.NoError(t, err)
 
-	data, err := reader.GetLBTCMessageInTx(context.Background(), payloadHash[:], common.Hash{}.Hex())
+	data, err := reader.GetLBTCMessageInTx(context.Background(), payloadHash, common.Hash{}.Hex())
 	assert.NoError(t, err)
 	assert.Equal(t, payload, data)
 }
