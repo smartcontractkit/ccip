@@ -1,8 +1,10 @@
 package lbtc
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"sync"
@@ -79,6 +81,10 @@ type messageAttestationResponse struct {
 }
 
 // TODO: Adjust after checking API docs
+type attestationRequest struct {
+	PayloadHashes []string `json:"messageHash"`
+}
+
 type attestationResponse struct {
 	Attestations []messageAttestationResponse `json:"attestations"`
 }
@@ -283,7 +289,14 @@ func (s *TokenDataReader) getLBTCPayloadAndHash(ctx context.Context, msg cciptyp
 }
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, lbtcMessageHash [32]byte) (attestationResponse, error) {
-	_, _, _, err := s.httpClient.Get(ctx, "", s.attestationApiTimeout)
+	attestationUrl := fmt.Sprintf("%s/bridge/%s/%s", s.attestationApi.String(), apiVersion, attestationPath)
+	request := attestationRequest{PayloadHashes: []string{hexutil.Encode(lbtcMessageHash[:])}}
+	encodedRequest, err := json.Marshal(request)
+	requestBuffer := bytes.NewBuffer(encodedRequest)
+	if err != nil {
+		return attestationResponse{}, err
+	}
+	respRaw, _, _, err := s.httpClient.Post(ctx, attestationUrl, requestBuffer, s.attestationApiTimeout)
 	switch {
 	case errors.Is(err, tokendata.ErrRateLimit):
 		s.setCoolDownPeriod(defaultCoolDownDuration)
@@ -291,7 +304,9 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, lbtcMessageHas
 	case err != nil:
 		return attestationResponse{}, err
 	}
-	return attestationResponse{}, nil
+	var attestationResp attestationResponse
+	err = json.Unmarshal(respRaw, &attestationResp)
+	return attestationResp, err
 }
 
 func encodePayloadAndProof(payload []byte, attestation string) ([]byte, error) {
