@@ -12,8 +12,11 @@ import (
 )
 
 type IHttpClient interface {
-	// Get issue a GET request to the given url and return the response body and status code.
+	// Get issues a GET request to the given url and returns the response body and status code.
 	Get(ctx context.Context, url string, timeout time.Duration) ([]byte, int, http.Header, error)
+
+	// Post issues a POST request to the given url with the given request data and returns the response body and status code.
+	Post(ctx context.Context, url string, requestData io.Reader, timeout time.Duration) ([]byte, int, http.Header, error)
 }
 
 type HttpClient struct {
@@ -45,4 +48,9 @@ func (s *HttpClient) Get(ctx context.Context, url string, timeout time.Duration)
 
 	body, err := io.ReadAll(res.Body)
 	return body, res.StatusCode, res.Header, err
+}
+
+func (s *HttpClient) Post(ctx context.Context, url string, requestData io.Reader, timeout time.Duration) ([]byte, int, http.Header, error) {
+	// TODO: Implement
+	return nil, 0, nil, nil
 }
