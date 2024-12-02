@@ -131,7 +131,7 @@ func NewExecServices(ctx context.Context, lggr logger.Logger, jb job.Job, srcPro
 
 		lbtcReader, err2 := srcProvider.NewTokenDataReader(ctx, ccip.EvmAddrToGeneric(pluginConfig.LBTCConfig.SourceTokenAddress))
 		if err2 != nil {
-			return nil, fmt.Errorf("new usdc reader: %w", err2)
+			return nil, fmt.Errorf("new lbtc reader: %w", err2)
 		}
 		tokenDataProviders[cciptypes.Address(pluginConfig.LBTCConfig.SourceTokenAddress.String())] = lbtcReader
 	}

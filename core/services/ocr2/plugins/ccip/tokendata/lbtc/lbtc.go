@@ -18,7 +18,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/http"
 )
@@ -65,7 +64,6 @@ type TokenDataReader struct {
 	httpClient            http.IHttpClient
 	attestationApi        *url.URL
 	attestationApiTimeout time.Duration
-	lbtcReader            ccipdata.LBTCReader
 	lbtcTokenAddress      common.Address
 	rate                  *rate.Limiter
 
@@ -77,7 +75,7 @@ type TokenDataReader struct {
 type messageAttestationResponse struct {
 	MessageHash string            `json:"message_hash"`
 	Status      attestationStatus `json:"status"`
-	Attestation string            `json:"attestation"`
+	Attestation string            `json:"attestation"` // Attestation represented by abi.encode(payload, proof)
 }
 
 // TODO: Adjust after checking API docs
@@ -123,37 +121,10 @@ func (m sourceTokenData) Validate() error {
 	return nil
 }
 
-type payloadAndProof struct {
-	Payload []byte
-	Proof   []byte
-}
-
-func (m payloadAndProof) AbiString() string {
-	return `
-	[{
-		"components": [
-			{"name": "payload", "type": "bytes"},
-			{"name": "proof", "type": "bytes"}
-		],
-		"type": "tuple"
-	}]`
-}
-
-func (m payloadAndProof) Validate() error {
-	if len(m.Payload) == 0 {
-		return errors.New("payload must be non-empty")
-	}
-	if len(m.Proof) == 0 {
-		return errors.New("proof must be non-empty")
-	}
-	return nil
-}
-
 var _ tokendata.Reader = &TokenDataReader{}
 
 func NewLBTCTokenDataReader(
 	lggr logger.Logger,
-	lbtcReader ccipdata.LBTCReader,
 	lbtcAttestationApi *url.URL,
 	lbtcAttestationApiTimeoutSeconds int,
 	lbtcTokenAddress common.Address,
@@ -175,7 +146,6 @@ func NewLBTCTokenDataReader(
 		httpClient:            http.NewObservedIHttpClient(&http.HttpClient{}),
 		attestationApi:        lbtcAttestationApi,
 		attestationApiTimeout: timeout,
-		lbtcReader:            lbtcReader,
 		lbtcTokenAddress:      lbtcTokenAddress,
 		coolDownMu:            &sync.RWMutex{},
 		rate:                  rate.NewLimiter(rate.Every(requestInterval), 1),
@@ -218,7 +188,7 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg cciptypes.EVM2E
 		}
 	}
 
-	payload, payloadHash, err := s.getLBTCPayloadAndHash(ctx, msg, tokenIndex)
+	payloadHash, err := s.getLBTCPayloadHash(msg, tokenIndex)
 	if err != nil {
 		return []byte{}, errors.Wrap(err, "failed getting the LBTC message body")
 	}
@@ -247,9 +217,9 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg cciptypes.EVM2E
 		"attestationStatus", attestation.Status, "attestation", attestation)
 	switch attestation.Status {
 	case attestationStatusSessionApproved:
-		payloadAndProof, err := encodePayloadAndProof(payload, attestation.Attestation)
+		payloadAndProof, err := hexutil.Decode(attestation.Attestation)
 		if err != nil {
-			return nil, fmt.Errorf("failed to encode payloadAndProof : %w", err)
+			return nil, err
 		}
 		return payloadAndProof, nil
 	case attestationStatusPending:
@@ -262,30 +232,25 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg cciptypes.EVM2E
 	}
 }
 
-func (s *TokenDataReader) getLBTCPayloadAndHash(ctx context.Context, msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenIndex int) ([]byte, [32]byte, error) {
+func (s *TokenDataReader) getLBTCPayloadHash(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenIndex int) ([32]byte, error) {
 	decodedSourceTokenData, err := abihelpers.DecodeAbiStruct[sourceTokenData](msg.SourceTokenData[tokenIndex])
 	if err != nil {
-		return nil, [32]byte{}, err
+		return [32]byte{}, err
 	}
 	destTokenData := decodedSourceTokenData.ExtraData
 	var payloadHash [32]byte
+	// We don't have better way to determine if the extraData is a payload or sha256(payload)
+	// Last parameter of the payload struct is 32-bytes nonce (see Lombard's Bridge._deposit(...) method),
+	// so we can assume that payload always exceeds 32 bytes
 	if len(destTokenData) != 32 {
 		payloadHash = sha256.Sum256(destTokenData)
-		s.lggr.Warnw("SourceTokenData.extraData size is not 32. It could be a LBTC payload, not LBTC payload sha256. "+
-			"Probably this message is sent when LBTC attestation was disabled onchain. Will use sha256 from this value",
+		s.lggr.Warnw("SourceTokenData.extraData size is not 32. Probably this is deposit payload, not sha256(payload). "+
+			"This message was sent when LBTC attestation was disabled onchain. Will use sha256 from this value",
 			"destTokenData", destTokenData, "newPayloadHash", payloadHash)
 	} else {
 		payloadHash = [32]byte(destTokenData)
 	}
-	actualPayload, err := s.lbtcReader.GetLBTCMessageInTx(ctx, payloadHash, msg.TxHash)
-	if err != nil {
-		return nil, [32]byte{}, err
-	}
-	actualPayloadHash := sha256.Sum256(actualPayload)
-	if actualPayloadHash == payloadHash {
-		return actualPayload, payloadHash, nil
-	}
-	return nil, [32]byte{}, fmt.Errorf("payload hash mismatch: expected %x, got %x", payloadHash, actualPayloadHash)
+	return payloadHash, nil
 }
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, lbtcMessageHash [32]byte) (attestationResponse, error) {
@@ -307,17 +272,6 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, lbtcMessageHas
 	var attestationResp attestationResponse
 	err = json.Unmarshal(respRaw, &attestationResp)
 	return attestationResp, err
-}
-
-func encodePayloadAndProof(payload []byte, attestation string) ([]byte, error) {
-	proofBytes, err := hexutil.Decode(attestation)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode response attestation: %w", err)
-	}
-	return abihelpers.EncodeAbiStruct[payloadAndProof](payloadAndProof{
-		Payload: payload,
-		Proof:   proofBytes,
-	})
 }
 
 func (s *TokenDataReader) setCoolDownPeriod(d time.Duration) {
