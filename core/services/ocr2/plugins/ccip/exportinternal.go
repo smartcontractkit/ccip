@@ -112,10 +112,6 @@ func NewLBTCReader(lggr logger.Logger, jobID string, transmitter common.Address,
 	return ccipdata.NewLBTCReader(lggr, jobID, transmitter, lp, registerFilters)
 }
 
-func CloseLBTCReader(lggr logger.Logger, jobID string, transmitter common.Address, lp logpoller.LogPoller) error {
-	return ccipdata.CloseLBTCReader(lggr, jobID, transmitter, lp)
-}
-
 type USDCReaderImpl = ccipdata.USDCReaderImpl
 type LBTCReaderImpl = ccipdata.LBTCReaderImpl
 

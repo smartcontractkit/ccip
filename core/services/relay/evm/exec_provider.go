@@ -131,7 +131,7 @@ func (s *SrcExecProvider) Close() error {
 		if s.lbtcConfig.AttestationAPI == "" {
 			return nil
 		}
-		return ccip.CloseLBTCReader(s.lggr, s.lggr.Name(), s.lbtcConfig.SourceMessageTransmitterAddress, s.lp)
+		return s.lbtcReader.Close()
 	})
 	var multiErr error
 	for _, fn := range unregisterFuncs {
@@ -233,6 +233,7 @@ func (s *SrcExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress c
 		}
 		return lbtc.NewLBTCTokenDataReader(
 			s.lggr,
+			s.lbtcReader,
 			attestationURI,
 			int(s.lbtcConfig.AttestationAPITimeoutSeconds),
 			tokenAddr,
