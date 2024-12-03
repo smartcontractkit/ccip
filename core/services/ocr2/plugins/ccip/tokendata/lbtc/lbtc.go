@@ -34,8 +34,8 @@ const (
 	maxCoolDownDuration = 10 * time.Minute
 
 	// defaultRequestInterval defines the rate in requests per second that the attestation API can be called.
-	// this is set according to the APIs recommended 1 request per second rate limit.
-	defaultRequestInterval = 1000 * time.Millisecond
+	// this is set according to the APIs recommended 5 requests per second rate limit.
+	defaultRequestInterval = 200 * time.Millisecond
 
 	// APIIntervalRateLimitDisabled is a special value to disable the rate limiting.
 	APIIntervalRateLimitDisabled = -1
