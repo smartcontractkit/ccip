@@ -22,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/http"
 )
 
-// TODO: double check the validty of default values for lombard's API after checking docs
 const (
 	apiVersion                = "v1"
 	attestationPath           = "deposits/getByHash"
@@ -36,8 +35,8 @@ const (
 	maxCoolDownDuration = 10 * time.Minute
 
 	// defaultRequestInterval defines the rate in requests per second that the attestation API can be called.
-	// this is set according to the APIs documentated 10 requests per second rate limit.
-	defaultRequestInterval = 100 * time.Millisecond
+	// this is set according to the APIs recommended 1 request per second rate limit.
+	defaultRequestInterval = 1000 * time.Millisecond
 
 	// APIIntervalRateLimitDisabled is a special value to disable the rate limiting.
 	APIIntervalRateLimitDisabled = -1
@@ -75,10 +74,9 @@ type TokenDataReader struct {
 type messageAttestationResponse struct {
 	MessageHash string            `json:"message_hash"`
 	Status      attestationStatus `json:"status"`
-	Attestation string            `json:"attestation"` // Attestation represented by abi.encode(payload, proof)
+	Attestation string            `json:"attestation,omitempty"` // Attestation represented by abi.encode(payload, proof)
 }
 
-// TODO: Adjust after checking API docs
 type attestationRequest struct {
 	PayloadHashes []string `json:"messageHash"`
 }
@@ -86,8 +84,6 @@ type attestationRequest struct {
 type attestationResponse struct {
 	Attestations []messageAttestationResponse `json:"attestations"`
 }
-
-// TODO: Implement encoding/decoding
 
 type sourceTokenData struct {
 	SourcePoolAddress []byte
