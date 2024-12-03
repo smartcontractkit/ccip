@@ -39,7 +39,6 @@ type SrcExecProvider struct {
 	maxGasPrice   *big.Int
 	usdcReader    *ccip.USDCReaderImpl
 	usdcConfig    config.USDCConfig
-	lbtcReader    *ccip.LBTCReaderImpl
 	lbtcConfig    config.LBTCConfig
 
 	feeEstimatorConfig estimatorconfig.FeeEstimatorConfigProvider
@@ -73,13 +72,6 @@ func NewSrcExecProvider(
 			return nil, fmt.Errorf("new usdc reader: %w", err)
 		}
 	}
-	var lbtcReader *ccip.LBTCReaderImpl
-	if lbtcConfig.AttestationAPI != "" {
-		lbtcReader, err = ccip.NewLBTCReader(lggr, jobID, lbtcConfig.SourceMessageTransmitterAddress, lp, true)
-		if err != nil {
-			return nil, fmt.Errorf("new usdc reader: %w", err)
-		}
-	}
 
 	return &SrcExecProvider{
 		lggr:               lggr,
@@ -91,7 +83,6 @@ func NewSrcExecProvider(
 		startBlock:         startBlock,
 		usdcReader:         usdcReader,
 		usdcConfig:         usdcConfig,
-		lbtcReader:         lbtcReader,
 		lbtcConfig:         lbtcConfig,
 		feeEstimatorConfig: feeEstimatorConfig,
 	}, nil
@@ -126,12 +117,6 @@ func (s *SrcExecProvider) Close() error {
 			return nil
 		}
 		return ccip.CloseUSDCReader(s.lggr, s.lggr.Name(), s.usdcConfig.SourceMessageTransmitterAddress, s.lp)
-	})
-	unregisterFuncs = append(unregisterFuncs, func() error {
-		if s.lbtcConfig.AttestationAPI == "" {
-			return nil
-		}
-		return ccip.CloseLBTCReader(s.lggr, s.lggr.Name(), s.lbtcConfig.SourceMessageTransmitterAddress, s.lp)
 	})
 	var multiErr error
 	for _, fn := range unregisterFuncs {

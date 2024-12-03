@@ -108,16 +108,7 @@ func CloseUSDCReader(lggr logger.Logger, jobID string, transmitter common.Addres
 	return ccipdata.CloseUSDCReader(lggr, jobID, transmitter, lp)
 }
 
-func NewLBTCReader(lggr logger.Logger, jobID string, transmitter common.Address, lp logpoller.LogPoller, registerFilters bool) (*ccipdata.LBTCReaderImpl, error) {
-	return ccipdata.NewLBTCReader(lggr, jobID, transmitter, lp, registerFilters)
-}
-
-func CloseLBTCReader(lggr logger.Logger, jobID string, transmitter common.Address, lp logpoller.LogPoller) error {
-	return ccipdata.CloseLBTCReader(lggr, jobID, transmitter, lp)
-}
-
 type USDCReaderImpl = ccipdata.USDCReaderImpl
-type LBTCReaderImpl = ccipdata.LBTCReaderImpl
 
 var DefaultRpcBatchSizeLimit = rpclib.DefaultRpcBatchSizeLimit
 var DefaultRpcBatchBackOffMultiplier = rpclib.DefaultRpcBatchBackOffMultiplier

@@ -121,10 +121,9 @@ type USDCConfig struct {
 }
 
 type LBTCConfig struct {
-	SourceTokenAddress              common.Address
-	SourceMessageTransmitterAddress common.Address
-	AttestationAPI                  string
-	AttestationAPITimeoutSeconds    uint
+	SourceTokenAddress           common.Address
+	AttestationAPI               string
+	AttestationAPITimeoutSeconds uint
 	// AttestationAPIIntervalMilliseconds can be set to -1 to disable or 0 to use a default interval.
 	AttestationAPIIntervalMilliseconds int
 }
