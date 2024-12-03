@@ -3,7 +3,6 @@ package lbtc
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -188,10 +187,20 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg cciptypes.EVM2E
 		}
 	}
 
-	payloadHash, err := s.getLBTCPayloadHash(msg, tokenIndex)
+	decodedSourceTokenData, err := abihelpers.DecodeAbiStruct[sourceTokenData](msg.SourceTokenData[tokenIndex])
 	if err != nil {
-		return []byte{}, errors.Wrap(err, "failed getting the LBTC message body")
+		return []byte{}, err
 	}
+	destTokenData := decodedSourceTokenData.ExtraData
+	// We don't have better way to determine if the extraData is a payload or sha256(payload)
+	// Last parameter of the payload struct is 32-bytes nonce (see Lombard's Bridge._deposit(...) method),
+	// so we can assume that payload always exceeds 32 bytes
+	if len(destTokenData) != 32 {
+		s.lggr.Infow("SourceTokenData.extraData size is not 32. This is deposit payload, not sha256(payload). Attestation is disabled onchain",
+			"destTokenData", hexutil.Encode(destTokenData))
+		return destTokenData, nil
+	}
+	payloadHash := [32]byte(destTokenData)
 
 	msgID := hexutil.Encode(msg.MessageID[:])
 	payloadHashHex := hexutil.Encode(payloadHash[:])
@@ -213,6 +222,9 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg cciptypes.EVM2E
 			attestation = attestationCandidate
 		}
 	}
+	if attestation == (messageAttestationResponse{}) {
+		return nil, fmt.Errorf("requested attestation %s not found in response", payloadHashHex)
+	}
 	s.lggr.Infow("Got response from attestation API", "messageID", msgID,
 		"attestationStatus", attestation.Status, "attestation", attestation)
 	switch attestation.Status {
@@ -230,27 +242,6 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg cciptypes.EVM2E
 		s.lggr.Errorw("Unexpected response from attestation API", "attestation", attestation)
 		return nil, ErrUnknownResponse
 	}
-}
-
-func (s *TokenDataReader) getLBTCPayloadHash(msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenIndex int) ([32]byte, error) {
-	decodedSourceTokenData, err := abihelpers.DecodeAbiStruct[sourceTokenData](msg.SourceTokenData[tokenIndex])
-	if err != nil {
-		return [32]byte{}, err
-	}
-	destTokenData := decodedSourceTokenData.ExtraData
-	var payloadHash [32]byte
-	// We don't have better way to determine if the extraData is a payload or sha256(payload)
-	// Last parameter of the payload struct is 32-bytes nonce (see Lombard's Bridge._deposit(...) method),
-	// so we can assume that payload always exceeds 32 bytes
-	if len(destTokenData) != 32 {
-		payloadHash = sha256.Sum256(destTokenData)
-		s.lggr.Warnw("SourceTokenData.extraData size is not 32. Probably this is deposit payload, not sha256(payload). "+
-			"This message was sent when LBTC attestation was disabled onchain. Will use sha256 from this value",
-			"destTokenData", destTokenData, "newPayloadHash", payloadHash)
-	} else {
-		payloadHash = [32]byte(destTokenData)
-	}
-	return payloadHash, nil
 }
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, lbtcMessageHash [32]byte) (attestationResponse, error) {
