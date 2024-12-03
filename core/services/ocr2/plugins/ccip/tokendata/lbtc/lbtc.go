@@ -216,13 +216,13 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg cciptypes.EVM2E
 	if len(attestationResp.Attestations) > 1 {
 		s.lggr.Warnw("Multiple attestations received, expected one", "attestations", attestationResp.Attestations)
 	}
-	var attestation *messageAttestationResponse
+	var attestation messageAttestationResponse
 	for _, attestationCandidate := range attestationResp.Attestations {
 		if attestationCandidate.MessageHash == payloadHashHex {
-			attestation = &attestationCandidate
+			attestation = attestationCandidate
 		}
 	}
-	if attestation == nil {
+	if attestation == (messageAttestationResponse{}) {
 		return nil, fmt.Errorf("requested attestation %s not found in response", payloadHashHex)
 	}
 	s.lggr.Infow("Got response from attestation API", "messageID", msgID,
