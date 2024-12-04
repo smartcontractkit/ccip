@@ -283,6 +283,7 @@ type CCIPTestGroupConfig struct {
 	MaxNoOfLanes                               int                                   `toml:",omitempty"`
 	ChaosDuration                              *config.Duration                      `toml:",omitempty"`
 	USDCMockDeployment                         *bool                                 `toml:",omitempty"`
+	LBTCMockDeployment                         *bool                                 `toml:",omitempty"`
 	CommitOCRParams                            *contracts.OffChainAggregatorV2Config `toml:",omitempty"`
 	ExecOCRParams                              *contracts.OffChainAggregatorV2Config `toml:",omitempty"`
 	OffRampConfig                              *OffRampConfig                        `toml:",omitempty"`

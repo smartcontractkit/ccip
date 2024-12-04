@@ -262,7 +262,7 @@ NoOfSendsInMulticall = 5 # if MulticallInOneTx=true , this denotes the number of
 
 NoOfNetworks = 2 # this is used with Networks in `CCIP.Env`, `NoOfNetworks < len(CCIP.Env.Networks)` test only uses first NoOfNetworks from` CCIP.Env.Networks`.
 # This value is ignored if CCIP.Groups.<TestGroup>.NetworkPairs is provided
-
+LBTCMockDeployment = true
 
 [CCIP.Groups.smoke.MsgDetails]
 MsgType = 'DataWithToken' # type of message to be sent, either 'Token' or 'DataWithToken' Or 'Data'
