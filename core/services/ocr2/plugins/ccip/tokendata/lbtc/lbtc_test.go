@@ -14,8 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/test-go/testify/assert"
 	"go.uber.org/zap/zapcore"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
