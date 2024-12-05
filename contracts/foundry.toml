@@ -11,10 +11,15 @@ libs = ['node_modules']
 bytecode_hash = "none"
 ffi = false
 
+
+
 # default is zero, using a non-zero amount enables us to test e.g. billing based on gas prices.
 gas_price = 1
 block_timestamp = 1234567890
 block_number = 12345
+
+[etherscan]
+base = { chain = 84532, key = "EKGEZWKTMIKZE7WWE5EYGY8ATB2ED4K5U8", url = "https://api-sepolia.basescan.org/api" }
 
 [fmt]
 tab_width = 2

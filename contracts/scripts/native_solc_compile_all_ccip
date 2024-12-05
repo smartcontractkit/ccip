@@ -100,5 +100,7 @@ compileContract ccip/interfaces/encodingutils/ICCIPEncodingUtils.sol
 
 # Customer contracts
 compileContract ccip/pools/USDC/USDCTokenPool.sol
+compileContract ccip/pools/LBTC/adapters/CLAdapter.sol
+compileContract ccip/pools/LBTC/adapters/LombardTokenPool.sol
 
 compileContract tests/MockV3Aggregator.sol
