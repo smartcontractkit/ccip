@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"math/big"
 	"net/http"
 	"runtime"
@@ -932,7 +931,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 					if err != nil {
 						return fmt.Errorf("granting minter role to token transmitter shouldn't fail %w", err)
 					}
-				} else if ccipModule.IsLBTCDeployment() && i == 0 {
+				} else if ccipModule.IsLBTCDeployment() && i == 1 {
 					// if it's LBTC deployment, we deploy the burn mint token 677 with decimal 8 and cast it to ERC20Token
 					lbtcToken, err := ccipModule.tokenDeployer.DeployCustomBurnMintERC677Token("Lombard LBTC", "LBTC", uint8(18), new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
 					if err != nil {
@@ -1006,7 +1005,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 				}
 
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, usdcPool)
-			} else if ccipModule.IsLBTCDeployment() && i == 0 {
+			} else if ccipModule.IsLBTCDeployment() && i == 1 {
 				lbtcPool, err := ccipModule.tokenDeployer.DeployBurnAndMintTokenPoolContract(token.Address(), *ccipModule.RMNContract, ccipModule.Router.Instance.Address())
 				if err != nil {
 					return fmt.Errorf("deploying burn and mint bridge Token pool(lbtc) shouldn't fail %w", err)
@@ -3760,12 +3759,20 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		}
 	}
 	if !lane.Source.Common.ExistingDeployment && lane.Source.Common.IsLBTCDeployment() {
-		api := "/bridge/v1/deposits/getByHash"
-		url := "http://localhost:8080" + api //framework.HostDockerInternal() +
+		api := ""
+		if killgrave != nil {
+			api = killgrave.InternalEndpoint
+		}
+		if env.MockServer != nil {
+			api = env.MockServer.Config.ClusterURL
+		}
+		if lane.Source.Common.TokenTransmitter == nil {
+			return fmt.Errorf("token transmitter address not set")
+		}
 		// Only one LBTC allowed per chain
 		jobParams.LBTCConfig = &config.LBTCConfig{
 			SourceTokenAddress:           common.HexToAddress(lane.Source.Common.BridgeTokens[0].Address()),
-			AttestationAPI:               url,
+			AttestationAPI:               api,
 			AttestationAPITimeoutSeconds: 5,
 		}
 	}
@@ -4459,56 +4466,43 @@ func SetMockServerWithUSDCAttestation(
 
 // SetMockServerWithLBTCAttestation responds with a mock attestation for any msgHash
 // The path is set with regex to match any path that starts with /v1/attestations
-func SetMockServerWithLBTCAttestation() error {
-	apiPath := "/bridge/v1/deposits/getByHash"
-	service := gin.Default()
-	//Service.Use(recordMiddleware())
-	go func() {
-		_ = service.Run("http://localhost:8080")
-	}()
-	//out := &Output{
-	//	BaseURLHost:   fmt.Sprintf("http://localhost:%d", in.Port),
-	//	BaseURLDocker: fmt.Sprintf("%s:%d", framework.HostDockerInternal(), in.Port),
-	//}
-	//in.Out = out
-	//return out, nil
-	//out, err := fake.NewFakeDataProvider(cfg)
-	//if err != nil {
-	//	return fmt.Errorf("failed to create fake data provider: %w", err)
-	//}
-	path := "" + apiPath //out.BaseURLDocker + apiPath
-	method := "POST"
-	service.Handle(method, path, func(c *gin.Context) {
-		var requestBody struct {
-			MessageHashes []string `json:"messageHash"`
-		}
-		if err := c.ShouldBindJSON(&requestBody); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
-			return
-		}
-
-		// You can log the request body or process it if needed
-		fmt.Println("Received messageHash:", requestBody.MessageHashes[0])
-
-		// Mock response body based on the request
-		mockResponse := gin.H{
-			"attestations": []map[string]any{
-				{
-					"message_hash": requestBody.MessageHashes[0],
-					"status":       "NOTARIZATION_STATUS_SESSION_APPROVED",
-					"attestation":  "0x0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000000e45c70a5050000000000000000000000000000000000000000000000000000000000aa36a7000000000000000000000000845f8e3c214d8d0e4d83fc094f302aa26a12a0bc0000000000000000000000000000000000000000000000000000000000014a34000000000000000000000000845f8e3c214d8d0e4d83fc094f302aa26a12a0bc00000000000000000000000062f10ce5b727edf787ea45776bd050308a61150800000000000000000000000000000000000000000000000000000000000003e60000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000040277eeafba008d767c2636d9428f2ebb13ab29ac70337f4fc34b0f5606767cae546f9be3f12160de6d142e5b3c1c3ebd0bf4298662b32b597d0cc5970c7742fc10000000000000000000000000000000000000000000000000000000000000040bbcd60ecc9e06f2effe7c94161219498a1eb435b419387adadb86ec9a52dfb066ce027532517df7216404049d193a25b85c35edfa3e7c5aa4757bfe84887a3980000000000000000000000000000000000000000000000000000000000000040da4a6dc619b5ca2349783cabecc4efdbc910090d3e234d7b8d0430165f8fae532f9a965ceb85c18bb92e059adefa7ce5835850a705761ab9e026d2db4a13ef9a",
-				},
+func SetMockServerWithLBTCAttestation(
+	killGrave *ctftestenv.Killgrave,
+	mockserver *ctfClient.MockserverClient,
+) error {
+	path := "/bridge/v1/deposits/getByHash"
+	type attestation struct {
+		Status      string `json:"status"`
+		Attestation string `json:"attestation"`
+		MessageHash string `json:"message_hash"`
+	}
+	response := struct {
+		Attestations []attestation `json:"attestations"`
+	}{
+		Attestations: []attestation{
+			{
+				MessageHash: "5AAA501FD250E0C88C655C19836A6D71465E908492C5B17C5D8D0260BE905AE9", //sample hash
+				Status:      "NOTARIZATION_STATUS_SESSION_APPROVED",
+				Attestation: "0x0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000000e45c70a5050000000000000000000000000000000000000000000000000000000000aa36a7000000000000000000000000845f8e3c214d8d0e4d83fc094f302aa26a12a0bc0000000000000000000000000000000000000000000000000000000000014a34000000000000000000000000845f8e3c214d8d0e4d83fc094f302aa26a12a0bc00000000000000000000000062f10ce5b727edf787ea45776bd050308a61150800000000000000000000000000000000000000000000000000000000000003e60000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000040277eeafba008d767c2636d9428f2ebb13ab29ac70337f4fc34b0f5606767cae546f9be3f12160de6d142e5b3c1c3ebd0bf4298662b32b597d0cc5970c7742fc10000000000000000000000000000000000000000000000000000000000000040bbcd60ecc9e06f2effe7c94161219498a1eb435b419387adadb86ec9a52dfb066ce027532517df7216404049d193a25b85c35edfa3e7c5aa4757bfe84887a3980000000000000000000000000000000000000000000000000000000000000040da4a6dc619b5ca2349783cabecc4efdbc910090d3e234d7b8d0430165f8fae532f9a965ceb85c18bb92e059adefa7ce5835850a705761ab9e026d2db4a13ef9a",
 			},
-		}
-
-		// Return the mocked response
-		c.JSON(http.StatusOK, mockResponse)
-	},
-	)
-	//if err != nil {
-	//	return fmt.Errorf("failed to create mock response: %w", err)
-	//}
+		},
+	}
+	if killGrave == nil && mockserver == nil {
+		return fmt.Errorf("both killgrave and mockserver are nil")
+	}
 	log.Info().Str("path", path).Msg("setting attestation-api response for any msgHash")
+	if killGrave != nil {
+		err := killGrave.SetAnyValueResponse(path, []string{http.MethodPost}, response)
+		if err != nil {
+			return fmt.Errorf("failed to set killgrave server value: %w", err)
+		}
+	}
+	if mockserver != nil {
+		err := mockserver.SetAnyValueResponse(path, response)
+		if err != nil {
+			return fmt.Errorf("failed to set mockserver value: %w URL = %s", err, fmt.Sprintf("%s/%s/.*", mockserver.LocalURL(), path))
+		}
+	}
 	return nil
 }
 
