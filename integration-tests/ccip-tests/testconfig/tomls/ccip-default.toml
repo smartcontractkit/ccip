@@ -231,7 +231,7 @@ EIP1559FeeCapBufferBlocks = 0
 
 # Run by default using latest version from `ccip-develop` branch, override this value to use a specific version
 [CCIP.Env.NewCLCluster.Common.ChainlinkImage]
-version = "ccip-develop"
+version = "latest"
 
 # the following configs are specific to each test type, smoke, load , chaos, etc...
 [CCIP.Groups]
@@ -268,7 +268,7 @@ LBTCMockDeployment = true
 MsgType = 'DataWithToken' # type of message to be sent, either 'Token' or 'DataWithToken' Or 'Data'
 DestGasLimit = 100000     # change this to 0 gas limit if you are doing ccip-send to an EOA
 DataLength = 1000         # length of the data to be sent in ccip message if MsgType = 'Data'/'DataWithToken'
-NoOfTokens = 2            # number of bridge tokens to be sent in ccip message if MsgType = 'Token'/'DataWithToken'
+NoOfTokens = 1            # number of bridge tokens to be sent in ccip message if MsgType = 'Token'/'DataWithToken'
 AmountPerToken = 1        # amount to be sent for each bridge token in ccip message if MsgType = 'Token'/'DataWithToken'
 
 [CCIP.Groups.smoke.TokenConfig]
@@ -276,8 +276,8 @@ TimeoutForPriceUpdate = '15m' # Duration to wait for the price update to time-ou
 # Now testing only with dynamic price getter (no pipeline).
 # Could be removed once the pipeline is completely removed.
 WithPipeline = false
-NoOfTokensPerChain = 2  # number of bridge tokens to be deployed per network; if MsgType = 'Token'/'DataWithToken'
-CCIPOwnerTokens = false # if true, the test will use deploy the tokens by the CCIPOwner, otherwise the tokens will be deployed by a non-owner account, only applicable for 1.5 pools and onwards
+NoOfTokensPerChain = 1  # number of bridge tokens to be deployed per network; if MsgType = 'Token'/'DataWithToken'
+CCIPOwnerTokens = true # if true, the test will use deploy the tokens by the CCIPOwner, otherwise the tokens will be deployed by a non-owner account, only applicable for 1.5 pools and onwards
 
 #NoOfTokensWithDynamicPrice = 15 # number of tokens with dynamic price to be deployed
 #DynamicPriceUpdateInterval ='15s' # Periodic interval to update the price of tokens, if there are tokens with dynamic price

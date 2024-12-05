@@ -23,6 +23,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
+	burn_mint_token_pool "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool_1_4_0"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
@@ -210,6 +211,43 @@ func (e *CCIPContractsDeployer) DeployBurnMintERC677(ownerMintingAmount *big.Int
 		_ bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
 		return burn_mint_erc677.DeployBurnMintERC677(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), "Test Token ERC677", "TERC677", 6, new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)))
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	token := &ERC677Token{
+		client:          e.evmClient,
+		logger:          e.logger,
+		ContractAddress: *address,
+		instance:        instance.(*burn_mint_erc677.BurnMintERC677),
+		OwnerAddress:    common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+		OwnerWallet:     e.evmClient.GetDefaultWallet(),
+	}
+	if ownerMintingAmount != nil {
+		// grant minter role to owner and mint tokens
+		err = token.GrantMintRole(common.HexToAddress(e.evmClient.GetDefaultWallet().Address()))
+		if err != nil {
+			return token, fmt.Errorf("granting minter role to owner shouldn't fail %w", err)
+		}
+		err = e.evmClient.WaitForEvents()
+		if err != nil {
+			return token, fmt.Errorf("error in waiting for granting mint role %w", err)
+		}
+		err = token.Mint(common.HexToAddress(e.evmClient.GetDefaultWallet().Address()), ownerMintingAmount)
+		if err != nil {
+			return token, fmt.Errorf("minting tokens shouldn't fail %w", err)
+		}
+	}
+	return token, err
+}
+
+func (e *CCIPContractsDeployer) DeployCustomBurnMintERC677Token(name, symbol string, decimals uint8, ownerMintingAmount *big.Int) (*ERC677Token, error) {
+	address, _, instance, err := e.evmClient.DeployContract("Burn Mint ERC 677", func(
+		auth *bind.TransactOpts,
+		_ bind.ContractBackend,
+	) (common.Address, *types.Transaction, interface{}, error) {
+		return burn_mint_erc677.DeployBurnMintERC677(auth, wrappers.MustNewWrappedContractBackend(e.evmClient, nil), name, symbol, decimals, new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)))
 	})
 	if err != nil {
 		return nil, err
@@ -483,6 +521,65 @@ func (e *CCIPContractsDeployer) DeployUSDCTokenPoolContract(tokenAddr string, to
 			return nil, err
 		}
 		return e.NewUSDCTokenPoolContract(*address)
+	default:
+		return nil, fmt.Errorf("version not supported: %s", version)
+	}
+}
+
+func (e *CCIPContractsDeployer) DeployBurnAndMintTokenPoolContract(tokenAddr string, rmnProxy common.Address, router common.Address) (
+	*TokenPool,
+	error,
+) {
+	version := VersionMap[TokenPoolContract]
+	e.logger.Debug().Str("Token", tokenAddr).Msg("Deploying Burn and Mint token pool")
+	token := common.HexToAddress(tokenAddr)
+	switch version {
+	case Latest:
+		address, _, _, err := e.evmClient.DeployContract("Burn and Mint Token Pool", func(
+			auth *bind.TransactOpts,
+			_ bind.ContractBackend,
+		) (common.Address, *types.Transaction, interface{}, error) {
+			return burn_mint_token_pool.DeployBurnMintTokenPool(
+				auth,
+				wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
+				token,
+				[]common.Address{},
+				rmnProxy,
+				router,
+			)
+		})
+
+		if err != nil {
+			return nil, err
+		}
+		pool, err := burn_mint_token_pool.NewBurnMintTokenPool(*address, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
+
+		if err != nil {
+			return nil, err
+		}
+		e.logger.Info().
+			Str("Contract Address", address.Hex()).
+			Str("Contract Name", "USDC Token Pool").
+			Str("From", e.evmClient.GetDefaultWallet().Address()).
+			Str("Network Name", e.evmClient.GetNetworkConfig().Name).
+			Msg("New contract")
+		poolInterface, err := token_pool.NewTokenPool(*address, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
+		if err != nil {
+			return nil, err
+		}
+		return &TokenPool{
+			client: e.evmClient,
+			logger: e.logger,
+			Instance: &TokenPoolWrapper{
+				Latest: &LatestPool{
+					PoolInterface:        poolInterface,
+					BurnAndMintTokenPool: pool,
+				},
+			},
+			EthAddress:   *address,
+			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
+			OwnerWallet:  e.evmClient.GetDefaultWallet(),
+		}, err
 	default:
 		return nil, fmt.Errorf("version not supported: %s", version)
 	}
