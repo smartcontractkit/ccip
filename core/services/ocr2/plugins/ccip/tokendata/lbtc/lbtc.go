@@ -28,10 +28,7 @@ const (
 
 	// defaultCoolDownDurationSec defines the default time to wait after getting rate limited.
 	// this value is only used if the 429 response does not contain the Retry-After header
-	defaultCoolDownDuration = 5 * time.Minute
-
-	// maxCoolDownDuration defines the maximum duration we can wait till firing the next request
-	maxCoolDownDuration = 10 * time.Minute
+	defaultCoolDownDuration = 30 * time.Second
 
 	// defaultRequestInterval defines the rate in requests per second that the attestation API can be called.
 	// this is set according to the APIs recommended 5 requests per second rate limit.
@@ -204,7 +201,7 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg cciptypes.EVM2E
 
 	attestationResp, err := s.callAttestationApi(ctx, payloadHash)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed calling lbtc attestation API")
 	}
 	if attestationResp.Attestations == nil || len(attestationResp.Attestations) == 0 {
 		return nil, errors.New("attestation response is empty")
@@ -263,9 +260,6 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, lbtcMessageHas
 
 func (s *TokenDataReader) setCoolDownPeriod(d time.Duration) {
 	s.coolDownMu.Lock()
-	if d > maxCoolDownDuration {
-		d = maxCoolDownDuration
-	}
 	s.coolDownUntil = time.Now().Add(d)
 	s.coolDownMu.Unlock()
 }
