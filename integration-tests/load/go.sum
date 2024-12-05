@@ -1393,8 +1393,8 @@ github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ
 github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/slack-go/slack v0.12.2 h1:x3OppyMyGIbbiyFhsBmpf9pwkUzMhthJMRNmNlA4LaQ=
 github.com/slack-go/slack v0.12.2/go.mod h1:hlGi5oXA+Gt+yWTPP0plCdRKmjsDxecdHxYQdlMQKOw=
-github.com/smartcontractkit/chain-selectors v1.0.30 h1:jk+xVRocgQ/uvKLSd1JzeHJ/v+EKu1BjrreaSGqKzjo=
-github.com/smartcontractkit/chain-selectors v1.0.30/go.mod h1:xsKM0aN3YGcQKTPRPDDtPx2l4mlTN1Djmg0VVXV40b8=
+github.com/smartcontractkit/chain-selectors v1.0.31 h1:oRHyK88KnsCh4OdU2hr0u70pm3KUgyMDyK0v0aOtUk4=
+github.com/smartcontractkit/chain-selectors v1.0.31/go.mod h1:xsKM0aN3YGcQKTPRPDDtPx2l4mlTN1Djmg0VVXV40b8=
 github.com/smartcontractkit/chainlink-automation v1.0.4 h1:iyW181JjKHLNMnDleI8umfIfVVlwC7+n5izbLSFgjw8=
 github.com/smartcontractkit/chainlink-automation v1.0.4/go.mod h1:u4NbPZKJ5XiayfKHD/v3z3iflQWqvtdhj13jVZXj/cM=
 github.com/smartcontractkit/chainlink-common v0.2.3-0.20240925085218-aded1b263ecc h1:ALbyaoRzUSXQ2NhGFKVOyJqO22IB5yQjhjKWbIZGbrI=

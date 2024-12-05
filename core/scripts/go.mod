@@ -22,7 +22,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.20.0
 	github.com/shopspring/decimal v1.4.0
-	github.com/smartcontractkit/chain-selectors v1.0.30
+	github.com/smartcontractkit/chain-selectors v1.0.31
 	github.com/smartcontractkit/chainlink-automation v1.0.4
 	github.com/smartcontractkit/chainlink-common v0.2.3-0.20240925085218-aded1b263ecc
 	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
