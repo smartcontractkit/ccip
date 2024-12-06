@@ -150,7 +150,6 @@ func GetUSDCDomain(networkName string, simulated bool) (uint32, error) {
 	if val, ok := lookup[networkName]; ok {
 		return val, nil
 	}
-
 	return 0, fmt.Errorf("USDC domain not found for chain %s", networkName)
 }
 
@@ -931,7 +930,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 					if err != nil {
 						return fmt.Errorf("granting minter role to token transmitter shouldn't fail %w", err)
 					}
-				} else if ccipModule.IsLBTCDeployment() && i == 1 {
+				} else if ccipModule.IsLBTCDeployment() && i == 0 {
 					// if it's LBTC deployment, we deploy the burn mint token 677 with decimal 8 and cast it to ERC20Token
 					lbtcToken, err := ccipModule.tokenDeployer.DeployCustomBurnMintERC677Token("Lombard LBTC", "LBTC", uint8(18), new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
 					if err != nil {
@@ -1005,10 +1004,10 @@ func (ccipModule *CCIPCommon) DeployContracts(
 				}
 
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, usdcPool)
-			} else if ccipModule.IsLBTCDeployment() && i == 1 {
-				lbtcPool, err := ccipModule.tokenDeployer.DeployBurnAndMintTokenPoolContract(token.Address(), *ccipModule.RMNContract, ccipModule.Router.Instance.Address())
+			} else if ccipModule.IsLBTCDeployment() && i == 0 {
+				lbtcPool, err := ccipModule.tokenDeployer.DeployLBTCTokenPoolContract(token.Address(), *ccipModule.RMNContract, ccipModule.Router.Instance.Address())
 				if err != nil {
-					return fmt.Errorf("deploying burn and mint bridge Token pool(lbtc) shouldn't fail %w", err)
+					return fmt.Errorf("deploying mock lbtc bridge token pool shouldn't fail %w", err)
 				}
 
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, lbtcPool)

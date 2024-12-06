@@ -23,7 +23,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
-	burn_mint_token_pool "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool_1_4_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_lbtc_token_pool"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
@@ -526,7 +526,6 @@ func (e *CCIPContractsDeployer) DeployUSDCTokenPoolContract(tokenAddr string, to
 	}
 }
 
-// TODO: finish converting from USDC to LBTC
 func (e *CCIPContractsDeployer) NewLBTCTokenPoolContract(addr common.Address) (
 	*TokenPool,
 	error,
@@ -535,7 +534,7 @@ func (e *CCIPContractsDeployer) NewLBTCTokenPoolContract(addr common.Address) (
 	e.logger.Info().Str("Version", version.String()).Msg("New LBTC Token Pool")
 	switch version {
 	case Latest:
-		pool, err := usdc_token_pool.NewUSDCTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
+		pool, err := mock_lbtc_token_pool.NewMockLBTCTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
 
 		if err != nil {
 			return nil, err
@@ -556,36 +555,7 @@ func (e *CCIPContractsDeployer) NewLBTCTokenPoolContract(addr common.Address) (
 			Instance: &TokenPoolWrapper{
 				Latest: &LatestPool{
 					PoolInterface: poolInterface,
-					USDCPool:      pool,
-				},
-			},
-			EthAddress:   addr,
-			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
-			OwnerWallet:  e.evmClient.GetDefaultWallet(),
-		}, err
-	case V1_4_0:
-		pool, err := usdc_token_pool_1_4_0.NewUSDCTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
-
-		if err != nil {
-			return nil, err
-		}
-		e.logger.Info().
-			Str("Contract Address", addr.Hex()).
-			Str("Contract Name", "USDC Token Pool").
-			Str("From", e.evmClient.GetDefaultWallet().Address()).
-			Str("Network Name", e.evmClient.GetNetworkConfig().Name).
-			Msg("New contract")
-		poolInterface, err := token_pool_1_4_0.NewTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
-		if err != nil {
-			return nil, err
-		}
-		return &TokenPool{
-			client: e.evmClient,
-			logger: e.logger,
-			Instance: &TokenPoolWrapper{
-				V1_4_0: &V1_4_0Pool{
-					PoolInterface: poolInterface,
-					USDCPool:      pool,
+					MockLBTCPool:  pool,
 				},
 			},
 			EthAddress:   addr,
@@ -598,8 +568,7 @@ func (e *CCIPContractsDeployer) NewLBTCTokenPoolContract(addr common.Address) (
 
 }
 
-// TODO: finish converting from USDC to LBTC
-func (e *CCIPContractsDeployer) DeployLBTCTokenPoolContract(tokenAddr string, tokenMessenger, rmnProxy common.Address, router common.Address) (
+func (e *CCIPContractsDeployer) DeployLBTCTokenPoolContract(tokenAddr string, rmnProxy common.Address, router common.Address) (
 	*TokenPool,
 	error,
 ) {
@@ -612,10 +581,9 @@ func (e *CCIPContractsDeployer) DeployLBTCTokenPoolContract(tokenAddr string, to
 			auth *bind.TransactOpts,
 			_ bind.ContractBackend,
 		) (common.Address, *types.Transaction, interface{}, error) {
-			return usdc_token_pool.DeployUSDCTokenPool(
+			return mock_lbtc_token_pool.DeployMockLBTCTokenPool(
 				auth,
 				wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
-				tokenMessenger,
 				token,
 				[]common.Address{},
 				rmnProxy,
@@ -627,85 +595,6 @@ func (e *CCIPContractsDeployer) DeployLBTCTokenPoolContract(tokenAddr string, to
 			return nil, err
 		}
 		return e.NewUSDCTokenPoolContract(*address)
-	case V1_4_0:
-		address, _, _, err := e.evmClient.DeployContract("USDC Token Pool", func(
-			auth *bind.TransactOpts,
-			_ bind.ContractBackend,
-		) (common.Address, *types.Transaction, interface{}, error) {
-			return usdc_token_pool_1_4_0.DeployUSDCTokenPool(
-				auth,
-				wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
-				tokenMessenger,
-				token,
-				[]common.Address{},
-				rmnProxy,
-				router,
-			)
-		})
-
-		if err != nil {
-			return nil, err
-		}
-		return e.NewUSDCTokenPoolContract(*address)
-	default:
-		return nil, fmt.Errorf("version not supported: %s", version)
-	}
-}
-
-func (e *CCIPContractsDeployer) DeployBurnAndMintTokenPoolContract(tokenAddr string, rmnProxy common.Address, router common.Address) (
-	*TokenPool,
-	error,
-) {
-	version := VersionMap[TokenPoolContract]
-	e.logger.Debug().Str("Token", tokenAddr).Msg("Deploying Burn and Mint token pool")
-	token := common.HexToAddress(tokenAddr)
-	switch version {
-	case Latest:
-		address, _, _, err := e.evmClient.DeployContract("Burn and Mint Token Pool", func(
-			auth *bind.TransactOpts,
-			_ bind.ContractBackend,
-		) (common.Address, *types.Transaction, interface{}, error) {
-			return burn_mint_token_pool.DeployBurnMintTokenPool(
-				auth,
-				wrappers.MustNewWrappedContractBackend(e.evmClient, nil),
-				token,
-				[]common.Address{},
-				rmnProxy,
-				router,
-			)
-		})
-
-		if err != nil {
-			return nil, err
-		}
-		pool, err := burn_mint_token_pool.NewBurnMintTokenPool(*address, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
-
-		if err != nil {
-			return nil, err
-		}
-		e.logger.Info().
-			Str("Contract Address", address.Hex()).
-			Str("Contract Name", "USDC Token Pool").
-			Str("From", e.evmClient.GetDefaultWallet().Address()).
-			Str("Network Name", e.evmClient.GetNetworkConfig().Name).
-			Msg("New contract")
-		poolInterface, err := token_pool.NewTokenPool(*address, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
-		if err != nil {
-			return nil, err
-		}
-		return &TokenPool{
-			client: e.evmClient,
-			logger: e.logger,
-			Instance: &TokenPoolWrapper{
-				Latest: &LatestPool{
-					PoolInterface:        poolInterface,
-					BurnAndMintTokenPool: pool,
-				},
-			},
-			EthAddress:   *address,
-			OwnerAddress: common.HexToAddress(e.evmClient.GetDefaultWallet().Address()),
-			OwnerWallet:  e.evmClient.GetDefaultWallet(),
-		}, err
 	default:
 		return nil, fmt.Errorf("version not supported: %s", version)
 	}

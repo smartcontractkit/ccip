@@ -18,7 +18,7 @@ import (
 	"golang.org/x/exp/rand"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
-	burn_mint_token_pool "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool_1_4_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_lbtc_token_pool"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/wrappers"
 
@@ -402,10 +402,10 @@ func (l *LinkToken) Transfer(to string, amount *big.Int) error {
 }
 
 type LatestPool struct {
-	PoolInterface        *token_pool.TokenPool
-	BurnAndMintTokenPool *burn_mint_token_pool.BurnMintTokenPool
-	LockReleasePool      *lock_release_token_pool.LockReleaseTokenPool
-	USDCPool             *usdc_token_pool.USDCTokenPool
+	PoolInterface   *token_pool.TokenPool
+	LockReleasePool *lock_release_token_pool.LockReleaseTokenPool
+	USDCPool        *usdc_token_pool.USDCTokenPool
+	MockLBTCPool    *mock_lbtc_token_pool.MockLBTCTokenPool
 }
 
 type V1_4_0Pool struct {
