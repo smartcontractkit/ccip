@@ -23,8 +23,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_lbtc_token_pool"
-
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/wrappers"
@@ -37,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_4_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_lbtc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_messenger"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_transmitter"
@@ -526,12 +525,12 @@ func (e *CCIPContractsDeployer) DeployUSDCTokenPoolContract(tokenAddr string, to
 	}
 }
 
-func (e *CCIPContractsDeployer) NewLBTCTokenPoolContract(addr common.Address) (
+func (e *CCIPContractsDeployer) NewMockLBTCTokenPoolContract(addr common.Address) (
 	*TokenPool,
 	error,
 ) {
 	version := VersionMap[TokenPoolContract]
-	e.logger.Info().Str("Version", version.String()).Msg("New LBTC Token Pool")
+	e.logger.Info().Str("Version", version.String()).Msg("New Mock LBTC Token Pool")
 	switch version {
 	case Latest:
 		pool, err := mock_lbtc_token_pool.NewMockLBTCTokenPool(addr, wrappers.MustNewWrappedContractBackend(e.evmClient, nil))
@@ -541,7 +540,7 @@ func (e *CCIPContractsDeployer) NewLBTCTokenPoolContract(addr common.Address) (
 		}
 		e.logger.Info().
 			Str("Contract Address", addr.Hex()).
-			Str("Contract Name", "LBTC Token Pool").
+			Str("Contract Name", "Mock LBTC Token Pool").
 			Str("From", e.evmClient.GetDefaultWallet().Address()).
 			Str("Network Name", e.evmClient.GetNetworkConfig().Name).
 			Msg("New contract")
@@ -568,16 +567,17 @@ func (e *CCIPContractsDeployer) NewLBTCTokenPoolContract(addr common.Address) (
 
 }
 
-func (e *CCIPContractsDeployer) DeployLBTCTokenPoolContract(tokenAddr string, rmnProxy common.Address, router common.Address) (
+func (e *CCIPContractsDeployer) DeployMockLBTCTokenPoolContract(tokenAddr string, rmnProxy common.Address, router common.Address) (
 	*TokenPool,
 	error,
 ) {
+	e.logger.Println("In DeployMockLBTCTokenPoolContract")
 	version := VersionMap[TokenPoolContract]
-	e.logger.Debug().Str("Token", tokenAddr).Msg("Deploying LBTC token pool")
+	e.logger.Debug().Str("Token", tokenAddr).Msg("Deploying Mock LBTC token pool")
 	token := common.HexToAddress(tokenAddr)
 	switch version {
 	case Latest:
-		address, _, _, err := e.evmClient.DeployContract("LBTC Token Pool", func(
+		address, _, _, err := e.evmClient.DeployContract("Mock LBTC Token Pool", func(
 			auth *bind.TransactOpts,
 			_ bind.ContractBackend,
 		) (common.Address, *types.Transaction, interface{}, error) {
@@ -594,7 +594,7 @@ func (e *CCIPContractsDeployer) DeployLBTCTokenPoolContract(tokenAddr string, rm
 		if err != nil {
 			return nil, err
 		}
-		return e.NewUSDCTokenPoolContract(*address)
+		return e.NewMockLBTCTokenPoolContract(*address)
 	default:
 		return nil, fmt.Errorf("version not supported: %s", version)
 	}

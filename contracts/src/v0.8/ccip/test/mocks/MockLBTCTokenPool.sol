@@ -9,25 +9,28 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-
+/// @notice This pool mints and burns LBTC tokens through the Cross Chain Transfer
+/// Protocol (CCTP).
 contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
     using SafeERC20 for IERC20;
 
-    string public constant override typeAndVersion = "LBTCTokenPool 1.5.1";
+    string public constant override typeAndVersion = "MockLBTCTokenPool 1.5.1";
 
     constructor(
         IERC20 token,
         address[] memory allowlist,
         address rmnProxy,
         address router
-    ) TokenPool(token, 6, allowlist, rmnProxy, router) {
+    ) TokenPool(token, 18, allowlist, rmnProxy, router) {
+
     }
 
     /// @notice Burn the token in the pool
-    /// @dev The _validateLockOrBurn check is an essential security check
+    /// @dev emits ITokenMessenger.DepositForBurn
+    /// @dev Assumes caller has validated destinationReceiver
     function lockOrBurn(
         Pool.LockOrBurnInV1 calldata lockOrBurnIn
-    ) external virtual override returns (Pool.LockOrBurnOutV1 memory) {
+    ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
         bytes memory payload;
         bytes memory destPoolData;
         payload = abi.encodePacked(hex"1234abcd");
@@ -44,7 +47,7 @@ contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
 
     function releaseOrMint(
         Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
-    ) external virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
+    ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
 
         // TODO: validate releaseOrMintIn.offchainTokenData?
 
@@ -60,3 +63,4 @@ contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
         });
     }
 }
+

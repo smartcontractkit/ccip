@@ -991,6 +991,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 			token := ccipModule.BridgeTokens[i]
 			// usdc pool need to be the first one in the slice
 			if ccipModule.IsUSDCDeployment() && i == 0 {
+				//ccipModule.Logger.Println("Enter USDC")
 				// deploy usdc token pool in case of usdc deployment
 				if ccipModule.TokenMessenger == nil {
 					return fmt.Errorf("TokenMessenger contract address is not provided")
@@ -1004,8 +1005,13 @@ func (ccipModule *CCIPCommon) DeployContracts(
 				}
 
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, usdcPool)
+				//ccipModule.Logger.Println("Exit USDC")
 			} else if ccipModule.IsLBTCDeployment() && i == 0 {
-				lbtcPool, err := ccipModule.tokenDeployer.DeployLBTCTokenPoolContract(token.Address(), *ccipModule.RMNContract, ccipModule.Router.Instance.Address())
+				ccipModule.Logger.Warn().Msg("Right before lbtcPool")
+				rmnContract := *ccipModule.RMNContract
+				ccipModule.Logger.Warn().Msg(fmt.Sprintf("token addr: %v, RMN contract %v, router addr: %v", token.Address(), rmnContract, ccipModule.Router.Instance.Address()))
+				lbtcPool, err := ccipModule.tokenDeployer.DeployMockLBTCTokenPoolContract(token.Address(), rmnContract, ccipModule.Router.Instance.Address())
+				//lbtcPool, err := ccipModule.tokenDeployer.DeployUSDCTokenPoolContract(token.Address(), *ccipModule.TokenMessenger, *ccipModule.RMNContract, ccipModule.Router.Instance.Address())
 				if err != nil {
 					return fmt.Errorf("deploying mock lbtc bridge token pool shouldn't fail %w", err)
 				}
