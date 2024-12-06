@@ -3771,9 +3771,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		if env.MockServer != nil {
 			api = env.MockServer.Config.ClusterURL
 		}
-		if lane.Source.Common.TokenTransmitter == nil {
-			return fmt.Errorf("token transmitter address not set")
-		}
 		// Only one LBTC allowed per chain
 		jobParams.LBTCConfig = &config.LBTCConfig{
 			SourceTokenAddress:           common.HexToAddress(lane.Source.Common.BridgeTokens[0].Address()),
