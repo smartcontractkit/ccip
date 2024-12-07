@@ -214,7 +214,7 @@ func (s *SrcExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress c
 	case s.lbtcConfig.SourceTokenAddress:
 		attestationURI, err := url.ParseRequestURI(s.lbtcConfig.AttestationAPI)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse USDC attestation API: %w", err)
+			return nil, fmt.Errorf("failed to parse LBTC attestation API: %w", err)
 		}
 		return lbtc.NewLBTCTokenDataReader(
 			s.lggr,
