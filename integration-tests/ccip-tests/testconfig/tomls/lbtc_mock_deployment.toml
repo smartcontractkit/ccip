@@ -1,0 +1,10 @@
+[CCIP]
+[CCIP.Groups]
+[CCIP.Groups.smoke]
+LBTCMockDeployment = true
+
+[CCIP.Groups.smoke.TokenConfig]
+NoOfTokensPerChain = 1
+
+[CCIP.Groups.smoke.MsgDetails]
+NoOfTokens = 1
