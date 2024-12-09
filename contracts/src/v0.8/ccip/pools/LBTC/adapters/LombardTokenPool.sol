@@ -73,27 +73,21 @@ contract LombardTokenPool is TokenPool {
     ) external virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
         _validateReleaseOrMint(releaseOrMintIn);
 
+        uint64 amount;
         if (isAttestationEnabled) {
-            adapter.initiateWithdrawal(
+            amount = adapter.initiateWithdrawal(
                 releaseOrMintIn.remoteChainSelector,
                 releaseOrMintIn.offchainTokenData
             );
         } else {
-            adapter.initWithdrawalNoSignatures(
+            amount = adapter.initWithdrawalNoSignatures(
                 releaseOrMintIn.remoteChainSelector,
                 releaseOrMintIn.sourcePoolData
             );
         }
 
-        emit Minted(
-            msg.sender,
-            releaseOrMintIn.receiver,
-            releaseOrMintIn.amount
-        );
+        emit Minted(msg.sender, releaseOrMintIn.receiver, uint256(amount));
 
-        return
-            Pool.ReleaseOrMintOutV1({
-                destinationAmount: releaseOrMintIn.amount
-            });
+        return Pool.ReleaseOrMintOutV1({destinationAmount: uint256(amount)});
     }
 }

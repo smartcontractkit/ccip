@@ -140,17 +140,17 @@ contract CLAdapter is AbstractAdapter, Ownable {
     function initWithdrawalNoSignatures(
         uint64 remoteSelector,
         bytes calldata onChainData
-    ) external {
+    ) external returns (uint64) {
         _onlyTokenPool();
 
         _receive(getChain[remoteSelector], onChainData);
-        bridge.withdraw(onChainData);
+        return bridge.withdraw(onChainData);
     }
 
     function initiateWithdrawal(
         uint64 remoteSelector,
         bytes calldata offChainData
-    ) external {
+    ) external returns (uint64) {
         _onlyTokenPool();
 
         (bytes memory payload, bytes memory proof) = abi.decode(
@@ -160,7 +160,7 @@ contract CLAdapter is AbstractAdapter, Ownable {
 
         _receive(getChain[remoteSelector], payload);
         bridge.authNotary(payload, proof);
-        bridge.withdraw(payload);
+        return bridge.withdraw(payload);
     }
 
     /// ONLY OWNER FUNCTIONS ///
