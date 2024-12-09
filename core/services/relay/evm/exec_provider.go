@@ -10,13 +10,12 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccip"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/lbtc"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
@@ -30,20 +29,20 @@ import (
 )
 
 type SrcExecProvider struct {
-	lggr          logger.Logger
-	versionFinder ccip.VersionFinder
-	client        client.Client
-	lp            logpoller.LogPoller
-	startBlock    uint64
-	estimator     gas.EvmFeeEstimator
-	maxGasPrice   *big.Int
-	usdcReader    *ccip.USDCReaderImpl
-	usdcConfig    config.USDCConfig
-	lbtcConfig    config.LBTCConfig
+	lggr                                   logger.Logger
+	versionFinder                          ccip.VersionFinder
+	client                                 client.Client
+	lp                                     logpoller.LogPoller
+	startBlock                             uint64
+	estimator                              gas.EvmFeeEstimator
+	maxGasPrice                            *big.Int
+	usdcReader                             *ccip.USDCReaderImpl
+	usdcAttestationAPI                     string
+	usdcAttestationAPITimeoutSeconds       int
+	usdcAttestationAPIIntervalMilliseconds int
+	usdcSrcMsgTransmitterAddr              common.Address
 
 	feeEstimatorConfig estimatorconfig.FeeEstimatorConfigProvider
-
-	// TODO: Add lbtc reader & api fields
 
 	// these values are nil and are updated for Close()
 	seenOnRampAddress       *cciptypes.Address
@@ -60,31 +59,35 @@ func NewSrcExecProvider(
 	lp logpoller.LogPoller,
 	startBlock uint64,
 	jobID string,
-	usdcConfig config.USDCConfig,
-	lbtcConfig config.LBTCConfig,
+	usdcAttestationAPI string,
+	usdcAttestationAPITimeoutSeconds int,
+	usdcAttestationAPIIntervalMilliseconds int,
+	usdcSrcMsgTransmitterAddr common.Address,
 	feeEstimatorConfig estimatorconfig.FeeEstimatorConfigProvider,
 ) (commontypes.CCIPExecProvider, error) {
 	var usdcReader *ccip.USDCReaderImpl
 	var err error
-	if usdcConfig.AttestationAPI != "" {
-		usdcReader, err = ccip.NewUSDCReader(lggr, jobID, usdcConfig.SourceMessageTransmitterAddress, lp, true)
+	if usdcAttestationAPI != "" {
+		usdcReader, err = ccip.NewUSDCReader(lggr, jobID, usdcSrcMsgTransmitterAddr, lp, true)
 		if err != nil {
 			return nil, fmt.Errorf("new usdc reader: %w", err)
 		}
 	}
 
 	return &SrcExecProvider{
-		lggr:               lggr,
-		versionFinder:      versionFinder,
-		client:             client,
-		estimator:          estimator,
-		maxGasPrice:        maxGasPrice,
-		lp:                 lp,
-		startBlock:         startBlock,
-		usdcReader:         usdcReader,
-		usdcConfig:         usdcConfig,
-		lbtcConfig:         lbtcConfig,
-		feeEstimatorConfig: feeEstimatorConfig,
+		lggr:                                   lggr,
+		versionFinder:                          versionFinder,
+		client:                                 client,
+		estimator:                              estimator,
+		maxGasPrice:                            maxGasPrice,
+		lp:                                     lp,
+		startBlock:                             startBlock,
+		usdcReader:                             usdcReader,
+		usdcAttestationAPI:                     usdcAttestationAPI,
+		usdcAttestationAPITimeoutSeconds:       usdcAttestationAPITimeoutSeconds,
+		usdcAttestationAPIIntervalMilliseconds: usdcAttestationAPIIntervalMilliseconds,
+		usdcSrcMsgTransmitterAddr:              usdcSrcMsgTransmitterAddr,
+		feeEstimatorConfig:                     feeEstimatorConfig,
 	}, nil
 }
 
@@ -113,10 +116,10 @@ func (s *SrcExecProvider) Close() error {
 		return ccip.CloseOnRampReader(s.lggr, versionFinder, *s.seenSourceChainSelector, *s.seenDestChainSelector, *s.seenOnRampAddress, s.lp, s.client)
 	})
 	unregisterFuncs = append(unregisterFuncs, func() error {
-		if s.usdcConfig.AttestationAPI == "" {
+		if s.usdcAttestationAPI == "" {
 			return nil
 		}
-		return ccip.CloseUSDCReader(s.lggr, s.lggr.Name(), s.usdcConfig.SourceMessageTransmitterAddress, s.lp)
+		return ccip.CloseUSDCReader(s.lggr, s.lggr.Name(), s.usdcSrcMsgTransmitterAddr, s.lp)
 	})
 	var multiErr error
 	for _, fn := range unregisterFuncs {
@@ -192,40 +195,24 @@ func (s *SrcExecProvider) NewPriceRegistryReader(ctx context.Context, addr ccipt
 	return
 }
 
-func (s *SrcExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cciptypes.Address) (cciptypes.TokenDataReader, error) {
-	tokenAddr, err := ccip.GenericAddrToEvm(tokenAddress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse token address: %w", err)
+func (s *SrcExecProvider) NewTokenDataReader(ctx context.Context, tokenAddress cciptypes.Address) (tokenDataReader cciptypes.TokenDataReader, err error) {
+	attestationURI, err2 := url.ParseRequestURI(s.usdcAttestationAPI)
+	if err2 != nil {
+		return nil, fmt.Errorf("failed to parse USDC attestation API: %w", err2)
 	}
-	switch tokenAddr {
-	case s.usdcConfig.SourceTokenAddress:
-		attestationURI, err := url.ParseRequestURI(s.usdcConfig.AttestationAPI)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse USDC attestation API: %w", err)
-		}
-		return usdc.NewUSDCTokenDataReader(
-			s.lggr,
-			s.usdcReader,
-			attestationURI,
-			int(s.usdcConfig.AttestationAPITimeoutSeconds),
-			tokenAddr,
-			time.Duration(s.usdcConfig.AttestationAPIIntervalMilliseconds)*time.Millisecond,
-		), nil
-	case s.lbtcConfig.SourceTokenAddress:
-		attestationURI, err := url.ParseRequestURI(s.lbtcConfig.AttestationAPI)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse LBTC attestation API: %w", err)
-		}
-		return lbtc.NewLBTCTokenDataReader(
-			s.lggr,
-			attestationURI,
-			int(s.lbtcConfig.AttestationAPITimeoutSeconds),
-			tokenAddr,
-			time.Duration(s.lbtcConfig.AttestationAPIIntervalMilliseconds)*time.Millisecond,
-		), nil
-	default:
-		return nil, fmt.Errorf("unsupported token address: %s", tokenAddress)
+	tokenAddr, err2 := ccip.GenericAddrToEvm(tokenAddress)
+	if err2 != nil {
+		return nil, fmt.Errorf("failed to parse token address: %w", err2)
 	}
+	tokenDataReader = usdc.NewUSDCTokenDataReader(
+		s.lggr,
+		s.usdcReader,
+		attestationURI,
+		s.usdcAttestationAPITimeoutSeconds,
+		tokenAddr,
+		time.Duration(s.usdcAttestationAPIIntervalMilliseconds)*time.Millisecond,
+	)
+	return
 }
 
 func (s *SrcExecProvider) NewTokenPoolBatchedReader(ctx context.Context, offRampAddr cciptypes.Address, sourceChainSelector uint64) (cciptypes.TokenPoolBatchedReader, error) {
