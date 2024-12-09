@@ -22,7 +22,7 @@ contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
         address[] memory allowlist,
         address rmnProxy,
         address router
-    ) TokenPool(token, 18, allowlist, rmnProxy, router) {
+    ) TokenPool(token, 8, allowlist, rmnProxy, router) {
 
     }
 
@@ -36,6 +36,9 @@ contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
         bytes memory destPoolData;
         payload = abi.encodePacked(hex"1234abcd");
         destPoolData = abi.encode(sha256(payload));
+
+        IBurnMintERC20(address(i_token)).burn(lockOrBurnIn.amount);
+        emit Burned(msg.sender, lockOrBurnIn.amount);
 
         return
             Pool.LockOrBurnOutV1({
@@ -51,12 +54,8 @@ contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
     ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
 
         // TODO: validate releaseOrMintIn.offchainTokenData?
-
-        // Calculate the local amount
-        uint256 localAmount =
-                        _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
         // Mint to the receiver
-        IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, localAmount);
+        IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
         emit Minted(
             msg.sender,

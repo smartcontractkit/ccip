@@ -33,8 +33,6 @@ import (
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
-
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/lib/client"
@@ -44,6 +42,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/mockserver"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/reorg"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
@@ -61,6 +60,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
@@ -884,7 +884,6 @@ func (ccipModule *CCIPCommon) DeployContracts(
 		// deploy bridge token.
 		for i := len(ccipModule.BridgeTokens); i < noOfTokens; i++ {
 			var token *contracts.ERC20Token
-
 			if len(tokenDeployerFns) != noOfTokens {
 				if ccipModule.IsUSDCDeployment() && i == 0 {
 					// if it's USDC deployment, we deploy the burn mint token 677 with decimal 6 and cast it to ERC20Token
@@ -932,7 +931,7 @@ func (ccipModule *CCIPCommon) DeployContracts(
 					}
 				} else if ccipModule.IsLBTCDeployment() && i == 0 {
 					// if it's LBTC deployment, we deploy the burn mint token 677 with decimal 8 and cast it to ERC20Token
-					lbtcToken, err := ccipModule.tokenDeployer.DeployCustomBurnMintERC677Token("Lombard LBTC", "LBTC", uint8(18), new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
+					lbtcToken, err := ccipModule.tokenDeployer.DeployCustomBurnMintERC677Token("Lombard LBTC", "LBTC", uint8(8), new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
 					if err != nil {
 						return fmt.Errorf("deploying bridge lbtc token contract shouldn't fail %w", err)
 					}
@@ -1005,15 +1004,29 @@ func (ccipModule *CCIPCommon) DeployContracts(
 				}
 
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, usdcPool)
-				//ccipModule.Logger.Println("Exit USDC")
 			} else if ccipModule.IsLBTCDeployment() && i == 0 {
 				ccipModule.Logger.Warn().Msg("Right before lbtcPool")
 				rmnContract := *ccipModule.RMNContract
 				ccipModule.Logger.Warn().Msg(fmt.Sprintf("token addr: %v, RMN contract %v, router addr: %v", token.Address(), rmnContract, ccipModule.Router.Instance.Address()))
 				lbtcPool, err := ccipModule.tokenDeployer.DeployMockLBTCTokenPoolContract(token.Address(), rmnContract, ccipModule.Router.Instance.Address())
-				//lbtcPool, err := ccipModule.tokenDeployer.DeployUSDCTokenPoolContract(token.Address(), *ccipModule.TokenMessenger, *ccipModule.RMNContract, ccipModule.Router.Instance.Address())
 				if err != nil {
 					return fmt.Errorf("deploying mock lbtc bridge token pool shouldn't fail %w", err)
+				}
+				lbtcInstance, err := burn_mint_erc677.NewBurnMintERC677(token.ContractAddress, ccipModule.ChainClient.Backend())
+				if err != nil {
+					return fmt.Errorf("failed to get dest usdc token instance: %w", err)
+				}
+				opts, err := ccipModule.tokenDeployer.Client().TransactionOpts(token.OwnerWallet)
+				if err != nil {
+					return fmt.Errorf("failed to get transaction opts: %w", err)
+				}
+				tx, err := lbtcInstance.GrantMintAndBurnRoles(opts, common.HexToAddress(lbtcPool.Address()))
+				if err != nil {
+					return fmt.Errorf("granting minter role to owner shouldn't fail %w", err)
+				}
+				err = ccipModule.tokenDeployer.Client().ProcessTransaction(tx)
+				if err != nil {
+					return fmt.Errorf("failed to process grant mint role %w", err)
 				}
 
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, lbtcPool)
