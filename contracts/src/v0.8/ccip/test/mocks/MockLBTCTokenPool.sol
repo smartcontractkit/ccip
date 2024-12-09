@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
+import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 
 import {Pool} from "../../libraries/Pool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
@@ -50,6 +51,12 @@ contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
     ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
 
         // TODO: validate releaseOrMintIn.offchainTokenData?
+
+        // Calculate the local amount
+        uint256 localAmount =
+                        _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
+        // Mint to the receiver
+        IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, localAmount);
 
         emit Minted(
             msg.sender,
