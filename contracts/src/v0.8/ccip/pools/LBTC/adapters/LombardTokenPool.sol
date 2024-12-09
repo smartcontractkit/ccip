@@ -25,8 +25,12 @@ contract LombardTokenPool is TokenPool {
         isAttestationEnabled = attestationEnable_;
     }
 
-    function setAdapter(CLAdapter adapter_) external {
+    function setAdapter(CLAdapter adapter_) external onlyOwner {
         adapter = adapter_;
+    }
+
+    function setAttestationEnabled(bool attestationEnable_) external onlyOwner {
+        isAttestationEnabled = attestationEnable_;
     }
 
     /// @notice Burn the token in the pool

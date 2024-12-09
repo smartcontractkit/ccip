@@ -41,12 +41,7 @@ contract CLAdapter is AbstractAdapter, Ownable {
     constructor(
         IBridge bridge_,
         LombardTokenPool tokenPool_,
-        uint128 executionGasLimit_,
-        //
-        address ccipRouter_,
-        address[] memory allowlist_,
-        address rmnProxy_,
-        bool attestationEnable_
+        uint128 executionGasLimit_
     ) AbstractAdapter(bridge_) Ownable() {
         _setExecutionGasLimit(executionGasLimit_);
         tokenPool = tokenPool_;
