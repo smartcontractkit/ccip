@@ -1,0 +1,164 @@
+{
+  "compiler": {
+    "version": "0.8.24+commit.e11b9ed9"
+  },
+  "language": "Solidity",
+  "output": {
+    "abi": [
+      {
+        "inputs": [
+          {
+            "internalType": "bytes",
+            "name": "encodedAddress",
+            "type": "bytes"
+          }
+        ],
+        "type": "error",
+        "name": "InvalidEVMAddress"
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "ANY_2_EVM_MESSAGE_FIXED_BYTES",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "CHAIN_FAMILY_SELECTOR_EVM",
+        "outputs": [
+          {
+            "internalType": "bytes4",
+            "name": "",
+            "type": "bytes4"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "GAS_PRICE_BITS",
+        "outputs": [
+          {
+            "internalType": "uint8",
+            "name": "",
+            "type": "uint8"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "MESSAGE_FIXED_BYTES",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "MESSAGE_FIXED_BYTES_PER_TOKEN",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "PRECOMPILE_SPACE",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "devdoc": {
+      "kind": "dev",
+      "methods": {},
+      "version": 1
+    },
+    "userdoc": {
+      "kind": "user",
+      "methods": {},
+      "version": 1
+    }
+  },
+  "settings": {
+    "remappings": [],
+    "optimizer": {
+      "enabled": true,
+      "runs": 26000
+    },
+    "metadata": {
+      "bytecodeHash": "ipfs"
+    },
+    "compilationTarget": {
+      "contracts/src/v0.8/ccip/libraries/Internal.sol": "Internal"
+    },
+    "evmVersion": "cancun",
+    "libraries": {}
+  },
+  "sources": {
+    "contracts/src/v0.8/ccip/libraries/Client.sol": {
+      "keccak256": "0xa1ce70adec733c80b230084b425a50caa852a99f17a7e43e38a96a975f11ce88",
+      "urls": [
+        "bzz-raw://08db3aa57ceae13832c1bf323aa29afa2620fd5b5205ff0d56152bf323c56256",
+        "dweb:/ipfs/QmUG2FSVP8xXVkdgFwNhc4YFDU7FNCaf1kKShiTaaHUddE"
+      ],
+      "license": "MIT"
+    },
+    "contracts/src/v0.8/ccip/libraries/Internal.sol": {
+      "keccak256": "0x60b0d8eabf063eaaa353f636a9b4437080caa2ca4194d2e834061595efaa674d",
+      "urls": [
+        "bzz-raw://6cd0c4df5c051e64c45cff87ac1d85074babf085ce1f5a21689cf713fe01ae62",
+        "dweb:/ipfs/QmQMTT3y7iq2Kx3dDx6A6mHKCv3F3n9XKZZHdZbDnQyYB3"
+      ],
+      "license": "MIT"
+    },
+    "contracts/src/v0.8/ccip/libraries/MerkleMultiProof.sol": {
+      "keccak256": "0x9f2e5edd718cd1b5aa7143ca39ee50d7c15b8456ce32c49c10833c9ef3b0eb72",
+      "urls": [
+        "bzz-raw://c2591501ed4b28164009e58166324634a0ce79a0599ee682d47d825f302a9955",
+        "dweb:/ipfs/QmeN35m4PFQDBc1ew2Q5koYNfchf8DcTemUmXVFVSuZV5t"
+      ],
+      "license": "BUSL-1.1"
+    }
+  },
+  "version": 1
+}

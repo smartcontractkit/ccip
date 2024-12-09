@@ -1,0 +1,1220 @@
+{
+  "compiler": {
+    "version": "0.8.24+commit.e11b9ed9"
+  },
+  "language": "Solidity",
+  "output": {
+    "abi": [
+      {
+        "inputs": [
+          {
+            "internalType": "struct CommitStore.StaticConfig",
+            "name": "staticConfig",
+            "type": "tuple",
+            "components": [
+              {
+                "internalType": "uint64",
+                "name": "chainSelector",
+                "type": "uint64"
+              },
+              {
+                "internalType": "uint64",
+                "name": "sourceChainSelector",
+                "type": "uint64"
+              },
+              {
+                "internalType": "address",
+                "name": "onRamp",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "rmnProxy",
+                "type": "address"
+              }
+            ]
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes32",
+            "name": "expected",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "actual",
+            "type": "bytes32"
+          }
+        ],
+        "type": "error",
+        "name": "ConfigDigestMismatch"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "CursedByRMN"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "expected",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "actual",
+            "type": "uint256"
+          }
+        ],
+        "type": "error",
+        "name": "ForkedChain"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "InvalidCommitStoreConfig"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "enum OCR2Base.InvalidConfigErrorType",
+            "name": "errorType",
+            "type": "uint8"
+          }
+        ],
+        "type": "error",
+        "name": "InvalidConfig"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "struct CommitStore.Interval",
+            "name": "interval",
+            "type": "tuple",
+            "components": [
+              {
+                "internalType": "uint64",
+                "name": "min",
+                "type": "uint64"
+              },
+              {
+                "internalType": "uint64",
+                "name": "max",
+                "type": "uint64"
+              }
+            ]
+          }
+        ],
+        "type": "error",
+        "name": "InvalidInterval"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "InvalidProof"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "InvalidRoot"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "LeavesCannotBeEmpty"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "NonUniqueSignatures"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "OracleCannotBeZeroAddress"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "PausedError"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "RootAlreadyCommitted"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "SignaturesOutOfRegistration"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "StaleReport"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "UnauthorizedSigner"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "UnauthorizedTransmitter"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "expected",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "actual",
+            "type": "uint256"
+          }
+        ],
+        "type": "error",
+        "name": "WrongMessageLength"
+      },
+      {
+        "inputs": [],
+        "type": "error",
+        "name": "WrongNumberOfSignatures"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "struct CommitStore.StaticConfig",
+            "name": "staticConfig",
+            "type": "tuple",
+            "components": [
+              {
+                "internalType": "uint64",
+                "name": "chainSelector",
+                "type": "uint64"
+              },
+              {
+                "internalType": "uint64",
+                "name": "sourceChainSelector",
+                "type": "uint64"
+              },
+              {
+                "internalType": "address",
+                "name": "onRamp",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "rmnProxy",
+                "type": "address"
+              }
+            ],
+            "indexed": false
+          },
+          {
+            "internalType": "struct CommitStore.DynamicConfig",
+            "name": "dynamicConfig",
+            "type": "tuple",
+            "components": [
+              {
+                "internalType": "address",
+                "name": "priceRegistry",
+                "type": "address"
+              }
+            ],
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "ConfigSet",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint32",
+            "name": "previousConfigBlockNumber",
+            "type": "uint32",
+            "indexed": false
+          },
+          {
+            "internalType": "bytes32",
+            "name": "configDigest",
+            "type": "bytes32",
+            "indexed": false
+          },
+          {
+            "internalType": "uint64",
+            "name": "configCount",
+            "type": "uint64",
+            "indexed": false
+          },
+          {
+            "internalType": "address[]",
+            "name": "signers",
+            "type": "address[]",
+            "indexed": false
+          },
+          {
+            "internalType": "address[]",
+            "name": "transmitters",
+            "type": "address[]",
+            "indexed": false
+          },
+          {
+            "internalType": "uint8",
+            "name": "f",
+            "type": "uint8",
+            "indexed": false
+          },
+          {
+            "internalType": "bytes",
+            "name": "onchainConfig",
+            "type": "bytes",
+            "indexed": false
+          },
+          {
+            "internalType": "uint64",
+            "name": "offchainConfigVersion",
+            "type": "uint64",
+            "indexed": false
+          },
+          {
+            "internalType": "bytes",
+            "name": "offchainConfig",
+            "type": "bytes",
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "ConfigSet",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint40",
+            "name": "oldEpochAndRound",
+            "type": "uint40",
+            "indexed": false
+          },
+          {
+            "internalType": "uint40",
+            "name": "newEpochAndRound",
+            "type": "uint40",
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "LatestPriceEpochAndRoundSet",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "from",
+            "type": "address",
+            "indexed": true
+          },
+          {
+            "internalType": "address",
+            "name": "to",
+            "type": "address",
+            "indexed": true
+          }
+        ],
+        "type": "event",
+        "name": "OwnershipTransferRequested",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "from",
+            "type": "address",
+            "indexed": true
+          },
+          {
+            "internalType": "address",
+            "name": "to",
+            "type": "address",
+            "indexed": true
+          }
+        ],
+        "type": "event",
+        "name": "OwnershipTransferred",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address",
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "Paused",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "struct CommitStore.CommitReport",
+            "name": "report",
+            "type": "tuple",
+            "components": [
+              {
+                "internalType": "struct Internal.PriceUpdates",
+                "name": "priceUpdates",
+                "type": "tuple",
+                "components": [
+                  {
+                    "internalType": "struct Internal.TokenPriceUpdate[]",
+                    "name": "tokenPriceUpdates",
+                    "type": "tuple[]",
+                    "components": [
+                      {
+                        "internalType": "address",
+                        "name": "sourceToken",
+                        "type": "address"
+                      },
+                      {
+                        "internalType": "uint224",
+                        "name": "usdPerToken",
+                        "type": "uint224"
+                      }
+                    ]
+                  },
+                  {
+                    "internalType": "struct Internal.GasPriceUpdate[]",
+                    "name": "gasPriceUpdates",
+                    "type": "tuple[]",
+                    "components": [
+                      {
+                        "internalType": "uint64",
+                        "name": "destChainSelector",
+                        "type": "uint64"
+                      },
+                      {
+                        "internalType": "uint224",
+                        "name": "usdPerUnitGas",
+                        "type": "uint224"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "internalType": "struct CommitStore.Interval",
+                "name": "interval",
+                "type": "tuple",
+                "components": [
+                  {
+                    "internalType": "uint64",
+                    "name": "min",
+                    "type": "uint64"
+                  },
+                  {
+                    "internalType": "uint64",
+                    "name": "max",
+                    "type": "uint64"
+                  }
+                ]
+              },
+              {
+                "internalType": "bytes32",
+                "name": "merkleRoot",
+                "type": "bytes32"
+              }
+            ],
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "ReportAccepted",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes32",
+            "name": "root",
+            "type": "bytes32",
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "RootRemoved",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint64",
+            "name": "oldSeqNum",
+            "type": "uint64",
+            "indexed": false
+          },
+          {
+            "internalType": "uint64",
+            "name": "newSeqNum",
+            "type": "uint64",
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "SequenceNumberSet",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes32",
+            "name": "configDigest",
+            "type": "bytes32",
+            "indexed": false
+          },
+          {
+            "internalType": "uint32",
+            "name": "epoch",
+            "type": "uint32",
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "Transmitted",
+        "anonymous": false
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address",
+            "indexed": false
+          }
+        ],
+        "type": "event",
+        "name": "Unpaused",
+        "anonymous": false
+      },
+      {
+        "inputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "acceptOwnership"
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getDynamicConfig",
+        "outputs": [
+          {
+            "internalType": "struct CommitStore.DynamicConfig",
+            "name": "",
+            "type": "tuple",
+            "components": [
+              {
+                "internalType": "address",
+                "name": "priceRegistry",
+                "type": "address"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getExpectedNextSequenceNumber",
+        "outputs": [
+          {
+            "internalType": "uint64",
+            "name": "",
+            "type": "uint64"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getLatestPriceEpochAndRound",
+        "outputs": [
+          {
+            "internalType": "uint64",
+            "name": "",
+            "type": "uint64"
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes32",
+            "name": "root",
+            "type": "bytes32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getMerkleRoot",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getStaticConfig",
+        "outputs": [
+          {
+            "internalType": "struct CommitStore.StaticConfig",
+            "name": "",
+            "type": "tuple",
+            "components": [
+              {
+                "internalType": "uint64",
+                "name": "chainSelector",
+                "type": "uint64"
+              },
+              {
+                "internalType": "uint64",
+                "name": "sourceChainSelector",
+                "type": "uint64"
+              },
+              {
+                "internalType": "address",
+                "name": "onRamp",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "rmnProxy",
+                "type": "address"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getTransmitters",
+        "outputs": [
+          {
+            "internalType": "address[]",
+            "name": "",
+            "type": "address[]"
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes32",
+            "name": "root",
+            "type": "bytes32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "isBlessed",
+        "outputs": [
+          {
+            "internalType": "bool",
+            "name": "",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "isUnpausedAndNotCursed",
+        "outputs": [
+          {
+            "internalType": "bool",
+            "name": "",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "latestConfigDetails",
+        "outputs": [
+          {
+            "internalType": "uint32",
+            "name": "configCount",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint32",
+            "name": "blockNumber",
+            "type": "uint32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "configDigest",
+            "type": "bytes32"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "latestConfigDigestAndEpoch",
+        "outputs": [
+          {
+            "internalType": "bool",
+            "name": "scanLogs",
+            "type": "bool"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "configDigest",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "uint32",
+            "name": "epoch",
+            "type": "uint32"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "owner",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "pause"
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "paused",
+        "outputs": [
+          {
+            "internalType": "bool",
+            "name": "",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes32[]",
+            "name": "rootToReset",
+            "type": "bytes32[]"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "resetUnblessedRoots"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint40",
+            "name": "latestPriceEpochAndRound",
+            "type": "uint40"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "setLatestPriceEpochAndRound"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint64",
+            "name": "minSeqNr",
+            "type": "uint64"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "setMinSeqNr"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address[]",
+            "name": "signers",
+            "type": "address[]"
+          },
+          {
+            "internalType": "address[]",
+            "name": "transmitters",
+            "type": "address[]"
+          },
+          {
+            "internalType": "uint8",
+            "name": "f",
+            "type": "uint8"
+          },
+          {
+            "internalType": "bytes",
+            "name": "onchainConfig",
+            "type": "bytes"
+          },
+          {
+            "internalType": "uint64",
+            "name": "offchainConfigVersion",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bytes",
+            "name": "offchainConfig",
+            "type": "bytes"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "setOCR2Config"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "to",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "transferOwnership"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes32[3]",
+            "name": "reportContext",
+            "type": "bytes32[3]"
+          },
+          {
+            "internalType": "bytes",
+            "name": "report",
+            "type": "bytes"
+          },
+          {
+            "internalType": "bytes32[]",
+            "name": "rs",
+            "type": "bytes32[]"
+          },
+          {
+            "internalType": "bytes32[]",
+            "name": "ss",
+            "type": "bytes32[]"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "rawVs",
+            "type": "bytes32"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "transmit"
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "typeAndVersion",
+        "outputs": [
+          {
+            "internalType": "string",
+            "name": "",
+            "type": "string"
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "unpause"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes32[]",
+            "name": "hashedLeaves",
+            "type": "bytes32[]"
+          },
+          {
+            "internalType": "bytes32[]",
+            "name": "proofs",
+            "type": "bytes32[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "proofFlagBits",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "verify",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "timestamp",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "devdoc": {
+      "kind": "dev",
+      "methods": {
+        "constructor": {
+          "details": "When instantiating OCR2Base we set UNIQUE_REPORTS to false, which means that we do not require 2f+1 signatures on a report, only f+1 to save gas. 2f+1 is required only if one must strictly ensure that for a given round there is only one valid report ever generated by the DON. In our case additional valid reports (i.e. approved by >= f+1 oracles) are not a problem, as they will will either be ignored (reverted as an invalid interval) or will be accepted as an additional valid price update.",
+          "params": {
+            "staticConfig": "Containing the static part of the commitStore config"
+          }
+        },
+        "getDynamicConfig()": {
+          "returns": {
+            "_0": "the configuration."
+          }
+        },
+        "getExpectedNextSequenceNumber()": {
+          "returns": {
+            "_0": "the next expected sequenceNumber."
+          }
+        },
+        "getLatestPriceEpochAndRound()": {
+          "returns": {
+            "_0": "the latest price epoch and round."
+          }
+        },
+        "getMerkleRoot(bytes32)": {
+          "params": {
+            "root": "The merkle root to check the commit status for."
+          },
+          "returns": {
+            "_0": "the timestamp of the committed root or zero in the case that it was never committed."
+          }
+        },
+        "getStaticConfig()": {
+          "details": "RMN depends on this function, if changing, please notify the RMN maintainers.",
+          "returns": {
+            "_0": "the configuration."
+          }
+        },
+        "getTransmitters()": {
+          "details": "The list will match the order used to specify the transmitter during setConfig",
+          "returns": {
+            "_0": "list of addresses permitted to transmit reports to this contract"
+          }
+        },
+        "isBlessed(bytes32)": {
+          "params": {
+            "root": "The merkle root to check the blessing status for."
+          },
+          "returns": {
+            "_0": "whether the root is blessed or not."
+          }
+        },
+        "latestConfigDetails()": {
+          "returns": {
+            "blockNumber": "block at which this config was set",
+            "configCount": "ordinal number of current config, out of all configs applied to this contract so far",
+            "configDigest": "domain-separation tag for current config (see _configDigestFromConfigData)"
+          }
+        },
+        "latestConfigDigestAndEpoch()": {
+          "returns": {
+            "configDigest": "configDigest",
+            "epoch": "epoch",
+            "scanLogs": "indicates whether to rely on the configDigest and epoch returned or whether to scan logs for the Transmitted event instead."
+          }
+        },
+        "pause()": {
+          "details": "only callable by the owner"
+        },
+        "resetUnblessedRoots(bytes32[])": {
+          "params": {
+            "rootToReset": "The roots that will be reset. This function will only reset roots that are not blessed."
+          }
+        },
+        "setLatestPriceEpochAndRound(uint40)": {
+          "params": {
+            "latestPriceEpochAndRound": "The new epoch and round for prices."
+          }
+        },
+        "setMinSeqNr(uint64)": {
+          "params": {
+            "minSeqNr": "The new minimum sequence number."
+          }
+        },
+        "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": {
+          "params": {
+            "f": "number of faulty oracles the system can tolerate",
+            "offchainConfig": "encoded off-chain oracle configuration",
+            "offchainConfigVersion": "version number for offchainEncoding schema",
+            "onchainConfig": "encoded on-chain contract configuration",
+            "signers": "addresses with which oracles sign the reports",
+            "transmitters": "addresses oracles use to transmit the reports"
+          }
+        },
+        "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)": {
+          "params": {
+            "rawVs": "ith element is the the V component of the ith signature",
+            "report": "serialized report, which the signatures are signing.",
+            "rs": "ith element is the R components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries",
+            "ss": "ith element is the S components of the ith signature on report. Must have at most MAX_NUM_ORACLES entries"
+          }
+        },
+        "unpause()": {
+          "details": "only callable by the owner"
+        },
+        "verify(bytes32[],bytes32[],uint256)": {
+          "details": "This method uses a merkle tree within a merkle tree, with the hashedLeaves, proofs and proofFlagBits being used to get the root of the inner tree. This root is then used as the singular leaf of the outer tree."
+        }
+      },
+      "version": 1
+    },
+    "userdoc": {
+      "kind": "user",
+      "methods": {
+        "acceptOwnership()": {
+          "notice": "Allows an ownership transfer to be completed by the recipient."
+        },
+        "getDynamicConfig()": {
+          "notice": "Returns the dynamic commit store config."
+        },
+        "getExpectedNextSequenceNumber()": {
+          "notice": "Returns the next expected sequence number."
+        },
+        "getLatestPriceEpochAndRound()": {
+          "notice": "Returns the epoch and round of the last price update."
+        },
+        "getMerkleRoot(bytes32)": {
+          "notice": "Returns the timestamp of a potentially previously committed merkle root. If the root was never committed 0 will be returned."
+        },
+        "getStaticConfig()": {
+          "notice": "Returns the static commit store config."
+        },
+        "isBlessed(bytes32)": {
+          "notice": "Returns if a root is blessed or not."
+        },
+        "isUnpausedAndNotCursed()": {
+          "notice": "Single function to check the status of the commitStore."
+        },
+        "latestConfigDetails()": {
+          "notice": "information about current offchain reporting protocol configuration"
+        },
+        "latestConfigDigestAndEpoch()": {
+          "notice": "optionally returns the latest configDigest and epoch for which a report was successfully transmitted. Alternatively, the contract may return scanLogs set to true and use Transmitted events to provide this information to offchain watchers."
+        },
+        "owner()": {
+          "notice": "Get the current owner"
+        },
+        "pause()": {
+          "notice": "Pause the contract"
+        },
+        "paused()": {
+          "notice": "Returns true if the contract is paused, and false otherwise."
+        },
+        "resetUnblessedRoots(bytes32[])": {
+          "notice": "Used by the owner in case an invalid sequence of roots has been posted and needs to be removed. The interval in the report is trusted."
+        },
+        "setLatestPriceEpochAndRound(uint40)": {
+          "notice": "Sets the latest epoch and round for price update."
+        },
+        "setMinSeqNr(uint64)": {
+          "notice": "Sets the minimum sequence number."
+        },
+        "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": {
+          "notice": "sets offchain reporting protocol configuration incl. participating oracles"
+        },
+        "transferOwnership(address)": {
+          "notice": "Allows an owner to begin transferring ownership to a new address."
+        },
+        "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)": {
+          "notice": "transmit is called to post a new report to the contract"
+        },
+        "unpause()": {
+          "notice": "Unpause the contract"
+        },
+        "verify(bytes32[],bytes32[],uint256)": {
+          "notice": "Returns timestamp of when root was accepted or 0 if verification fails."
+        }
+      },
+      "version": 1
+    }
+  },
+  "settings": {
+    "remappings": [],
+    "optimizer": {
+      "enabled": true,
+      "runs": 26000
+    },
+    "metadata": {
+      "bytecodeHash": "ipfs"
+    },
+    "compilationTarget": {
+      "contracts/src/v0.8/ccip/CommitStore.sol": "CommitStore"
+    },
+    "evmVersion": "cancun",
+    "libraries": {}
+  },
+  "sources": {
+    "contracts/src/v0.8/ccip/CommitStore.sol": {
+      "keccak256": "0xbcdc98b579a10a0ce815468a4be17f2b5663ce469668d29ad4cc120beae11e29",
+      "urls": [
+        "bzz-raw://ce47ab0112c1631ef6e2a8b0dcd895be80825e385af0516073de24b0c1325491",
+        "dweb:/ipfs/QmeagAzRzXavFUuiFGYh3q95qSNRoD8tdK3iAouNyr2zp3"
+      ],
+      "license": "BUSL-1.1"
+    },
+    "contracts/src/v0.8/ccip/interfaces/ICommitStore.sol": {
+      "keccak256": "0x07eefec62840b0cbb72d2c3ae0db5185e7be3bf18a4e46c7321092df4582ca4b",
+      "urls": [
+        "bzz-raw://b9a4fa46de25eef979b73256c125160fed84bef208501de933a45c83b5f7b60c",
+        "dweb:/ipfs/QmdBwDXe9Ra2BB2JAaNwVN6YqTJPziffah2RkEtc2ZkhWS"
+      ],
+      "license": "MIT"
+    },
+    "contracts/src/v0.8/ccip/interfaces/IPriceRegistry.sol": {
+      "keccak256": "0x6ac41522574de331d35d5f1b41d0683c9973675a8c7b9c459e31f1ba18a5e592",
+      "urls": [
+        "bzz-raw://5b9581435a82a6a650f00546752ed28be68770bfdd9649ce469126054fcaed15",
+        "dweb:/ipfs/QmSeitveAVXobpd1MNrGmB6HYWhEHQ6Zb5UZg9J3ZezpEF"
+      ],
+      "license": "MIT"
+    },
+    "contracts/src/v0.8/ccip/interfaces/IRMN.sol": {
+      "keccak256": "0xef211e29d7cb2b93241514e9075a0d997ab4fd7c57650b0c94ecb62415d15ba5",
+      "urls": [
+        "bzz-raw://6955a9e54a8dc7c37a4275e403074219a0c7a219d050c7cd382bafdc57a5feaa",
+        "dweb:/ipfs/QmYzcnw8dfduu4oAfmz4QCgx3zCMuHdppqtxyE172FeAC2"
+      ],
+      "license": "MIT"
+    },
+    "contracts/src/v0.8/ccip/libraries/Client.sol": {
+      "keccak256": "0xa1ce70adec733c80b230084b425a50caa852a99f17a7e43e38a96a975f11ce88",
+      "urls": [
+        "bzz-raw://08db3aa57ceae13832c1bf323aa29afa2620fd5b5205ff0d56152bf323c56256",
+        "dweb:/ipfs/QmUG2FSVP8xXVkdgFwNhc4YFDU7FNCaf1kKShiTaaHUddE"
+      ],
+      "license": "MIT"
+    },
+    "contracts/src/v0.8/ccip/libraries/Internal.sol": {
+      "keccak256": "0x60b0d8eabf063eaaa353f636a9b4437080caa2ca4194d2e834061595efaa674d",
+      "urls": [
+        "bzz-raw://6cd0c4df5c051e64c45cff87ac1d85074babf085ce1f5a21689cf713fe01ae62",
+        "dweb:/ipfs/QmQMTT3y7iq2Kx3dDx6A6mHKCv3F3n9XKZZHdZbDnQyYB3"
+      ],
+      "license": "MIT"
+    },
+    "contracts/src/v0.8/ccip/libraries/MerkleMultiProof.sol": {
+      "keccak256": "0x9f2e5edd718cd1b5aa7143ca39ee50d7c15b8456ce32c49c10833c9ef3b0eb72",
+      "urls": [
+        "bzz-raw://c2591501ed4b28164009e58166324634a0ce79a0599ee682d47d825f302a9955",
+        "dweb:/ipfs/QmeN35m4PFQDBc1ew2Q5koYNfchf8DcTemUmXVFVSuZV5t"
+      ],
+      "license": "BUSL-1.1"
+    },
+    "contracts/src/v0.8/ccip/ocr/OCR2Abstract.sol": {
+      "keccak256": "0xdac140f9da44203be2953c220a463e3ea6d49ac4a72bcbff103f57af89ae77e9",
+      "urls": [
+        "bzz-raw://bb68c19d2aea9b1813d7a2895a4e1e78f0d86b4310d773a068f5cd139139b691",
+        "dweb:/ipfs/QmQe5RHRU3tjiX2USo23Pasg6tCoJ9UMrsDKSihtuDZfKc"
+      ],
+      "license": "BUSL-1.1"
+    },
+    "contracts/src/v0.8/ccip/ocr/OCR2Base.sol": {
+      "keccak256": "0x1f06f2e342db9c37844c33879df8b7a952934781d8780d537cd68a445eb440c1",
+      "urls": [
+        "bzz-raw://38c4b7036342fc914d762c95e1de157e84ebfa92dced79b86f659bb27cedd87c",
+        "dweb:/ipfs/Qma7qm5ark3QYSd3iNksax3wxDRQR6wWWCVkJEhwNyGHMT"
+      ],
+      "license": "BUSL-1.1"
+    },
+    "contracts/src/v0.8/shared/access/ConfirmedOwner.sol": {
+      "keccak256": "0xdcb0e9135ddbe71ee27ba99fa06656960c66c964cf2ecb29696da1c1427d9861",
+      "urls": [
+        "bzz-raw://f914a1b638300e82d8f5a020a4195235599afebab4ef1e10c6992f3c90e7df3e",
+        "dweb:/ipfs/Qmf2MbuVB16qbCGii3U5cjcBvVjAHHYzKp9voJa2eDch9B"
+      ],
+      "license": "MIT"
+    },
+    "contracts/src/v0.8/shared/access/ConfirmedOwnerWithProposal.sol": {
+      "keccak256": "0x2422a055657a87e98be61f8f31abb1824ec50fd0f73949f4e3c6ac877efb6da8",
+      "urls": [
+        "bzz-raw://fde3b9ac3a4c42ea43e2f92b037d32ab20e30818471c6e20d2590147a6c2958a",
+        "dweb:/ipfs/QmQ2ohQP4GnhPUsiWCvCfb1dsoGYDdxSap3dxtnYTV4rmT"
+      ],
+      "license": "MIT"
+    },
+    "contracts/src/v0.8/shared/access/OwnerIsCreator.sol": {
+      "keccak256": "0x895af02d6a3df2930bbb6ec1f2d68118b492ca6e710ba0c34fcb6b574a0906aa",
+      "urls": [
+        "bzz-raw://c4c69fab5eea1c0448f856a51d7e5736454fe5cc083d36c60bf3ee23bb3d0e8e",
+        "dweb:/ipfs/QmP4fYQ9k7xeZms6cwnqnQuuAkRkeE2TWewyvCD8Mrc2DZ"
+      ],
+      "license": "MIT"
+    },
+    "contracts/src/v0.8/shared/interfaces/IOwnable.sol": {
+      "keccak256": "0x885de72b7b4e4f1bf8ba817a3f2bcc37fd9022d342c4ce76782151c30122d767",
+      "urls": [
+        "bzz-raw://17c636625a5d29a140612db496d2cca9fb4b48c673adb0fd7b3957d287e75921",
+        "dweb:/ipfs/QmNoBX8TY424bdQWyQC7y3kpKfgxyWxhLw7KEhhEEoBN9q"
+      ],
+      "license": "MIT"
+    },
+    "contracts/src/v0.8/shared/interfaces/ITypeAndVersion.sol": {
+      "keccak256": "0xf5827cb463c01d055021684d04f9186391c2d9ac850e0d0819f76140e4fc84ed",
+      "urls": [
+        "bzz-raw://a19c7bae07330e6d7904a0a21cf0ab0067ef096b66c1653a2e012801a931c5b9",
+        "dweb:/ipfs/QmckpvSuLx8UL8zfVzAtN6ZRxyXHUSVqqz2JwYZ2jrK58h"
+      ],
+      "license": "MIT"
+    }
+  },
+  "version": 1
+}

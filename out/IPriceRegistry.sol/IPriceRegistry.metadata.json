@@ -1,0 +1,632 @@
+{
+  "compiler": {
+    "version": "0.8.24+commit.e11b9ed9"
+  },
+  "language": "Solidity",
+  "output": {
+    "abi": [
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "fromToken",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "fromTokenAmount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "toToken",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "convertTokenAmount",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "toTokenAmount",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint64",
+            "name": "destChainSelector",
+            "type": "uint64"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getDestinationChainGasPrice",
+        "outputs": [
+          {
+            "internalType": "struct Internal.TimestampedPackedUint224",
+            "name": "",
+            "type": "tuple",
+            "components": [
+              {
+                "internalType": "uint224",
+                "name": "value",
+                "type": "uint224"
+              },
+              {
+                "internalType": "uint32",
+                "name": "timestamp",
+                "type": "uint32"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "inputs": [],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getFeeTokens",
+        "outputs": [
+          {
+            "internalType": "address[]",
+            "name": "",
+            "type": "address[]"
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "token",
+            "type": "address"
+          },
+          {
+            "internalType": "uint64",
+            "name": "destChainSelector",
+            "type": "uint64"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getTokenAndGasPrices",
+        "outputs": [
+          {
+            "internalType": "uint224",
+            "name": "tokenPrice",
+            "type": "uint224"
+          },
+          {
+            "internalType": "uint224",
+            "name": "gasPrice",
+            "type": "uint224"
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "token",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getTokenPrice",
+        "outputs": [
+          {
+            "internalType": "struct Internal.TimestampedPackedUint224",
+            "name": "",
+            "type": "tuple",
+            "components": [
+              {
+                "internalType": "uint224",
+                "name": "value",
+                "type": "uint224"
+              },
+              {
+                "internalType": "uint32",
+                "name": "timestamp",
+                "type": "uint32"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "token",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getTokenPriceFeedConfig",
+        "outputs": [
+          {
+            "internalType": "struct IPriceRegistry.TokenPriceFeedConfig",
+            "name": "",
+            "type": "tuple",
+            "components": [
+              {
+                "internalType": "address",
+                "name": "dataFeedAddress",
+                "type": "address"
+              },
+              {
+                "internalType": "uint8",
+                "name": "tokenDecimals",
+                "type": "uint8"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address[]",
+            "name": "tokens",
+            "type": "address[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getTokenPrices",
+        "outputs": [
+          {
+            "internalType": "struct Internal.TimestampedPackedUint224[]",
+            "name": "",
+            "type": "tuple[]",
+            "components": [
+              {
+                "internalType": "uint224",
+                "name": "value",
+                "type": "uint224"
+              },
+              {
+                "internalType": "uint32",
+                "name": "timestamp",
+                "type": "uint32"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint64",
+            "name": "destChainSelector",
+            "type": "uint64"
+          },
+          {
+            "internalType": "struct Client.EVM2AnyMessage",
+            "name": "message",
+            "type": "tuple",
+            "components": [
+              {
+                "internalType": "bytes",
+                "name": "receiver",
+                "type": "bytes"
+              },
+              {
+                "internalType": "bytes",
+                "name": "data",
+                "type": "bytes"
+              },
+              {
+                "internalType": "struct Client.EVMTokenAmount[]",
+                "name": "tokenAmounts",
+                "type": "tuple[]",
+                "components": [
+                  {
+                    "internalType": "address",
+                    "name": "token",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "uint256",
+                    "name": "amount",
+                    "type": "uint256"
+                  }
+                ]
+              },
+              {
+                "internalType": "address",
+                "name": "feeToken",
+                "type": "address"
+              },
+              {
+                "internalType": "bytes",
+                "name": "extraArgs",
+                "type": "bytes"
+              }
+            ]
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getValidatedFee",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "feeTokenAmount",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "token",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getValidatedTokenPrice",
+        "outputs": [
+          {
+            "internalType": "uint224",
+            "name": "",
+            "type": "uint224"
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint64",
+            "name": "destChainSelector",
+            "type": "uint64"
+          },
+          {
+            "internalType": "address",
+            "name": "feeToken",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "feeTokenAmount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bytes",
+            "name": "extraArgs",
+            "type": "bytes"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "processMessageArgs",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "msgFeeJuels",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "isOutOfOrderExecution",
+            "type": "bool"
+          },
+          {
+            "internalType": "bytes",
+            "name": "convertedExtraArgs",
+            "type": "bytes"
+          }
+        ]
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "struct Internal.PriceUpdates",
+            "name": "priceUpdates",
+            "type": "tuple",
+            "components": [
+              {
+                "internalType": "struct Internal.TokenPriceUpdate[]",
+                "name": "tokenPriceUpdates",
+                "type": "tuple[]",
+                "components": [
+                  {
+                    "internalType": "address",
+                    "name": "sourceToken",
+                    "type": "address"
+                  },
+                  {
+                    "internalType": "uint224",
+                    "name": "usdPerToken",
+                    "type": "uint224"
+                  }
+                ]
+              },
+              {
+                "internalType": "struct Internal.GasPriceUpdate[]",
+                "name": "gasPriceUpdates",
+                "type": "tuple[]",
+                "components": [
+                  {
+                    "internalType": "uint64",
+                    "name": "destChainSelector",
+                    "type": "uint64"
+                  },
+                  {
+                    "internalType": "uint224",
+                    "name": "usdPerUnitGas",
+                    "type": "uint224"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function",
+        "name": "updatePrices"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint64",
+            "name": "destChainSelector",
+            "type": "uint64"
+          },
+          {
+            "internalType": "struct Internal.RampTokenAmount[]",
+            "name": "rampTokenAmounts",
+            "type": "tuple[]",
+            "components": [
+              {
+                "internalType": "bytes",
+                "name": "sourcePoolAddress",
+                "type": "bytes"
+              },
+              {
+                "internalType": "bytes",
+                "name": "destTokenAddress",
+                "type": "bytes"
+              },
+              {
+                "internalType": "bytes",
+                "name": "extraData",
+                "type": "bytes"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "internalType": "struct Client.EVMTokenAmount[]",
+            "name": "sourceTokenAmounts",
+            "type": "tuple[]",
+            "components": [
+              {
+                "internalType": "address",
+                "name": "token",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+              }
+            ]
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "validatePoolReturnData"
+      }
+    ],
+    "devdoc": {
+      "kind": "dev",
+      "methods": {
+        "convertTokenAmount(address,uint256,address)": {
+          "params": {
+            "fromToken": "The given token address.",
+            "fromTokenAmount": "The given token amount.",
+            "toToken": "The target token address."
+          },
+          "returns": {
+            "toTokenAmount": "The target token amount."
+          }
+        },
+        "getDestinationChainGasPrice(uint64)": {
+          "params": {
+            "destChainSelector": "The destination chain to get the price for."
+          },
+          "returns": {
+            "_0": "gasPrice The encoded gasPrice for the given destination chain ID."
+          }
+        },
+        "getFeeTokens()": {
+          "returns": {
+            "_0": "The tokens set as fee tokens."
+          }
+        },
+        "getTokenAndGasPrices(address,uint64)": {
+          "params": {
+            "destChainSelector": "The destination chain to get the gas price for.",
+            "token": "The source token to get the price for."
+          },
+          "returns": {
+            "gasPrice": "The price of gas in 1e18 dollars per base unit.",
+            "tokenPrice": "The price of the feeToken in 1e18 dollars per base unit."
+          }
+        },
+        "getTokenPrice(address)": {
+          "params": {
+            "token": "The token to get the price for."
+          },
+          "returns": {
+            "_0": "tokenPrice The tokenPrice for the given token."
+          }
+        },
+        "getTokenPriceFeedConfig(address)": {
+          "params": {
+            "token": "The token to retrieve the feed config for"
+          },
+          "returns": {
+            "_0": "dataFeedAddress The token price data feed config (if feed address is 0, the feed config is disabled)"
+          }
+        },
+        "getTokenPrices(address[])": {
+          "params": {
+            "tokens": "The tokens to get prices for."
+          },
+          "returns": {
+            "_0": "tokenPrices The tokenPrices for the given tokens."
+          }
+        },
+        "getValidatedFee(uint64,(bytes,bytes,(address,uint256)[],address,bytes))": {
+          "params": {
+            "destChainSelector": "The destination chain selector.",
+            "message": "The message to get quote for."
+          },
+          "returns": {
+            "feeTokenAmount": "The amount of fee token needed for the fee, in smallest denomination of the fee token."
+          }
+        },
+        "getValidatedTokenPrice(address)": {
+          "params": {
+            "token": "The token to get the price for."
+          },
+          "returns": {
+            "_0": "tokenPrice The tokenPrice for the given token if it exists and is valid."
+          }
+        },
+        "processMessageArgs(uint64,address,uint256,bytes)": {
+          "params": {
+            "destChainSelector": "destination chain selector to process",
+            "extraArgs": "Message extra args that were passed in by the client",
+            "feeToken": "Fee token address used to pay for message fees",
+            "feeTokenAmount": "Fee token amount"
+          },
+          "returns": {
+            "convertedExtraArgs": "extra args converted to the latest family-specific args version",
+            "isOutOfOrderExecution": "true if the message should be executed out of order",
+            "msgFeeJuels": "message fee in juels"
+          }
+        },
+        "updatePrices(((address,uint224)[],(uint64,uint224)[]))": {
+          "params": {
+            "priceUpdates": "The price updates to apply."
+          }
+        },
+        "validatePoolReturnData(uint64,(bytes,bytes,bytes,uint256)[],(address,uint256)[])": {
+          "params": {
+            "destChainSelector": "Destination chain selector to which the token amounts are sent to",
+            "rampTokenAmounts": "Token amounts with populated pool return data",
+            "sourceTokenAmounts": "Token amounts originally sent in a Client.EVM2AnyMessage message"
+          }
+        }
+      },
+      "version": 1
+    },
+    "userdoc": {
+      "kind": "user",
+      "methods": {
+        "convertTokenAmount(address,uint256,address)": {
+          "notice": "Convert a given token amount to target token amount."
+        },
+        "getDestinationChainGasPrice(uint64)": {
+          "notice": "Get an encoded `gasPrice` for a given destination chain ID. The 224-bit result encodes necessary gas price components. On L1 chains like Ethereum or Avax, the only component is the gas price. On Optimistic Rollups, there are two components - the L2 gas price, and L1 base fee for data availability. On future chains, there could be more or differing price components. PriceRegistry does not contain chain-specific logic to parse destination chain price components."
+        },
+        "getFeeTokens()": {
+          "notice": "Get the list of fee tokens."
+        },
+        "getTokenAndGasPrices(address,uint64)": {
+          "notice": "Gets the fee token price and the gas price, both denominated in dollars."
+        },
+        "getTokenPrice(address)": {
+          "notice": "Get the `tokenPrice` for a given token."
+        },
+        "getTokenPriceFeedConfig(address)": {
+          "notice": "Returns the token price data feed configuration"
+        },
+        "getTokenPrices(address[])": {
+          "notice": "Get the `tokenPrice` for an array of tokens."
+        },
+        "getValidatedFee(uint64,(bytes,bytes,(address,uint256)[],address,bytes))": {
+          "notice": "Validates the ccip message & returns the fee"
+        },
+        "getValidatedTokenPrice(address)": {
+          "notice": "Get the `tokenPrice` for a given token, checks if the price is valid."
+        },
+        "processMessageArgs(uint64,address,uint256,bytes)": {
+          "notice": "Converts the extraArgs to the latest version and returns the converted message fee in juels"
+        },
+        "updatePrices(((address,uint224)[],(uint64,uint224)[]))": {
+          "notice": "Update the price for given tokens and gas prices for given chains."
+        },
+        "validatePoolReturnData(uint64,(bytes,bytes,bytes,uint256)[],(address,uint256)[])": {
+          "notice": "Validates pool return data"
+        }
+      },
+      "version": 1
+    }
+  },
+  "settings": {
+    "remappings": [],
+    "optimizer": {
+      "enabled": true,
+      "runs": 26000
+    },
+    "metadata": {
+      "bytecodeHash": "ipfs"
+    },
+    "compilationTarget": {
+      "contracts/src/v0.8/ccip/interfaces/IPriceRegistry.sol": "IPriceRegistry"
+    },
+    "evmVersion": "cancun",
+    "libraries": {}
+  },
+  "sources": {
+    "contracts/src/v0.8/ccip/interfaces/IPriceRegistry.sol": {
+      "keccak256": "0x6ac41522574de331d35d5f1b41d0683c9973675a8c7b9c459e31f1ba18a5e592",
+      "urls": [
+        "bzz-raw://5b9581435a82a6a650f00546752ed28be68770bfdd9649ce469126054fcaed15",
+        "dweb:/ipfs/QmSeitveAVXobpd1MNrGmB6HYWhEHQ6Zb5UZg9J3ZezpEF"
+      ],
+      "license": "MIT"
+    },
+    "contracts/src/v0.8/ccip/libraries/Client.sol": {
+      "keccak256": "0xa1ce70adec733c80b230084b425a50caa852a99f17a7e43e38a96a975f11ce88",
+      "urls": [
+        "bzz-raw://08db3aa57ceae13832c1bf323aa29afa2620fd5b5205ff0d56152bf323c56256",
+        "dweb:/ipfs/QmUG2FSVP8xXVkdgFwNhc4YFDU7FNCaf1kKShiTaaHUddE"
+      ],
+      "license": "MIT"
+    },
+    "contracts/src/v0.8/ccip/libraries/Internal.sol": {
+      "keccak256": "0x60b0d8eabf063eaaa353f636a9b4437080caa2ca4194d2e834061595efaa674d",
+      "urls": [
+        "bzz-raw://6cd0c4df5c051e64c45cff87ac1d85074babf085ce1f5a21689cf713fe01ae62",
+        "dweb:/ipfs/QmQMTT3y7iq2Kx3dDx6A6mHKCv3F3n9XKZZHdZbDnQyYB3"
+      ],
+      "license": "MIT"
+    },
+    "contracts/src/v0.8/ccip/libraries/MerkleMultiProof.sol": {
+      "keccak256": "0x9f2e5edd718cd1b5aa7143ca39ee50d7c15b8456ce32c49c10833c9ef3b0eb72",
+      "urls": [
+        "bzz-raw://c2591501ed4b28164009e58166324634a0ce79a0599ee682d47d825f302a9955",
+        "dweb:/ipfs/QmeN35m4PFQDBc1ew2Q5koYNfchf8DcTemUmXVFVSuZV5t"
+      ],
+      "license": "BUSL-1.1"
+    }
+  },
+  "version": 1
+}
