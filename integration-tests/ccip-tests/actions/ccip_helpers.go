@@ -1006,7 +1006,8 @@ func (ccipModule *CCIPCommon) DeployContracts(
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, usdcPool)
 			} else if ccipModule.IsLBTCDeployment() && i == 0 {
 				rmnContract := *ccipModule.RMNContract
-				lbtcPool, err := ccipModule.tokenDeployer.DeployMockLBTCTokenPoolContract(token.Address(), rmnContract, ccipModule.Router.Instance.Address())
+				destPoolData := []byte{0x12, 0x34, 0x56, 0x78}
+				lbtcPool, err := ccipModule.tokenDeployer.DeployMockLBTCTokenPoolContract(token.Address(), rmnContract, ccipModule.Router.Instance.Address(), destPoolData)
 				if err != nil {
 					return fmt.Errorf("deploying mock lbtc bridge token pool shouldn't fail %w", err)
 				}

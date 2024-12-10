@@ -17,13 +17,16 @@ contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
 
     string public constant override typeAndVersion = "MockLBTCTokenPool 1.5.1";
 
+    bytes public destPoolData;
+
     constructor(
         IERC20 token,
         address[] memory allowlist,
         address rmnProxy,
-        address router
+        address router,
+        bytes memory _data
     ) TokenPool(token, 8, allowlist, rmnProxy, router) {
-
+        destPoolData = _data;
     }
 
     /// @notice Burn the token in the pool
@@ -32,10 +35,10 @@ contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
     function lockOrBurn(
         Pool.LockOrBurnInV1 calldata lockOrBurnIn
     ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-        bytes memory payload;
-        bytes memory destPoolData;
-        payload = abi.encodePacked(hex"1234abcd");
-        destPoolData = abi.encode(sha256(payload));
+//        bytes memory payload;
+//        bytes memory destPoolData;
+//        payload = abi.encodePacked(hex"1234abcd");
+//        destPoolData = abi.encode(sha256(payload));
 
         IBurnMintERC20(address(i_token)).burn(lockOrBurnIn.amount);
         emit Burned(msg.sender, lockOrBurnIn.amount);

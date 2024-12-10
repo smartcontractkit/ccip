@@ -567,7 +567,7 @@ func (e *CCIPContractsDeployer) NewMockLBTCTokenPoolContract(addr common.Address
 
 }
 
-func (e *CCIPContractsDeployer) DeployMockLBTCTokenPoolContract(tokenAddr string, rmnProxy common.Address, router common.Address) (
+func (e *CCIPContractsDeployer) DeployMockLBTCTokenPoolContract(tokenAddr string, rmnProxy common.Address, router common.Address, destPoolData []byte) (
 	*TokenPool,
 	error,
 ) {
@@ -588,6 +588,7 @@ func (e *CCIPContractsDeployer) DeployMockLBTCTokenPoolContract(tokenAddr string
 				[]common.Address{},
 				rmnProxy,
 				router,
+				destPoolData,
 			)
 		})
 
