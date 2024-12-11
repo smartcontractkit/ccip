@@ -993,7 +993,6 @@ func (ccipModule *CCIPCommon) DeployContracts(
 			token := ccipModule.BridgeTokens[i]
 			// usdc pool need to be the first one in the slice
 			if ccipModule.IsUSDCDeployment() && i == 0 {
-				//ccipModule.Logger.Println("Enter USDC")
 				// deploy usdc token pool in case of usdc deployment
 				if ccipModule.TokenMessenger == nil {
 					return fmt.Errorf("TokenMessenger contract address is not provided")
@@ -1008,36 +1007,39 @@ func (ccipModule *CCIPCommon) DeployContracts(
 
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, usdcPool)
 			} else if ccipModule.IsLBTCDeployment() && i == 0 {
+				if ccipModule.RMNContract == nil {
+					return fmt.Errorf("RMNContract is not initialized")
+				}
 				rmnContract := *ccipModule.RMNContract
+
 				destPoolData, err := hex.DecodeString(LBTCValidDestPoolData) // valid 32 bytes should call attestation api
 				if err != nil {
-					return fmt.Errorf("decoding dest pool data shouldn't fail %w", err)
+					return errors.Wrapf(err, "decoding dest pool data shouldn't fail")
 				}
 				if !pointer.GetBool(ccipModule.LBTCDestPoolDataAs32Bytes) {
 					// non 32 bytes data should not call attestation api and instead consider it as deposit payload.
 					// lombard has both attested and non-attested flow
 					destPoolData = []byte{0x12, 0x34, 0x56, 0x78}
 				}
-				//
 				lbtcPool, err := ccipModule.tokenDeployer.DeployMockLBTCTokenPoolContract(token.Address(), rmnContract, ccipModule.Router.Instance.Address(), destPoolData)
 				if err != nil {
-					return fmt.Errorf("deploying mock lbtc bridge token pool shouldn't fail %w", err)
+					return errors.Wrapf(err, "deploying mock lbtc bridge token pool shouldn't fail")
 				}
 				lbtcInstance, err := burn_mint_erc677.NewBurnMintERC677(token.ContractAddress, ccipModule.ChainClient.Backend())
 				if err != nil {
-					return fmt.Errorf("failed to get dest usdc token instance: %w", err)
+					return errors.Wrapf(err, "failed to get dest usdc token instance")
 				}
 				opts, err := ccipModule.tokenDeployer.Client().TransactionOpts(token.OwnerWallet)
 				if err != nil {
-					return fmt.Errorf("failed to get transaction opts: %w", err)
+					return errors.Wrapf(err, "failed to get transaction opts")
 				}
 				tx, err := lbtcInstance.GrantMintAndBurnRoles(opts, common.HexToAddress(lbtcPool.Address()))
 				if err != nil {
-					return fmt.Errorf("granting minter role to owner shouldn't fail %w", err)
+					return errors.Wrapf(err, "granting minter role to owner shouldn't fail")
 				}
 				err = ccipModule.tokenDeployer.Client().ProcessTransaction(tx)
 				if err != nil {
-					return fmt.Errorf("failed to process grant mint role %w", err)
+					return errors.Wrapf(err, "failed to process grant mint role")
 				}
 
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, lbtcPool)
