@@ -47,7 +47,6 @@
     "src/v0.8/vendor/Pausable.sol",
     "abi/v0.8/",
     "src/v0.8/ccip/LICENSE.md",
-    "src/v0.8/ccip/LICENSE-MIT.md",
     "src/v0.8/ccip/v1.5-CCIP-License-grants.md",
     "!src/v0.8/ccip/test/**/*",
     "src/v0.8/ccip/test/mocks/**/*",
