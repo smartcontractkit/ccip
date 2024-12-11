@@ -29,17 +29,9 @@ contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
         destPoolData = _data;
     }
 
-    /// @notice Burn the token in the pool
-    /// @dev emits ITokenMessenger.DepositForBurn
-    /// @dev Assumes caller has validated destinationReceiver
     function lockOrBurn(
         Pool.LockOrBurnInV1 calldata lockOrBurnIn
     ) public virtual override returns (Pool.LockOrBurnOutV1 memory) {
-//        bytes memory payload;
-//        bytes memory destPoolData;
-//        payload = abi.encodePacked(hex"1234abcd");
-//        destPoolData = abi.encode(sha256(payload));
-
         IBurnMintERC20(address(i_token)).burn(lockOrBurnIn.amount);
         emit Burned(msg.sender, lockOrBurnIn.amount);
 
@@ -55,9 +47,6 @@ contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
     function releaseOrMint(
         Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
     ) public virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
-
-        // TODO: validate releaseOrMintIn.offchainTokenData?
-        // Mint to the receiver
         IBurnMintERC20(address(i_token)).mint(releaseOrMintIn.receiver, releaseOrMintIn.amount);
 
         emit Minted(
