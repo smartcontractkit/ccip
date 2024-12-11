@@ -4,6 +4,7 @@ import (
 	"context"
 	crypto_rand "crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -88,6 +89,7 @@ const (
 	// DefaultResubscriptionTimeout denotes the max backoff duration for resubscription for various watch events
 	// if the subscription keeps failing even after this duration, the test will fail
 	DefaultResubscriptionTimeout = 2 * time.Hour
+	LBTCValidDestPoolData        = "9b11457aa29d65e4940b67b7da16bd370d29bf6a3247a28066f93ac407b8b811"
 )
 
 // TODO: These should be refactored along with the default CCIP test setup to use optional config functions
@@ -177,6 +179,7 @@ type CCIPCommon struct {
 	ExistingDeployment            bool
 	USDCMockDeployment            *bool
 	LBTCMockDeployment            *bool
+	LBTCDestPoolDataAs32Bytes     *bool
 	TokenMessenger                *common.Address
 	TokenTransmitter              *contracts.TokenTransmitter
 	IsConnectionRestoredRecently  *atomic.Bool
@@ -1006,7 +1009,14 @@ func (ccipModule *CCIPCommon) DeployContracts(
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, usdcPool)
 			} else if ccipModule.IsLBTCDeployment() && i == 0 {
 				rmnContract := *ccipModule.RMNContract
-				destPoolData := []byte{0x12, 0x34, 0x56, 0x78}
+				destPoolData, err := hex.DecodeString(LBTCValidDestPoolData)
+				if err != nil {
+					return fmt.Errorf("decoding dest pool data shouldn't fail %w", err)
+				}
+				if !pointer.GetBool(ccipModule.LBTCDestPoolDataAs32Bytes) {
+					destPoolData = []byte{0x12, 0x34, 0x56, 0x78}
+				}
+				//
 				lbtcPool, err := ccipModule.tokenDeployer.DeployMockLBTCTokenPoolContract(token.Address(), rmnContract, ccipModule.Router.Instance.Address(), destPoolData)
 				if err != nil {
 					return fmt.Errorf("deploying mock lbtc bridge token pool shouldn't fail %w", err)
@@ -1328,6 +1338,7 @@ func DefaultCCIPModule(
 		MulticallEnabled:              pointer.GetBool(testGroupConf.MulticallInOneTx),
 		USDCMockDeployment:            testGroupConf.USDCMockDeployment,
 		LBTCMockDeployment:            testGroupConf.LBTCMockDeployment,
+		LBTCDestPoolDataAs32Bytes:     testGroupConf.LBTCDestPoolDataAs32Bytes,
 		NoOfTokensNeedingDynamicPrice: pointer.GetInt(testGroupConf.TokenConfig.NoOfTokensWithDynamicPrice),
 		poolFunds:                     testhelpers.Link(5),
 		gasUpdateWatcherMu:            &sync.Mutex{},
@@ -4495,7 +4506,7 @@ func SetMockServerWithLBTCAttestation(
 	}{
 		Attestations: []attestation{
 			{
-				MessageHash: "0x9b11457aa29d65e4940b67b7da16bd370d29bf6a3247a28066f93ac407b8b811", //sample hash
+				MessageHash: "0x" + LBTCValidDestPoolData, //sample hash
 				Status:      "NOTARIZATION_STATUS_SESSION_APPROVED",
 				Attestation: "0x0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000000e45c70a5050000000000000000000000000000000000000000000000000000000000aa36a7000000000000000000000000845f8e3c214d8d0e4d83fc094f302aa26a12a0bc0000000000000000000000000000000000000000000000000000000000014a34000000000000000000000000845f8e3c214d8d0e4d83fc094f302aa26a12a0bc00000000000000000000000062f10ce5b727edf787ea45776bd050308a61150800000000000000000000000000000000000000000000000000000000000003e60000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000040277eeafba008d767c2636d9428f2ebb13ab29ac70337f4fc34b0f5606767cae546f9be3f12160de6d142e5b3c1c3ebd0bf4298662b32b597d0cc5970c7742fc10000000000000000000000000000000000000000000000000000000000000040bbcd60ecc9e06f2effe7c94161219498a1eb435b419387adadb86ec9a52dfb066ce027532517df7216404049d193a25b85c35edfa3e7c5aa4757bfe84887a3980000000000000000000000000000000000000000000000000000000000000040da4a6dc619b5ca2349783cabecc4efdbc910090d3e234d7b8d0430165f8fae532f9a965ceb85c18bb92e059adefa7ce5835850a705761ab9e026d2db4a13ef9a",
 			},

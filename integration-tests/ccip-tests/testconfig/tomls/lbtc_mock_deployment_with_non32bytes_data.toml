@@ -2,6 +2,7 @@
 [CCIP.Groups]
 [CCIP.Groups.smoke]
 LBTCMockDeployment = true
+LBTCDestPoolDataAs32Bytes = false
 
 [CCIP.Groups.smoke.TokenConfig]
 NoOfTokensPerChain = 1
