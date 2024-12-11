@@ -1387,7 +1387,9 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 	t.Cleanup(func() {
 		if configureCLNode {
 			if ccipEnv.LocalCluster != nil {
-				flushClLogs(*lggr, ccipEnv.LocalCluster)
+				if t.Failed() || (ccipEnv.LocalCluster.TestConfig.GetLoggingConfig() != nil && ccipEnv.LocalCluster.TestConfig.GetLoggingConfig().TestLogCollect != nil && *ccipEnv.LocalCluster.TestConfig.GetLoggingConfig().TestLogCollect) {
+					flushClLogs(*lggr, ccipEnv.LocalCluster)
+				}
 
 				err := ccipEnv.LocalCluster.Terminate()
 				require.NoError(t, err, "Local cluster termination shouldn't fail")
