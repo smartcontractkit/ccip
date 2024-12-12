@@ -19,7 +19,7 @@ contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
     // This variable i_destPoolData will have either a 32-byte or non-32-byte value, which will change the off-chain behavior.
     // If it is 32 bytes, the off-chain will consider it as attestation enabled and call the attestation API.
     // If it is non-32 bytes, the off-chain will consider it as attestation disabled.
-    bytes public immutable i_destPoolData;
+    bytes public i_destPoolData;
 
     constructor(
         IERC20 token,
