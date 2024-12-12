@@ -10,7 +10,6 @@ NoNewFinalizedHeadsThreshold = '40m0s'
 HistoryDepth = 1250
 
 [GasEstimator]
-Mode = 'BlockHistory'
 PriceMax = '120 gwei'
 # Limit values are high as Mantle's GasPrice is in native token (MNT) instead of ETH. Their proprietary TokenRatio parameter is used to adjust fees
 LimitDefault = 80_000_000_000
