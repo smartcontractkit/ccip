@@ -10,23 +10,25 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/// @notice This pool mints and burns LBTC tokens through the Cross Chain Transfer
-/// Protocol (CCTP).
+/// @notice This mock contract facilitates testing of LBTC token transfers by burning and minting tokens.
 contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
     using SafeERC20 for IERC20;
 
     string public constant override typeAndVersion = "MockLBTCTokenPool 1.5.1";
 
-    bytes public destPoolData;
+    // This variable i_destPoolData will have either a 32-byte or non-32-byte value, which will change the off-chain behavior.
+    // If it is 32 bytes, the off-chain will consider it as attestation enabled and call the attestation API.
+    // If it is non-32 bytes, the off-chain will consider it as attestation disabled.
+    bytes public immutable i_destPoolData;
 
     constructor(
         IERC20 token,
         address[] memory allowlist,
         address rmnProxy,
         address router,
-        bytes memory _data
+        bytes memory destPoolData
     ) TokenPool(token, 8, allowlist, rmnProxy, router) {
-        destPoolData = _data;
+        i_destPoolData = destPoolData;
     }
 
     function lockOrBurn(
@@ -40,7 +42,7 @@ contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
             destTokenAddress: getRemoteToken(
                 lockOrBurnIn.remoteChainSelector
             ),
-            destPoolData: destPoolData
+            destPoolData: i_destPoolData
         });
     }
 
