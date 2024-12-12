@@ -48,6 +48,10 @@ contract CLAdapter is AbstractAdapter, Ownable {
         emit CLTokenPoolDeployed(address(tokenPool));
     }
 
+    function setTokenPool(LombardTokenPool tokenPool_) external onlyOwner {
+        tokenPool = tokenPool_;
+    }
+
     /// USER ACTIONS ///
 
     function getFee(
