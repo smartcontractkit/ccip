@@ -27,7 +27,7 @@ contract MockLBTCTokenPool is TokenPool, ITypeAndVersion {
         address rmnProxy,
         address router,
         bytes memory destPoolData
-    ) TokenPool(token, 8, allowlist, rmnProxy, router) {
+    ) TokenPool(token, allowlist, rmnProxy, router) {
         i_destPoolData = destPoolData;
     }
 
