@@ -22,7 +22,7 @@ contract LombardTokenPool is TokenPool {
         address rmnProxy_,
         CLAdapter adapter_,
         bool attestationEnable_
-    ) TokenPool(lbtc_, allowlist_, rmnProxy_, ccipRouter_) {
+    ) TokenPool(lbtc_, 8, allowlist_, rmnProxy_, ccipRouter_) {
         adapter = adapter_;
         isAttestationEnabled = attestationEnable_;
     }

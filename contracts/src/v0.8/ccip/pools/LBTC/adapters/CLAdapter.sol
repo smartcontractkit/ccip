@@ -46,7 +46,7 @@ contract CLAdapter is AbstractAdapter, Ownable {
         address[] memory allowlist_,
         address rmnProxy_,
         bool attestationEnable_
-    ) AbstractAdapter(bridge_) Ownable(_msgSender()) {
+    ) AbstractAdapter(bridge_) Ownable() {
         _setExecutionGasLimit(executionGasLimit_);
 
         tokenPool = new LombardTokenPool(
