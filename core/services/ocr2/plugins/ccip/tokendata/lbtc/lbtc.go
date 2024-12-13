@@ -135,7 +135,7 @@ func NewLBTCTokenDataReader(
 
 	return &TokenDataReader{
 		lggr:                  lggr,
-		httpClient:            http.NewObservedIHttpClient(&http.HttpClient{}),
+		httpClient:            http.NewObservedLbtcIHttpClient(&http.HttpClient{}),
 		attestationApi:        lbtcAttestationApi,
 		attestationApiTimeout: timeout,
 		lbtcTokenAddress:      lbtcTokenAddress,
