@@ -18,3 +18,8 @@ HistoryDepth = 350
 # FinalityDepth < 1k => FinalityTagBypass = false
 # https://chainlink-core.slack.com/archives/C07RA1B58CC/p1730983397689179?thread_ts=1730908333.814809&cid=C07RA1B58CC
 FinalityTagBypass = false
+
+[Transactions.AutoPurge]
+Enabled = true
+Threshold = 50 # 50 blocks at 3s block time ~2.5 minutes
+MinAttempts = 3

@@ -54,14 +54,18 @@ contract MockRMN is IRMN, OwnerIsCreator {
     return s_curse;
   }
 
-  function isCursed(bytes16 subject) external view override returns (bool) {
+  function isCursed(
+    bytes16 subject
+  ) external view override returns (bool) {
     if (s_err.length != 0) {
       revert CustomError(s_err);
     }
     return s_curse || s_curseBySubject[subject];
   }
 
-  function voteToCurse(bytes32) external {
+  function voteToCurse(
+    bytes32
+  ) external {
     s_curse = true;
   }
 
@@ -69,7 +73,9 @@ contract MockRMN is IRMN, OwnerIsCreator {
     s_curseBySubject[subject] = true;
   }
 
-  function ownerUnvoteToCurse(OldRMN.UnvoteToCurseRecord[] memory) external {
+  function ownerUnvoteToCurse(
+    OldRMN.UnvoteToCurseRecord[] memory
+  ) external {
     s_curse = false;
   }
 
@@ -77,11 +83,15 @@ contract MockRMN is IRMN, OwnerIsCreator {
     s_curseBySubject[subject] = false;
   }
 
-  function setRevert(bytes memory err) external {
+  function setRevert(
+    bytes memory err
+  ) external {
     s_err = err;
   }
 
-  function isBlessed(IRMN.TaggedRoot calldata) external view override returns (bool) {
+  function isBlessed(
+    IRMN.TaggedRoot calldata
+  ) external view override returns (bool) {
     return !s_curse;
   }
 

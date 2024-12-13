@@ -34,5 +34,7 @@ contract OCR2Helper is OCR2Base(false) {
     return "OCR2BaseHelper 1.0.0";
   }
 
-  function _beforeSetConfig(bytes memory _onchainConfig) internal override {}
+  function _beforeSetConfig(
+    bytes memory _onchainConfig
+  ) internal override {}
 }

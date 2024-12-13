@@ -246,7 +246,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   /// @inheritdoc IEVM2AnyOnRamp
-  function getSenderNonce(address sender) external view returns (uint64) {
+  function getSenderNonce(
+    address sender
+  ) external view returns (uint64) {
     uint256 senderNonce = s_senderNonce[sender];
 
     if (i_prevOnRamp != address(0)) {
@@ -399,7 +401,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev Convert the extra args bytes into a struct
   /// @param extraArgs The extra args bytes
   /// @return The extra args struct
-  function _fromBytes(bytes calldata extraArgs) internal view returns (Client.EVMExtraArgsV2 memory) {
+  function _fromBytes(
+    bytes calldata extraArgs
+  ) internal view returns (Client.EVMExtraArgsV2 memory) {
     if (extraArgs.length == 0) {
       return Client.EVMExtraArgsV2({gasLimit: i_defaultTxGasLimit, allowOutOfOrderExecution: false});
     }
@@ -467,12 +471,16 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @notice Sets the dynamic configuration.
   /// @param dynamicConfig The configuration.
-  function setDynamicConfig(DynamicConfig memory dynamicConfig) external onlyOwner {
+  function setDynamicConfig(
+    DynamicConfig memory dynamicConfig
+  ) external onlyOwner {
     _setDynamicConfig(dynamicConfig);
   }
 
   /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
-  function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
+  function _setDynamicConfig(
+    DynamicConfig memory dynamicConfig
+  ) internal {
     // We permit router to be set to zero as a way to pause the contract.
     if (dynamicConfig.priceRegistry == address(0)) revert InvalidConfig();
     s_dynamicConfig = dynamicConfig;
@@ -502,7 +510,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   /// @inheritdoc IEVM2AnyOnRampClient
-  function getSupportedTokens(uint64) external pure returns (address[] memory) {
+  function getSupportedTokens(
+    uint64
+  ) external pure returns (address[] memory) {
     revert GetSupportedTokensFunctionalityRemovedCheckAdminRegistry();
   }
 
@@ -688,20 +698,26 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @notice Gets the fee configuration for a token
   /// @param token The token to get the fee configuration for
   /// @return feeTokenConfig FeeTokenConfig struct
-  function getFeeTokenConfig(address token) external view returns (FeeTokenConfig memory feeTokenConfig) {
+  function getFeeTokenConfig(
+    address token
+  ) external view returns (FeeTokenConfig memory feeTokenConfig) {
     return s_feeTokenConfig[token];
   }
 
   /// @notice Sets the fee configuration for a token
   /// @param feeTokenConfigArgs Array of FeeTokenConfigArgs structs.
-  function setFeeTokenConfig(FeeTokenConfigArgs[] memory feeTokenConfigArgs) external {
+  function setFeeTokenConfig(
+    FeeTokenConfigArgs[] memory feeTokenConfigArgs
+  ) external {
     _onlyOwnerOrAdmin();
     _setFeeTokenConfig(feeTokenConfigArgs);
   }
 
   /// @dev Set the fee config
   /// @param feeTokenConfigArgs The fee token configs.
-  function _setFeeTokenConfig(FeeTokenConfigArgs[] memory feeTokenConfigArgs) internal {
+  function _setFeeTokenConfig(
+    FeeTokenConfigArgs[] memory feeTokenConfigArgs
+  ) internal {
     for (uint256 i = 0; i < feeTokenConfigArgs.length; ++i) {
       FeeTokenConfigArgs memory configArg = feeTokenConfigArgs[i];
 
@@ -791,7 +807,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @notice Sets the Nops and their weights
   /// @param nopsAndWeights Array of NopAndWeight structs
-  function setNops(NopAndWeight[] calldata nopsAndWeights) external {
+  function setNops(
+    NopAndWeight[] calldata nopsAndWeights
+  ) external {
     _onlyOwnerOrAdmin();
     _setNops(nopsAndWeights);
   }
@@ -800,7 +818,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev Clears existing nops, sets new nops and weights
   /// @dev We permit fees to accrue before nops are configured, in which case
   /// they will go to the first set of configured nops.
-  function _setNops(NopAndWeight[] memory nopsAndWeights) internal {
+  function _setNops(
+    NopAndWeight[] memory nopsAndWeights
+  ) internal {
     uint256 numberOfNops = nopsAndWeights.length;
     if (numberOfNops > MAX_NUMBER_OF_NOPS) revert TooManyNops();
 

@@ -146,8 +146,6 @@ jobs:
       contents: read
     env:
       CHAINLINK_ENV_USER: ${{ github.actor }}
-      SLACK_API_KEY: ${{ secrets.QA_SLACK_API_KEY }}
-      SLACK_CHANNEL: ${{ secrets.QA_SLACK_CHANNEL }}
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
       CHAINLINK_TEST_VERSION: ${{ github.sha }}
@@ -248,8 +246,6 @@ jobs:
       contents: read
     env:
       CHAINLINK_ENV_USER: ${{ github.actor }}
-      SLACK_API_KEY: ${{ secrets.QA_SLACK_API_KEY }}
-      SLACK_CHANNEL: ${{ secrets.QA_SLACK_CHANNEL }}
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
     strategy:
@@ -291,7 +287,7 @@ jobs:
           - name: 'METIS_ANDROMEDA'
             pairs: 'METIS_ANDROMEDA,ARBITRUM_MAINNET'
             enabled: true
-            phaseTimeout: 60m
+            phaseTimeout: 300m
           - name: 'MODE_MAINNET'
             pairs: 'MODE_MAINNET,OPTIMISM_MAINNET;MODE_MAINNET,ARBITRUM_MAINNET;MODE_MAINNET,BASE_MAINNET;MODE_MAINNET,BSC_MAINNET'
             enabled: true
@@ -311,7 +307,7 @@ jobs:
           - name: 'ZKSYNC_MAINNET'
             pairs: 'ZKSYNC_MAINNET,ARBITRUM_MAINNET'
             enabled: true
-            phaseTimeout: 90m
+            phaseTimeout: 300m
     steps:
       - name: Collect Metrics
         if: ${{ matrix.lanes.enabled == true }}
@@ -399,7 +395,7 @@ jobs:
   # Custom reporting Jobs
   start-slack-thread:
     name: Start Slack Thread
-    if: ${{ always() && needs.ccip-smoke-test.result != 'skipped' && needs.ccip-smoke-test.result != 'cancelled' }}
+    if: ${{ failure() && needs.ccip-smoke-test.result != 'skipped' && needs.ccip-smoke-test.result != 'cancelled' }}
     environment: integration
     outputs:
       thread_ts: ${{ steps.slack.outputs.thread_ts }}
@@ -417,7 +413,7 @@ jobs:
         uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
         id: slack
         with:
-          channel-id: "#test-run-notifications"
+          channel-id: "#ccip-testing"
           payload: |
             {
               "attachments": [
@@ -451,7 +447,7 @@ jobs:
 
   post-test-results-to-slack:
     name: Post Test Results
-    if: ${{ always() && needs.start-slack-thread.result != 'skipped' && needs.start-slack-thread.result != 'cancelled' }}
+    if: ${{ failure() && needs.start-slack-thread.result != 'skipped' && needs.start-slack-thread.result != 'cancelled' }}
     environment: integration
     permissions:
       checks: write
@@ -473,7 +469,7 @@ jobs:
           workflow_run_id: ${{ github.run_id }}
           github_job_name_regex: ^CCIP Smoke (.*)$
           message_title: CCIP Mainnet Smoke test
-          slack_channel_id: "#test-run-notifications"
+          slack_channel_id: "#ccip-testing"
           slack_bot_token: ${{ secrets.QA_SLACK_API_KEY }}
           slack_thread_ts: ${{ needs.start-slack-thread.outputs.thread_ts }}
 

@@ -35,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/config"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/environment"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/osutil"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/testcontext"
 
 	integrationactions "github.com/smartcontractkit/chainlink/integration-tests/actions"
@@ -1386,6 +1387,10 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 	t.Cleanup(func() {
 		if configureCLNode {
 			if ccipEnv.LocalCluster != nil {
+				if t.Failed() || (ccipEnv.LocalCluster.TestConfig.GetLoggingConfig() != nil && ccipEnv.LocalCluster.TestConfig.GetLoggingConfig().TestLogCollect != nil && *ccipEnv.LocalCluster.TestConfig.GetLoggingConfig().TestLogCollect) {
+					flushClLogs(*lggr, ccipEnv.LocalCluster)
+				}
+
 				err := ccipEnv.LocalCluster.Terminate()
 				require.NoError(t, err, "Local cluster termination shouldn't fail")
 				require.NoError(t, o.Reporter.SendReport(t, namespace, false), "Aggregating and sending report shouldn't fail")
@@ -1404,6 +1409,24 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 		}
 	})
 	return chainByChainID
+}
+
+func flushClLogs(l zerolog.Logger, testEnv *test_env.CLClusterTestEnv) {
+	l.Info().Msg("Shutting down LogStream")
+	logPath, err := osutil.GetAbsoluteFolderPath("logs")
+	if err == nil {
+		l.Info().Str("Absolute path", logPath).Msg("LogStream logs folder location")
+	}
+
+	l.Info().Msg("Flushing LogStream logs")
+	// we can't do much if this fails, so we just log the error in LogStream
+	if err := testEnv.LogStream.FlushAndShutdown(); err != nil {
+		l.Error().Err(err).Msg("Error flushing and shutting down LogStream")
+	}
+	testEnv.LogStream.PrintLogTargetsLocations()
+	testEnv.LogStream.SaveLogLocationInTestSummary()
+
+	l.Info().Msg("Finished shutting down LogStream")
 }
 
 func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestConfig, reportPath string) *environment.Config {

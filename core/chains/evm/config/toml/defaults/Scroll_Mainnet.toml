@@ -23,3 +23,7 @@ FinalityTagBypass = false
 
 [OCR]
 ContractConfirmations = 1
+
+[Transactions.AutoPurge]
+Enabled = true
+DetectionApiUrl = 'https://venus.scroll.io'

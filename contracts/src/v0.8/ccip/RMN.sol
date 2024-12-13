@@ -190,7 +190,9 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
   /// 1. Cursedness is retained from a prior config.
   /// 2. The curse weight threshold was met at some point, which activated a curse, and enough voters unvoted to curse
   /// such that the curse weight threshold is no longer met.
-  function _shouldCurseBeActive(CurseVoteProgress storage sptr_upToDateCurseVoteProgress) internal view returns (bool) {
+  function _shouldCurseBeActive(
+    CurseVoteProgress storage sptr_upToDateCurseVoteProgress
+  ) internal view returns (bool) {
     return sptr_upToDateCurseVoteProgress.latestVoteToCurseByCurseVoteAddr[OWNER_CURSE_VOTE_ADDR].cursesHash
       != NO_VOTES_CURSES_HASH
       || sptr_upToDateCurseVoteProgress.accumulatedWeight >= sptr_upToDateCurseVoteProgress.curseWeightThreshold;
@@ -291,7 +293,9 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
   // Prevents a subject from receiving multiple votes to curse with the same curse id.
   error SubjectsMustBeStrictlyIncreasing();
 
-  constructor(Config memory config) {
+  constructor(
+    Config memory config
+  ) {
     {
       // Ensure that the bitmap is large enough to hold MAX_NUM_VOTERS.
       // We do this in the constructor because MAX_NUM_VOTERS is constant.
@@ -316,7 +320,9 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
     return bitmap | (uint200(1) << index);
   }
 
-  function _bitmapCount(uint200 bitmap) internal pure returns (uint8 oneBits) {
+  function _bitmapCount(
+    uint200 bitmap
+  ) internal pure returns (uint8 oneBits) {
     assert(bitmap < 1 << MAX_NUM_VOTERS);
     // https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan
     for (; bitmap != 0; ++oneBits) {
@@ -324,7 +330,9 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
     }
   }
 
-  function _taggedRootHash(IRMN.TaggedRoot memory taggedRoot) internal pure returns (bytes32) {
+  function _taggedRootHash(
+    IRMN.TaggedRoot memory taggedRoot
+  ) internal pure returns (bytes32) {
     return keccak256(abi.encode(taggedRoot.commitStore, taggedRoot.root));
   }
 
@@ -340,7 +348,9 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
   /// /* address */, taggedRoot.root /* bytes32 */))`.
   /// @notice Tagged roots which are already (voted to be) blessed are skipped and emit corresponding events. In case
   /// the call has no effect, i.e., all passed tagged roots are skipped, the function reverts with a `VoteToBlessNoop`.
-  function voteToBless(IRMN.TaggedRoot[] calldata taggedRoots) external {
+  function voteToBless(
+    IRMN.TaggedRoot[] calldata taggedRoots
+  ) external {
     // If we have an active global curse, something is really wrong. Let's err on the
     // side of caution and not accept further blessings during this time of
     // uncertainty.
@@ -402,7 +412,9 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
   /// scenario. The owner must ensure that there are no in-flight transactions by RMN nodes voting for any of the
   /// taggedRoots before calling this function, as such in-flight transactions could lead to the roots becoming
   /// re-blessed shortly after the call to this function, contrary to the original intention.
-  function ownerResetBlessVotes(IRMN.TaggedRoot[] calldata taggedRoots) external onlyOwner {
+  function ownerResetBlessVotes(
+    IRMN.TaggedRoot[] calldata taggedRoots
+  ) external onlyOwner {
     uint32 configVersion = s_versionedConfig.configVersion;
     for (uint256 i = 0; i < taggedRoots.length; ++i) {
       IRMN.TaggedRoot memory taggedRoot = taggedRoots[i];
@@ -510,7 +522,9 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
   /// We expect this to be called very rarely, e.g. in case of a bug in the
   /// offchain code causing false voteToCurse calls.
   /// @notice Should be called from curser's corresponding curseVoteAddr.
-  function unvoteToCurse(UnvoteToCurseRequest[] memory unvoteToCurseRequests) external {
+  function unvoteToCurse(
+    UnvoteToCurseRequest[] memory unvoteToCurseRequests
+  ) external {
     address curseVoteAddr = msg.sender;
     CurserRecord storage sptr_curserRecord = s_curserRecords[curseVoteAddr];
 
@@ -635,7 +649,9 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
   /// @notice Enables the owner to remove curse votes. After the curse votes are removed,
   /// this function will check whether the curse is still valid and restore the uncursed state if possible.
   /// This function also enables the owner to lift a curse created through ownerCurse.
-  function ownerUnvoteToCurse(OwnerUnvoteToCurseRequest[] memory ownerUnvoteToCurseRequests) external onlyOwner {
+  function ownerUnvoteToCurse(
+    OwnerUnvoteToCurseRequest[] memory ownerUnvoteToCurseRequests
+  ) external onlyOwner {
     bool anyCurseWasLifted = false;
     bool anyVoteWasUnvoted = false;
     uint32 configVersion = s_versionedConfig.configVersion;
@@ -667,7 +683,9 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
     }
   }
 
-  function setConfig(Config memory config) external onlyOwner {
+  function setConfig(
+    Config memory config
+  ) external onlyOwner {
     _setConfig(config);
   }
 
@@ -695,7 +713,9 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
   }
 
   /// @inheritdoc IRMN
-  function isBlessed(IRMN.TaggedRoot calldata taggedRoot) external view returns (bool) {
+  function isBlessed(
+    IRMN.TaggedRoot calldata taggedRoot
+  ) external view returns (bool) {
     return s_blessVoteProgressByTaggedRootHash[_taggedRootHash(taggedRoot)].weightThresholdMet
       || s_permaBlessedCommitStores.contains(taggedRoot.commitStore);
   }
@@ -711,7 +731,9 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
   }
 
   /// @inheritdoc IRMN
-  function isCursed(bytes16 subject) public view returns (bool) {
+  function isCursed(
+    bytes16 subject
+  ) public view returns (bool) {
     if (s_curseHotVars.numSubjectsCursed == 0) {
       return false; // happy path costs a single SLOAD
     } else {
@@ -864,7 +886,9 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
     return page;
   }
 
-  function _validateConfig(Config memory config) internal pure returns (bool) {
+  function _validateConfig(
+    Config memory config
+  ) internal pure returns (bool) {
     if (
       config.voters.length == 0 || config.voters.length > MAX_NUM_VOTERS || config.blessWeightThreshold == 0
         || config.curseWeightThreshold == 0
@@ -905,7 +929,9 @@ contract RMN is IRMN, OwnerIsCreator, ITypeAndVersion {
     return totalBlessWeight >= config.blessWeightThreshold && totalCurseWeight >= config.curseWeightThreshold;
   }
 
-  function _setConfig(Config memory config) private {
+  function _setConfig(
+    Config memory config
+  ) private {
     if (!_validateConfig(config)) revert InvalidConfig();
 
     // We can't directly assign s_versionedConfig.config to config

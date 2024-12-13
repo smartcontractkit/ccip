@@ -26,7 +26,9 @@ contract AggregateRateLimiter is OwnerIsCreator {
   RateLimiter.TokenBucket private s_rateLimiter;
 
   /// @param config The RateLimiter.Config
-  constructor(RateLimiter.Config memory config) {
+  constructor(
+    RateLimiter.Config memory config
+  ) {
     s_rateLimiter = RateLimiter.TokenBucket({
       rate: config.rate,
       capacity: config.capacity,
@@ -37,7 +39,9 @@ contract AggregateRateLimiter is OwnerIsCreator {
   }
 
   /// @notice Consumes value from the rate limiter bucket based on the token value given.
-  function _rateLimitValue(uint256 value) internal {
+  function _rateLimitValue(
+    uint256 value
+  ) internal {
     s_rateLimiter._consume(value, address(0));
   }
 
@@ -61,7 +65,9 @@ contract AggregateRateLimiter is OwnerIsCreator {
   /// @notice Sets the rate limited config.
   /// @param config The new rate limiter config.
   /// @dev should only be callable by the owner or token limit admin.
-  function setRateLimiterConfig(RateLimiter.Config memory config) external onlyAdminOrOwner {
+  function setRateLimiterConfig(
+    RateLimiter.Config memory config
+  ) external onlyAdminOrOwner {
     s_rateLimiter._setTokenBucketConfig(config);
   }
 
@@ -78,7 +84,9 @@ contract AggregateRateLimiter is OwnerIsCreator {
   /// @notice Sets the token limit admin address.
   /// @param newAdmin the address of the new admin.
   /// @dev setting this to address(0) indicates there is no active admin.
-  function setAdmin(address newAdmin) external onlyAdminOrOwner {
+  function setAdmin(
+    address newAdmin
+  ) external onlyAdminOrOwner {
     s_admin = newAdmin;
     emit AdminSet(newAdmin);
   }

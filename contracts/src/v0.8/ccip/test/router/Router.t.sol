@@ -313,7 +313,9 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_sourceRouter.ccipSend(wrongChain, message);
   }
 
-  function test_Fuzz_UnsupportedFeeToken_Reverts(address wrongFeeToken) public {
+  function test_Fuzz_UnsupportedFeeToken_Reverts(
+    address wrongFeeToken
+  ) public {
     // We have three fee tokens set, all others should revert.
     vm.assume(address(s_sourceFeeToken) != wrongFeeToken);
     vm.assume(address(s_sourceRouter.getWrappedNative()) != wrongFeeToken);
@@ -327,7 +329,9 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_sourceRouter.ccipSend(DEST_CHAIN_SELECTOR, message);
   }
 
-  function test_Fuzz_UnsupportedToken_Reverts(address wrongToken) public {
+  function test_Fuzz_UnsupportedToken_Reverts(
+    address wrongToken
+  ) public {
     for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
       vm.assume(address(s_sourceTokens[i]) != wrongToken);
     }
@@ -399,7 +403,9 @@ contract Router_applyRampUpdates is RouterSetup {
     s_receiver = new MaybeRevertMessageReceiver(false);
   }
 
-  function _assertOffRampRouteSucceeds(Router.OffRamp memory offRamp) internal {
+  function _assertOffRampRouteSucceeds(
+    Router.OffRamp memory offRamp
+  ) internal {
     vm.startPrank(offRamp.offRamp);
 
     Client.Any2EVMMessage memory message = _generateReceiverMessage(offRamp.sourceChainSelector);
@@ -407,7 +413,9 @@ contract Router_applyRampUpdates is RouterSetup {
     s_sourceRouter.routeMessage(message, GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver));
   }
 
-  function _assertOffRampRouteReverts(Router.OffRamp memory offRamp) internal {
+  function _assertOffRampRouteReverts(
+    Router.OffRamp memory offRamp
+  ) internal {
     vm.startPrank(offRamp.offRamp);
 
     vm.expectRevert(IRouter.OnlyOffRamp.selector);
@@ -416,7 +424,9 @@ contract Router_applyRampUpdates is RouterSetup {
     );
   }
 
-  function test_Fuzz_OffRampUpdates(address[20] memory offRampsInput) public {
+  function test_Fuzz_OffRampUpdates(
+    address[20] memory offRampsInput
+  ) public {
     Router.OffRamp[] memory offRamps = new Router.OffRamp[](20);
 
     for (uint256 i = 0; i < offRampsInput.length; ++i) {
@@ -595,7 +605,9 @@ contract Router_applyRampUpdates is RouterSetup {
     }
   }
 
-  function test_Fuzz_OnRampUpdates(Router.OnRamp[] memory onRamps) public {
+  function test_Fuzz_OnRampUpdates(
+    Router.OnRamp[] memory onRamps
+  ) public {
     // Test adding onRamps
     for (uint256 i = 0; i < onRamps.length; ++i) {
       vm.expectEmit();
@@ -668,7 +680,9 @@ contract Router_applyRampUpdates is RouterSetup {
 }
 
 contract Router_setWrappedNative is EVM2EVMOnRampSetup {
-  function test_Fuzz_SetWrappedNative_Success(address wrappedNative) public {
+  function test_Fuzz_SetWrappedNative_Success(
+    address wrappedNative
+  ) public {
     s_sourceRouter.setWrappedNative(wrappedNative);
     assertEq(wrappedNative, s_sourceRouter.getWrappedNative());
   }
@@ -694,7 +708,9 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     vm.startPrank(address(s_offRamp));
   }
 
-  function _generateManualGasLimit(uint256 callDataLength) internal view returns (uint256) {
+  function _generateManualGasLimit(
+    uint256 callDataLength
+  ) internal view returns (uint256) {
     return ((gasleft() - 2 * (16 * callDataLength + GAS_FOR_CALL_EXACT_CHECK)) * 62) / 64;
   }
 
@@ -796,7 +812,9 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     assertGt(gasUsed, 3_000);
   }
 
-  function test_Fuzz_ExecutionEvent_Success(bytes calldata error) public {
+  function test_Fuzz_ExecutionEvent_Success(
+    bytes calldata error
+  ) public {
     Client.Any2EVMMessage memory message = _generateReceiverMessage(SOURCE_CHAIN_SELECTOR);
     s_reverting_receiver.setErr(error);
 

@@ -13,7 +13,9 @@ contract CCIPReaderTester {
   /// @notice Gets the next sequence number to be used in the onRamp
   /// @param destChainSelector The destination chain selector
   /// @return nextSequenceNumber The next sequence number to be used
-  function getExpectedNextSequenceNumber(uint64 destChainSelector) external view returns (uint64) {
+  function getExpectedNextSequenceNumber(
+    uint64 destChainSelector
+  ) external view returns (uint64) {
     return s_destChainSeqNrs[destChainSelector] + 1;
   }
 
@@ -24,7 +26,9 @@ contract CCIPReaderTester {
     s_destChainSeqNrs[destChainSelector] = sequenceNumber;
   }
 
-  function getSourceChainConfig(uint64 sourceChainSelector) external view returns (OffRamp.SourceChainConfig memory) {
+  function getSourceChainConfig(
+    uint64 sourceChainSelector
+  ) external view returns (OffRamp.SourceChainConfig memory) {
     return s_sourceChainConfigs[sourceChainSelector];
   }
 
@@ -59,7 +63,9 @@ contract CCIPReaderTester {
 
   event CommitReportAccepted(OffRamp.CommitReport report);
 
-  function emitCommitReportAccepted(OffRamp.CommitReport memory report) external {
+  function emitCommitReportAccepted(
+    OffRamp.CommitReport memory report
+  ) external {
     emit CommitReportAccepted(report);
   }
 }
