@@ -26,7 +26,6 @@ BumpPercent = 20
 # Accounting for Node syncs & avoid re-sending txns before fetching the receipt, setting to 2m
 ResendAfterThreshold = '2m'
 
-
 [NodePool]
 SyncThreshold = 10
 

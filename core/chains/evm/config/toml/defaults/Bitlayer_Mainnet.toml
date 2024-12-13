@@ -9,3 +9,8 @@ PriceMax = '1 gwei'        # DS&A recommended value
 PriceMin = '40 mwei'       # During testing, we saw minimum gas prices ~50 mwei
 PriceDefault = '1 gwei'    # As we set PriceMax to '1 gwei' and PriceDefault must be less than or equal to PriceMax
 FeeCapDefault = '1 gwei'   # As we set PriceMax to '1 gwei' and FeeCapDefault must be less than or equal to PriceMax
+
+[HeadTracker]
+# FinalityDepth < 1k => FinalityTagBypass = false
+# https://chainlink-core.slack.com/archives/C07RA1B58CC/p1730983397689179?thread_ts=1730908333.814809&cid=C07RA1B58CC
+FinalityTagBypass = false
