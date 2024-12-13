@@ -9,5 +9,5 @@ PriceDefault = '5 gwei'
 
 [HeadTracker]
 # FinalityDepth < 1k => FinalityTagBypass = false
-# https://chainlink-core.slack.com/archives/C07RA1B58CC/p1730983397689179?thread_ts=1730908333.814809&cid=C07RA1B58CC
+# https://smartcontract-it.atlassian.net/browse/SHIP-4078
 FinalityTagBypass = false
