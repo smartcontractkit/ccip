@@ -18,6 +18,7 @@ import (
 	"golang.org/x/exp/rand"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_lbtc_token_pool"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/wrappers"
 
@@ -404,6 +405,7 @@ type LatestPool struct {
 	PoolInterface   *token_pool.TokenPool
 	LockReleasePool *lock_release_token_pool.LockReleaseTokenPool
 	USDCPool        *usdc_token_pool.USDCTokenPool
+	MockLBTCPool    *mock_lbtc_token_pool.MockLBTCTokenPool
 }
 
 type V1_4_0Pool struct {

@@ -40,6 +40,7 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/WETH9/WETH9.abi ../../../contracts/solc/v0.8.24/WETH9/WETH9.bin WETH9 weth9
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MockE2EUSDCTokenMessenger/MockE2EUSDCTokenMessenger.abi ../../../contracts/solc/v0.8.24/MockE2EUSDCTokenMessenger/MockE2EUSDCTokenMessenger.bin MockE2EUSDCTokenMessenger mock_usdc_token_messenger
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MockE2EUSDCTransmitter/MockE2EUSDCTransmitter.abi ../../../contracts/solc/v0.8.24/MockE2EUSDCTransmitter/MockE2EUSDCTransmitter.bin MockE2EUSDCTransmitter mock_usdc_token_transmitter
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MockLBTCTokenPool/MockLBTCTokenPool.abi ../../../contracts/solc/v0.8.24/MockLBTCTokenPool/MockLBTCTokenPool.bin MockLBTCTokenPool mock_lbtc_token_pool
 
 // EncodingUtils
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/ICCIPEncodingUtils/ICCIPEncodingUtils.abi ../../../contracts/solc/v0.8.24/ICCIPEncodingUtils/ICCIPEncodingUtils.bin EncodingUtils ccip_encoding_utils
