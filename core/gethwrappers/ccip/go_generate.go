@@ -27,7 +27,7 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/TokenPool/TokenPool.abi ../../../contracts/solc/v0.8.24/TokenPool/TokenPool.bin TokenPool token_pool
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/USDCTokenPool/USDCTokenPool.abi ../../../contracts/solc/v0.8.24/USDCTokenPool/USDCTokenPool.bin USDCTokenPool usdc_token_pool
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/CLAdapter/CLAdapter.abi ../../../contracts/solc/v0.8.24/CLAdapter/CLAdapter.bin CLAdapter lbtc_adapter
-//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/LombardTokenPool/LombardTokenPool.abi ../../../contracts/solc/v0.8.24/CLAdapter/LombardTokenPool.bin LombardTokenPool lbtc_token_pool
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/LombardTokenPool/LombardTokenPool.abi ../../../contracts/solc/v0.8.24/LombardTokenPool/LombardTokenPool.bin LombardTokenPool lbtc_token_pool
 
 // Helpers
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MockV3Aggregator/MockV3Aggregator.abi ../../../contracts/solc/v0.8.24/MockV3Aggregator/MockV3Aggregator.bin MockV3Aggregator mock_v3_aggregator_contract

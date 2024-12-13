@@ -20,16 +20,10 @@ contract LombardTokenPool is TokenPool {
         address ccipRouter_,
         address[] memory allowlist_,
         address rmnProxy_,
+        CLAdapter adapter_,
         bool attestationEnable_
-    ) TokenPool(lbtc_, 8, allowlist_, rmnProxy_, ccipRouter_) {
-        isAttestationEnabled = attestationEnable_;
-    }
-
-    function setAdapter(CLAdapter adapter_) external onlyOwner {
+    ) TokenPool(lbtc_, allowlist_, rmnProxy_, ccipRouter_) {
         adapter = adapter_;
-    }
-
-    function setAttestationEnabled(bool attestationEnable_) external onlyOwner {
         isAttestationEnabled = attestationEnable_;
     }
 

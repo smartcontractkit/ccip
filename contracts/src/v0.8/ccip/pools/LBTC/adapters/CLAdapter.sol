@@ -40,16 +40,25 @@ contract CLAdapter is AbstractAdapter, Ownable {
     /// token pool implementation
     constructor(
         IBridge bridge_,
-        LombardTokenPool tokenPool_,
-        uint128 executionGasLimit_
-    ) AbstractAdapter(bridge_) Ownable() {
+        uint128 executionGasLimit_,
+        //
+        address ccipRouter_,
+        address[] memory allowlist_,
+        address rmnProxy_,
+        bool attestationEnable_
+    ) AbstractAdapter(bridge_) Ownable(_msgSender()) {
         _setExecutionGasLimit(executionGasLimit_);
-        tokenPool = tokenPool_;
-        emit CLTokenPoolDeployed(address(tokenPool));
-    }
 
-    function setTokenPool(LombardTokenPool tokenPool_) external onlyOwner {
-        tokenPool = tokenPool_;
+        tokenPool = new LombardTokenPool(
+            IERC20(address(bridge_.lbtc())),
+            ccipRouter_,
+            allowlist_,
+            rmnProxy_,
+            CLAdapter(this),
+            attestationEnable_
+        );
+        tokenPool.transferOwnership(_msgSender());
+        emit CLTokenPoolDeployed(address(tokenPool));
     }
 
     /// USER ACTIONS ///
