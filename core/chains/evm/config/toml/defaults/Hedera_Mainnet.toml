@@ -3,7 +3,7 @@ ChainType = 'hedera'
 # Considering the 3-5 (6 including a buffer) seconds of finality and 2 seconds block production
 # We set the depth to 6/2 = 3 blocks, setting to 10 for safety
 FinalityDepth = 10
-# Hedera has high TPS, so polling less often
+# Hedera has high TPS, so polling less often 
 LogPollInterval = '10s'
 MinIncomingConfirmations = 1
 
@@ -26,10 +26,6 @@ BumpPercent = 20
 # Accounting for Node syncs & avoid re-sending txns before fetching the receipt, setting to 2m
 ResendAfterThreshold = '2m'
 
+
 [NodePool]
 SyncThreshold = 10
-
-[HeadTracker]
-# FinalityDepth < 1k => FinalityTagBypass = false
-# https://smartcontract-it.atlassian.net/browse/SHIP-4078
-FinalityTagBypass = false
