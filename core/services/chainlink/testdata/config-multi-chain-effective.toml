@@ -358,7 +358,7 @@ HistoryDepth = 100
 MaxBufferSize = 3
 SamplingInterval = '1s'
 MaxAllowedFinalityDepth = 10000
-FinalityTagBypass = false
+FinalityTagBypass = true
 
 [EVM.NodePool]
 PollFailureThreshold = 5
@@ -570,7 +570,7 @@ HistoryDepth = 2000
 MaxBufferSize = 3
 SamplingInterval = '1s'
 MaxAllowedFinalityDepth = 10000
-FinalityTagBypass = false
+FinalityTagBypass = true
 
 [EVM.NodePool]
 PollFailureThreshold = 5

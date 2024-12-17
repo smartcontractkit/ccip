@@ -3,8 +3,8 @@ ChainID = '808813'
 ChainType = 'optimismBedrock'
 # FinalityDepth in mainnet showed more than 3k
 FinalityDepth = 3150
-# block_time was:  2s, adding 1 second buffer
-LogPollInterval = '3s'
+# block_time was:  2s, adding 1 second buffer 
+LogPollInterval = '3s'  
 
 # finality_depth * block_time / 60 secs = ~105  min (finality time)
 NoNewFinalizedHeadsThreshold = '110m'
@@ -21,8 +21,3 @@ CacheTimeout = '4s'
 
 [GasEstimator.BlockHistory]
 BlockHistorySize = 100
-
-[HeadTracker]
-# FinalityDepth < 1k => FinalityTagBypass = false
-# https://smartcontract-it.atlassian.net/browse/SHIP-4078
-FinalityTagBypass = false
