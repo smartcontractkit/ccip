@@ -7,11 +7,8 @@ MinIncomingConfirmations = 1
 
 [HeadTracker]
 HistoryDepth = 600
-# FinalityDepth < 1k => FinalityTagBypass = false
-# https://smartcontract-it.atlassian.net/browse/SHIP-4078
-FinalityTagBypass = false
 
-[GasEstimator]
+[GasEstimator]     
 Mode = 'L2Suggested'
 PriceMax = '200 gwei'
 LimitDefault = 100000000
