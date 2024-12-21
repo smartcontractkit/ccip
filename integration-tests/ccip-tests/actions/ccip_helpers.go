@@ -1833,26 +1833,28 @@ func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 func (sourceCCIP *SourceCCIPModule) SendRequest(
 	receiver common.Address,
 	gasLimit *big.Int,
-) (common.Hash, time.Duration, *big.Int, error) {
+) (common.Hash, time.Duration, *big.Int, []byte, error) {
 	var d time.Duration
 	destChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
-		return common.Hash{}, d, nil, fmt.Errorf("failed getting the chain selector: %w", err)
+		return common.Hash{}, d, nil, nil, fmt.Errorf("failed getting the chain selector: %w", err)
 	}
 	// form the message for transfer
 	msg, err := sourceCCIP.CCIPMsg(receiver, sourceCCIP.Common.AllowOutOfOrder, gasLimit)
 	if err != nil {
-		return common.Hash{}, d, nil, fmt.Errorf("failed forming the ccip msg: %w", err)
+		return common.Hash{}, d, nil, nil, fmt.Errorf("failed forming the ccip msg: %w", err)
 	}
+
+	msgData := msg.Data
 
 	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
 	if err != nil {
 		log.Info().Interface("Msg", msg).Msg("CCIP msg")
 		reason, _ := blockchain.RPCErrorFromError(err)
 		if reason != "" {
-			return common.Hash{}, d, nil, fmt.Errorf("failed getting the fee: %s", reason)
+			return common.Hash{}, d, nil, nil, fmt.Errorf("failed getting the fee: %s", reason)
 		}
-		return common.Hash{}, d, nil, fmt.Errorf("failed getting the fee: %w", err)
+		return common.Hash{}, d, nil, nil, fmt.Errorf("failed getting the fee: %w", err)
 	}
 	log.Info().Str("Fee", fee.String()).Msg("Calculated fee")
 
@@ -1868,7 +1870,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 			if sendTx != nil {
 				txHash = sendTx.Hash()
 			}
-			return txHash, time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %w", err)
+			return txHash, time.Since(timeNow), nil, nil, fmt.Errorf("failed initiating the transfer ccip-send: %w", err)
 		}
 	} else {
 		sendTx, err = sourceCCIP.Common.Router.CCIPSendAndProcessTx(destChainSelector, msg, fee)
@@ -1877,7 +1879,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 			if sendTx != nil {
 				txHash = sendTx.Hash()
 			}
-			return txHash, time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %w", err)
+			return txHash, time.Since(timeNow), nil, nil, fmt.Errorf("failed initiating the transfer ccip-send: %w", err)
 		}
 	}
 
@@ -1886,7 +1888,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 		Str("Send token transaction", sendTx.Hash().String()).
 		Str("lane", fmt.Sprintf("%s-->%s", sourceCCIP.Common.ChainClient.GetNetworkName(), sourceCCIP.DestNetworkName)).
 		Msg("Sending token")
-	return sendTx.Hash(), time.Since(timeNow), fee, nil
+	return sendTx.Hash(), time.Since(timeNow), fee, msgData, nil
 }
 
 func DefaultSourceCCIPModule(
@@ -1932,6 +1934,7 @@ type DestCCIPModule struct {
 	OffRamp                 *contracts.OffRamp
 	ReportAcceptedWatcher   *sync.Map
 	ExecStateChangedWatcher *sync.Map
+	MessageReceivedWatcher  *sync.Map
 	ReportBlessedWatcher    *sync.Map
 	ReportBlessedBySeqNum   *sync.Map
 	NextSeqNumToCommit      *atomic.Uint64
@@ -2642,6 +2645,74 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 	}
 }
 
+func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
+	lggr *zerolog.Logger,
+	messageID string,
+	expectedContent []byte,
+	timeout time.Duration,
+	reqStat *testreporters.RequestStat,
+) error {
+	fmt.Println(reqStat)
+	lggr.Info().
+		Str("MsgID", fmt.Sprintf("0x%x", messageID)).
+		Str("Timeout", timeout.String()).
+		Msg("Waiting for message content to match")
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	resetTimerCount := 0
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			// Load the message content from the watcher
+			value, ok := destCCIP.MessageReceivedWatcher.Load(messageID)
+			if !ok {
+				lggr.Warn().
+					Str("MsgID", fmt.Sprintf("0x%x", messageID)).
+					Msg("Message still not found in MessageReceivedWatcher")
+				continue
+			}
+
+			receivedContent, ok := value.([]uint8)
+			if !ok {
+				lggr.Warn().
+					Str("MsgID", fmt.Sprintf("0x%x", messageID)).
+					Msg("Invalid content type in MessageReceivedWatcher")
+				continue
+			}
+
+			// Compare the received content with the expected content
+			if string(receivedContent) == string(expectedContent) {
+				lggr.Info().
+					Str("MessageID", messageID).
+					Msg("Message content matches the expected content")
+				return nil
+			}
+
+			lggr.Warn().
+				Str("MessageID", messageID).
+				Str("ReceivedContent", string(receivedContent)).
+				Str("ExpectedContent", string(expectedContent)).
+				Msg("Message content mismatch")
+
+		case <-timer.C:
+			// Handle timeout with potential connection issue recovery
+			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
+				if resetTimerCount > 2 {
+					return fmt.Errorf("possible RPC issue - message content did not match for MessageID %s", messageID)
+				}
+				timer.Reset(timeout)
+				resetTimerCount++
+				lggr.Info().Int("count of reset", resetTimerCount).Msg("Resetting timer to validate message content match")
+				continue
+			}
+
+			return fmt.Errorf("timeout - message content did not match for MessageID %s", messageID)
+		}
+	}
+}
+
 func DefaultDestinationCCIPModule(
 	logger *zerolog.Logger,
 	testConf *testconfig.CCIPTestGroupConfig,
@@ -2671,6 +2742,7 @@ func DefaultDestinationCCIPModule(
 		ReportBlessedBySeqNum:   &sync.Map{},
 		ExecStateChangedWatcher: &sync.Map{},
 		ReportAcceptedWatcher:   &sync.Map{},
+		MessageReceivedWatcher:  &sync.Map{},
 	}, nil
 }
 
@@ -2679,6 +2751,7 @@ type CCIPRequest struct {
 	txHash                  string
 	txConfirmationTimestamp time.Time
 	RequestStat             *testreporters.RequestStat
+	MessageData             []byte
 }
 
 func CCIPRequestFromTxHash(txHash common.Hash, chainClient blockchain.EVMClient) (CCIPRequest, *types.Receipt, error) {
@@ -2831,7 +2904,7 @@ func (lane *CCIPLane) RecordStateBeforeTransfer() {
 	lane.SentReqs = make(map[common.Hash][]CCIPRequest)
 }
 
-func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporters.RequestStat) (*types.Receipt, error) {
+func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporters.RequestStat, msgData []byte) (*types.Receipt, error) {
 	request, rcpt, err := CCIPRequestFromTxHash(txHash, lane.Source.Common.ChainClient)
 	if err != nil {
 		for _, stat := range reqStats {
@@ -2846,6 +2919,7 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporter
 			txHash:                  rcpt.TxHash.Hex(),
 			txConfirmationTimestamp: request.txConfirmationTimestamp,
 			RequestStat:             stat,
+			MessageData:             msgData,
 		})
 		lane.NumberOfReq++
 	}
@@ -2932,7 +3006,7 @@ func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) 
 		}
 		return fmt.Errorf("failed to send the multicall: %w", err)
 	}
-	rcpt, err := lane.AddToSentReqs(tx.Hash(), reqStats)
+	rcpt, err := lane.AddToSentReqs(tx.Hash(), reqStats, nil)
 	if err != nil {
 		return err
 	}
@@ -2954,7 +3028,7 @@ func (lane *CCIPLane) Multicall(noOfRequests int, multiSendAddr common.Address) 
 func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
 	for i := 1; i <= noOfRequests; i++ {
 		stat := testreporters.NewCCIPRequestStats(int64(lane.NumberOfReq+i), lane.SourceNetworkName, lane.DestNetworkName)
-		txHash, txConfirmationDur, fee, err := lane.Source.SendRequest(lane.Dest.ReceiverDapp.EthAddress, gasLimit)
+		txHash, txConfirmationDur, fee, msgData, err := lane.Source.SendRequest(lane.Dest.ReceiverDapp.EthAddress, gasLimit)
 		if err != nil {
 			stat.UpdateState(lane.Logger, 0, testreporters.TX, txConfirmationDur, testreporters.Failure, nil)
 			return fmt.Errorf("could not send request: %w", err)
@@ -2971,7 +3045,7 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, gasLimit *big.Int) error {
 				noOfTokens++
 			}
 		}
-		_, err = lane.AddToSentReqs(txHash, []*testreporters.RequestStat{stat})
+		_, err = lane.AddToSentReqs(txHash, []*testreporters.RequestStat{stat}, msgData)
 		if err != nil {
 			return err
 		}
@@ -3246,6 +3320,14 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 		if opts.phaseExpectedToFail == testreporters.Commit && opts.timeout != 0 {
 			timeout = opts.timeout
 		}
+
+		err = lane.Dest.AssertMessageContentMatch(lane.Logger, string(msgLog.MessageId[:]), []byte(lane.SentReqs[txHash][0].MessageData), timeout, reqStat)
+		if err != nil {
+			return fmt.Errorf("message validation failed: %v", err)
+		} else {
+			log.Info().Msg("Message content validation successful")
+		}
+
 		err = lane.Dest.AssertSeqNumberExecuted(lane.Logger, seqNumber, timeout, sourceLogFinalizedAt, reqStat)
 		if shouldReturn, phaseErr := isPhaseValid(lane.Logger, testreporters.Commit, opts, err); shouldReturn {
 			return phaseErr
@@ -3503,7 +3585,9 @@ func (lane *CCIPLane) StartEventWatchers() error {
 			select {
 			case e := <-messageReceivedEvent:
 				log.Info().Msgf("messageReceivedEvent received with data: %+v", e)
-				// You could store these events in a map or other structure for validation later.
+				messageId := string(e.MessageId[:])
+				messageContent := e.Data
+				lane.Dest.MessageReceivedWatcher.Store(messageId, messageContent)
 			case <-lane.Context.Done():
 				return
 			}
