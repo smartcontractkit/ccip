@@ -2668,9 +2668,6 @@ func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
 			// Load the message content from the watcher
 			value, ok := destCCIP.MessageReceivedWatcher.Load(messageID)
 			if !ok {
-				lggr.Warn().
-					Str("MsgID", fmt.Sprintf("0x%x", messageID)).
-					Msg("Message still not found in MessageReceivedWatcher")
 				continue
 			}
 
@@ -2700,7 +2697,7 @@ func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
 			// Handle timeout with potential connection issue recovery
 			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
 				if resetTimerCount > 2 {
-					return fmt.Errorf("possible RPC issue - message content did not match for MessageID %s", messageID)
+					return fmt.Errorf("possible RPC issue - message content did not match for MessageID 0x%x", messageID)
 				}
 				timer.Reset(timeout)
 				resetTimerCount++
@@ -2708,7 +2705,7 @@ func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
 				continue
 			}
 
-			return fmt.Errorf("timeout - message content did not match for MessageID %s", messageID)
+			return fmt.Errorf("timeout - message was not received or content did not match for MessageID 0x%x", messageID)
 		}
 	}
 }
