@@ -2682,15 +2682,17 @@ func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
 			// Compare the received content with the expected content
 			if string(receivedContent) == string(expectedContent) {
 				lggr.Info().
-					Str("MessageID", messageID).
-					Msg("Message content matches the expected content")
+					Str("MessageID 0x%x", messageID).
+					Str("Received Content", string(receivedContent)).
+					Str("Expected Content", string(expectedContent)).
+					Msg("Message received and its content matches the sent content")
 				return nil
 			}
 
 			lggr.Warn().
-				Str("MessageID", messageID).
-				Str("ReceivedContent", string(receivedContent)).
-				Str("ExpectedContent", string(expectedContent)).
+				Str("MessageID 0x%x", messageID).
+				Str("Received Content", string(receivedContent)).
+				Str("Expected Content", string(expectedContent)).
 				Msg("Message content mismatch")
 
 		case <-timer.C:
@@ -3569,21 +3571,24 @@ func (lane *CCIPLane) StartEventWatchers() error {
 	messageReceivedSub := event.Resubscribe(DefaultResubscriptionTimeout, func(_ context.Context) (event.Subscription, error) {
 		sub, err := lane.Dest.ReceiverDapp.WatchMessageReceived(nil, messageReceivedEvent)
 		if err != nil {
-			log.Error().Err(err).Msg("error in subscribing to messageReceivedEvent")
+			log.Error().Err(err).Msg("error in subscribing to message received event")
 		}
 		return sub, err
 	})
 	if messageReceivedSub == nil {
-		return fmt.Errorf("failed to subscribe to messageReceivedEvent")
+		return fmt.Errorf("failed to subscribe to message received event")
 	}
 	go func(sub event.Subscription) {
 		defer sub.Unsubscribe()
 		for {
 			select {
 			case e := <-messageReceivedEvent:
-				log.Info().Msgf("messageReceivedEvent received with data: %+v", e)
 				messageId := string(e.MessageId[:])
-				messageContent := e.Data
+				messageContent := string(e.Data)
+				messageSender := string(e.Sender[:])
+				log.Info().Msgf("Message event received for message id: 0x%x", messageId)
+				log.Info().Msgf("Message event received with content: %+v", messageContent)
+				log.Info().Msgf("Message event received with sender: 0x%x", messageSender[len(messageSender)-20:])
 				lane.Dest.MessageReceivedWatcher.Store(messageId, messageContent)
 			case <-lane.Context.Done():
 				return
