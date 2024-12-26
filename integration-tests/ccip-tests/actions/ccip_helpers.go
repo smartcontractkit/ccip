@@ -2654,7 +2654,7 @@ func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
 ) error {
 	fmt.Println(reqStat)
 	lggr.Info().
-		Str("MsgID", fmt.Sprintf("0x%x", messageID)).
+		Str("MsgID", fmt.Sprintf("0x%x", string(messageID))).
 		Str("Timeout", timeout.String()).
 		Msg("Waiting for message content to match")
 	timer := time.NewTimer(timeout)
@@ -2674,7 +2674,7 @@ func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
 			receivedContent, ok := value.([]uint8)
 			if !ok {
 				lggr.Warn().
-					Str("MsgID", fmt.Sprintf("0x%x", messageID)).
+					Str("MsgID", fmt.Sprintf("0x%x", string(messageID))).
 					Msg("Invalid content type in MessageReceivedWatcher")
 				continue
 			}
@@ -2682,7 +2682,7 @@ func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
 			// Compare the received content with the expected content
 			if string(receivedContent) == string(expectedContent) {
 				lggr.Info().
-					Str("MessageID 0x%x", messageID).
+					Str("MessageID 0x%x", string(messageID)).
 					Str("Received Content", string(receivedContent)).
 					Str("Expected Content", string(expectedContent)).
 					Msg("Message received and its content matches the sent content")
@@ -2690,7 +2690,7 @@ func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
 			}
 
 			lggr.Warn().
-				Str("MessageID 0x%x", messageID).
+				Str("MessageID 0x%x", string(messageID)).
 				Str("Received Content", string(receivedContent)).
 				Str("Expected Content", string(expectedContent)).
 				Msg("Message content mismatch")
@@ -2699,7 +2699,7 @@ func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
 			// Handle timeout with potential connection issue recovery
 			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
 				if resetTimerCount > 2 {
-					return fmt.Errorf("possible RPC issue - message content did not match for MessageID 0x%x", messageID)
+					return fmt.Errorf("possible RPC issue - message content did not match for MessageID 0x%x", string(messageID))
 				}
 				timer.Reset(timeout)
 				resetTimerCount++
@@ -2707,7 +2707,7 @@ func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
 				continue
 			}
 
-			return fmt.Errorf("timeout - message was not received or content did not match for MessageID 0x%x", messageID)
+			return fmt.Errorf("timeout - message was not received or content did not match for MessageID 0x%x", string(messageID))
 		}
 	}
 }
