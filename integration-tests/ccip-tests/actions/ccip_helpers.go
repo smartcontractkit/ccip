@@ -3584,10 +3584,10 @@ func (lane *CCIPLane) StartEventWatchers() error {
 			select {
 			case e := <-messageReceivedEvent:
 				messageId := string(e.MessageId[:])
-				messageContent := string(e.Data)
+				messageContent := e.Data
 				messageSender := string(e.Sender[:])
 				log.Info().Msgf("Message event received for message id: 0x%x", messageId)
-				log.Info().Msgf("Message event received with content: %+v", messageContent)
+				log.Info().Msgf("Message event received with content: %+v", string(messageContent))
 				log.Info().Msgf("Message event received with sender: 0x%x", messageSender[len(messageSender)-20:])
 				lane.Dest.MessageReceivedWatcher.Store(messageId, messageContent)
 			case <-lane.Context.Done():
