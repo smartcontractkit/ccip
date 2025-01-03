@@ -114,7 +114,9 @@ abstract contract TokenPool1_4 is IPoolPriorTo1_5, OwnerIsCreator, IERC165 {
 
   /// @notice Sets the pool's Router
   /// @param newRouter The new Router
-  function setRouter(address newRouter) public onlyOwner {
+  function setRouter(
+    address newRouter
+  ) public onlyOwner {
     if (newRouter == address(0)) revert ZeroAddressNotAllowed();
     address oldRouter = address(s_router);
     s_router = IRouter(newRouter);
@@ -123,7 +125,9 @@ abstract contract TokenPool1_4 is IPoolPriorTo1_5, OwnerIsCreator, IERC165 {
   }
 
   /// @inheritdoc IERC165
-  function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
+  function supportsInterface(
+    bytes4 interfaceId
+  ) public pure virtual override returns (bool) {
     return interfaceId == type(IPoolPriorTo1_5).interfaceId || interfaceId == type(IERC165).interfaceId;
   }
 
@@ -133,7 +137,9 @@ abstract contract TokenPool1_4 is IPoolPriorTo1_5, OwnerIsCreator, IERC165 {
 
   /// @notice Checks whether a chain selector is permissioned on this contract.
   /// @return true if the given chain selector is a permissioned remote chain.
-  function isSupportedChain(uint64 remoteChainSelector) public view returns (bool) {
+  function isSupportedChain(
+    uint64 remoteChainSelector
+  ) public view returns (bool) {
     return s_remoteChainSelectors.contains(remoteChainSelector);
   }
 
@@ -154,7 +160,9 @@ abstract contract TokenPool1_4 is IPoolPriorTo1_5, OwnerIsCreator, IERC165 {
   /// @dev Only callable by the owner
   /// @param chains A list of chains and their new permission status & rate limits. Rate limits
   /// are only used when the chain is being added through `allowed` being true.
-  function applyChainUpdates(ChainUpdate[] calldata chains) external virtual onlyOwner {
+  function applyChainUpdates(
+    ChainUpdate[] calldata chains
+  ) external virtual onlyOwner {
     for (uint256 i = 0; i < chains.length; ++i) {
       ChainUpdate memory update = chains[i];
       RateLimiter._validateTokenBucketConfig(update.outboundRateLimiterConfig, !update.allowed);
@@ -256,7 +264,9 @@ abstract contract TokenPool1_4 is IPoolPriorTo1_5, OwnerIsCreator, IERC165 {
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned onRamp for the given chain on the Router.
-  modifier onlyOnRamp(uint64 remoteChainSelector) {
+  modifier onlyOnRamp(
+    uint64 remoteChainSelector
+  ) {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!(msg.sender == s_router.getOnRamp(remoteChainSelector))) revert CallerIsNotARampOnRouter(msg.sender);
     _;
@@ -264,7 +274,9 @@ abstract contract TokenPool1_4 is IPoolPriorTo1_5, OwnerIsCreator, IERC165 {
 
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned offRamp for the given chain on the Router.
-  modifier onlyOffRamp(uint64 remoteChainSelector) {
+  modifier onlyOffRamp(
+    uint64 remoteChainSelector
+  ) {
     if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!s_router.isOffRamp(remoteChainSelector, msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
     _;
@@ -274,7 +286,9 @@ abstract contract TokenPool1_4 is IPoolPriorTo1_5, OwnerIsCreator, IERC165 {
   // │                          Allowlist                           │
   // ================================================================
 
-  modifier checkAllowList(address sender) {
+  modifier checkAllowList(
+    address sender
+  ) {
     if (i_allowlistEnabled && !s_allowList.contains(sender)) revert SenderNotAllowed(sender);
     _;
   }
@@ -331,7 +345,9 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool1_4 {
   /// @notice Contains the specific burn call for a pool.
   /// @dev overriding this method allows us to create pools with different burn signatures
   /// without duplicating the underlying logic.
-  function _burn(uint256 amount) internal virtual;
+  function _burn(
+    uint256 amount
+  ) internal virtual;
 
   /// @notice Burn the token in the pool
   /// @param amount Amount to burn
@@ -392,7 +408,9 @@ contract BurnMintTokenPool1_4 is BurnMintTokenPoolAbstract, ITypeAndVersion {
   ) TokenPool1_4(token, allowlist, armProxy, router) {}
 
   /// @inheritdoc BurnMintTokenPoolAbstract
-  function _burn(uint256 amount) internal virtual override {
+  function _burn(
+    uint256 amount
+  ) internal virtual override {
     IBurnMintERC20(address(i_token)).burn(amount);
   }
 }

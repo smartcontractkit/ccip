@@ -235,13 +235,142 @@ interface VmSafe {
         uint64 gasLimit;
         // The total gas used.
         uint64 gasTotalUsed;
-        // The amount of gas used for memory expansion.
+        // DEPRECATED: The amount of gas used for memory expansion. Ref: <https://github.com/foundry-rs/foundry/pull/7934#pullrequestreview-2069236939>
         uint64 gasMemoryUsed;
         // The amount of gas refunded.
         int64 gasRefunded;
         // The amount of gas remaining.
         uint64 gasRemaining;
     }
+
+    /// The result of the `stopDebugTraceRecording` call
+    struct DebugStep {
+        // The stack before executing the step of the run.
+        // stack\[0\] represents the top of the stack.
+        // and only stack data relevant to the opcode execution is contained.
+        uint256[] stack;
+        // The memory input data before executing the step of the run.
+        // only input data relevant to the opcode execution is contained.
+        // e.g. for MLOAD, it will have memory\[offset:offset+32\] copied here.
+        // the offset value can be get by the stack data.
+        bytes memoryInput;
+        // The opcode that was accessed.
+        uint8 opcode;
+        // The call depth of the step.
+        uint64 depth;
+        // Whether the call end up with out of gas error.
+        bool isOutOfGas;
+        // The contract address where the opcode is running
+        address contractAddr;
+    }
+
+    // ======== Crypto ========
+
+    /// Derives a private key from the name, labels the account with that name, and returns the wallet.
+    function createWallet(string calldata walletLabel) external returns (Wallet memory wallet);
+
+    /// Generates a wallet from the private key and returns the wallet.
+    function createWallet(uint256 privateKey) external returns (Wallet memory wallet);
+
+    /// Generates a wallet from the private key, labels the account with that name, and returns the wallet.
+    function createWallet(uint256 privateKey, string calldata walletLabel) external returns (Wallet memory wallet);
+
+    /// Derive a private key from a provided mnenomic string (or mnenomic file path)
+    /// at the derivation path `m/44'/60'/0'/0/{index}`.
+    function deriveKey(string calldata mnemonic, uint32 index) external pure returns (uint256 privateKey);
+
+    /// Derive a private key from a provided mnenomic string (or mnenomic file path)
+    /// at `{derivationPath}{index}`.
+    function deriveKey(string calldata mnemonic, string calldata derivationPath, uint32 index)
+        external
+        pure
+        returns (uint256 privateKey);
+
+    /// Derive a private key from a provided mnenomic string (or mnenomic file path) in the specified language
+    /// at the derivation path `m/44'/60'/0'/0/{index}`.
+    function deriveKey(string calldata mnemonic, uint32 index, string calldata language)
+        external
+        pure
+        returns (uint256 privateKey);
+
+    /// Derive a private key from a provided mnenomic string (or mnenomic file path) in the specified language
+    /// at `{derivationPath}{index}`.
+    function deriveKey(string calldata mnemonic, string calldata derivationPath, uint32 index, string calldata language)
+        external
+        pure
+        returns (uint256 privateKey);
+
+    /// Derives secp256r1 public key from the provided `privateKey`.
+    function publicKeyP256(uint256 privateKey) external pure returns (uint256 publicKeyX, uint256 publicKeyY);
+
+    /// Adds a private key to the local forge wallet and returns the address.
+    function rememberKey(uint256 privateKey) external returns (address keyAddr);
+
+    /// Derive a set number of wallets from a mnemonic at the derivation path `m/44'/60'/0'/0/{0..count}`.
+    ///
+    /// The respective private keys are saved to the local forge wallet for later use and their addresses are returned.
+    function rememberKeys(string calldata mnemonic, string calldata derivationPath, uint32 count)
+        external
+        returns (address[] memory keyAddrs);
+
+    /// Derive a set number of wallets from a mnemonic in the specified language at the derivation path `m/44'/60'/0'/0/{0..count}`.
+    ///
+    /// The respective private keys are saved to the local forge wallet for later use and their addresses are returned.
+    function rememberKeys(
+        string calldata mnemonic,
+        string calldata derivationPath,
+        string calldata language,
+        uint32 count
+    ) external returns (address[] memory keyAddrs);
+
+    /// Signs data with a `Wallet`.
+    /// Returns a compact signature (`r`, `vs`) as per EIP-2098, where `vs` encodes both the
+    /// signature's `s` value, and the recovery id `v` in a single bytes32.
+    /// This format reduces the signature size from 65 to 64 bytes.
+    function signCompact(Wallet calldata wallet, bytes32 digest) external returns (bytes32 r, bytes32 vs);
+
+    /// Signs `digest` with `privateKey` using the secp256k1 curve.
+    /// Returns a compact signature (`r`, `vs`) as per EIP-2098, where `vs` encodes both the
+    /// signature's `s` value, and the recovery id `v` in a single bytes32.
+    /// This format reduces the signature size from 65 to 64 bytes.
+    function signCompact(uint256 privateKey, bytes32 digest) external pure returns (bytes32 r, bytes32 vs);
+
+    /// Signs `digest` with signer provided to script using the secp256k1 curve.
+    /// Returns a compact signature (`r`, `vs`) as per EIP-2098, where `vs` encodes both the
+    /// signature's `s` value, and the recovery id `v` in a single bytes32.
+    /// This format reduces the signature size from 65 to 64 bytes.
+    /// If `--sender` is provided, the signer with provided address is used, otherwise,
+    /// if exactly one signer is provided to the script, that signer is used.
+    /// Raises error if signer passed through `--sender` does not match any unlocked signers or
+    /// if `--sender` is not provided and not exactly one signer is passed to the script.
+    function signCompact(bytes32 digest) external pure returns (bytes32 r, bytes32 vs);
+
+    /// Signs `digest` with signer provided to script using the secp256k1 curve.
+    /// Returns a compact signature (`r`, `vs`) as per EIP-2098, where `vs` encodes both the
+    /// signature's `s` value, and the recovery id `v` in a single bytes32.
+    /// This format reduces the signature size from 65 to 64 bytes.
+    /// Raises error if none of the signers passed into the script have provided address.
+    function signCompact(address signer, bytes32 digest) external pure returns (bytes32 r, bytes32 vs);
+
+    /// Signs `digest` with `privateKey` using the secp256r1 curve.
+    function signP256(uint256 privateKey, bytes32 digest) external pure returns (bytes32 r, bytes32 s);
+
+    /// Signs data with a `Wallet`.
+    function sign(Wallet calldata wallet, bytes32 digest) external returns (uint8 v, bytes32 r, bytes32 s);
+
+    /// Signs `digest` with `privateKey` using the secp256k1 curve.
+    function sign(uint256 privateKey, bytes32 digest) external pure returns (uint8 v, bytes32 r, bytes32 s);
+
+    /// Signs `digest` with signer provided to script using the secp256k1 curve.
+    /// If `--sender` is provided, the signer with provided address is used, otherwise,
+    /// if exactly one signer is provided to the script, that signer is used.
+    /// Raises error if signer passed through `--sender` does not match any unlocked signers or
+    /// if `--sender` is not provided and not exactly one signer is passed to the script.
+    function sign(bytes32 digest) external pure returns (uint8 v, bytes32 r, bytes32 s);
+
+    /// Signs `digest` with signer provided to script using the secp256k1 curve.
+    /// Raises error if none of the signers passed into the script have provided address.
+    function sign(address signer, bytes32 digest) external pure returns (uint8 v, bytes32 r, bytes32 s);
 
     // ======== Environment ========
 
@@ -447,10 +576,13 @@ interface VmSafe {
     /// Gets the nonce of an account.
     function getNonce(address account) external view returns (uint64 nonce);
 
+    /// Get the nonce of a `Wallet`.
+    function getNonce(Wallet calldata wallet) external returns (uint64 nonce);
+
     /// Gets all the recorded logs.
     function getRecordedLogs() external returns (Log[] memory logs);
 
-    /// Gets the gas used in the last call.
+    /// Gets the gas used in the last call from the callee perspective.
     function lastCallGas() external view returns (Gas memory gas);
 
     /// Loads a storage slot from an address.
@@ -465,28 +597,22 @@ interface VmSafe {
     /// Record all the transaction logs.
     function recordLogs() external;
 
+    /// Reset gas metering (i.e. gas usage is set to gas limit).
+    function resetGasMetering() external;
+
     /// Resumes gas metering (i.e. gas usage is counted again). Noop if already on.
     function resumeGasMetering() external;
 
     /// Performs an Ethereum JSON-RPC request to the current fork URL.
     function rpc(string calldata method, string calldata params) external returns (bytes memory data);
 
-    /// Signs `digest` with `privateKey` using the secp256r1 curve.
-    function signP256(uint256 privateKey, bytes32 digest) external pure returns (bytes32 r, bytes32 s);
+    /// Performs an Ethereum JSON-RPC request to the given endpoint.
+    function rpc(string calldata urlOrAlias, string calldata method, string calldata params)
+        external
+        returns (bytes memory data);
 
-    /// Signs `digest` with `privateKey` using the secp256k1 curve.
-    function sign(uint256 privateKey, bytes32 digest) external pure returns (uint8 v, bytes32 r, bytes32 s);
-
-    /// Signs `digest` with signer provided to script using the secp256k1 curve.
-    /// If `--sender` is provided, the signer with provided address is used, otherwise,
-    /// if exactly one signer is provided to the script, that signer is used.
-    /// Raises error if signer passed through `--sender` does not match any unlocked signers or
-    /// if `--sender` is not provided and not exactly one signer is passed to the script.
-    function sign(bytes32 digest) external pure returns (uint8 v, bytes32 r, bytes32 s);
-
-    /// Signs `digest` with signer provided to script using the secp256k1 curve.
-    /// Raises error if none of the signers passed into the script have provided address.
-    function sign(address signer, bytes32 digest) external pure returns (uint8 v, bytes32 r, bytes32 s);
+    /// Records the debug trace during the run.
+    function startDebugTraceRecording() external;
 
     /// Starts recording all map SSTOREs for later retrieval.
     function startMappingRecording() external;
@@ -494,6 +620,9 @@ interface VmSafe {
     /// Record all account accesses as part of CREATE, CALL or SELFDESTRUCT opcodes in order,
     /// along with the context of the calls
     function startStateDiffRecording() external;
+
+    /// Stop debug trace recording and returns the recorded debug trace.
+    function stopAndReturnDebugTraceRecording() external returns (DebugStep[] memory step);
 
     /// Returns an ordered array of all account accesses from a `vm.startStateDiffRecording` session.
     function stopAndReturnStateDiff() external returns (AccountAccess[] memory accountAccesses);
@@ -520,6 +649,17 @@ interface VmSafe {
     /// `path` is relative to the project root.
     function createDir(string calldata path, bool recursive) external;
 
+    /// Deploys a contract from an artifact file. Takes in the relative path to the json file or the path to the
+    /// artifact in the form of <path>:<contract>:<version> where <contract> and <version> parts are optional.
+    function deployCode(string calldata artifactPath) external returns (address deployedAddress);
+
+    /// Deploys a contract from an artifact file. Takes in the relative path to the json file or the path to the
+    /// artifact in the form of <path>:<contract>:<version> where <contract> and <version> parts are optional.
+    /// Additionally accepts abi-encoded constructor arguments.
+    function deployCode(string calldata artifactPath, bytes calldata constructorArgs)
+        external
+        returns (address deployedAddress);
+
     /// Returns true if the given path points to an existing entity, else returns false.
     function exists(string calldata path) external returns (bool result);
 
@@ -528,6 +668,12 @@ interface VmSafe {
 
     /// Given a path, query the file system to get information about a file, directory, etc.
     function fsMetadata(string calldata path) external view returns (FsMetadata memory metadata);
+
+    /// Gets the artifact path from code (aka. creation code).
+    function getArtifactPathByCode(bytes calldata code) external view returns (string memory path);
+
+    /// Gets the artifact path from deployed code (aka. runtime code).
+    function getArtifactPathByDeployedCode(bytes calldata deployedCode) external view returns (string memory path);
 
     /// Gets the creation bytecode from an artifact file. Takes in the relative path to the json file or the path to the
     /// artifact in the form of <path>:<contract>:<version> where <contract> and <version> parts are optional.
@@ -554,6 +700,9 @@ interface VmSafe {
 
     /// Prompts the user for a hidden string value in the terminal.
     function promptSecret(string calldata promptText) external returns (string memory input);
+
+    /// Prompts the user for hidden uint256 in the terminal (usually pk).
+    function promptSecretUint(string calldata promptText) external returns (uint256);
 
     /// Prompts the user for uint256 in the terminal.
     function promptUint(string calldata promptText) external returns (uint256);
@@ -624,10 +773,6 @@ interface VmSafe {
 
     // ======== JSON ========
 
-    /// Checks if `key` exists in a JSON object
-    /// `keyExists` is being deprecated in favor of `keyExistsJson`. It will be removed in future versions.
-    function keyExists(string calldata json, string calldata key) external view returns (bool);
-
     /// Checks if `key` exists in a JSON object.
     function keyExistsJson(string calldata json, string calldata key) external view returns (bool);
 
@@ -675,6 +820,24 @@ interface VmSafe {
 
     /// Parses a string of JSON data at `key` and coerces it to `string[]`.
     function parseJsonStringArray(string calldata json, string calldata key) external pure returns (string[] memory);
+
+    /// Parses a string of JSON data at `key` and coerces it to type array corresponding to `typeDescription`.
+    function parseJsonTypeArray(string calldata json, string calldata key, string calldata typeDescription)
+        external
+        pure
+        returns (bytes memory);
+
+    /// Parses a string of JSON data and coerces it to type corresponding to `typeDescription`.
+    function parseJsonType(string calldata json, string calldata typeDescription)
+        external
+        pure
+        returns (bytes memory);
+
+    /// Parses a string of JSON data at `key` and coerces it to type corresponding to `typeDescription`.
+    function parseJsonType(string calldata json, string calldata key, string calldata typeDescription)
+        external
+        pure
+        returns (bytes memory);
 
     /// Parses a string of JSON data at `key` and coerces it to `uint256`.
     function parseJsonUint(string calldata json, string calldata key) external pure returns (uint256);
@@ -743,6 +906,20 @@ interface VmSafe {
     function serializeJson(string calldata objectKey, string calldata value) external returns (string memory json);
 
     /// See `serializeJson`.
+    function serializeJsonType(string calldata typeDescription, bytes calldata value)
+        external
+        pure
+        returns (string memory json);
+
+    /// See `serializeJson`.
+    function serializeJsonType(
+        string calldata objectKey,
+        string calldata valueKey,
+        string calldata typeDescription,
+        bytes calldata value
+    ) external returns (string memory json);
+
+    /// See `serializeJson`.
     function serializeString(string calldata objectKey, string calldata valueKey, string calldata value)
         external
         returns (string memory json);
@@ -774,7 +951,14 @@ interface VmSafe {
     /// This is useful to replace a specific value of a JSON file, without having to parse the entire thing.
     function writeJson(string calldata json, string calldata path, string calldata valueKey) external;
 
+    /// Checks if `key` exists in a JSON object
+    /// `keyExists` is being deprecated in favor of `keyExistsJson`. It will be removed in future versions.
+    function keyExists(string calldata json, string calldata key) external view returns (bool);
+
     // ======== Scripting ========
+
+    /// Takes a signed transaction and broadcasts it to the network.
+    function broadcastRawTransaction(bytes calldata data) external;
 
     /// Has the next call (at this call depth only) create transactions that can later be signed and sent onchain.
     /// Broadcasting address is determined by checking the following in order:
@@ -790,6 +974,9 @@ interface VmSafe {
     /// Has the next call (at this call depth only) create a transaction with the private key
     /// provided as the sender that can later be signed and sent onchain.
     function broadcast(uint256 privateKey) external;
+
+    /// Returns addresses of available unlocked wallets in the script environment.
+    function getScriptWallets() external returns (address[] memory wallets);
 
     /// Has all subsequent calls (at this call depth only) create transactions that can later be signed and sent onchain.
     /// Broadcasting address is determined by checking the following in order:
@@ -808,6 +995,9 @@ interface VmSafe {
 
     /// Stops collecting onchain transactions.
     function stopBroadcast() external;
+
+    /// Returns addresses of available unlocked wallets in the script environment.
+    function getWallets() external returns (address[] memory wallets);
 
     // ======== String ========
 
@@ -1303,11 +1493,22 @@ interface VmSafe {
     /// If the condition is false, discard this run's fuzz inputs and generate new ones.
     function assume(bool condition) external pure;
 
+    /// Discard this run's fuzz inputs and generate new ones if next call reverted.
+    function assumeNoRevert() external pure;
+
     /// Writes a breakpoint to jump to in the debugger.
-    function breakpoint(string calldata char) external;
+    function breakpoint(string calldata char) external pure;
 
     /// Writes a conditional breakpoint to jump to in the debugger.
-    function breakpoint(string calldata char, bool value) external;
+    function breakpoint(string calldata char, bool value) external pure;
+
+    /// Returns the Foundry version.
+    /// Format: <cargo_version>+<git_sha>+<build_timestamp>
+    /// Sample output: 0.2.0+faa94c384+202407110019
+    /// Note: Build timestamps may vary slightly across platforms due to separate CI jobs.
+    /// For reliable version comparisons, use YYYYMMDD0000 format (e.g., >= 202407110000)
+    /// to compare timestamps while ignoring minor time differences.
+    function getFoundryVersion() external view returns (string memory version);
 
     /// Returns the RPC url for the given alias.
     function rpcUrl(string calldata rpcAlias) external view returns (string memory json);
@@ -1371,6 +1572,24 @@ interface VmSafe {
     /// Parses a string of TOML data at `key` and coerces it to `string[]`.
     function parseTomlStringArray(string calldata toml, string calldata key) external pure returns (string[] memory);
 
+    /// Parses a string of TOML data at `key` and coerces it to type array corresponding to `typeDescription`.
+    function parseTomlTypeArray(string calldata toml, string calldata key, string calldata typeDescription)
+        external
+        pure
+        returns (bytes memory);
+
+    /// Parses a string of TOML data and coerces it to type corresponding to `typeDescription`.
+    function parseTomlType(string calldata toml, string calldata typeDescription)
+        external
+        pure
+        returns (bytes memory);
+
+    /// Parses a string of TOML data at `key` and coerces it to type corresponding to `typeDescription`.
+    function parseTomlType(string calldata toml, string calldata key, string calldata typeDescription)
+        external
+        pure
+        returns (bytes memory);
+
     /// Parses a string of TOML data at `key` and coerces it to `uint256`.
     function parseTomlUint(string calldata toml, string calldata key) external pure returns (uint256);
 
@@ -1404,39 +1623,8 @@ interface VmSafe {
     /// Compute the address a contract will be deployed at for a given deployer address and nonce.
     function computeCreateAddress(address deployer, uint256 nonce) external pure returns (address);
 
-    /// Derives a private key from the name, labels the account with that name, and returns the wallet.
-    function createWallet(string calldata walletLabel) external returns (Wallet memory wallet);
-
-    /// Generates a wallet from the private key and returns the wallet.
-    function createWallet(uint256 privateKey) external returns (Wallet memory wallet);
-
-    /// Generates a wallet from the private key, labels the account with that name, and returns the wallet.
-    function createWallet(uint256 privateKey, string calldata walletLabel) external returns (Wallet memory wallet);
-
-    /// Derive a private key from a provided mnenomic string (or mnenomic file path)
-    /// at the derivation path `m/44'/60'/0'/0/{index}`.
-    function deriveKey(string calldata mnemonic, uint32 index) external pure returns (uint256 privateKey);
-
-    /// Derive a private key from a provided mnenomic string (or mnenomic file path)
-    /// at `{derivationPath}{index}`.
-    function deriveKey(string calldata mnemonic, string calldata derivationPath, uint32 index)
-        external
-        pure
-        returns (uint256 privateKey);
-
-    /// Derive a private key from a provided mnenomic string (or mnenomic file path) in the specified language
-    /// at the derivation path `m/44'/60'/0'/0/{index}`.
-    function deriveKey(string calldata mnemonic, uint32 index, string calldata language)
-        external
-        pure
-        returns (uint256 privateKey);
-
-    /// Derive a private key from a provided mnenomic string (or mnenomic file path) in the specified language
-    /// at `{derivationPath}{index}`.
-    function deriveKey(string calldata mnemonic, string calldata derivationPath, uint32 index, string calldata language)
-        external
-        pure
-        returns (uint256 privateKey);
+    /// Utility cheatcode to copy storage of `from` contract to another `to` contract.
+    function copyStorage(address from, address to) external;
 
     /// Returns ENS namehash for provided string.
     function ensNamehash(string calldata name) external pure returns (bytes32);
@@ -1444,17 +1632,48 @@ interface VmSafe {
     /// Gets the label for the specified address.
     function getLabel(address account) external view returns (string memory currentLabel);
 
-    /// Get a `Wallet`'s nonce.
-    function getNonce(Wallet calldata wallet) external returns (uint64 nonce);
-
     /// Labels an address in call traces.
     function label(address account, string calldata newLabel) external;
 
-    /// Adds a private key to the local forge wallet and returns the address.
-    function rememberKey(uint256 privateKey) external returns (address keyAddr);
+    /// Pauses collection of call traces. Useful in cases when you want to skip tracing of
+    /// complex calls which are not useful for debugging.
+    function pauseTracing() external view;
 
-    /// Signs data with a `Wallet`.
-    function sign(Wallet calldata wallet, bytes32 digest) external returns (uint8 v, bytes32 r, bytes32 s);
+    /// Returns a random `address`.
+    function randomAddress() external returns (address);
+
+    /// Returns a random `bool`.
+    function randomBool() external view returns (bool);
+
+    /// Returns a random byte array value of the given length.
+    function randomBytes(uint256 len) external view returns (bytes memory);
+
+    /// Returns a random fixed-size byte array of length 4.
+    function randomBytes4() external view returns (bytes4);
+
+    /// Returns a random fixed-size byte array of length 8.
+    function randomBytes8() external view returns (bytes8);
+
+    /// Returns a random `int256` value.
+    function randomInt() external view returns (int256);
+
+    /// Returns a random `int256` value of given bits.
+    function randomInt(uint256 bits) external view returns (int256);
+
+    /// Returns a random uint256 value.
+    function randomUint() external returns (uint256);
+
+    /// Returns random uint256 value between the provided range (=min..=max).
+    function randomUint(uint256 min, uint256 max) external returns (uint256);
+
+    /// Returns a random `uint256` value of given bits.
+    function randomUint(uint256 bits) external view returns (uint256);
+
+    /// Unpauses collection of call traces.
+    function resumeTracing() external view;
+
+    /// Utility cheatcode to set arbitrary storage for given target address.
+    function setArbitraryStorage(address target) external;
 
     /// Encodes a `bytes` value to a base64url string.
     function toBase64URL(bytes calldata data) external pure returns (string memory);
@@ -1494,6 +1713,9 @@ interface Vm is VmSafe {
     /// Clears all mocked calls.
     function clearMockedCalls() external;
 
+    /// Clones a source account code, state, balance and nonce to a target account and updates in-memory EVM state.
+    function cloneAccount(address source, address target) external;
+
     /// Sets `block.coinbase`.
     function coinbase(address newCoinbase) external;
 
@@ -1524,10 +1746,10 @@ interface Vm is VmSafe {
     /// Takes the snapshot ID to delete.
     /// Returns `true` if the snapshot was successfully deleted.
     /// Returns `false` if the snapshot does not exist.
-    function deleteSnapshot(uint256 snapshotId) external returns (bool success);
+    function deleteStateSnapshot(uint256 snapshotId) external returns (bool success);
 
     /// Removes _all_ snapshots previously created by `snapshot`.
-    function deleteSnapshots() external;
+    function deleteStateSnapshots() external;
 
     /// Sets `block.difficulty`.
     /// Not available on EVM versions from Paris onwards. Use `prevrandao` instead.
@@ -1551,7 +1773,7 @@ interface Vm is VmSafe {
     /// Returns true if the account is marked as persistent.
     function isPersistent(address account) external view returns (bool persistent);
 
-    /// Load a genesis JSON file's `allocs` into the in-memory revm state.
+    /// Load a genesis JSON file's `allocs` into the in-memory EVM state.
     function loadAllocs(string calldata pathToAllocsJson) external;
 
     /// Marks that the account(s) should use persistent storage across fork swaps in a multifork setup
@@ -1584,6 +1806,20 @@ interface Vm is VmSafe {
     /// Calldata match takes precedence over `msg.value` in case of ambiguity.
     function mockCall(address callee, uint256 msgValue, bytes calldata data, bytes calldata returnData) external;
 
+    /// Mocks multiple calls to an address, returning specified data for each call.
+    function mockCalls(address callee, bytes calldata data, bytes[] calldata returnData) external;
+
+    /// Mocks multiple calls to an address with a specific `msg.value`, returning specified data for each call.
+    function mockCalls(address callee, uint256 msgValue, bytes calldata data, bytes[] calldata returnData) external;
+
+    /// Whenever a call is made to `callee` with calldata `data`, this cheatcode instead calls
+    /// `target` with the same calldata. This functionality is similar to a delegate call made to
+    /// `target` contract from `callee`.
+    /// Can be used to substitute a call to a function with another implementation that captures
+    /// the primary logic of the original function but is easier to reason about.
+    /// If calldata is not a strict match then partial match by selector is attempted.
+    function mockFunction(address callee, address target, bytes calldata data) external;
+
     /// Sets the *next* call's `msg.sender` to be the input address.
     function prank(address msgSender) external;
 
@@ -1610,14 +1846,14 @@ interface Vm is VmSafe {
     /// Takes the snapshot ID to revert to.
     /// Returns `true` if the snapshot was successfully reverted.
     /// Returns `false` if the snapshot does not exist.
-    /// **Note:** This does not automatically delete the snapshot. To delete the snapshot use `deleteSnapshot`.
-    function revertTo(uint256 snapshotId) external returns (bool success);
+    /// **Note:** This does not automatically delete the snapshot. To delete the snapshot use `deleteStateSnapshot`.
+    function revertToState(uint256 snapshotId) external returns (bool success);
 
     /// Revert the state of the EVM to a previous snapshot and automatically deletes the snapshots
     /// Takes the snapshot ID to revert to.
     /// Returns `true` if the snapshot was successfully reverted and deleted.
     /// Returns `false` if the snapshot does not exist.
-    function revertToAndDelete(uint256 snapshotId) external returns (bool success);
+    function revertToStateAndDelete(uint256 snapshotId) external returns (bool success);
 
     /// Revokes persistent status from the address, previously added via `makePersistent`.
     function revokePersistent(address account) external;
@@ -1645,16 +1881,33 @@ interface Vm is VmSafe {
     /// Takes a fork identifier created by `createFork` and sets the corresponding forked state as active.
     function selectFork(uint256 forkId) external;
 
+    /// Set blockhash for the current block.
+    /// It only sets the blockhash for blocks where `block.number - 256 <= number < block.number`.
+    function setBlockhash(uint256 blockNumber, bytes32 blockHash) external;
+
     /// Sets the nonce of an account. Must be higher than the current nonce of the account.
     function setNonce(address account, uint64 newNonce) external;
 
     /// Sets the nonce of an account to an arbitrary value.
     function setNonceUnsafe(address account, uint64 newNonce) external;
 
+    /// Snapshot capture the gas usage of the last call by name from the callee perspective.
+    function snapshotGasLastCall(string calldata name) external returns (uint256 gasUsed);
+
+    /// Snapshot capture the gas usage of the last call by name in a group from the callee perspective.
+    function snapshotGasLastCall(string calldata group, string calldata name) external returns (uint256 gasUsed);
+
     /// Snapshot the current state of the evm.
     /// Returns the ID of the snapshot that was created.
-    /// To revert a snapshot use `revertTo`.
-    function snapshot() external returns (uint256 snapshotId);
+    /// To revert a snapshot use `revertToState`.
+    function snapshotState() external returns (uint256 snapshotId);
+
+    /// Snapshot capture an arbitrary numerical value by name.
+    /// The group name is derived from the contract name.
+    function snapshotValue(string calldata name, uint256 value) external;
+
+    /// Snapshot capture an arbitrary numerical value by name in a group.
+    function snapshotValue(string calldata group, string calldata name, uint256 value) external;
 
     /// Sets all subsequent calls' `msg.sender` to be the input address until `stopPrank` is called.
     function startPrank(address msgSender) external;
@@ -1662,8 +1915,25 @@ interface Vm is VmSafe {
     /// Sets all subsequent calls' `msg.sender` to be the input address until `stopPrank` is called, and the `tx.origin` to be the second input.
     function startPrank(address msgSender, address txOrigin) external;
 
+    /// Start a snapshot capture of the current gas usage by name.
+    /// The group name is derived from the contract name.
+    function startSnapshotGas(string calldata name) external;
+
+    /// Start a snapshot capture of the current gas usage by name in a group.
+    function startSnapshotGas(string calldata group, string calldata name) external;
+
     /// Resets subsequent calls' `msg.sender` to be `address(this)`.
     function stopPrank() external;
+
+    /// Stop the snapshot capture of the current gas by latest snapshot name, capturing the gas used since the start.
+    function stopSnapshotGas() external returns (uint256 gasUsed);
+
+    /// Stop the snapshot capture of the current gas usage by name, capturing the gas used since the start.
+    /// The group name is derived from the contract name.
+    function stopSnapshotGas(string calldata name) external returns (uint256 gasUsed);
+
+    /// Stop the snapshot capture of the current gas usage by name in a group, capturing the gas used since the start.
+    function stopSnapshotGas(string calldata group, string calldata name) external returns (uint256 gasUsed);
 
     /// Stores a value to an address' storage slot.
     function store(address target, bytes32 slot, bytes32 value) external;
@@ -1679,6 +1949,21 @@ interface Vm is VmSafe {
 
     /// Sets `block.timestamp`.
     function warp(uint256 newTimestamp) external;
+
+    /// `deleteSnapshot` is being deprecated in favor of `deleteStateSnapshot`. It will be removed in future versions.
+    function deleteSnapshot(uint256 snapshotId) external returns (bool success);
+
+    /// `deleteSnapshots` is being deprecated in favor of `deleteStateSnapshots`. It will be removed in future versions.
+    function deleteSnapshots() external;
+
+    /// `revertToAndDelete` is being deprecated in favor of `revertToStateAndDelete`. It will be removed in future versions.
+    function revertToAndDelete(uint256 snapshotId) external returns (bool success);
+
+    /// `revertTo` is being deprecated in favor of `revertToState`. It will be removed in future versions.
+    function revertTo(uint256 snapshotId) external returns (bool success);
+
+    /// `snapshot` is being deprecated in favor of `snapshotState`. It will be removed in future versions.
+    function snapshot() external returns (uint256 snapshotId);
 
     // ======== Testing ========
 
@@ -1708,6 +1993,30 @@ interface Vm is VmSafe {
     /// Expects given number of calls to an address with the specified `msg.value`, gas, and calldata.
     function expectCall(address callee, uint256 msgValue, uint64 gas, bytes calldata data, uint64 count) external;
 
+    /// Prepare an expected anonymous log with (bool checkTopic1, bool checkTopic2, bool checkTopic3, bool checkData.).
+    /// Call this function, then emit an anonymous event, then call a function. Internally after the call, we check if
+    /// logs were emitted in the expected order with the expected topics and data (as specified by the booleans).
+    function expectEmitAnonymous(bool checkTopic0, bool checkTopic1, bool checkTopic2, bool checkTopic3, bool checkData)
+        external;
+
+    /// Same as the previous method, but also checks supplied address against emitting contract.
+    function expectEmitAnonymous(
+        bool checkTopic0,
+        bool checkTopic1,
+        bool checkTopic2,
+        bool checkTopic3,
+        bool checkData,
+        address emitter
+    ) external;
+
+    /// Prepare an expected anonymous log with all topic and data checks enabled.
+    /// Call this function, then emit an anonymous event, then call a function. Internally after the call, we check if
+    /// logs were emitted in the expected order with the expected topics and data.
+    function expectEmitAnonymous() external;
+
+    /// Same as the previous method, but also checks supplied address against emitting contract.
+    function expectEmitAnonymous(address emitter) external;
+
     /// Prepare an expected log with (bool checkTopic1, bool checkTopic2, bool checkTopic3, bool checkData.).
     /// Call this function, then emit an event, then call a function. Internally after the call, we check if
     /// logs were emitted in the expected order with the expected topics and data (as specified by the booleans).
@@ -1725,14 +2034,29 @@ interface Vm is VmSafe {
     /// Same as the previous method, but also checks supplied address against emitting contract.
     function expectEmit(address emitter) external;
 
+    /// Expects an error on next call that starts with the revert data.
+    function expectPartialRevert(bytes4 revertData) external;
+
+    /// Expects an error on next call to reverter address, that starts with the revert data.
+    function expectPartialRevert(bytes4 revertData, address reverter) external;
+
     /// Expects an error on next call with any revert data.
     function expectRevert() external;
 
-    /// Expects an error on next call that starts with the revert data.
+    /// Expects an error on next call that exactly matches the revert data.
     function expectRevert(bytes4 revertData) external;
 
     /// Expects an error on next call that exactly matches the revert data.
     function expectRevert(bytes calldata revertData) external;
+
+    /// Expects an error with any revert data on next call to reverter address.
+    function expectRevert(address reverter) external;
+
+    /// Expects an error from reverter address on next call, with any revert data.
+    function expectRevert(bytes4 revertData, address reverter) external;
+
+    /// Expects an error from reverter address on next call, that exactly matches the revert data.
+    function expectRevert(bytes calldata revertData, address reverter) external;
 
     /// Only allows memory writes to offsets [0x00, 0x60) ∪ [min, max) in the current subcontext. If any other
     /// memory is written to, the test will fail. Can be called multiple times to add more ranges to the set.
@@ -1743,8 +2067,11 @@ interface Vm is VmSafe {
     /// to the set.
     function expectSafeMemoryCall(uint64 min, uint64 max) external;
 
-    /// Marks a test as skipped. Must be called at the top of the test.
+    /// Marks a test as skipped. Must be called at the top level of a test.
     function skip(bool skipTest) external;
+
+    /// Marks a test as skipped with a reason. Must be called at the top level of a test.
+    function skip(bool skipTest, string calldata reason) external;
 
     /// Stops all safe memory expectation in the current subcontext.
     function stopExpectSafeMemory() external;

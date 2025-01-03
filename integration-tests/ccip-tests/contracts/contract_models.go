@@ -18,6 +18,7 @@ import (
 	"golang.org/x/exp/rand"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/blockchain"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_lbtc_token_pool"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/wrappers"
 
@@ -404,6 +405,7 @@ type LatestPool struct {
 	PoolInterface   *token_pool.TokenPool
 	LockReleasePool *lock_release_token_pool.LockReleaseTokenPool
 	USDCPool        *usdc_token_pool.USDCTokenPool
+	MockLBTCPool    *mock_lbtc_token_pool.MockLBTCTokenPool
 }
 
 type V1_4_0Pool struct {
@@ -478,14 +480,14 @@ func (w TokenPoolWrapper) IsSupportedChain(opts *bind.CallOpts, remoteChainSelec
 
 func (w TokenPoolWrapper) ApplyChainUpdates(opts *bind.TransactOpts, update []token_pool.TokenPoolChainUpdate) (*types.Transaction, error) {
 	if w.Latest != nil && w.Latest.PoolInterface != nil {
-		return w.Latest.PoolInterface.ApplyChainUpdates(opts, update)
+		return w.Latest.PoolInterface.ApplyChainUpdates(opts, []uint64{}, update)
 	}
 	if w.V1_4_0 != nil && w.V1_4_0.PoolInterface != nil {
 		V1_4_0Updates := make([]token_pool_1_4_0.TokenPoolChainUpdate, len(update))
 		for i, u := range update {
 			V1_4_0Updates[i] = token_pool_1_4_0.TokenPoolChainUpdate{
 				RemoteChainSelector: u.RemoteChainSelector,
-				Allowed:             u.Allowed,
+				Allowed:             true,
 				InboundRateLimiterConfig: token_pool_1_4_0.RateLimiterConfig{
 					IsEnabled: u.InboundRateLimiterConfig.IsEnabled,
 					Capacity:  u.InboundRateLimiterConfig.Capacity,
@@ -828,9 +830,8 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64, remotePo
 
 	selectorsToUpdate = append(selectorsToUpdate, token_pool.TokenPoolChainUpdate{
 		RemoteChainSelector: remoteChainSelector,
-		RemotePoolAddress:   encodedPoolAddress,
+		RemotePoolAddresses: [][]byte{encodedPoolAddress},
 		RemoteTokenAddress:  encodedTokenAddress,
-		Allowed:             true,
 		InboundRateLimiterConfig: token_pool.RateLimiterConfig{
 			IsEnabled: true,
 			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),

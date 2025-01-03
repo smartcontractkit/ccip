@@ -563,8 +563,6 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 		return nil, err
 	}
 
-	usdcConfig := execPluginConfig.USDCConfig
-
 	feeEstimatorConfig := estimatorconfig.NewFeeEstimatorConfigService()
 
 	// CCIPExec reads when dest chain is mantle, and uses it to calc boosting in batching
@@ -591,10 +589,8 @@ func (r *Relayer) NewCCIPExecProvider(rargs commontypes.RelayArgs, pargs commont
 			r.chain.LogPoller(),
 			execPluginConfig.SourceStartBlock,
 			execPluginConfig.JobID,
-			usdcConfig.AttestationAPI,
-			int(usdcConfig.AttestationAPITimeoutSeconds),
-			usdcConfig.AttestationAPIIntervalMilliseconds,
-			usdcConfig.SourceMessageTransmitterAddress,
+			execPluginConfig.USDCConfig,
+			execPluginConfig.LBTCConfig,
 			feeEstimatorConfig,
 		)
 	}

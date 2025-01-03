@@ -23,13 +23,9 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/BurnMintTokenPool/BurnMintTokenPool.abi ../../../contracts/solc/v0.8.24/BurnMintTokenPool/BurnMintTokenPool.bin BurnMintTokenPool burn_mint_token_pool
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/BurnFromMintTokenPool/BurnFromMintTokenPool.abi ../../../contracts/solc/v0.8.24/BurnFromMintTokenPool/BurnFromMintTokenPool.bin BurnFromMintTokenPool burn_from_mint_token_pool
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/BurnWithFromMintTokenPool/BurnWithFromMintTokenPool.abi ../../../contracts/solc/v0.8.24/BurnWithFromMintTokenPool/BurnWithFromMintTokenPool.bin BurnWithFromMintTokenPool burn_with_from_mint_token_pool
-//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/BurnMintTokenPoolAndProxy/BurnMintTokenPoolAndProxy.abi ../../../contracts/solc/v0.8.24/BurnMintTokenPoolAndProxy/BurnMintTokenPoolAndProxy.bin BurnMintTokenPoolAndProxy burn_mint_token_pool_and_proxy
-//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/BurnWithFromMintTokenPoolAndProxy/BurnWithFromMintTokenPoolAndProxy.abi ../../../contracts/solc/v0.8.24/BurnWithFromMintTokenPoolAndProxy/BurnWithFromMintTokenPoolAndProxy.bin BurnWithFromMintTokenPoolAndProxy burn_with_from_mint_token_pool_and_proxy
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/LockReleaseTokenPool/LockReleaseTokenPool.abi ../../../contracts/solc/v0.8.24/LockReleaseTokenPool/LockReleaseTokenPool.bin LockReleaseTokenPool lock_release_token_pool
-//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/LockReleaseTokenPoolAndProxy/LockReleaseTokenPoolAndProxy.abi ../../../contracts/solc/v0.8.24/LockReleaseTokenPoolAndProxy/LockReleaseTokenPoolAndProxy.bin LockReleaseTokenPoolAndProxy lock_release_token_pool_and_proxy
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/TokenPool/TokenPool.abi ../../../contracts/solc/v0.8.24/TokenPool/TokenPool.bin TokenPool token_pool
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/USDCTokenPool/USDCTokenPool.abi ../../../contracts/solc/v0.8.24/USDCTokenPool/USDCTokenPool.bin USDCTokenPool usdc_token_pool
-//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/BurnWithFromMintRebasingTokenPool/BurnWithFromMintRebasingTokenPool.abi ../../../contracts/solc/v0.8.24/BurnWithFromMintRebasingTokenPool/BurnWithFromMintRebasingTokenPool.bin BurnWithFromMintRebasingTokenPool burn_with_from_mint_rebasing_token_pool
 
 // Helpers
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MockV3Aggregator/MockV3Aggregator.abi ../../../contracts/solc/v0.8.24/MockV3Aggregator/MockV3Aggregator.bin MockV3Aggregator mock_v3_aggregator_contract
@@ -44,6 +40,7 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/WETH9/WETH9.abi ../../../contracts/solc/v0.8.24/WETH9/WETH9.bin WETH9 weth9
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MockE2EUSDCTokenMessenger/MockE2EUSDCTokenMessenger.abi ../../../contracts/solc/v0.8.24/MockE2EUSDCTokenMessenger/MockE2EUSDCTokenMessenger.bin MockE2EUSDCTokenMessenger mock_usdc_token_messenger
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MockE2EUSDCTransmitter/MockE2EUSDCTransmitter.abi ../../../contracts/solc/v0.8.24/MockE2EUSDCTransmitter/MockE2EUSDCTransmitter.bin MockE2EUSDCTransmitter mock_usdc_token_transmitter
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/MockLBTCTokenPool/MockLBTCTokenPool.abi ../../../contracts/solc/v0.8.24/MockLBTCTokenPool/MockLBTCTokenPool.bin MockLBTCTokenPool mock_lbtc_token_pool
 
 // EncodingUtils
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.24/ICCIPEncodingUtils/ICCIPEncodingUtils.abi ../../../contracts/solc/v0.8.24/ICCIPEncodingUtils/ICCIPEncodingUtils.bin EncodingUtils ccip_encoding_utils

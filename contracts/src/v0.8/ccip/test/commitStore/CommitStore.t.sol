@@ -117,7 +117,9 @@ contract CommitStore_constructor is FeeQuoterSetup, OCR2BaseSetup {
 }
 
 contract CommitStore_setMinSeqNr is CommitStoreSetup {
-  function test_Fuzz_SetMinSeqNr_Success(uint64 minSeqNr) public {
+  function test_Fuzz_SetMinSeqNr_Success(
+    uint64 minSeqNr
+  ) public {
     vm.expectEmit();
     emit CommitStore.SequenceNumberSet(s_commitStore.getExpectedNextSequenceNumber(), minSeqNr);
 
@@ -135,7 +137,9 @@ contract CommitStore_setMinSeqNr is CommitStoreSetup {
 }
 
 contract CommitStore_setDynamicConfig is CommitStoreSetup {
-  function test_Fuzz_SetDynamicConfig_Success(address priceRegistry) public {
+  function test_Fuzz_SetDynamicConfig_Success(
+    address priceRegistry
+  ) public {
     vm.assume(priceRegistry != address(0));
     CommitStore.StaticConfig memory staticConfig = s_commitStore.getStaticConfig();
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({priceRegistry: priceRegistry});

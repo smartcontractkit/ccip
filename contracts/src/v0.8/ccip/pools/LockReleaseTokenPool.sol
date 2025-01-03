@@ -9,6 +9,7 @@ import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC165} from "../../vendor/openzeppelin-solidity/v5.0.2/contracts/utils/introspection/IERC165.sol";
 
 /// @notice Token pool used for tokens on their native chain. This uses a lock and release mechanism.
 /// Because of lock/unlock requiring liquidity, this pool contract also has function to add and remove
@@ -22,7 +23,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
   event LiquidityTransferred(address indexed from, uint256 amount);
 
-  string public constant override typeAndVersion = "LockReleaseTokenPool 1.5.0";
+  string public constant override typeAndVersion = "LockReleaseTokenPool 1.5.1";
 
   /// @dev Whether or not the pool accepts liquidity.
   /// External liquidity is not required when there is one canonical token deployed to a chain,
@@ -34,11 +35,12 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
   constructor(
     IERC20 token,
+    uint8 localTokenDecimals,
     address[] memory allowlist,
     address rmnProxy,
     bool acceptLiquidity,
     address router
-  ) TokenPool(token, allowlist, rmnProxy, router) {
+  ) TokenPool(token, localTokenDecimals, allowlist, rmnProxy, router) {
     i_acceptLiquidity = acceptLiquidity;
   }
 
@@ -51,7 +53,10 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
     emit Locked(msg.sender, lockOrBurnIn.amount);
 
-    return Pool.LockOrBurnOutV1({destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector), destPoolData: ""});
+    return Pool.LockOrBurnOutV1({
+      destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
+      destPoolData: _encodeLocalDecimals()
+    });
   }
 
   /// @notice Release tokens from the pool to the recipient
@@ -61,16 +66,22 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
   ) external virtual override returns (Pool.ReleaseOrMintOutV1 memory) {
     _validateReleaseOrMint(releaseOrMintIn);
 
+    // Calculate the local amount
+    uint256 localAmount =
+      _calculateLocalAmount(releaseOrMintIn.amount, _parseRemoteDecimals(releaseOrMintIn.sourcePoolData));
+
     // Release to the recipient
-    getToken().safeTransfer(releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    getToken().safeTransfer(releaseOrMintIn.receiver, localAmount);
 
-    emit Released(msg.sender, releaseOrMintIn.receiver, releaseOrMintIn.amount);
+    emit Released(msg.sender, releaseOrMintIn.receiver, localAmount);
 
-    return Pool.ReleaseOrMintOutV1({destinationAmount: releaseOrMintIn.amount});
+    return Pool.ReleaseOrMintOutV1({destinationAmount: localAmount});
   }
 
-  // @inheritdoc IERC165
-  function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
+  /// @inheritdoc IERC165
+  function supportsInterface(
+    bytes4 interfaceId
+  ) public pure virtual override returns (bool) {
     return interfaceId == type(ILiquidityContainer).interfaceId || super.supportsInterface(interfaceId);
   }
 
@@ -82,7 +93,9 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
   /// @notice Sets the LiquidityManager address.
   /// @dev Only callable by the owner.
-  function setRebalancer(address rebalancer) external onlyOwner {
+  function setRebalancer(
+    address rebalancer
+  ) external onlyOwner {
     s_rebalancer = rebalancer;
   }
 
@@ -94,7 +107,9 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
   /// @notice Adds liquidity to the pool. The tokens should be approved first.
   /// @param amount The amount of liquidity to provide.
-  function provideLiquidity(uint256 amount) external {
+  function provideLiquidity(
+    uint256 amount
+  ) external {
     if (!i_acceptLiquidity) revert LiquidityNotAccepted();
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
@@ -104,7 +119,9 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
   /// @notice Removed liquidity to the pool. The tokens will be sent to msg.sender.
   /// @param amount The amount of liquidity to remove.
-  function withdrawLiquidity(uint256 amount) external {
+  function withdrawLiquidity(
+    uint256 amount
+  ) external {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
 
     if (i_token.balanceOf(address(this)) < amount) revert InsufficientLiquidity();

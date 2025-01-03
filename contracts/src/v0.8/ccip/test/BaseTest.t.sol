@@ -42,6 +42,7 @@ contract BaseTest is Test {
   uint16 internal constant DEFAULT_TOKEN_FEE_USD_CENTS = 50;
   uint32 internal constant DEFAULT_TOKEN_DEST_GAS_OVERHEAD = 90_000;
   uint32 internal constant DEFAULT_TOKEN_BYTES_OVERHEAD = 32;
+  uint8 internal constant DEFAULT_TOKEN_DECIMALS = 18;
 
   bool private s_baseTestInitialized;
 
@@ -99,7 +100,9 @@ contract BaseTest is Test {
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed(bytes16)"), abi.encode(false)); // no curses by defaule
   }
 
-  function _setMockRMNGlobalCurse(bool isCursed) internal {
+  function _setMockRMNGlobalCurse(
+    bool isCursed
+  ) internal {
     vm.mockCall(address(s_mockRMNRemote), abi.encodeWithSignature("isCursed()"), abi.encode(isCursed));
   }
 

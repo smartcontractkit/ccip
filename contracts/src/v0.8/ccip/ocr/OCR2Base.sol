@@ -89,7 +89,9 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   bool internal immutable i_uniqueReports;
   uint256 internal immutable i_chainID;
 
-  constructor(bool uniqueReports) {
+  constructor(
+    bool uniqueReports
+  ) {
     i_uniqueReports = uniqueReports;
     i_chainID = block.chainid;
   }
@@ -176,7 +178,9 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
 
   /// @dev Hook that is run from setOCR2Config() right after validating configuration.
   /// Empty by default, please provide an implementation in a child contract if you need additional configuration processing
-  function _beforeSetConfig(bytes memory _onchainConfig) internal virtual;
+  function _beforeSetConfig(
+    bytes memory _onchainConfig
+  ) internal virtual;
 
   /// @return list of addresses permitted to transmit reports to this contract
   /// @dev The list will match the order used to specify the transmitter during setConfig
