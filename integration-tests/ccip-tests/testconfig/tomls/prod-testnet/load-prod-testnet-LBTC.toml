@@ -1,0 +1,178 @@
+[CCIP]
+[CCIP.ContractVersions]
+PriceRegistry = 'latest'
+OffRamp = 'latest'
+OnRamp = 'latest'
+CommitStore = 'latest'
+TokenPool = 'latest'
+
+
+[CCIP.Deployments]
+Data = """
+{
+  "lane_configs": {
+    "Ethereum Holesky": {
+      "is_native_fee_token": false,
+      "fee_token": "0x685cE6742351ae9b618F383883D6d1e0c5A31B4B",
+      "bridge_tokens": [
+        "0x38A13AB20D15ffbE5A7312d2336EF1552580a4E2"
+      ],
+      "bridge_tokens_pools": [
+        "0xbfac0397ef727c9c4d683f6d198ab6686ecb1864"
+      ],
+      "arm": "0x8607115fd037d4f182b0eBaEC3cF08Df67080d05",
+      "router": "0xb9531b46fE8808fB3659e39704953c2B1112DD43",
+      "price_registry": "0x9a877946713960E547544B611487434429A69cED",
+      "wrapped_native": "0x94373a4919B3240D86eA41593D5eBa789FEF3848",
+      "src_contracts": {
+        "Base Sepolia": {
+          "on_ramp": "0x515336F1001aBC57Aa9d4a73115fa9451B5b4271",
+          "deployed_at": 0
+        }
+      },
+      "dest_contracts": {
+        "Base Sepolia": {
+          "off_ramp": "0xD51b52F612Fe76fb7B41335491cdae148D6eA112",
+          "commit_store": "0x74bB3171c44fA24958faF1444062f7518d5d89bC",
+          "receiver_dapp": "0xea387241d834D04CC408f4C2FE7ef2c477E4B3E7"
+        }
+      }
+    },
+    "Base Sepolia": {
+      "is_native_fee_token": true,
+      "fee_token": "0x4200000000000000000000000000000000000006",
+      "bridge_tokens": [
+        "0x107Fc7d90484534704dD2A9e24c7BD45DB4dD1B5"
+      ],
+      "bridge_tokens_pools": [
+        "0x8aF38c5B632c6F0d511d86521fDb21555Df35310"
+      ],
+      "arm": "0x7827dD0481EE18DB646bD250d20A8eA43da52146",
+      "router": "0xD3b06cEbF099CE7DA4AcCf578aaebFDBd6e88a93",
+      "price_registry": "0x4D20536e60832bE579Cd38E89Dc03d11E1741FbA",
+      "wrapped_native": "0x4200000000000000000000000000000000000006",
+      "src_contracts": {
+        "Ethereum Holesky": {
+          "on_ramp": "0xCB8657f4a64a0a3465AA10c9f7aC11b28Eb3F6F4",
+          "deployed_at": 0
+        }
+      },
+      "dest_contracts": {
+        "Ethereum Holesky": {
+          "off_ramp": "0x696d82B951CB43581485C7028BeA0b5470Dc9195",
+          "commit_store": "0x39d7e2Cf9C762c39dB882A67a89e283EDb0d284f",
+          "receiver_dapp": "0xea387241d834D04CC408f4C2FE7ef2c477E4B3E7"
+        }
+      }
+    }
+  }
+}
+"""
+
+[CCIP.Env]
+TTL = '2h'
+
+[CCIP.Env.Network]
+selected_networks = [
+    'BASE_SEPOLIA',
+    'HOLESKY_ETHEREUM',
+]
+
+[CCIP.Env.Network.EVMNetworks.HOLESKY_ETHEREUM]
+evm_name = "Ethereum Holesky"
+evm_chain_id = 17000
+evm_simulated = false
+client_implementation = "Ethereum"
+evm_chainlink_transaction_limit = 5000
+evm_transaction_timeout = '5m'
+evm_minimum_confirmations = 1
+evm_gas_estimation_buffer = 0
+evm_supports_eip1559 = true
+evm_default_gas_limit = 600000
+evm_finality_depth = 100
+evm_finality_tag = true
+
+[CCIP.Groups.load]
+NetworkPairs = [
+#    'AVALANCHE_FUJI,SEPOLIA',
+    'HOLESKY_ETHEREUM,BASE_SEPOLIA'
+]
+
+BiDirectionalLane = false
+PhaseTimeout = '45m'
+ExistingDeployment = true
+
+[CCIP.Groups.load.TokenConfig]
+NoOfTokensPerChain = 1
+
+# 1msg/5sec = 12msg/min
+[CCIP.Groups.load.LoadProfile]
+RequestPerUnitTime = [1]
+TimeUnit = '4s'
+TestDuration = '10m'
+TestRunName = 'load-prod-testnet-lbtc'
+
+# There is slower exec rounds in Sepolia/Ethereum, therefore reducing the frequency
+# 1msg/12sec = 5msg/min
+#[CCIP.Groups.load.LoadProfile.FrequencyByDestination.sepolia-testnet]
+#RequestPerUnitTime = [5]
+
+# to represent 20%, 60%, 15%, 5% of the total messages
+#[CCIP.Groups.load.LoadProfile.MsgProfile]
+#Frequencies = [4, 12, 3, 1]
+
+[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+MsgType = 'Token'
+DestGasLimit = 600000
+DataLength = 0
+NoOfTokens = 1
+AmountPerToken = 10
+
+#[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+#MsgType = 'DataWithToken'
+#DestGasLimit = 500000
+#DataLength = 5000
+#NoOfTokens = 1
+#AmountPerToken = 1
+#
+#[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+#MsgType = 'Data'
+#DestGasLimit = 600000
+#DataLength = 10000
+#
+#[[CCIP.Groups.load.LoadProfile.MsgProfile.MsgDetails]]
+#MsgType = 'Data'
+#DestGasLimit = 250000
+#DataLength = 10000
+
+
+[CCIP.Groups.smoke]
+# these are all the valid network pairs
+NetworkPairs = [
+    #    'BSC_TESTNET,BASE_SEPOLIA',
+    #    'BSC_TESTNET,GNOSIS_CHIADO',
+
+    #    'BASE_SEPOLIA,MODE_SEPOLIA',
+    'HOLESKY_ETHEREUM,BASE_SEPOLIA',
+    #    'BASE_SEPOLIA,GNOSIS_CHIADO',
+
+    #    'OPTIMISM_SEPOLIA,GNOSIS_CHIADO',
+]
+
+BiDirectionalLane = true
+PhaseTimeout = '30m'
+LocalCluster = false
+ExistingDeployment = true
+ReuseContracts = true
+
+
+[CCIP.Groups.smoke.TokenConfig]
+NoOfTokensPerChain = 1
+CCIPOwnerTokens = true
+
+[CCIP.Groups.smoke.MsgDetails]
+MsgType = 'Token'
+DestGasLimit = 600000
+DataLength = 0
+NoOfTokens = 1
+AmountPerToken = 10
