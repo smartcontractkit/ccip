@@ -1,5 +1,9 @@
 # Verify ZkSync Contracts For CCIP
 
+G++ <-> CCIP repo artifacts mapping
+- The current version of zkSync artifacts in G++ was generated with `v2.14.0-ccip1.5.0` version of zkSync contracts.
+- For MCMS contracts change the zkSolc version to v1.5.3
+
 Pre-requisites:
 - `pnpm install` at contracts directory
 - `pnpm run zksync:compile `>> for compiling the contracts, you can uncomment `contractsToCompile` in [hardhat.ccip.zksync.config.ts](../../hardhat.ccip.zksync.config.ts) to compile only the contracts you need

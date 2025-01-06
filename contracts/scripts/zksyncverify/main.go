@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
@@ -13,9 +12,38 @@ import (
 
 	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 )
+
+// CustomTx represents a custom transaction structure with selected fields
+type CustomTx struct {
+	Hash string `json:"hash"`
+	Data string `json:"data"`
+}
+
+func getTransaction(rpcClient *rpc.Client, txHash string) (*CustomTx, error) {
+	var result map[string]interface{}
+	if err := rpcClient.Call(&result, "eth_getTransactionByHash", txHash); err != nil {
+		return nil, fmt.Errorf("failed to fetch transaction: %w", err)
+	}
+
+	data, ok := result["input"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing or invalid 'input' field in transaction result")
+	}
+
+	hash, ok := result["hash"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing or invalid 'hash' field in transaction result")
+	}
+
+	tx := &CustomTx{
+		Hash: hash,
+		Data: data,
+	}
+	return tx, nil
+}
 
 // This script decodes the constructor arguments of a contract from a hex string
 func main() {
@@ -38,11 +66,13 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to connect to the rpc client: %v", err)
 		}
-		tx, _, err := client.TransactionByHash(context.Background(), common.HexToHash(pointer.GetString(deploymentTx)))
+
+		rpcClient := client.Client()
+		tx, err := getTransaction(rpcClient, pointer.GetString(deploymentTx))
 		if err != nil {
 			log.Fatalf("Failed to get transaction receipt: %v", err)
 		}
-		params = string(tx.Data())
+		params = string(tx.Data[2:])
 	} else {
 		params = pointer.GetString(encodedConstructorArgs)
 	}
@@ -61,6 +91,7 @@ func main() {
 		log.Fatalf("Failed to unmarshal ABI file content: %v", err)
 	}
 
+	fmt.Println("Bytecode Size:", calculateBytecodeSize(compiledFile.DeployedBytecode))
 	// Parse the ABI
 	parsedABI, err := abi.JSON(strings.NewReader(string(compiledFile.ABI)))
 	if err != nil {
@@ -84,6 +115,7 @@ func main() {
 
 	// Create a map to hold the named constructor arguments
 	constructorArgsMap := make(map[string]interface{})
+	fmt.Println("Constructor Arguments order for reference:")
 	for i, arg := range parsedABI.Constructor.Inputs {
 		fmt.Println(arg.Name)
 		constructorArgsMap[arg.Name] = decodedArgs[i]
@@ -97,4 +129,13 @@ func main() {
 
 	fmt.Println("Decoded Constructor Arguments in JSON Format:")
 	fmt.Println(string(decodedArgsJSON))
+}
+
+func calculateBytecodeSize(bytecode string) int {
+	// Remove the "0x" prefix if present
+	if strings.HasPrefix(bytecode, "0x") {
+		bytecode = bytecode[2:]
+	}
+	// Calculate the size in bytes
+	return len(bytecode) / 2
 }
