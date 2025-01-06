@@ -2,7 +2,7 @@
 
 G++ <-> CCIP repo artifacts mapping
 - The current version of zkSync artifacts in G++ was generated with `v2.14.0-ccip1.5.0` version of zkSync contracts.
-- For MCMS contracts change the zkSolc version to v1.5.3
+- For MCMS contracts change the zkSolc version to v1.5.0
 
 Pre-requisites:
 - `pnpm install` at contracts directory
