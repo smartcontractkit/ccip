@@ -3416,9 +3416,10 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 		err = lane.Dest.AssertMessageContentMatch(lane.Logger, string(msgLog.MessageId[:]), []byte(lane.SentReqs[txHash][0].MessageData), timeout, reqStat)
 		if err != nil {
 			return errors.Wrap(err, "message validation failed")
-		} else {
-			log.Info().Msg("Message content validation successful")
 		}
+
+		log.Info().Msg("Message content validation successful")
+
 	}
 	if opts.expectAnyPhaseToFail {
 		return fmt.Errorf("expected at least any one phase to fail but no phase got failed")
