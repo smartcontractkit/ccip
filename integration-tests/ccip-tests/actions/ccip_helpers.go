@@ -1908,7 +1908,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 		log.Info().Interface("Msg", msg).Msg("CCIP msg")
 		reason, _ := blockchain.RPCErrorFromError(err)
 		if reason != "" {
-			return common.Hash{}, d, nil, nil, fmt.Errorf("failed getting the fee: %s", reason)
+			return common.Hash{}, d, nil, msgData, fmt.Errorf("failed getting the fee: %s", reason)
 		}
 		return common.Hash{}, d, nil, nil, fmt.Errorf("failed getting the fee: %w", err)
 	}
@@ -2708,7 +2708,6 @@ func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
 	timeout time.Duration,
 	reqStat *testreporters.RequestStat,
 ) error {
-	fmt.Println(reqStat)
 	lggr.Info().
 		Str("MsgID", fmt.Sprintf("0x%x", string(messageID))).
 		Str("Timeout", timeout.String()).
@@ -2732,7 +2731,7 @@ func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
 				lggr.Warn().
 					Str("MsgID", fmt.Sprintf("0x%x", string(messageID))).
 					Msg("Invalid content type in MessageReceivedWatcher")
-				continue
+				return fmt.Errorf("invalid content type in MessageReceivedWatcher")
 			}
 
 			// Compare the received content with the expected content
@@ -2751,6 +2750,8 @@ func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
 				Str("Expected Content", string(expectedContent)).
 				Msg("Message content mismatch")
 
+			return fmt.Errorf("message content did not match for MessageID 0x%x", string(messageID))
+
 		case <-timer.C:
 			// Handle timeout with potential connection issue recovery
 			if destCCIP.Common.IsConnectionRestoredRecently != nil && !destCCIP.Common.IsConnectionRestoredRecently.Load() {
@@ -2763,7 +2764,7 @@ func (destCCIP *DestCCIPModule) AssertMessageContentMatch(
 				continue
 			}
 
-			return fmt.Errorf("timeout - message was not received or content did not match for MessageID 0x%x", string(messageID))
+			return fmt.Errorf("timeout - message was not received for MessageID 0x%x", string(messageID))
 		}
 	}
 }
@@ -3376,13 +3377,6 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 			timeout = opts.timeout
 		}
 
-		err = lane.Dest.AssertMessageContentMatch(lane.Logger, string(msgLog.MessageId[:]), []byte(lane.SentReqs[txHash][0].MessageData), timeout, reqStat)
-		if err != nil {
-			return fmt.Errorf("message validation failed: %v", err)
-		} else {
-			log.Info().Msg("Message content validation successful")
-		}
-
 		err = lane.Dest.AssertSeqNumberExecuted(lane.Logger, seqNumber, timeout, sourceLogFinalizedAt, reqStat)
 		if shouldReturn, phaseErr := isPhaseValid(lane.Logger, testreporters.Commit, opts, err); shouldReturn {
 			return phaseErr
@@ -3417,6 +3411,13 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 		)
 		if shouldReturn, phaseErr := isPhaseValid(lane.Logger, testreporters.ExecStateChanged, opts, err); shouldReturn {
 			return phaseErr
+		}
+
+		err = lane.Dest.AssertMessageContentMatch(lane.Logger, string(msgLog.MessageId[:]), []byte(lane.SentReqs[txHash][0].MessageData), timeout, reqStat)
+		if err != nil {
+			return errors.Wrap(err, "message validation failed")
+		} else {
+			log.Info().Msg("Message content validation successful")
 		}
 	}
 	if opts.expectAnyPhaseToFail {
