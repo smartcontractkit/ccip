@@ -72,7 +72,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to get transaction receipt: %v", err)
 		}
-		params = string(tx.Data[2:])
+		params = tx.Data[2:]
 	} else {
 		params = pointer.GetString(encodedConstructorArgs)
 	}
@@ -132,10 +132,6 @@ func main() {
 }
 
 func calculateBytecodeSize(bytecode string) int {
-	// Remove the "0x" prefix if present
-	if strings.HasPrefix(bytecode, "0x") {
-		bytecode = bytecode[2:]
-	}
-	// Calculate the size in bytes
+	bytecode = strings.TrimPrefix(bytecode, "0x")
 	return len(bytecode) / 2
 }

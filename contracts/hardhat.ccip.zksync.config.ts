@@ -90,7 +90,7 @@ let config = {
   },
   zksolc: {
     version: '1.5.3',
-    settings: {      
+    settings: {
       optimizer: {
         enabled: true,
         mode: '3',
