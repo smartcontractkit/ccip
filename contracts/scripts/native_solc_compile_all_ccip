@@ -92,6 +92,7 @@ compileContract ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
 compileContract ccip/test/helpers/MultiOCR3Helper.sol
 compileContract ccip/test/mocks/MockE2EUSDCTokenMessenger.sol
 compileContract ccip/test/mocks/MockE2EUSDCTransmitter.sol
+compileContract ccip/test/mocks/MockLBTCTokenPool.sol
 compileContract ccip/test/WETH9.sol
 
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	crypto_rand "crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -31,8 +32,6 @@ import (
 	"golang.org/x/exp/rand"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
-
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -44,6 +43,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/mockserver"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/k8s/pkg/helm/reorg"
 	"github.com/smartcontractkit/chainlink-testing-framework/lib/networks"
+	"github.com/smartcontractkit/chainlink-testing-framework/lib/utils/ptr"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
@@ -61,6 +61,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/rmn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
@@ -88,6 +89,7 @@ const (
 	// DefaultResubscriptionTimeout denotes the max backoff duration for resubscription for various watch events
 	// if the subscription keeps failing even after this duration, the test will fail
 	DefaultResubscriptionTimeout = 2 * time.Hour
+	LBTCValidDestPoolData        = "9b11457aa29d65e4940b67b7da16bd370d29bf6a3247a28066f93ac407b8b811"
 )
 
 // TODO: These should be refactored along with the default CCIP test setup to use optional config functions
@@ -176,6 +178,8 @@ type CCIPCommon struct {
 	MulticallContract             common.Address
 	ExistingDeployment            bool
 	USDCMockDeployment            *bool
+	LBTCMockDeployment            *bool
+	LBTCDestPoolDataAs32Bytes     *bool
 	TokenMessenger                *common.Address
 	TokenTransmitter              *contracts.TokenTransmitter
 	IsConnectionRestoredRecently  *atomic.Bool
@@ -720,6 +724,10 @@ func (ccipModule *CCIPCommon) IsUSDCDeployment() bool {
 	return pointer.GetBool(ccipModule.USDCMockDeployment)
 }
 
+func (ccipModule *CCIPCommon) IsLBTCDeployment() bool {
+	return pointer.GetBool(ccipModule.LBTCMockDeployment)
+}
+
 func (ccipModule *CCIPCommon) WriteLaneConfig(conf *laneconfig.LaneConfig) {
 	var btAddresses, btpAddresses []string
 	priceAggrs := make(map[string]string)
@@ -879,7 +887,6 @@ func (ccipModule *CCIPCommon) DeployContracts(
 		// deploy bridge token.
 		for i := len(ccipModule.BridgeTokens); i < noOfTokens; i++ {
 			var token *contracts.ERC20Token
-
 			if len(tokenDeployerFns) != noOfTokens {
 				if ccipModule.IsUSDCDeployment() && i == 0 {
 					// if it's USDC deployment, we deploy the burn mint token 677 with decimal 6 and cast it to ERC20Token
@@ -924,6 +931,16 @@ func (ccipModule *CCIPCommon) DeployContracts(
 					err = usdcToken.GrantMintAndBurn(ccipModule.TokenTransmitter.ContractAddress)
 					if err != nil {
 						return fmt.Errorf("granting minter role to token transmitter shouldn't fail %w", err)
+					}
+				} else if ccipModule.IsLBTCDeployment() && i == 0 {
+					// if it's LBTC deployment, we deploy the burn mint token 677 with decimal 8 and cast it to ERC20Token
+					lbtcToken, err := ccipModule.tokenDeployer.DeployCustomBurnMintERC677Token("Lombard LBTC", "LBTC", uint8(8), new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
+					if err != nil {
+						return fmt.Errorf("deploying bridge lbtc token contract shouldn't fail %w", err)
+					}
+					token, err = ccipModule.tokenDeployer.NewERC20TokenContract(lbtcToken.ContractAddress)
+					if err != nil {
+						return fmt.Errorf("getting new bridge lbtc token contract shouldn't fail %w", err)
 					}
 				} else {
 					// otherwise we deploy link token and cast it to ERC20Token
@@ -989,6 +1006,43 @@ func (ccipModule *CCIPCommon) DeployContracts(
 				}
 
 				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, usdcPool)
+			} else if ccipModule.IsLBTCDeployment() && i == 0 {
+				if ccipModule.RMNContract == nil {
+					return fmt.Errorf("RMNContract is not initialized")
+				}
+				rmnContract := *ccipModule.RMNContract
+
+				destPoolData, err := hex.DecodeString(LBTCValidDestPoolData) // valid 32 bytes should call attestation api
+				if err != nil {
+					return errors.Wrapf(err, "decoding dest pool data shouldn't fail")
+				}
+				if !pointer.GetBool(ccipModule.LBTCDestPoolDataAs32Bytes) {
+					// non 32 bytes data should not call attestation api and instead consider it as deposit payload.
+					// lombard has both attested and non-attested flow
+					destPoolData = []byte{0x12, 0x34, 0x56, 0x78}
+				}
+				lbtcPool, err := ccipModule.tokenDeployer.DeployMockLBTCTokenPoolContract(token.Address(), rmnContract, ccipModule.Router.Instance.Address(), destPoolData)
+				if err != nil {
+					return errors.Wrapf(err, "deploying mock lbtc bridge token pool shouldn't fail")
+				}
+				lbtcInstance, err := burn_mint_erc677.NewBurnMintERC677(token.ContractAddress, ccipModule.ChainClient.Backend())
+				if err != nil {
+					return errors.Wrapf(err, "failed to get dest usdc token instance")
+				}
+				opts, err := ccipModule.tokenDeployer.Client().TransactionOpts(token.OwnerWallet)
+				if err != nil {
+					return errors.Wrapf(err, "failed to get transaction opts")
+				}
+				tx, err := lbtcInstance.GrantMintAndBurnRoles(opts, common.HexToAddress(lbtcPool.Address()))
+				if err != nil {
+					return errors.Wrapf(err, "granting minter role to owner shouldn't fail")
+				}
+				err = ccipModule.tokenDeployer.Client().ProcessTransaction(tx)
+				if err != nil {
+					return errors.Wrapf(err, "failed to process grant mint role")
+				}
+
+				ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, lbtcPool)
 			} else {
 				// deploy lock release token pool in case of non-usdc deployment
 				btp, err := ccipModule.tokenDeployer.DeployLockReleaseTokenPoolContract(token.Address(), *ccipModule.RMNContract, ccipModule.Router.Instance.Address())
@@ -1287,6 +1341,8 @@ func DefaultCCIPModule(
 		ExistingDeployment:            pointer.GetBool(testGroupConf.ExistingDeployment),
 		MulticallEnabled:              pointer.GetBool(testGroupConf.MulticallInOneTx),
 		USDCMockDeployment:            testGroupConf.USDCMockDeployment,
+		LBTCMockDeployment:            testGroupConf.LBTCMockDeployment,
+		LBTCDestPoolDataAs32Bytes:     testGroupConf.LBTCDestPoolDataAs32Bytes,
 		NoOfTokensNeedingDynamicPrice: pointer.GetInt(testGroupConf.TokenConfig.NoOfTokensWithDynamicPrice),
 		poolFunds:                     testhelpers.Link(5),
 		gasUpdateWatcherMu:            &sync.Mutex{},
@@ -3734,6 +3790,21 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 			AttestationAPITimeoutSeconds:    5,
 		}
 	}
+	if !lane.Source.Common.ExistingDeployment && lane.Source.Common.IsLBTCDeployment() {
+		api := ""
+		if killgrave != nil {
+			api = killgrave.InternalEndpoint
+		}
+		if env.MockServer != nil {
+			api = env.MockServer.Config.ClusterURL
+		}
+		// Only one LBTC allowed per chain
+		jobParams.LBTCConfig = &config.LBTCConfig{
+			SourceTokenAddress:           common.HexToAddress(lane.Source.Common.BridgeTokens[0].Address()),
+			AttestationAPI:               api,
+			AttestationAPITimeoutSeconds: 5,
+		}
+	}
 	if !bootstrapAdded.Load() {
 		bootstrapAdded.Store(true)
 		err := CreateBootstrapJob(jobParams, bootstrapCommit, bootstrapExec)
@@ -4415,6 +4486,48 @@ func SetMockServerWithUSDCAttestation(
 	}
 	if mockserver != nil {
 		err := mockserver.SetAnyValueResponse(fmt.Sprintf("%s/.*", path), response)
+		if err != nil {
+			return fmt.Errorf("failed to set mockserver value: %w URL = %s", err, fmt.Sprintf("%s/%s/.*", mockserver.LocalURL(), path))
+		}
+	}
+	return nil
+}
+
+// SetMockServerWithLBTCAttestation responds with a mock attestation for any msgHash
+// The path is set with regex to match any path that starts with /v1/attestations
+func SetMockServerWithLBTCAttestation(
+	killGrave *ctftestenv.Killgrave,
+	mockserver *ctfClient.MockserverClient,
+) error {
+	path := "/bridge/v1/deposits/getByHash"
+	type attestation struct {
+		Status      string `json:"status"`
+		Attestation string `json:"attestation"`
+		MessageHash string `json:"message_hash"`
+	}
+	response := struct {
+		Attestations []attestation `json:"attestations"`
+	}{
+		Attestations: []attestation{
+			{
+				MessageHash: "0x" + LBTCValidDestPoolData, //sample hash
+				Status:      "NOTARIZATION_STATUS_SESSION_APPROVED",
+				Attestation: "0x0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000000e45c70a5050000000000000000000000000000000000000000000000000000000000aa36a7000000000000000000000000845f8e3c214d8d0e4d83fc094f302aa26a12a0bc0000000000000000000000000000000000000000000000000000000000014a34000000000000000000000000845f8e3c214d8d0e4d83fc094f302aa26a12a0bc00000000000000000000000062f10ce5b727edf787ea45776bd050308a61150800000000000000000000000000000000000000000000000000000000000003e60000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000040277eeafba008d767c2636d9428f2ebb13ab29ac70337f4fc34b0f5606767cae546f9be3f12160de6d142e5b3c1c3ebd0bf4298662b32b597d0cc5970c7742fc10000000000000000000000000000000000000000000000000000000000000040bbcd60ecc9e06f2effe7c94161219498a1eb435b419387adadb86ec9a52dfb066ce027532517df7216404049d193a25b85c35edfa3e7c5aa4757bfe84887a3980000000000000000000000000000000000000000000000000000000000000040da4a6dc619b5ca2349783cabecc4efdbc910090d3e234d7b8d0430165f8fae532f9a965ceb85c18bb92e059adefa7ce5835850a705761ab9e026d2db4a13ef9a",
+			},
+		},
+	}
+	if killGrave == nil && mockserver == nil {
+		return fmt.Errorf("both killgrave and mockserver are nil")
+	}
+	log.Info().Str("path", path).Msg("setting attestation-api response for any msgHash")
+	if killGrave != nil {
+		err := killGrave.SetAnyValueResponse(path, []string{http.MethodPost}, response)
+		if err != nil {
+			return fmt.Errorf("failed to set killgrave server value: %w", err)
+		}
+	}
+	if mockserver != nil {
+		err := mockserver.SetAnyValueResponse(path, response)
 		if err != nil {
 			return fmt.Errorf("failed to set mockserver value: %w URL = %s", err, fmt.Sprintf("%s/%s/.*", mockserver.LocalURL(), path))
 		}
