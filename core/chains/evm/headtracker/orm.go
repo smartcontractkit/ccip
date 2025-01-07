@@ -9,6 +9,7 @@ import (
 	pkgerrors "github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/sqlutil"
+
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 )
@@ -46,9 +47,9 @@ func (orm *DbORM) IdempotentInsertHead(ctx context.Context, head *evmtypes.Head)
 	// listener guarantees head.EVMChainID to be equal to DbORM.chainID
 	query := `
 	INSERT INTO evm.heads (hash, number, parent_hash, created_at, timestamp, l1_block_number, evm_chain_id, base_fee_per_gas) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8)
+	$1, $2, $3, now(), $4, $5, $6, $7)
 	ON CONFLICT (evm_chain_id, hash) DO NOTHING`
-	_, err := orm.ds.ExecContext(ctx, query, head.Hash, head.Number, head.ParentHash, head.CreatedAt, head.Timestamp, head.L1BlockNumber, orm.chainID, head.BaseFeePerGas)
+	_, err := orm.ds.ExecContext(ctx, query, head.Hash, head.Number, head.ParentHash, head.Timestamp, head.L1BlockNumber, orm.chainID, head.BaseFeePerGas)
 	return pkgerrors.Wrap(err, "IdempotentInsertHead failed to insert head")
 }
 
@@ -81,4 +82,30 @@ func (orm *DbORM) HeadByHash(ctx context.Context, hash common.Hash) (head *evmty
 		return nil, nil
 	}
 	return head, err
+}
+
+type nullORM struct{}
+
+func NewNullORM() ORM {
+	return &nullORM{}
+}
+
+func (orm *nullORM) IdempotentInsertHead(ctx context.Context, head *evmtypes.Head) error {
+	return nil
+}
+
+func (orm *nullORM) TrimOldHeads(ctx context.Context, minBlockNumber int64) (err error) {
+	return nil
+}
+
+func (orm *nullORM) LatestHead(ctx context.Context) (head *evmtypes.Head, err error) {
+	return nil, nil
+}
+
+func (orm *nullORM) LatestHeads(ctx context.Context, minBlockNumer int64) (heads []*evmtypes.Head, err error) {
+	return nil, nil
+}
+
+func (orm *nullORM) HeadByHash(ctx context.Context, hash common.Hash) (head *evmtypes.Head, err error) {
+	return nil, nil
 }
