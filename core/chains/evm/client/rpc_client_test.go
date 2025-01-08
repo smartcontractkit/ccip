@@ -457,7 +457,7 @@ func TestRPCClient_SubscribeFilterLogs(t *testing.T) {
 
 func TestRPCClientFilterLogs(t *testing.T) {
 	t.Parallel()
-	
+
 	chainID := big.NewInt(123456)
 	lggr := logger.Test(t)
 	ctx, cancel := context.WithTimeout(tests.Context(t), tests.WaitTimeout(t))
