@@ -38,11 +38,7 @@ func (c ChainType) IsL2() bool {
 
 func (c ChainType) IsValid() bool {
 	switch c {
-<<<<<<< HEAD
-	case "", ChainArbitrum, ChainAstar, ChainCelo, ChainGnosis, ChainHedera, ChainKroma, ChainMantle, ChainMetis, ChainOptimismBedrock, ChainScroll, ChainWeMix, ChainXLayer, ChainZkEvm, ChainZkSync:
-=======
 	case "", ChainArbitrum, ChainAstar, ChainCelo, ChainGnosis, ChainHedera, ChainKroma, ChainMantle, ChainMetis, ChainOptimismBedrock, ChainSei, ChainScroll, ChainWeMix, ChainXLayer, ChainZkEvm, ChainZkSync:
->>>>>>> a3492fc8f6 (Reduce Avalanche PriceMin to 1 gwei [SHIP-4085] (#15735))
 		return true
 	}
 	return false
