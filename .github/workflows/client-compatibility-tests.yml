@@ -1,12 +1,12 @@
 name: Client Compatibility Tests
 on:
-  schedule:
-    - cron: "30 5 * * TUE,FRI" # Run every Tuesday and Friday at midnight + 30min EST
-  push:
-    tags:
-      - "*"
-  merge_group:
-  pull_request:
+  # schedule:
+  #   - cron: "30 5 * * TUE,FRI" # Run every Tuesday and Friday at midnight + 30min EST
+  # push:
+  #   tags:
+  #     - "*"
+  # merge_group:
+  # pull_request:
   workflow_dispatch:
     inputs:
       chainlinkVersion:
