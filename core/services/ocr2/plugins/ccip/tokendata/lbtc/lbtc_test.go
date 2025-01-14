@@ -278,11 +278,12 @@ func TestLBTCReader_rateLimiting(t *testing.T) {
 					_, err := lbtcService.ReadTokenData(ctx, cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 						EVM2EVMMessage: cciptypes.EVM2EVMMessage{
 							SourceTokenData: [][]byte{srcTokenData},
-							TokenAmounts:    []cciptypes.TokenAmount{{Token: ccipcalc.EvmAddrToGeneric(utils.ZeroAddress), Amount: nil}}, // trigger failure due to wrong address
+							TokenAmounts:    []cciptypes.TokenAmount{{Token: ccipcalc.EvmAddrToGeneric(utils.ZeroAddress), Amount: nil}},
 						},
 					}, 0)
-
-					errorChan <- err
+					if err != nil {
+						errorChan <- err
+					}
 				}()
 			}
 
