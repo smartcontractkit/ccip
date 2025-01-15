@@ -65,20 +65,19 @@ compileContract () {
 
 # Solc produces and overwrites intermediary contracts.
 # Contracts should be ordered in reverse-import-complexity-order to minimize overwrite risks.
-# compileContract ccip/offRamp/EVM2EVMOffRamp.sol
+compileContract ccip/offRamp/EVM2EVMOffRamp.sol
 compileContract ccip/onRamp/EVM2EVMOnRamp.sol
-# compileContract ccip/applications/PingPongDemo.sol
-# compileContract ccip/applications/SelfFundedPingPong.sol
-# compileContract ccip/CommitStore.sol
-# compileContract ccip/Router.sol
-# compileContract ccip/PriceRegistry.sol
-# compileContract ccip/RMN.sol
-# compileContract ccip/ARMProxy.sol
-# compileContract ccip/tokenAdminRegistry/TokenAdminRegistry.sol
-# compileContract ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol
-# compileContract ccip/pools/LockReleaseTokenPool.sol
-# compileContract ccip/test/WETH9.sol
-# compileContract shared/token/ERC677/LinkToken.sol
+compileContract ccip/applications/SelfFundedPingPong.sol
+compileContract ccip/CommitStore.sol
+compileContract ccip/Router.sol
+compileContract ccip/PriceRegistry.sol
+compileContract ccip/RMN.sol
+compileContract ccip/ARMProxy.sol
+compileContract ccip/tokenAdminRegistry/TokenAdminRegistry.sol
+compileContract ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol
+compileContract ccip/pools/LockReleaseTokenPool.sol
+compileContract ccip/test/WETH9.sol
+compileContract shared/token/ERC677/LinkToken.sol
 
 
 # compileContract ccip/offRamp/OffRamp.sol
