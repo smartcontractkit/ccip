@@ -43,10 +43,12 @@ contract WETH9 {
     _deposit();
   }
 
-  function withdraw(uint256 wad) external {
+  function withdraw(uint256 wad) public {
     require(balanceOf[msg.sender] >= wad);
     balanceOf[msg.sender] -= wad;
-    payable(msg.sender).transfer(wad);
+    // Replace transfer with call
+    (bool success,) = payable(msg.sender).call{value: wad}("");
+    require(success, "WETH9: ETH transfer failed");
     emit Withdrawal(msg.sender, wad);
   }
 

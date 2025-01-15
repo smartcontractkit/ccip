@@ -28,7 +28,7 @@ const headerComment = `// Code generated - DO NOT EDIT.
 // AbigenArgs is the arguments to the abigen executable. E.g., Bin is the -bin
 // arg.
 type AbigenArgs struct {
-	Bin, ABI, Out, Type, Pkg string
+	Bin, ABI, Out, Type, Pkg, ZkBinPath string
 }
 
 // Abigen calls Abigen  with the given arguments
@@ -72,6 +72,9 @@ func Abigen(a AbigenArgs) {
 	}
 
 	ImproveAbigenOutput(a.Out, a.ABI)
+	if a.ZkBinPath != "" {
+		ImproveAbigenOutputZks(a.Out, a.ZkBinPath)
+	}
 }
 
 func ImproveAbigenOutput(path string, abiPath string) {
@@ -465,4 +468,196 @@ func writeInterface(contractName string, fileNode *ast.File) *ast.File {
 
 func addHeader(code []byte) []byte {
 	return utils.ConcatBytes([]byte(headerComment), code)
+}
+
+// ZK stack logic
+func ImproveAbigenOutputZks(path string, zkBinPath string) {
+	bs, err := os.ReadFile(path)
+	if err != nil {
+		Exit("Error while improving abigen output", err)
+	}
+
+	fset, fileNode := parseFile(bs)
+
+	contractName := getContractName(fileNode)
+
+	zkByteCode, err := os.ReadFile(zkBinPath)
+	if err != nil {
+		Exit("Error while improving abigen output", err)
+	}
+	zkHexString := string(zkByteCode)
+
+	// add zksync binary to the wrapper
+	fileNode = addZKSyncBin(fileNode, contractName, zkHexString)
+
+	// add zksync logic to the deploy function
+	fileNode = updateDeployMethod(contractName, fset, fileNode)
+
+	bs = generateCode(fset, fileNode)
+
+	err = os.WriteFile(path, bs, 0600)
+	if err != nil {
+		Exit("Error while writing improved abigen source", err)
+	}
+}
+
+// add zksync binary to the wrapper
+func addZKSyncBin(fileNode *ast.File, contractName string, zkHexString string) *ast.File {
+	// zksync
+	newVarSpec := &ast.ValueSpec{
+		Names: []*ast.Ident{ast.NewIdent(contractName + "ZKBin")},
+		Values: []ast.Expr{
+			&ast.BasicLit{
+				Kind:  token.STRING,
+				Value: fmt.Sprintf("(\"%s\")", zkHexString),
+			},
+		},
+	}
+	newVarDecl := &ast.GenDecl{
+		Tok:   token.VAR,
+		Specs: []ast.Spec{newVarSpec},
+	}
+
+	// Insert the new variable declaration at the top of the file (before existing functions)
+	fileNode.Decls = append(fileNode.Decls, newVarDecl)
+	return fileNode
+}
+
+// add zksync logic to the deploy function
+func updateDeployMethod(contractName string, fset *token.FileSet, fileNode *ast.File) *ast.File {
+
+	return astutil.Apply(fileNode, func(cursor *astutil.Cursor) bool {
+		x, is := cursor.Node().(*ast.FuncDecl)
+		if !is {
+			return true
+		} else if x.Name.Name != "Deploy"+contractName {
+			return false
+		}
+
+		// only add this import if Deploy method found
+		astutil.AddImport(fset, fileNode, "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated")
+
+		// Extract the parameters from the existing function x
+		paramList := getConstructorParams(x.Type.Params.List)
+		// get the `if zksync()` block
+		zkSyncBlock := getZKSyncBlock(contractName, paramList)
+		// insert the `if zksync()` block
+		addZKSyncBlock(*x, zkSyncBlock)
+		// update the return type in the function signature
+		updateTxReturnType(*x)
+		// update the actual return value
+		updateReturnStmt(*x)
+
+		return false
+	}, nil).(*ast.File)
+}
+
+// get the `if zksync()` block
+func getZKSyncBlock(contractName, paramList string) string {
+	zkSyncBlock := `if generated.IsZKSync(backend) {
+				address, ethTx, contractBind, _ := generated.DeployContract(auth, parsed, common.FromHex(%sZKBin), backend, %params)
+				contractReturn := &%s{address: address, abi: *parsed, %sCaller: %sCaller{contract: contractBind}, %sTransactor: %sTransactor{contract: contractBind},%sFilterer: %sFilterer{contract: contractBind}}
+				return address, ethTx, contractReturn, err
+		}`
+	zkSyncBlock = strings.ReplaceAll(zkSyncBlock, "%s", contractName)
+	zkSyncBlock = strings.ReplaceAll(zkSyncBlock, "%params", paramList)
+	return strings.ReplaceAll(zkSyncBlock, "%s", contractName)
+}
+
+// Extract the parameters for constructor function
+func getConstructorParams(contstructorParams []*ast.Field) string {
+	params := []string{}
+	for i, param := range contstructorParams {
+		if i > 1 { // Skip auth and backend
+			for _, name := range param.Names {
+				params = append(params, name.Name)
+			}
+		}
+	}
+	paramList := strings.Join(params, ", ")
+	return paramList
+}
+
+// insert the `if zksync()` block
+func addZKSyncBlock(x ast.FuncDecl, zkSyncBlock string) ast.FuncDecl {
+	for i, stmt := range x.Body.List {
+
+		ifStmt, ok := stmt.(*ast.IfStmt)
+		if !ok {
+			continue
+		}
+		binaryExpr, ok := ifStmt.Cond.(*ast.BinaryExpr)
+		if !ok {
+			continue
+		}
+		if ident, ok := binaryExpr.X.(*ast.Ident); ok && ident.Name == "parsed" {
+			// Creating new statement to insert
+			newStmt := &ast.ExprStmt{
+				X: &ast.BasicLit{
+					Kind:  token.STRING,
+					Value: zkSyncBlock,
+				},
+			}
+
+			// Insert the new statement after the current statement
+			x.Body.List = append(x.Body.List[:i+1], append([]ast.Stmt{newStmt}, x.Body.List[i+1:]...)...)
+			break
+		}
+	}
+	return x
+}
+
+// convert *types.Transaction to *generated_zks.Transaction
+func updateTxReturnType(x ast.FuncDecl) {
+	x.Type.Results.List[1].Type = &ast.StarExpr{
+		X: &ast.SelectorExpr{
+			X:   &ast.Ident{Name: "generated"},
+			Sel: &ast.Ident{Name: "Transaction"},
+		},
+	}
+}
+
+// convert tx to &Transaction{Transaction: tx, HashZks: tx.Hash()}
+func updateReturnStmt(x ast.FuncDecl) {
+	for _, stmt := range x.Body.List {
+		returnStmt, is := stmt.(*ast.ReturnStmt)
+		if !is {
+			continue
+		}
+		if len(returnStmt.Results) < 3 {
+			continue
+		}
+
+		txExpr, ok := returnStmt.Results[1].(*ast.Ident)
+		if !ok {
+			return
+		}
+		if txExpr.Name != "tx" {
+			return
+		}
+
+		txField := &ast.KeyValueExpr{
+			Key:   ast.NewIdent("Transaction"),
+			Value: ast.NewIdent("tx"),
+		}
+
+		hashField := &ast.KeyValueExpr{
+			Key: ast.NewIdent("HashZks"),
+			Value: &ast.CallExpr{
+				Fun: &ast.SelectorExpr{
+					X:   ast.NewIdent("tx"),
+					Sel: ast.NewIdent("Hash"),
+				},
+			},
+		}
+		newRet := &ast.CompositeLit{
+			Type: &ast.SelectorExpr{
+				X:   ast.NewIdent("generated"),
+				Sel: ast.NewIdent("Transaction"),
+			},
+			Elts: []ast.Expr{txField, hashField},
+		}
+		pointerRet := &ast.UnaryExpr{Op: token.AND, X: newRet}
+		returnStmt.Results[1] = pointerRet
+	}
 }
