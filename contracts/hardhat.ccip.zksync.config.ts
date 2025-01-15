@@ -89,9 +89,8 @@ let config = {
     ],
   },
   zksolc: {
+    version: '1.5.3',
     settings: {
-      compilerPath: 'zksolc',
-      version: 'v1.5.3',
       optimizer: {
         enabled: true,
         mode: '3',
