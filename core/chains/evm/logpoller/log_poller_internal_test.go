@@ -709,7 +709,7 @@ func Test_PollAndSaveLogs_BackfillFinalityViolation(t *testing.T) {
 		require.NoError(t, orm.InsertBlock(tests.Context(t), common.HexToHash("0x123"), 2, time.Unix(10, 0), 2))
 		lp := NewLogPoller(orm, ec, lggr, headTracker, lpOpts)
 		lp.PollAndSaveLogs(tests.Context(t), 4)
-		require.ErrorIs(t, lp.HealthReport()[lp.Name()], commontypes.ErrFinalityViolated)
+		require.ErrorIs(t, lp.HealthReport()[lp.Name()], ErrFinalityViolated)
 	})
 	t.Run("RPCs contradict each other and return different finalized blocks", func(t *testing.T) {
 		lggr, _ := logger.TestObserved(t, zapcore.ErrorLevel)
@@ -729,7 +729,7 @@ func Test_PollAndSaveLogs_BackfillFinalityViolation(t *testing.T) {
 		})
 		lp := NewLogPoller(orm, ec, lggr, headTracker, lpOpts)
 		lp.PollAndSaveLogs(tests.Context(t), 4)
-		require.ErrorIs(t, lp.HealthReport()[lp.Name()], commontypes.ErrFinalityViolated)
+		require.ErrorIs(t, lp.HealthReport()[lp.Name()], ErrFinalityViolated)
 	})
 	t.Run("Log's hash does not match block's", func(t *testing.T) {
 		lggr, _ := logger.TestObserved(t, zapcore.ErrorLevel)
@@ -746,7 +746,7 @@ func Test_PollAndSaveLogs_BackfillFinalityViolation(t *testing.T) {
 		mockBatchCallContext(t, ec)
 		lp := NewLogPoller(orm, ec, lggr, headTracker, lpOpts)
 		lp.PollAndSaveLogs(tests.Context(t), 4)
-		require.ErrorIs(t, lp.HealthReport()[lp.Name()], commontypes.ErrFinalityViolated)
+		require.ErrorIs(t, lp.HealthReport()[lp.Name()], ErrFinalityViolated)
 	})
 	t.Run("Happy path", func(t *testing.T) {
 		lggr, _ := logger.TestObserved(t, zapcore.ErrorLevel)

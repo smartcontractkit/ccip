@@ -993,9 +993,9 @@ func (o *DSORM) FilteredLogs(ctx context.Context, filter []query.Expression, lim
 func (o *DSORM) SelectLatestFinalizedBlock(ctx context.Context) (*LogPollerBlock, error) {
 	var b LogPollerBlock
 	if err := o.ds.GetContext(ctx, &b,
-		blocksQuery(`WHERE evm_chain_id = $1 AND block_number <= (
+		`SELECT * FROM evm.log_poller_blocks WHERE evm_chain_id = $1 AND block_number <= (
 			SELECT finalized_block_number FROM evm.log_poller_blocks WHERE evm_chain_id = $1 ORDER BY block_number DESC LIMIT 1
-		) ORDER BY block_number DESC LIMIT 1`), ubig.New(o.chainID),
+		) ORDER BY block_number DESC LIMIT 1`, ubig.New(o.chainID),
 	); err != nil {
 		return nil, err
 	}
