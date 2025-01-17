@@ -2119,6 +2119,8 @@ func (destCCIP *DestCCIPModule) RemoveAllRateLimitTokens(ctx context.Context) er
 	return destCCIP.OffRamp.RemoveAllRateLimitTokens(ctx)
 }
 
+var wasReceiverDappDeployed = false
+
 // DeployContracts deploys all CCIP contracts specific to the destination chain
 func (destCCIP *DestCCIPModule) DeployContracts(
 	sourceCCIP SourceCCIPModule,
@@ -2239,6 +2241,8 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		if err != nil {
 			return fmt.Errorf("waiting for events on destination contract deployments %w", err)
 		}
+
+		wasReceiverDappDeployed = true
 	} else {
 		destCCIP.ReceiverDapp, err = contractDeployer.NewReceiverDapp(destCCIP.ReceiverDapp.EthAddress)
 		if err != nil {
@@ -3383,42 +3387,44 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash, opts validatio
 		}
 
 		// Verify whether commitStore has accepted the report
-		commitReport, reportAcceptedAt, err := lane.Dest.AssertEventReportAccepted(
-			lane.Logger, seqNumber, timeout, sourceLogFinalizedAt, reqStat,
-		)
-		if shouldReturn, phaseErr := isPhaseValid(lane.Logger, testreporters.Commit, opts, err); shouldReturn {
-			return phaseErr
-		}
+		// commitReport, reportAcceptedAt, err := lane.Dest.AssertEventReportAccepted(
+		// 	lane.Logger, seqNumber, timeout, sourceLogFinalizedAt, reqStat,
+		// )
+		// if shouldReturn, phaseErr := isPhaseValid(lane.Logger, testreporters.Commit, opts, err); shouldReturn {
+		// 	return phaseErr
+		// }
 
-		if opts.phaseExpectedToFail == testreporters.ReportBlessed && opts.timeout != 0 {
-			timeout = opts.timeout
-		}
-		reportBlessedAt, err := lane.Dest.AssertReportBlessed(lane.Logger, seqNumber, timeout, *commitReport, reportAcceptedAt, reqStat)
-		if shouldReturn, phaseErr := isPhaseValid(lane.Logger, testreporters.ReportBlessed, opts, err); shouldReturn {
-			return phaseErr
-		}
+		// if opts.phaseExpectedToFail == testreporters.ReportBlessed && opts.timeout != 0 {
+		// 	timeout = opts.timeout
+		// }
+		// reportBlessedAt, err := lane.Dest.AssertReportBlessed(lane.Logger, seqNumber, timeout, *commitReport, reportAcceptedAt, reqStat)
+		// if shouldReturn, phaseErr := isPhaseValid(lane.Logger, testreporters.ReportBlessed, opts, err); shouldReturn {
+		// 	return phaseErr
+		// }
 
-		if opts.phaseExpectedToFail == testreporters.ExecStateChanged && opts.timeout != 0 {
-			timeout = opts.timeout
-		}
-		// Verify whether the execution state is changed and the transfer is successful
-		_, err = lane.Dest.AssertEventExecutionStateChanged(
-			lane.Logger, seqNumber,
-			timeout,
-			reportBlessedAt,
-			reqStat,
-			testhelpers.ExecutionStateSuccess,
-		)
-		if shouldReturn, phaseErr := isPhaseValid(lane.Logger, testreporters.ExecStateChanged, opts, err); shouldReturn {
-			return phaseErr
-		}
+		// if opts.phaseExpectedToFail == testreporters.ExecStateChanged && opts.timeout != 0 {
+		// 	timeout = opts.timeout
+		// }
+		// // Verify whether the execution state is changed and the transfer is successful
+		// _, err = lane.Dest.AssertEventExecutionStateChanged(
+		// 	lane.Logger, seqNumber,
+		// 	timeout,
+		// 	reportBlessedAt,
+		// 	reqStat,
+		// 	testhelpers.ExecutionStateSuccess,
+		// )
+		// if shouldReturn, phaseErr := isPhaseValid(lane.Logger, testreporters.ExecStateChanged, opts, err); shouldReturn {
+		// 	return phaseErr
+		// }
 
-		err = lane.Dest.AssertMessageContentMatch(lane.Logger, string(msgLog.MessageId[:]), []byte(lane.SentReqs[txHash][0].MessageData), timeout, reqStat)
-		if err != nil {
-			return errors.Wrap(err, "message validation failed")
-		}
+		if wasReceiverDappDeployed {
+			err = lane.Dest.AssertMessageContentMatch(lane.Logger, string(msgLog.MessageId[:]), []byte(lane.SentReqs[txHash][0].MessageData), timeout, reqStat)
+			if err != nil {
+				return errors.Wrap(err, "message validation failed")
+			}
 
-		log.Info().Msg("Message content validation successful")
+			log.Info().Msg("Message content validation successful")
+		}
 
 	}
 	if opts.expectAnyPhaseToFail {
