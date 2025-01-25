@@ -2242,6 +2242,8 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 			return fmt.Errorf("waiting for events on destination contract deployments %w", err)
 		}
 
+		log.Info().Str("Address", destCCIP.ReceiverDapp.Address()).Msg("Receiver Dapp Deployed")
+
 		wasReceiverDappDeployed = true
 	} else {
 		destCCIP.ReceiverDapp, err = contractDeployer.NewReceiverDapp(destCCIP.ReceiverDapp.EthAddress)

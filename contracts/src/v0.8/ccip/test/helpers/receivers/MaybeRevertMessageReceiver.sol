@@ -109,4 +109,12 @@ contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
 
     emit TokensWithdrawn(token, s_manager, amount);
   }
+
+  /// @notice Fetches the balance of an ERC-20 token held by the contract
+  /// @param token The address of the ERC-20 token contract
+  /// @return The balance of the specified ERC-20 token
+  function balanceOfToken(address token) external view returns (uint256) {
+    IERC20 erc20 = IERC20(token);
+    return erc20.balanceOf(address(this));
+  }
 }
