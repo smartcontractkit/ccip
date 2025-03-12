@@ -64,7 +64,7 @@ jobs:
       id-token: write
       contents: read
     name: Build Chainlink Image
-    runs-on: ubuntu24.04-16cores-64GB
+    runs-on: ubuntu20.04-16cores-64GB
     steps:
       - name: Checkout the repo
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
@@ -106,7 +106,7 @@ jobs:
       id-token: write
       contents: read
     name: Build Test Image
-    runs-on: ubuntu24.04-16cores-64GB
+    runs-on: ubuntu20.04-16cores-64GB
     steps:
       - name: Collect Metrics
         id: collect-gha-metrics

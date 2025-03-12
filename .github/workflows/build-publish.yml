@@ -12,7 +12,7 @@ env:
 jobs:
   checks:
     name: "Checks"
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
@@ -25,7 +25,7 @@ jobs:
 
   build-sign-publish-chainlink:
     needs: [checks]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-20.04
     environment: build-publish
     permissions:
       id-token: write
