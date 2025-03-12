@@ -53,7 +53,7 @@ COPY --from=buildgo /chainlink-starknet/relayer .
 RUN go install ./pkg/chainlink/cmd/chainlink-starknet
 
 # Final image: ubuntu with chainlink binary
-FROM ubuntu:20.04
+FROM ubuntu:24.04
 
 ARG CHAINLINK_USER=root
 ENV DEBIAN_FRONTEND noninteractive
