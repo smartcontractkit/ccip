@@ -1,3 +1,9 @@
+## Active development of CCIP has moved to other repositories
+
+Onchain [smartcontractkit/chainlink](https://github.com/smartcontractkit/chainlink)
+
+Offchain [smartcontractkit/chainlink-ccip](https://github.com/smartcontractkit/chainlink-ccip)
+
 <br/>
 <p align="center">
 <a href="https://chain.link" target="_blank">
