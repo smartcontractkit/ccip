@@ -4016,7 +4016,7 @@ func CreateOCR2CCIPCommitJobs(
 		lggr.Info().Msgf("Creating CCIP-Commit job on OCR node %d job name %s", index+1, ocr2SpecCommit.Name)
 		_, err = node.Node.MustCreateJob(&ocr2SpecCommit)
 		if err != nil {
-			return fmt.Errorf("shouldn't fail creating CCIP-Commit job on OCR node %d job name %s - %w", index+1, ocr2SpecCommit.Name, err)
+			lggr.Error().Err(err).Msgf("shouldn't fail creating CCIP-Commit job on OCR node %d job name %s - %w", index+1, ocr2SpecCommit.Name, err)
 		}
 		return nil
 	}
@@ -4055,8 +4055,7 @@ func CreateOCR2CCIPExecutionJobs(
 		lggr.Info().Msgf("Creating CCIP-Exec job on OCR node %d job name %s", index+1, ocr2SpecExec.Name)
 		_, err = node.Node.MustCreateJob(&ocr2SpecExec)
 		if err != nil {
-			return fmt.Errorf("shouldn't fail creating CCIP-Exec job on OCR node %d job name %s - %w", index+1,
-				ocr2SpecExec.Name, err)
+			lggr.Error().Err(err).Msgf("shouldn't fail creating CCIP-Exec job on OCR node %d job name %s", index+1, ocr2SpecExec.Name)
 		}
 		return nil
 	}
