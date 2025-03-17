@@ -238,7 +238,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'pull_request' && ( needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@aad83f232743646faa35f5ac03ee3829148d37ce
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@f5baaf5e95d718546820cc5fecb42b6df410343d
     with:
       workflow_name: Run Core E2E Tests For PR
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
@@ -254,7 +254,6 @@ jobs:
       QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
       QA_PYROSCOPE_INSTANCE: ${{ secrets.QA_PYROSCOPE_INSTANCE }}
       QA_PYROSCOPE_KEY: ${{ secrets.QA_PYROSCOPE_KEY }}
-      QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
       GRAFANA_INTERNAL_TENANT_ID: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
       GRAFANA_INTERNAL_BASIC_AUTH: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
       GRAFANA_INTERNAL_HOST: ${{ secrets.GRAFANA_INTERNAL_HOST }}
@@ -267,6 +266,9 @@ jobs:
       AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN: ${{ secrets.AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN }}
       AWS_API_GW_HOST_GRAFANA: ${{ secrets.AWS_API_GW_HOST_GRAFANA }}
       SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
+      MAIN_DNS_ZONE_PUBLIC_SDLC: ${{ secrets.MAIN_DNS_ZONE_PUBLIC_SDLC }}
+      AWS_K8S_CLUSTER_NAME_SDLC: ${{ secrets.AWS_K8S_CLUSTER_NAME_SDLC }}
+      PROD_AWS_ACCOUNT_NUMBER: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
 
   run-core-e2e-tests-for-merge-queue:
     name: Run Core E2E Tests For Merge Queue
@@ -278,7 +280,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'merge_group' && ( needs.changes.outputs.core_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@aad83f232743646faa35f5ac03ee3829148d37ce
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@f5baaf5e95d718546820cc5fecb42b6df410343d
     with:
       workflow_name: Run Core E2E Tests For Merge Queue
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
@@ -298,7 +300,6 @@ jobs:
       QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
       QA_PYROSCOPE_INSTANCE: ${{ secrets.QA_PYROSCOPE_INSTANCE }}
       QA_PYROSCOPE_KEY: ${{ secrets.QA_PYROSCOPE_KEY }}
-      QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
       GRAFANA_INTERNAL_TENANT_ID: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
       GRAFANA_INTERNAL_BASIC_AUTH: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
       GRAFANA_INTERNAL_HOST: ${{ secrets.GRAFANA_INTERNAL_HOST }}
@@ -311,7 +312,10 @@ jobs:
       AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN: ${{ secrets.AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN }}
       AWS_API_GW_HOST_GRAFANA: ${{ secrets.AWS_API_GW_HOST_GRAFANA }}
       SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
-              
+      MAIN_DNS_ZONE_PUBLIC_SDLC: ${{ secrets.MAIN_DNS_ZONE_PUBLIC_SDLC }}
+      AWS_K8S_CLUSTER_NAME_SDLC: ${{ secrets.AWS_K8S_CLUSTER_NAME_SDLC }}
+      PROD_AWS_ACCOUNT_NUMBER: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
+
   run-ccip-e2e-tests-for-pr:
     name: Run CCIP E2E Tests For PR
     permissions:
@@ -322,7 +326,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'pull_request' && (needs.changes.outputs.ccip_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@aad83f232743646faa35f5ac03ee3829148d37ce
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@f5baaf5e95d718546820cc5fecb42b6df410343d
     with:
       workflow_name: Run CCIP E2E Tests For PR
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
@@ -338,7 +342,6 @@ jobs:
       QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
       QA_PYROSCOPE_INSTANCE: ${{ secrets.QA_PYROSCOPE_INSTANCE }}
       QA_PYROSCOPE_KEY: ${{ secrets.QA_PYROSCOPE_KEY }}
-      QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
       GRAFANA_INTERNAL_TENANT_ID: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
       GRAFANA_INTERNAL_BASIC_AUTH: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
       GRAFANA_INTERNAL_HOST: ${{ secrets.GRAFANA_INTERNAL_HOST }}
@@ -350,8 +353,11 @@ jobs:
       AWS_REGION: ${{ secrets.QA_AWS_REGION }}
       AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN: ${{ secrets.AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN }}
       AWS_API_GW_HOST_GRAFANA: ${{ secrets.AWS_API_GW_HOST_GRAFANA }}
-      SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}      
-              
+      SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
+      MAIN_DNS_ZONE_PUBLIC_SDLC: ${{ secrets.MAIN_DNS_ZONE_PUBLIC_SDLC }}
+      AWS_K8S_CLUSTER_NAME_SDLC: ${{ secrets.AWS_K8S_CLUSTER_NAME_SDLC }}
+      PROD_AWS_ACCOUNT_NUMBER: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
+
   run-ccip-e2e-tests-for-merge-queue:
     name: Run CCIP E2E Tests For Merge Queue
     permissions:
@@ -362,7 +368,7 @@ jobs:
       contents: read
     needs: [build-chainlink, changes]
     if: github.event_name == 'merge_group' && (needs.changes.outputs.ccip_changes == 'true' || needs.changes.outputs.github_ci_changes == 'true')
-    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@aad83f232743646faa35f5ac03ee3829148d37ce
+    uses: smartcontractkit/.github/.github/workflows/run-e2e-tests.yml@f5baaf5e95d718546820cc5fecb42b6df410343d
     with:
       workflow_name: Run CCIP E2E Tests For Merge Queue
       chainlink_version: ${{ inputs.evm-ref || github.sha }}
@@ -378,7 +384,6 @@ jobs:
       QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
       QA_PYROSCOPE_INSTANCE: ${{ secrets.QA_PYROSCOPE_INSTANCE }}
       QA_PYROSCOPE_KEY: ${{ secrets.QA_PYROSCOPE_KEY }}
-      QA_KUBECONFIG: ${{ secrets.QA_KUBECONFIG }}
       GRAFANA_INTERNAL_TENANT_ID: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
       GRAFANA_INTERNAL_BASIC_AUTH: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
       GRAFANA_INTERNAL_HOST: ${{ secrets.GRAFANA_INTERNAL_HOST }}
@@ -391,6 +396,9 @@ jobs:
       AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN: ${{ secrets.AWS_OIDC_IAM_ROLE_VALIDATION_PROD_ARN }}
       AWS_API_GW_HOST_GRAFANA: ${{ secrets.AWS_API_GW_HOST_GRAFANA }}
       SLACK_BOT_TOKEN: ${{ secrets.QA_SLACK_API_KEY }}
+      MAIN_DNS_ZONE_PUBLIC_SDLC: ${{ secrets.MAIN_DNS_ZONE_PUBLIC_SDLC }}
+      AWS_K8S_CLUSTER_NAME_SDLC: ${{ secrets.AWS_K8S_CLUSTER_NAME_SDLC }}
+      PROD_AWS_ACCOUNT_NUMBER: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
 
   check-e2e-test-results:
     if: always()
@@ -404,7 +412,7 @@ jobs:
           results='${{ needs.run-core-e2e-tests-for-pr.outputs.test_results }}'
           echo "Core test results:"
           echo "$results" | jq .
-          
+
           node_migration_tests_failed=$(echo $results | jq '[.[] | select(.id == "integration-tests/migration/upgrade_version_test.go:*" ) | select(.result != "success")] | length > 0')
           echo "node_migration_tests_failed=$node_migration_tests_failed" >> $GITHUB_OUTPUT
 
@@ -434,7 +442,7 @@ jobs:
 
       - name: Fail the job if core tests in merge queue not successful
         if: always() && needs.run-core-e2e-tests-for-merge-queue.result == 'failure'
-        run: exit 1        
+        run: exit 1
 
       - name: Fail the job if lint not successful
         if: always() && needs.lint-integration-tests.result == 'failure'
